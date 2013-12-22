@@ -1,4 +1,4 @@
-rules
+Durable Rules
 =====
 
-Durable Rules Engine
+Distributed Business Rules Engine  
