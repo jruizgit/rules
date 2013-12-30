@@ -1,0 +1,64 @@
+<html>
+<head>
+    <title>Approval page</title>
+</head>
+<body>
+<h3> Do you approve the expense?</h3>
+<script type="text/javascript" src="http://d3js.org/d3.v3.min.js?3.1.9"></script>
+<script type="text/javascript">
+
+    function post(choice) {
+        server.post('{ "id":"' + Math.floor(Math.random()*1000) + '", "subject":"' + choice + '"}', function(err) {
+            if (err) {
+                alert(err.responseText);
+            }
+            else {
+                alert('OK');
+            }
+        });
+    }
+
+    function approve() {
+        post('approve');
+    }
+
+    function deny() {
+        post('deny');
+    }
+
+
+    function getQueryVariables(query) {
+        query = query.substring(1);
+        var result = {};
+        var vars = query.split('&');
+        var pair;
+        for (var i = 0; i < vars.length; i++) {
+            pair = vars[i].split('=');
+            result[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1]);
+        }
+
+        return result;
+    }
+
+    var query = getQueryVariables(window.location.search);
+    var url = 'http://localhost:5000/approve/' + query.session;
+    var server = d3.xhr(url)
+            .header('content-type', 'application/json; charset=utf-8');
+
+    var body = d3.select('body');
+    body.append('input')
+            .attr('type', 'button')
+            .attr('id', 'approve')
+            .attr('value', 'Yes')
+            .on('click', approve);
+
+    var body = d3.select('body');
+    body.append('input')
+            .attr('type', 'button')
+            .attr('id', 'deny')
+            .attr('value', 'No')
+            .on('click', deny);
+
+</script>
+</body>
+</html>
