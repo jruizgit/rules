@@ -1,64 +1,35 @@
 Durable Rules
 =====
-
-Distributed Business Rules Engine  
-
-# Introduction
-Ditributed Rules enables real-time, consistent coordination of events. It leverages a variation of the RETE algorithm to evaluate massive streams of data. A simple, yet powerful meta-liguistic abstraction allows defining simple and complex rulesets.
+Durable Rules provides real-time, consistent and scalable coordination of events. A forward chaining algorithm (A.K.A. Rete) is used to evaluate massive streams of data. With a simple, yet powerful meta-liguistic abstraction you can define simple and complex rulesets. An example to illustrate the point:  
 
 ```javascript
 var d = require('durable');
 d.run({
-    approval: {
+    approve: {
         r1: {
-            whenAll: { 
-			    request: { subject: 'approve' },
-			    order: { $gt: { amount: 100 } }
-            },
-            run: deny
+            when: { $lt: { amount: 1000 } },
+            run: function(s) { s.status = 'pending' }
         },
         r2: {
-            whenAll: { 
-			    request: { subject: 'approve' },
-                order: { $lte: { amount: 100 } } 				
+            whenAll: {
+                $m: { subject: 'approved' },
+                $s: { status: 'pending' } 
             },
-            run: approve
+            run: function(s) { console.log('approved'); }
         }
     }
-});
+}); 
+```
 
-# Principles
-1. Rules are the basic building blocks of the system. 
-2. A rule is defined as a set of assertions followed by an action. 
-3. Assertions can be made on events (messages) and user state. 
-4. Actions are executed when a rule is satisfied. 
-5. Actions are guaranteed to be executed at least once. 
-6. Rules, events and user state are expressed in the JSON type system.
-7. Forward chaining (a modification of the RETE algorithm) is used to enable rule inference. 
-8. To scale the system out, redis is used as a memory cache to keep the join state.
-9. More complex constructs such as state machines and flow charts are transformed into rulesets.
+Durable Rules relies on state of the art technologies:  
 
-# Topics
-Data Model
-Events and user state
-Assert events and user state
-$and, $or 
-$gt, $lt, $eq, $lte, $gte
-$ex, $nex
-Algebra
-$all, $any
-Ruleset
-Assertions
-Actions
-Inference
-Statechart
-Triggers
-Actions
-Flowchart
-Actions
-Conditions
-Paralel
-Timers
+* [Node.js](http://www.nodejs.org) is used as the host. This allows leveraging the vast amount of available libraries.
+* Inference state is cached using [Redis](http://www.redis.io), which lets scaling out without giving up performance.
+* A web client based on [D3.js](http://www.d3js.org) provides powerful data visualization and test tools.
 
-
-
+#### Resources  
+To learn more:
+* [Setup] (http://www.github.com/jruizgit/rules/wiki/setup)
+* [Approve Tutorial] (http://www.github.com/jruizgit/rules/wiki/approve-tutorial)
+* [Order Tutorial] (http://www.github.com/jruizgit/rules/wiki/order-tutorial)
+* [Concepts] (http://www.github.com/jruizgit/rules/wiki/concepts)
