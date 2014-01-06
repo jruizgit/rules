@@ -27,8 +27,6 @@ Durable Rules relies on state of the art technologies:
 * Inference state is cached using [Redis](http://www.redis.io), which lets scaling out without giving up performance.
 * A web client based on [D3.js](http://www.d3js.org) provides powerful data visualization and test tools.
 
-![Rete tree](/rete.jpg)
-
 #### Resources  
 To learn more:
 * [Setup] (http://www.github.com/jruizgit/rules/wiki/setup)
