@@ -1,6 +1,8 @@
 Durable Rules
 =====
-Durable Rules provides real-time, consistent and scalable coordination of events. A forward chaining algorithm (A.K.A. Rete) is used to evaluate massive streams of data. With a simple, yet powerful meta-liguistic abstraction you can define simple and complex rulesets. An example to illustrate the point:  
+Durable Rules provides real-time, consistent and scalable coordination of events. With Durable Rules you can track and analyze information about things that happen (events) by combining data from multiple sources to infer more complicated circumstances.  
+
+A forward chaining algorithm (A.K.A. Rete) is used to evaluate massive streams of data. A simple, yet powerful meta-liguistic abstraction lets define simple and complex rulesets. Below is an example on how easy it is to define a couple of rules that act on incoming web messages.  
 
 ```javascript
 var d = require('durable');
@@ -30,6 +32,5 @@ Durable Rules relies on state of the art technologies:
 #### Resources  
 To learn more:
 * [Setup] (http://www.github.com/jruizgit/rules/wiki/setup)
-* [Approve Tutorial] (http://www.github.com/jruizgit/rules/wiki/approve-tutorial)
-* [Order Tutorial] (http://www.github.com/jruizgit/rules/wiki/order-tutorial)
+* [Tutorial] (http://www.github.com/jruizgit/rules/wiki/tutorial)
 * [Concepts] (http://www.github.com/jruizgit/rules/wiki/concepts)
