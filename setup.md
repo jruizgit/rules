@@ -1,3 +1,5 @@
+Setup
+=====
 #### Redis install
 durable.js relies on Redis version 2.8  
   
