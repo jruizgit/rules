@@ -1,3 +1,5 @@
+Tutorial
+=====
 ### Table of contents
 * [Introduction](tutorial.md#introduction)
 * [Ruleset](tutorial.md#ruleset)
