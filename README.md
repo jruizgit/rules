@@ -31,6 +31,6 @@ Durable Rules relies on state of the art technologies:
 
 #### Resources  
 To learn more:
-* [Setup] (http://www.github.com/jruizgit/rules/wiki/setup)
-* [Tutorial] (http://www.github.com/jruizgit/rules/wiki/tutorial)
-* [Concepts] (http://www.github.com/jruizgit/rules/wiki/concepts)
+* [Setup] (/setup)
+* [Tutorial] (/tutorial)
+* [Concepts] (/concepts)
