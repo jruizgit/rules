@@ -11,6 +11,66 @@ var transport = mailer.createTransport('SMTP',{
 });
 
 d.run({
+    approve1: {
+        r1: {
+            when: { $gt: { amount: 1000 } },
+            run: function(s) { console.log('denied'); }
+        },
+        r2: {
+            when: { $lte: { amount: 1000 } },
+            run: function(s) { console.log('approved'); }
+        }
+    },
+    approve2: {
+        r1: {
+            when: { $gt: { amount: 1000 } },
+            run: function(s) { console.log('denied'); }
+        },
+        r2: {
+            when: { $lte: { amount: 1000 } },
+            run: function(s) { s.startTimer('timeout', 10); }
+        },
+        r3: {
+            when: { $t: 'timeout' },
+            run: function(s) { console.log('timed out'); }
+        }
+    },
+    approve3: {
+        r1: {
+            whenAll: {
+                $s: { $nex: { state: 1 } },
+                $m: { $gt: { amount: 1000 } }
+            },
+            run: function(s) { console.log('denied'); }
+        },
+        r2: {
+            whenAll: {
+                $s: { $nex: { state: 1 } },
+                $m: { $lte: { amount: 1000 } }
+            },
+            run: function(s) {
+                s.state = 'pending';
+                console.log('request approval');
+            }
+        },
+        r3: {
+            whenAll: {
+                $s: { state: 'pending' },
+                $m: { subject: 'approve' }
+            },
+            run: function(s) { console.log('approved'); }
+        },
+        r4: {
+            whenAll: {
+                $s: { state: 'pending' },
+                m$any: {
+                    m: { subject: 'deny' },
+                    t: { $t: 'timeout' }
+                }
+            },
+            run: function(s) { console.log('denied'); }
+        }
+    },
     approve$state: {
         input: {
             deny: {
@@ -57,7 +117,6 @@ d.run({
     }
 }, '', null, function(host) {
     var fileServer = new stat.Server(__dirname);
-    console.log(__dirname);
     host.getApp().get('/approve.html', function (request, response) {
         request.addListener('end', function () {
             fileServer.serveFile('/approve.html', 200, {}, request, response);
@@ -65,6 +124,38 @@ d.run({
     });
 
     host.post({ id: '1', program: 'approve', sid: 1, amount: 500, from: 'jr3791@live.com', to: 'jr3791@live.com' }, function (err) {
+        if (err) {
+            console.log(err);
+        } else {
+            console.log('ok');
+        }
+    });
+
+    host.post({ id: '1', program: 'approve1', sid: 1, amount: 500, from: 'jr3791@live.com', to: 'jr3791@live.com' }, function (err) {
+        if (err) {
+            console.log(err);
+        } else {
+            console.log('ok');
+        }
+    });
+
+    host.post({ id: '1', program: 'approve2', sid: 1, amount: 500, from: 'jr3791@live.com', to: 'jr3791@live.com' }, function (err) {
+        if (err) {
+            console.log(err);
+        } else {
+            console.log('ok');
+        }
+    });
+
+    host.post({ id: '1', program: 'approve3', sid: 1, amount: 500, from: 'jr3791@live.com', to: 'jr3791@live.com' }, function (err) {
+        if (err) {
+            console.log(err);
+        } else {
+            console.log('ok');
+        }
+    });
+
+    host.post({ id: '2', program: 'approve3', sid: 1, subject: 'approve' }, function (err) {
         if (err) {
             console.log(err);
         } else {

@@ -1,7 +1,7 @@
 var d = require('../lib/durable');
 
-d.run([
-    d.ruleSet('unitAny', {
+d.run({
+    unitAny: {
         r1: {
             whenAny: {
                 a: { $and: [
@@ -15,8 +15,8 @@ d.run([
             },
             run: unitTest
         }
-    }),
-    d.ruleSet('unitAll', {
+    },
+    unitAll: {
         r1: {
             whenAll: {
                 a: { subject: 'approve' },
@@ -24,8 +24,8 @@ d.run([
             },
             run: unitTest
         }
-    }),
-    d.ruleSet('unitAllAny', {
+    },
+    unitAllAny: {
         r1: {
             whenAll: {
                 a$any: {
@@ -39,8 +39,8 @@ d.run([
             },
             run: unitTest
         }
-    }),
-    d.ruleSet('unitAnyAll', {
+    },
+    unitAnyAll: {
         r1: {
             whenAny: {
                 a$all: {
@@ -54,8 +54,8 @@ d.run([
             },
             run: unitTest
         }
-    }),
-    d.ruleSet('unitAnyAny', {
+    },
+    unitAnyAny: {
         r1: {
             whenAny: {
                 a$any: {
@@ -69,8 +69,8 @@ d.run([
             },
             run: unitTest
         }
-    }),
-    d.ruleSet('unitAllAll', {
+    },
+    unitAllAll: {
         r1: {
             whenAll: {
                 a$all: {
@@ -84,7 +84,8 @@ d.run([
             },
             run: unitTest
         }
-    })], '', null, function (host) {
+    }
+}, '', null, function (host) {
     host.post({ id: '1', program: 'unitAny', sid: 1, subject: 'approve', amount: 100 }, function (err) {
         if (err) {
             console.log(err);
@@ -102,13 +103,13 @@ d.run([
         }
     });
 
-    host.post({ id: '2', program: 'unitAll', sid: 1, amount: '100' }, function (err) {
-        if (err) {
-            console.log(err);
-        } else {
-            console.log('ok');
-        }
-    });
+//    host.post({ id: '2', program: 'unitAll', sid: 1, amount: '100' }, function (err) {
+//        if (err) {
+//            console.log(err);
+//        } else {
+//            console.log('ok');
+//        }
+//    });
 
     host.post({ id: '1', program: 'unitAllAny', sid: 1, subject: 'approve' }, function (err) {
         if (err) {
