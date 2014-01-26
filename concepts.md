@@ -1,39 +1,39 @@
 ### Table of contents
 ------
-* [Introduction](concepts#introduction)
-* [Abstraction](concepts#abstraction)
-  * [Rules](concepts#rules)
-  * [Statechart](concepts#statechart)
-  * [Flowchart](concepts#flowchart) 
-  * [Parallel](concepts#parallel)
-  * [Expressions](concepts#expressions)
-  * [Event Algebra](concepts#event-algebra)
-  * [Actions](concepts#actions)
-* [Event Sources](concepts#event-sources)
-  * [Web Messages](concepts#web-messages)
-  * [Internal Messages](concepts#internal-messages)
-  * [Signals](concepts#signals)
-  * [Timers](concepts#timers)
-* [Advanced Topics](concepts#advanced-topics)
-  * [Inference](concepts#inference)
-  * [Scale](concepts#scale)
-  * [Consistency](concepts#consistency)
+* [Introduction](concepts.md#introduction)
+* [Abstraction](concepts.md#abstraction)
+  * [Rules](concepts.md#rules)
+  * [Statechart](concepts.md#statechart)
+  * [Flowchart](concepts.md#flowchart) 
+  * [Parallel](concepts.md#parallel)
+  * [Expressions](concepts.md#expressions)
+  * [Event Algebra](concepts.md#event-algebra)
+  * [Actions](concepts.md#actions)
+* [Event Sources](concepts.md#event-sources)
+  * [Web Messages](concepts.md#web-messages)
+  * [Internal Messages](concepts.md#internal-messages)
+  * [Signals](concepts.md#signals)
+  * [Timers](concepts.md#timers)
+* [Advanced Topics](concepts.md#advanced-topics)
+  * [Inference](concepts.md#inference)
+  * [Scale](concepts.md#scale)
+  * [Consistency](concepts.md#consistency)
 
 ### Introduction
 ------
 Durable rules is designed for coordinating real time event streams with long running program state. This allows for tracking and analyzing information about things that happen (events) by combining data from multiple sources and inferring more complicated circumstances. In other words, identifying meaningful events and acting on them as quickly as possible. In fact this is a very useful pattern to model applications that coordinate interactions with external services or require human intervention (business and system process management, financial applications...).
 
-[Rules](concepts#rules) are the basic building blocks of the system. Rules define actions for event patterns. Event patterns can be defined with a rich [expression](concepts#expressions) abstraction. An [inference](concepts#inference) algorithm enables ultra fast event pattern evaluation. More complex coordinations such as [Statechart](concepts#statechart) and [Flowchart](concepts#flowchart) are just different ways of organizing a rule set.
+[Rules](concepts.md#rules) are the basic building blocks of the system. Rules define actions for event patterns. Event patterns can be defined with a rich [expression](concepts.md#expressions) abstraction. An [inference](concepts.md#inference) algorithm enables ultra fast event pattern evaluation. More complex coordinations such as [Statechart](concepts.md#statechart) and [Flowchart](concepts.md#flowchart) are just different ways of organizing a rule set.
 
 Durable rules is based on the JSON type system through and through: a REST interface is exposed for posting event messages as JSON objects, program state is stored in Redis as a JSON object and rulesets are defined as a JSON objects. The result is a simple, intuitive and consistent meta-linguistic abstraction as well as optimal system performance because resources are not wasted in type system mappings. 
 
-Node.js is the program hosting environment and Redis is used to store the user as well as inference state. The single thread execution model of both systems allows optimal resource utilization. [Scale out](concepts#scale) is achieved by simply adding Node processes and Redis servers.
+Node.js is the program hosting environment and Redis is used to store the user as well as inference state. The single thread execution model of both systems allows optimal resource utilization. [Scale out](concepts.md#scale) is achieved by simply adding Node processes and Redis servers.
 
 Durable Rules provides a management web interface based on svg and driven by d3.js. The user interface provides visualization of program structure as well as state overlays. This enables the analysis of code execution sequences, provides an intuitive set of actions for testing and repairing program instances.  
 
 _Note: This work is the result of my own research and experimentation and does not represent the views nor opinions of my employer._
   
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 
 ### Abstraction
 -----
@@ -42,8 +42,8 @@ Rules are the basic building blocks of the system. Simply put, a ruleset is a se
 * A ruleset has a name.  
 * A ruleset contains a set of named rules.  
 * Each rule consists of  
-  * Antecedent (when): which is an [expression](concepts#expressions).  
-  * Consequent (run): which is typically an [action](concepts#actions), but can also be a set of child rulesets.  
+  * Antecedent (when): which is an [expression](concepts.md#expressions).  
+  * Consequent (run): which is typically an [action](concepts.md#actions), but can also be a set of child rulesets.  
 
 ```javascript
 var d = require('durable');
@@ -66,7 +66,7 @@ d.run({
     }
 });
 ```
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 
 #### Statechart
 A statechart is a finite state machine. A statecahrt is a model of computation used to design sequential logic. The machine can be in only one of a finite number of states and can change from one state to another when initiated by a triggering event or condition. Syntactic definition:  
@@ -75,8 +75,8 @@ A statechart is a finite state machine. A statecahrt is a model of computation u
 * Each state contains a set of named transitions.  
 * A state can also contain a child statechart, which name is postfixed by `$state`.  
 * Each transition consists of:  
-  * Trigger: which is an [expression](concepts#expressions).  
-  * Action: which is typically an [action](concepts#actions), but can also be a set of child rulesets.  
+  * Trigger: which is an [expression](concepts.md#expressions).  
+  * Action: which is typically an [action](concepts.md#actions), but can also be a set of child rulesets.  
   * Destination: which the state to transition to.  
 
 ```javascript
@@ -114,17 +114,17 @@ d.run({
     }
 });
 ```
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 
 #### Flowchart
 A flowchart is typically used to represent complex processes and programs. Flowcharts consist of processing steps and decisions, which are ordered by connecting them with arrows. Syntactic definition:
 * A flowchart has a name postfixed by `$flow`.  
 * A flowchart contains a set of named stages.  
 * Each stage consists of:  
-  * Action: which is typically an [action](concepts#actions), but can also be a set of child rulesets.  
+  * Action: which is typically an [action](concepts.md#actions), but can also be a set of child rulesets.  
   * A set of conditions arranged as a set of:  
     * Condition Name: is the stage to go to if the condition is met.  
-    * Condition: which is an [expression](concepts#expressions).  
+    * Condition: which is an [expression](concepts.md#expressions).  
 
 ```javascript
 var d = require('durable');
@@ -152,9 +152,9 @@ d.run({
     },
 });
 ```
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 #### Parallel
-Parallels are expressed by defining children rulesets, statecharts or flowcharts as action objects (the property named 'run'). When parallel execution is started the user state is forked. The child user state is identified with the convention '[parentSid].[childRulesetName]'. Parallels can be synchronized by using [signals](Concepts#signals). The ruleset below, when r1 antecedent is met, will start two parallel rulesets named 'one' and 'two'. Rulesets 'one' and 'two' will synchronize by signaling completion to its parent ruleset when the [timers](concepts#timers) complete.
+Parallels are expressed by defining children rulesets, statecharts or flowcharts as action objects (the property named 'run'). When parallel execution is started the user state is forked. The child user state is identified with the convention '[parentSid].[childRulesetName]'. Parallels can be synchronized by using [signals](concepts.md#signals). The ruleset below, when r1 antecedent is met, will start two parallel rulesets named 'one' and 'two'. Rulesets 'one' and 'two' will synchronize by signaling completion to its parent ruleset when the [timers](concepts.md#timers) complete.
 ```javascript
 var d = require('durable');
 d.run({
@@ -195,7 +195,7 @@ d.run({
 });
 ```
 
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 
 #### Expressions 
 Expressions are used to define the rules antecedent. Each expression is a Json object. An expression is a set of name value pairs defining the names and values properties to match on the target object. The list of supported expression operators:
@@ -220,7 +220,7 @@ Expressions are used to define the rules antecedent. Each expression is a Json o
   $nex: { name: 1 }  
   For example: `{ $nex: { subject: 1 } }` is read as 'subject field does not exist'.
 
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 #### Event Algebra  
 There are two interesting operators, which compose well with expressions and allow for sophisticated coordination of events: `$all` wait for all matching events to happen. `$any` wait for any matching event to occur.  
 * $all: { name: expression, name: expression...}  
@@ -248,7 +248,7 @@ d.run({
     }
 });
 ```
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 
 #### Actions
 
@@ -276,7 +276,7 @@ function deny (s, complete) {
 ```
 
 Remarks:
-* When there is an error, Durable Rules runtime will reclaim control and the action will be retried later (see [consistency](concepts#consistency) section for more details).
+* When there is an error, Durable Rules runtime will reclaim control and the action will be retried later (see [consistency](concepts.md#consistency) section for more details).
 * The event that originates the action is included in the user state object 's' and can be retrieved by calling the function `s.getOutput()`. 
 * If the action is executed when coordinating several events (using event algebra), the output is a graph that follows the structure provided in the originating expression.
 
@@ -297,7 +297,7 @@ d.run({
     }
 });
 ```
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 
 ### Event Sources
 ------
@@ -310,7 +310,7 @@ POST: http://example.com/ping/1
     content: 'a'
 }
 ```
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 
 #### Internal Messages
 Events can also be raised between rulesets hosted in the same system, which enables faster event coordination between application components (provided the application has been component-ized using rulesets, statecharts and flowcharts). Messages are JSON objects and have a unique identifier named 'id'. Contrasting with the REST API, internal messages have a property named 'program', which defines the ruleset the message is addressed to and a a property named 'sid', which identifies the user state the message is addressed to. Internal messages are sent using the `post` function in the user state passed to an action. The example below shows a two statecharts, one named 'ping' and a second one named 'pong' sending internal messages to each other.
@@ -356,7 +356,7 @@ d.run({
     }
 ));
 ```
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 
 #### Signals
 When rulesets, statecharts or flowcharts initiate parallel execution, the children rulesets (statecharts or flowcharts) can coordinate and synchronize with the parent by sending signals. A signal is a Message, a JSON object with a unique identifier named 'id'. As opposed to internal messages signals don't have 'program' nor 'sid' property. Signals are sent using the `signal` function in the user state passed to an action. The example below illustrates how a parent statechart coordinates with two children statecharts, which send a signal when transitioning to the 'end' state.
@@ -424,7 +424,7 @@ When rulesets, statecharts or flowcharts initiate parallel execution, the childr
         }
     }
 ```
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 
 #### Timers
 Timers are critical for coordinating events (an application needs limit the time for waiting an event to happen, an application needs to count how many events happen over a period of time...). When a timer is due, an event (message) is posted to the originating ruleset and user state (sid). The example below shows how a timer is started and how the ruleset reacts to the event raised when the timer is due.
@@ -449,7 +449,7 @@ d.run({
     }
 });
 ```
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 
 ### Advanced Topics
 -------
@@ -520,7 +520,7 @@ http://www.durablejs.org/examples/simple/1
  2. The action is dequeued and dispatched. 
  3. The message that triggered the action is removed from the ruleset hashset. 
 
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 
 #### Scale
 
@@ -528,7 +528,7 @@ The goal of scaling out is to increase the system throughput when adding more ha
 
 ![Scale](https://raw.github.com/jruizgit/rules/master/scale.jpg)  
 
-First let's consider the problem of adding more processes. In the [inference](concepts#inference) section, I glossed over the details of steps 2.iv and 3.iv. The forward chaining algorithms described in published white-papers require heavy use of memory. In order to scale out, and be able to use several cores to evaluate the same ruleset, it is necessary to store the state in a cache external to the processes. There are three important challenges with this approach:  
+First let's consider the problem of adding more processes. In the [inference](concepts.md#inference) section, I glossed over the details of steps 2.iv and 3.iv. The forward chaining algorithms described in published white-papers require heavy use of memory. In order to scale out, and be able to use several cores to evaluate the same ruleset, it is necessary to store the state in a cache external to the processes. There are three important challenges with this approach:  
 
 1. Concurrent evaluation of join
 2. Reducing the number of cache access
@@ -572,7 +572,7 @@ else {
     }, '', ['/tmp/redis0.sock', '/tmp/redis1.sock', '/tmp/redis2.sock']);
 }
 ```
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 
 #### Consistency
 
@@ -598,5 +598,5 @@ Durable rules guarantees events are never lost and dispatched at least once. To 
 
 Note: If an error happens at any point after #1 (which runs as a single redis script), the action will be picked up again when its score is less than `new Date().getTime()`. The implication is that all operations,  including the action function, will be executed at least once, therefore they have to be idempotent.
   
-[top](Concepts#table-of-contents)  
+[top](concepts.md#table-of-contents)  
 
