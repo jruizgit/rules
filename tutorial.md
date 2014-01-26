@@ -17,7 +17,7 @@ In this tutorial we are going to build an expense approval process. The objectiv
 * After retrying if the approver does not click on the web page, the request is denied  
 
 ### Ruleset
-First we will define a couple of rules: 'r1' will log 'denied' to the console is a message with 'amount' greater than 1000 is sent. 'r2' will log 'approved' to the console if a message with 'amount' less than or equal to 1000 is sent. For detailed information see the [Rules](/concepts.md#rules) and [Expressions](/concepts.md#expressions) section in the concepts page.   
+First we will define a couple of rules: 'r1' will log 'denied' to the console is a message with 'amount' greater than 1000 is sent. 'r2' will log 'approved' to the console if a message with 'amount' less than or equal to 1000 is sent. For detailed information see the [rules](/concepts.md#rules) and [expressions](/concepts.md#expressions) section in the concepts page.   
   
 1. Install Durable Rules library
   1. Open a terminal and go to documents/approve
@@ -288,7 +288,7 @@ denied
 [top](tutorial.md#table-of-contents)  
 
 ### Actions
-Logging to the console is not that interesting, in this section we are going to enable our rules send email messages. Aside from the synchronous actions used in previous examples to log messages to the console, we can integrate asynchronous I/O actions following the simple node.js convention. Note that we are going to build this functionality on top of the example presented in the previous [statechart](tutorial.md#statechart) section. For more details visit the [actions](/concepts.md#statechart) section in the concepts page.  
+Logging to the console is not that interesting, in this section we are going to enable our rules send email messages. Aside from the synchronous actions used in previous examples to log messages to the console, we can integrate asynchronous I/O actions following the simple node.js convention. Note that we are going to build this functionality on top of the example presented in the previous [statechart](tutorial.md#statechart) section. For more details visit the [actions](/concepts.md#actions) section in the concepts page.  
 
 1. Install nodemailer
   1. Open a terminal and go to documents/approve
