@@ -31,6 +31,6 @@ Durable Rules relies on state of the art technologies:
 
 #### Resources  
 To learn more:
-* [Setup] (/setup)
-* [Tutorial] (/tutorial)
-* [Concepts] (/concepts)
+* [Setup] (/setup.md)
+* [Tutorial] (/tutorial.md)
+* [Concepts] (/concepts.md)
