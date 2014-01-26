@@ -17,7 +17,7 @@ In this tutorial we are going to build an expense approval process. The objectiv
 * After retrying if the approver does not click on the web page, the request is denied  
 
 ### Ruleset
-First we will define a couple of rules: 'r1' will log 'denied' to the console is a message with 'amount' greater than 1000 is sent. 'r2' will log 'approved' to the console if a message with 'amount' less than or equal to 1000 is sent. For detailed information see the [Rules](http://www.github.com/jruizgit/rules/wiki/concepts.md#rules) and [Expressions](http://www.github.com/jruizgit/rules/wiki/concepts.md#expressions) section in the concepts page.   
+First we will define a couple of rules: 'r1' will log 'denied' to the console is a message with 'amount' greater than 1000 is sent. 'r2' will log 'approved' to the console if a message with 'amount' less than or equal to 1000 is sent. For detailed information see the [Rules](/concepts.md#rules) and [Expressions](/concepts.md#expressions) section in the concepts page.   
   
 1. Install Durable Rules library
   1. Open a terminal and go to documents/approve
@@ -40,7 +40,7 @@ First we will define a couple of rules: 'r1' will log 'denied' to the console is
     });   
 ```
 
-4. Make sure redis is running (see [setup](http://www.github.com/jruizgit/rules/wiki/setup) for details)
+4. Make sure redis is running (see [setup](/setup) for details)
 5. Start a terminal, goto documents/approve, type node test.js
 6. Open a browser and navigate to http://localhost:5000/approve/1/admin.html
 7. Type the message definition in the textbox at the bottom and click the 'Post Message' button
@@ -62,7 +62,7 @@ denied
 [top](tutorial.md#table-of-contents)  
 
 ### Timers
-Let's add now the time dimension to our program. We are going to modify the ruleset above to start a timer when an event message with `amount < 1000` is seen. The timer then triggers an action after 5 minutes. For detailed information see the [timers](http://www.github.com/jruizgit/rules/wiki/concepts.md#timers) section in the concepts page. 
+Let's add now the time dimension to our program. We are going to modify the ruleset above to start a timer when an event message with `amount < 1000` is seen. The timer then triggers an action after 5 minutes. For detailed information see the [timers](/concepts.md#timers) section in the concepts page. 
 
 1. In your test.js file copy\paste the program below and save
 ```javascript
@@ -85,7 +85,7 @@ Let's add now the time dimension to our program. We are going to modify the rule
     });   
 ```
 
-2. Make sure redis is running (see [setup](http://www.github.com/jruizgit/rules/wiki/setup) for details).
+2. Make sure redis is running (see [setup](/setup) for details).
 3. Clear the redis database 
   1. Open a terminal and goto `library/redis-2.8.1`
   2. Type `src/redis-cli`
@@ -105,7 +105,7 @@ timed out
 [top](tutorial.md#table-of-contents)  
 
 ### Inference
-We are going to make things a little more interesting by writing rules to coordinate several events using the `whenAll` and `any` expression operators. Such operators rely on rule inference for efficient evaluation. This example starts a timer when an message event with `amount < 1000` is seen. At that point it waits 5 minutes for a message event with `subject = 'approved'`. To learn more see the [event algebra](http://www.github.com/jruizgit/rules/wiki/concepts.md#event-algebra) and the [inference](http://www.github.com/jruizgit/rules/wiki/concepts.md#inference)  section in the concepts page.  
+We are going to make things a little more interesting by writing rules to coordinate several events using the `whenAll` and `any` expression operators. Such operators rely on rule inference for efficient evaluation. This example starts a timer when an message event with `amount < 1000` is seen. At that point it waits 5 minutes for a message event with `subject = 'approved'`. To learn more see the [event algebra](/concepts.md#event-algebra) and the [inference](/concepts.md#inference)  section in the concepts page.  
 
 1. In your test.js file copy\paste the program below and save
 ```javascript
@@ -151,7 +151,7 @@ We are going to make things a little more interesting by writing rules to coordi
     });
 ```
 
-2. Make sure redis is running (see [setup](http://www.github.com/jruizgit/rules/wiki/setup) for details).
+2. Make sure redis is running (see [setup](/setup) for details).
 3. Start a terminal, goto `documents/approve`, type `node test.js`
 4. Clear the redis database 
   1. Open a terminal and goto `library/redis-2.8.1`
@@ -183,7 +183,7 @@ denied
 [top](tutorial.md#table-of-contents)  
 
 ### Statechart
-As you can see the example above has become complex, it is not easy to understand. A little bit of structure would help. A statechart is a great way of organizing reactions to events in different stages. In the code below we have four states: 'initial', which waits for a message with the amount property. 'pending', which waits for a message with subject 'approved', 'denied' or a timeout. 'approved' and 'denied' are the final outcome states. Notice how the statemachine retries a couple of times before moving to the denied state. For detailed information see the [statechart](http://www.github.com/jruizgit/rules/wiki/concepts.md#statechart)  section in the concepts page.  
+As you can see the example above has become complex, it is not easy to understand. A little bit of structure would help. A statechart is a great way of organizing reactions to events in different stages. In the code below we have four states: 'initial', which waits for a message with the amount property. 'pending', which waits for a message with subject 'approved', 'denied' or a timeout. 'approved' and 'denied' are the final outcome states. Notice how the statemachine retries a couple of times before moving to the denied state. For detailed information see the [statechart](/concepts.md#statechart)  section in the concepts page.  
 
 1. In your test.js file copy\paste the program below and save
 ```javascript
@@ -255,7 +255,7 @@ As you can see the example above has become complex, it is not easy to understan
     }
 ```
 
-2. Make sure redis is running (see [setup](http://www.github.com/jruizgit/rules/wiki/setup) for details).
+2. Make sure redis is running (see [setup](/setup) for details).
 3. Start a terminal, goto `documents/approve`, type `node test.js`
 4. Clear the redis database 
   1. Open a terminal and goto `library/redis-2.8.1`
@@ -288,7 +288,7 @@ denied
 [top](tutorial.md#table-of-contents)  
 
 ### Actions
-Logging to the console is not that interesting, in this section we are going to enable our rules send email messages. Aside from the synchronous actions used in previous examples to log messages to the console, we can integrate asynchronous I/O actions following the simple node.js convention. Note that we are going to build this functionality on top of the example presented in the previous [statechart](tutorial.md#statechart) section. For more details visit the [actions](http://www.github.com/jruizgit/rules/wiki/concepts.md#statechart) section in the concepts page.  
+Logging to the console is not that interesting, in this section we are going to enable our rules send email messages. Aside from the synchronous actions used in previous examples to log messages to the console, we can integrate asynchronous I/O actions following the simple node.js convention. Note that we are going to build this functionality on top of the example presented in the previous [statechart](tutorial.md#statechart) section. For more details visit the [actions](/concepts.md#statechart) section in the concepts page.  
 
 1. Install nodemailer
   1. Open a terminal and go to documents/approve
@@ -352,7 +352,7 @@ Logging to the console is not that interesting, in this section we are going to 
         }
     }
 ```
-4. Make sure redis is running (see [setup](http://www.github.com/jruizgit/rules/wiki/setup) for details).
+4. Make sure redis is running (see [setup](/setup) for details).
 5. Start a terminal, goto `documents/approve`, type `node test.js`
 6. Clear the redis database 
   1. Open a terminal and goto `library/redis-2.8.1`
@@ -369,7 +369,7 @@ Logging to the console is not that interesting, in this section we are going to 
 
 [top](tutorial.md#table-of-contents)  
 ### Hosting
-When running the example in the previous section, you might have noticed the link in the email was broken. In this section we are going to fix that problem by hosting the 'approve' and 'deny' webpage building on top of the code described in the [actions](tutorial.md#actions) section. Durable rules relies on Node.js and gives developers the opportunity to use the Node.js app object. Note how in the code in the approval.html page defined below we raise an event by posting a message to the REST interface. To learn more visit the [web messages](http://www.github.com/jruizgit/rules/wiki/concepts.md#web-messages) section in the concepts page.
+When running the example in the previous section, you might have noticed the link in the email was broken. In this section we are going to fix that problem by hosting the 'approve' and 'deny' webpage building on top of the code described in the [actions](tutorial.md#actions) section. Durable rules relies on Node.js and gives developers the opportunity to use the Node.js app object. Note how in the code in the approval.html page defined below we raise an event by posting a message to the REST interface. To learn more visit the [web messages](/concepts.md#web-messages) section in the concepts page.
 
 1. Install node static
   1. Open a terminal and go to documents/approve
