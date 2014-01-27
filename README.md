@@ -31,6 +31,6 @@ Durable Rules relies on state of the art technologies:
 
 #### Resources  
 To learn more:
-* [Setup] (/setup.md)
-* [Tutorial] (/tutorial.md)
-* [Concepts] (/concepts.md)
+* [Setup] (https://github.com/jruizgit/rules/blob/master/setup.md)
+* [Tutorial] (https://github.com/jruizgit/rules/blob/master/tutorial.md)
+* [Concepts] (https://github.com/jruizgit/rules/blob/master/concepts.md)
