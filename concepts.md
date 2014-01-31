@@ -483,13 +483,14 @@ Below is the tree constructed by Durable Rules when running the ruleset above.
 ![Rete tree](https://raw.github.com/jruizgit/rules/master/rete.jpg)  
 
 1. Let's start by posting the following message:
-```javascript
-http://www.durablejs.org/examples/simple/mySession
-{
-    id: 1,
-    amount: 500
-}
-```
+  ```javascript
+  http://www.durablejs.org/examples/simple/mySession
+  {
+      id: 1,
+      amount: 500
+  }
+  ```
+
  1. The request comes through the Node.js post handler and the message is run through the ruleset's Rete tree. 
  2. The message is first pushed to the alpha node `type = '$m'`, which pushes the message to the next alpha node.
  3. The message meets the condition `$m.amount < 1000`, so it is pushed to the action node. 
@@ -503,14 +504,15 @@ http://www.durablejs.org/examples/simple/mySession
  5. The message that triggered the action is removed from the ruleset message hashset.
  6. The new state is stored in the ruleset state hashset.
 3. Now let's post the message:
-```javascript
-http://www.durablejs.org/examples/simple/1
-{
-    id: 2,
-    sid: 'mySession',
-    subject: 'approved'
-}
-```
+  ```javascript
+  http://www.durablejs.org/examples/simple/1
+  {
+      id: 2,
+      sid: 'mySession',
+      subject: 'approved'
+  }
+  ```
+
  1. The request comes through the Node.js post handler and the message is run through the ruleset's Rete tree.
  2. The message is pushed to the alpha node `type = '$m'`, which pushes the message to the next alpha node.
  3. The message meets the condition `$m.subject = 'approved'` and is pushed to the beta node.
