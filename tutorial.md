@@ -26,7 +26,7 @@ First we will define a couple of rules: 'r1' will log 'denied' to the console is
   2. Run `npm -install 'durable'`
 2. Using your favorite text editor, create a test.js (documents/approve/test.js)
 3. Copy\Paste the program below and save
-```javascript
+  ```javascript
     var d = require('durable');
     d.run({
         approve: {
@@ -40,25 +40,26 @@ First we will define a couple of rules: 'r1' will log 'denied' to the console is
             }
         }
     });   
-```
+  ```
+
 4. Make sure redis is running (see [setup](/setup) for details)
 5. Start a terminal, goto documents/approve, type node test.js
 6. Open a browser and navigate to http://localhost:5000/approve/1/admin.html
 7. Type the message definition in the textbox at the bottom and click the 'Post Message' button
-```javascript
-{ "id":1, "amount":500 }
-```
+  ```javascript
+  { "id":1, "amount":500 }
+  ```
 
 8. Type the message definition in the textbox at the bottom and click the 'Post Message' button
-```javascript
-{ "id":2, "amount":1500 }
-```
+  ```javascript
+  { "id":2, "amount":1500 }
+  ```
 
 9. In the terminal window you should see
-```
-approved
-denied
-```
+  ```
+  approved
+  denied
+  ```
 
 [top](tutorial.md#table-of-contents)  
 
@@ -66,7 +67,7 @@ denied
 Let's add now the time dimension to our program. We are going to modify the ruleset above to start a timer when an event message with `amount < 1000` is seen. The timer then triggers an action after 5 minutes. For detailed information see the [timers](/concepts.md#timers) section in the concepts page. 
 
 1. In your test.js file copy\paste the program below and save
-```javascript
+  ```javascript
     var d = require('durable');
     d.run({
         approve: {
@@ -84,7 +85,7 @@ Let's add now the time dimension to our program. We are going to modify the rule
             }
         }
     });   
-```
+  ```
 
 2. Make sure redis is running (see [setup](/setup) for details).
 3. Clear the redis database 
@@ -94,14 +95,14 @@ Let's add now the time dimension to our program. We are going to modify the rule
 4. Start a terminal, goto `documents/approve`, type `node test.js`
 5. Open a browser and navigate to http://localhost:5000/approve/1/admin.html
 6. Type the message definition in the textbox at the bottom and click the 'Post Message' button
-```javascript
-{ "id":1, "amount":500 }
-```
+  ```javascript
+  { "id":1, "amount":500 }
+  ```
 
 7. After 5 minutes, in the terminal window you should see
-```
-timed out
-```
+  ```
+  timed out
+  ```
 
 [top](tutorial.md#table-of-contents)  
 
@@ -109,7 +110,7 @@ timed out
 We are going to make things a little more interesting by writing rules to coordinate several events using the `whenAll` and `any` expression operators. Such operators rely on rule inference for efficient evaluation. This example starts a timer when an message event with `amount < 1000` is seen. At that point it waits 5 minutes for a message event with `subject = 'approved'`. To learn more see the [event algebra](/concepts.md#event-algebra) and the [inference](/concepts.md#inference)  section in the concepts page.  
 
 1. In your test.js file copy\paste the program below and save
-```javascript
+  ```javascript
     var d = require('durable');
     d.run({
         approve: {
@@ -150,7 +151,7 @@ We are going to make things a little more interesting by writing rules to coordi
             }
         }
     });
-```
+  ```
 
 2. Make sure redis is running (see [setup](/setup) for details).
 3. Start a terminal, goto `documents/approve`, type `node test.js`
@@ -160,26 +161,26 @@ We are going to make things a little more interesting by writing rules to coordi
   3. Type `flushdb` 
 5. Open a browser and navigate to http://localhost:5000/approve/1/admin.html
 6. Type the message definition in the textbox at the bottom and click the 'Post Message' button
-```javascript
-{ "id":1, "amount":500 }
-```
+  ```javascript
+  { "id":1, "amount":500 }
+  ```
 
 7. Type the message definition in the textbox at the bottom and click the 'Post Message' button
-```javascript
-{ "id":2, "subject":"approved" }
-```
+  ```javascript
+  { "id":2, "subject":"approved" }
+  ```
 
 8. If you take less than 5 minutes to complete step 7, in the terminal window you should see
-```
-request approval
-approved
-```
+  ```
+  request approval
+  approved
+  ```
 
 9. If you take more than 5 minutes to complete step 7, in the terminal window you should see
-```
-request approval
-denied
-```
+  ```
+  request approval
+  denied
+  ```
 
 [top](tutorial.md#table-of-contents)  
 
@@ -187,7 +188,7 @@ denied
 As you can see the example above has become complex, it is not easy to understand. A little bit of structure would help. A statechart is a great way of organizing reactions to events in different stages. In the code below we have four states: 'initial', which waits for a message with the amount property. 'pending', which waits for a message with subject 'approved', 'denied' or a timeout. 'approved' and 'denied' are the final outcome states. Notice how the statemachine retries a couple of times before moving to the denied state. For detailed information see the [statechart](/concepts.md#statechart)  section in the concepts page.  
 
 1. In your test.js file copy\paste the program below and save
-```javascript
+  ```javascript
     var d = require('durable');
     d.run({
         approve$state: {
@@ -254,7 +255,7 @@ As you can see the example above has become complex, it is not easy to understan
     function deny(s) {
         console.log('denied');
     }
-```
+  ```
 
 2. Make sure redis is running (see [setup](/setup) for details).
 3. Start a terminal, goto `documents/approve`, type `node test.js`
@@ -264,27 +265,27 @@ As you can see the example above has become complex, it is not easy to understan
   3. Type `flushdb` 
 5. Open a browser and navigate to http://localhost:5000/approve/1/admin.html
 6. Type the message definition in the textbox at the bottom and click the 'Post Message' button
-```javascript
-{ "id":1, "amount":500 }
-```
+  ```javascript
+  { "id":1, "amount":500 }
+  ```
 
 7. Type the message definition in the textbox at the bottom and click the 'Post Message' button
-```javascript
-{ "id":2, "subject":"approved" }
-```
+  ```javascript
+  { "id":2, "subject":"approved" }
+  ```
 
 8. If you take less than 5 minutes to complete step 7, in the terminal window you should see
-```
-request approval
-approved
-```
+  ```
+  request approval
+  approved
+  ```
 
 9. If you take more than 10 minutes to complete step 7, in the terminal window you should see
-```
-request approval
-request approval
-denied
-```
+  ```
+  request approval
+  request approval
+  denied
+  ```
 
 [top](tutorial.md#table-of-contents)  
 
@@ -295,7 +296,7 @@ Logging to the console is not that interesting, in this section we are going to 
   1. Open a terminal and go to documents/approve
   2. Run `npm -install 'nodemailer'`
 2. Paste the following line to the top of the test.js file (set a valid Gmail user account and password in auth object)
-```javascript
+  ```javascript
     var mailer = require('nodemailer');
     var transport = mailer.createTransport('SMTP',{
         service: 'Gmail',
@@ -304,10 +305,10 @@ Logging to the console is not that interesting, in this section we are going to 
             pass: 'password'
         }
     });
-```
+  ```
 
 3. Replace the `requestApproval`, `approve` and `deny` functions in the example above with the functions below
-```javascript
+  ```javascript
     function deny (s, complete) {
         setState(s);
         var mailOptions = {
@@ -352,7 +353,7 @@ Logging to the console is not that interesting, in this section we are going to 
             s.to = s.getOutput().to;
         }
     }
-```
+  ```
 4. Make sure redis is running (see [setup](/setup) for details).
 5. Start a terminal, goto `documents/approve`, type `node test.js`
 6. Clear the redis database 
@@ -361,9 +362,9 @@ Logging to the console is not that interesting, in this section we are going to 
   3. Type `flushdb` 
 7. Open a browser and navigate to http://localhost:5000/approve/1/admin.html
 8. Type the message definition in the textbox at the bottom and click the 'Post Message' button (set a real email address in the 'from' and 'to' fields:
-```javascript
-{ "id":1, "from":"youremail", "to":"youremail", "amount":500 }
-```
+  ```javascript
+  { "id":1, "from":"youremail", "to":"youremail", "amount":500 }
+  ```
 
 9. The 'request approval' message will be sent to the 'to' email address
 10. The 'request denied' message will be sent to the 'from' email address after 10 minutes
@@ -376,12 +377,12 @@ When running the example in the previous section, you might have noticed the lin
   1. Open a terminal and go to documents/approve
   2. Run `npm -install 'node-static'`
 2. Add the following line to the top of the test.js file
-```javascript
-var stat = require('node-static');
-```
+  ```javascript
+  var stat = require('node-static');
+  ```
 
 3. Right after the statechart definition add the following code
-```javascript
+  ```javascript
     // other code omitted for clarity
     var d = require('durable');
     d.run({
@@ -394,21 +395,21 @@ var stat = require('node-static');
             }).resume();
         });
     });
-```
+  ```
 
 4. Using you favorite html editor create an html file documents\approve\approve.html
 5. Paste the following code in the file
-```html
-<html>
-<head>
-    <title>Approval page</title>
-</head>
-<body>
-<h3> Do you approve the expense?</h3>
-<script type="text/javascript" src="http://d3js.org/d3.v3.min.js?3.1.9"></script>
-<script type="text/javascript">
-```
-```javascript
+  ```html
+  <html>
+  <head>
+      <title>Approval page</title>
+  </head>
+  <body>
+  <h3> Do you approve the expense?</h3>
+  <script type="text/javascript" src="http://d3js.org/d3.v3.min.js?3.1.9"></script>
+  <script type="text/javascript">
+  ```
+  ```javascript
     function post(choice) {
         server.post('{ "id":"' + Math.floor(Math.random()*1000) + '", "subject":"' + choice + '"}', function(err) {
             if (err) {
@@ -460,12 +461,12 @@ var stat = require('node-static');
             .attr('id', 'deny')
             .attr('value', 'No')
             .on('click', deny);
-```
-```html
-</script>
-</body>
-</html>
-```
+  ```
+  ```html
+  </script>
+  </body>
+  </html>
+  ```
 
 6. Make sure redis is running
 7. Start a terminal, goto `documents/approve`, type `node test.js`
@@ -475,9 +476,9 @@ var stat = require('node-static');
   3. Type `flushdb` 
 8. Open a browser and navigate to http://localhost:5000/approve/1/admin.html
 10. Type the message definition in the textbox at the bottom and click the 'Post Message' button (set a real email address in the 'from' and 'to' fields:
-```javascript
-{ "id":1, "from":"youremail", "to":"youremail", "amount":500 }
-```
+  ```javascript
+  { "id":1, "from":"youremail", "to":"youremail", "amount":500 }
+  ```
 
 11. The 'request approval' message will be sent to the 'to' email address
 12. Click the link in the email message (note the link address is localhost, so you need to open the mail in the same machine as you run the service)
