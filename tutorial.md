@@ -380,7 +380,7 @@ When running the example in the previous section, you might have noticed the lin
 var stat = require('node-static');
 ```
 
-3. Right after the statecahrt definition add the following code
+3. Right after the statechart definition add the following code
 ```javascript
     // other code omitted for clarity
     var d = require('durable');
