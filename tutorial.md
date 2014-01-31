@@ -41,7 +41,6 @@ First we will define a couple of rules: 'r1' will log 'denied' to the console is
         }
     });   
 ```
-
 4. Make sure redis is running (see [setup](/setup) for details)
 5. Start a terminal, goto documents/approve, type node test.js
 6. Open a browser and navigate to http://localhost:5000/approve/1/admin.html
