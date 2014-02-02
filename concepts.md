@@ -484,7 +484,7 @@ Below is the tree constructed by Durable Rules when running the ruleset above.
 
 1. Let's start by posting the following message:
   ```javascript
-  http://www.durablejs.org/examples/simple/mySession
+  http://localhost:5000/approve/mySession
   {
       id: 1,
       amount: 500
@@ -505,10 +505,9 @@ Below is the tree constructed by Durable Rules when running the ruleset above.
  6. The new state is stored in the ruleset state hashset.
 3. Now let's post the message:
   ```javascript
-  http://www.durablejs.org/examples/simple/1
+  http://localhost:5000/approve/mySession
   {
       id: 2,
-      sid: 'mySession',
       subject: 'approved'
   }
   ```
