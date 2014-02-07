@@ -33,4 +33,10 @@ Durable Rules relies on state of the art technologies:
 To learn more:
 * [Setup](https://github.com/jruizgit/rules/blob/master/setup.md)
 * [Tutorial](https://github.com/jruizgit/rules/blob/master/tutorial.md)
-* [Concepts](https://github.com/jruizgit/rules/blob/master/concepts.md)
+* [Concepts](https://github.com/jruizgit/rules/blob/master/concepts.md)  
+ 
+Blog posts:
+* [Inference: From Expert Systems to Cloud Scale Event Processing](http://jruizblog.com/2014/01/27/event-processing/)
+* [Rete Meets Redis](http://jruizblog.com/2014/02/02/rete-meets-redis/)
+
+
