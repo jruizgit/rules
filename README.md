@@ -1,3 +1,7 @@
+Under construction - just finishing c implementation with two objectives  
+- boost performance 3x to 10x depending on the scenario
+- support polyglot platfrom
+
 Durable Rules
 =====
 Durable Rules provides real-time, consistent and scalable coordination of events. With Durable Rules you can track and analyze information about things that happen (events) by combining data from multiple sources to infer more complicated circumstances.
