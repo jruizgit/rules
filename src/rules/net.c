@@ -61,6 +61,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
         if (currentNode->type == NODE_ACTION) {
             unsigned int queryLength = currentNode->value.c.queryLength;
             char *actionName = &tree->stringPool[currentNode->nameOffset];
+            unsigned int elseCount = 0;
             for (unsigned int ii = 0; ii < queryLength; ++ii) {
                 unsigned int lineOffset = tree->queryPool[currentNode->value.c.queryOffset + ii];
                 char *currentLine = &tree->stringPool[lineOffset];
@@ -99,17 +100,28 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 
                 for (unsigned int iii = 0; iii < clauseCount; ++iii) {
                     oldLua = lua;
-                    asprintf(&lua, "%send\n", lua);
+                    if (ii < (queryLength -1) && iii == (clauseCount -1)) {
+                        asprintf(&lua, "%selse\n", lua);
+                        ++ elseCount;
+                    } else {
+                        asprintf(&lua, "%send\n", lua);
+                    }
                     free(oldLua);
                 }
+            }
 
-                if (currentNode->value.c.multi) {
-                    oldLua = lua;
-                    asprintf(&lua, "res = { 1 }\n"
-                                   "while (res[1] and (i < %d)) do\n"
-                                   "%send\n", MAX_MESSAGE_BATCH, lua);
-                    free(oldLua);
-                }
+            for (unsigned int ii = 0; ii < elseCount; ++ii) {
+                oldLua = lua;
+                asprintf(&lua, "%send\n", lua);
+                free(oldLua);
+            }
+
+            if (currentNode->value.c.multi) {
+                oldLua = lua;
+                asprintf(&lua, "res = { 1 }\n"
+                               "while (res[1] and (i < %d)) do\n"
+                               "%send\n", MAX_MESSAGE_BATCH, lua);
+                free(oldLua);
             }
 
             oldLua = lua;
@@ -136,6 +148,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                            "end\n"
                            "return result\n", name, actionName, lua, actionName, name, actionName);  
             free(oldLua);     
+            printf("%s\n", lua);
             redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
             redisGetReply(reContext, (void**)&reply);
             if (reply->type == REDIS_REPLY_ERROR) {
