@@ -12,6 +12,7 @@
 #define HASH_WHEN 2090866807 // when
 #define HASH_WHEN_ALL 3322641392 // whenAll 
 #define HASH_WHEN_ANY 3322641471 // whenAny
+#define HASH_WHEN_SOME 2273633803 // whenSome
 #define HASH_TO 5863848 // to
 #define HASH_LT 193419881 // $lt
 #define HASH_LTE 2087888878 // $lte
@@ -409,11 +410,10 @@ static unsigned int validateRuleset(char *rules) {
 
             switch (hash) {
                 case HASH_WHEN:
+                case HASH_WHEN_SOME:
                     result = validateWrappedExpression(first);
                     break;
                 case HASH_WHEN_ANY:
-                    result = validateAlgebra(first);
-                    break;
                 case HASH_WHEN_ALL:
                     result = validateAlgebra(first);
                     break;
@@ -711,7 +711,8 @@ static unsigned int unwrapAndCreateAlpha(ruleset *tree, char *rule, unsigned int
     readNextName(rule, &first, &last, &hash);
     resultOffset = NODE_M_OFFSET;
     *outPath = NULL;
-    if ((last - first) == 2) {
+    unsigned int nameLength = last - first; 
+    if (nameLength == 2) {
         if (!strncmp("$s", first, 2) || !strncmp("$m", first, 2)) {
             if (!strncmp("$s", first, 2)) {
                 resultOffset = NODE_S_OFFSET;
@@ -719,7 +720,13 @@ static unsigned int unwrapAndCreateAlpha(ruleset *tree, char *rule, unsigned int
 
             return createBeta(tree, rule, OP_ANY, nextOffset, NULL, outPath);
         }
-    }
+    } else if (nameLength >= 4) { 
+        if (!strncmp("$all", last - 4, 4)) {
+            return createBeta(tree, rule, OP_ALL, nextOffset, NULL, outPath);
+        } else if (!strncmp("$any", last - 4, 4)) {
+            return createBeta(tree, rule, OP_ANY, nextOffset, NULL, outPath);
+        } 
+    } 
 
     return createAlpha(tree, &resultOffset, rule, nextOffset);
 }
@@ -959,6 +966,7 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         }
         
         ruleAction->value.c.index = tree->actionCount;
+        ruleAction->value.c.multi = 0;
         ++tree->actionCount;
         ruleAction->type = NODE_ACTION;
 
@@ -982,6 +990,10 @@ static unsigned int createTree(ruleset *tree, char *rules) {
                 case HASH_RUN:
                     break;
                 case HASH_WHEN:
+                    result = unwrapAndCreateAlpha(tree, first, actionOffset, &betaPath);
+                    break;
+                case HASH_WHEN_SOME:
+                    ruleAction->value.c.multi = 1;
                     result = unwrapAndCreateAlpha(tree, first, actionOffset, &betaPath);
                     break;
                 case HASH_WHEN_ANY:

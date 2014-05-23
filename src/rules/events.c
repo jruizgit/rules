@@ -33,10 +33,13 @@
 #define COMP_STRING_STRING 0x0101
 
 #define ACTION_ASSERT_MESSAGE_IMMEDIATE 0
-#define ACTION_NEGATE_MESSAGE 1
-#define ACTION_ASSERT_SESSION 2
-#define ACTION_ASSERT_SESSION_IMMEDIATE 3
-#define ACTION_NEGATE_SESSION 4
+#define ACTION_ASSERT_FIRST_MESSAGE 1
+#define ACTION_ASSERT_MESSAGE 2
+#define ACTION_ASSERT_LAST_MESSAGE 3
+#define ACTION_NEGATE_MESSAGE 4
+#define ACTION_ASSERT_SESSION 5
+#define ACTION_ASSERT_SESSION_IMMEDIATE 6
+#define ACTION_NEGATE_SESSION 7
 
 typedef struct actionContext {
     void *rulesBinding;
@@ -60,7 +63,8 @@ typedef struct jsonResult {
     unsigned int hash;
     char *firstName;
     char *lastName;
-    char *message;
+    char *messages[MAX_MESSAGE_BATCH];
+    unsigned short messagesLength;
     unsigned char childrenCount;
     unsigned char children[MAX_NODE_RESULTS];
 } jsonResult;
@@ -228,6 +232,12 @@ static unsigned int handleAction(ruleset *tree, char *sid, char *mid, char *stat
     switch(actionType) {
         case ACTION_ASSERT_MESSAGE_IMMEDIATE:
             return assertMessageImmediate(tree, rulesBinding, prefix, sid, mid, state, node->value.c.index);
+        case ACTION_ASSERT_FIRST_MESSAGE:
+            return assertFirstMessage(tree, rulesBinding, prefix, sid, mid, state);
+        case ACTION_ASSERT_MESSAGE:
+            return assertMessage(*rulesBinding, prefix, sid, mid, state);
+        case ACTION_ASSERT_LAST_MESSAGE:
+            return assertLastMessage(*rulesBinding, prefix, sid, mid, state, node->value.c.index, *commandCount);
         case ACTION_NEGATE_MESSAGE:
             return negateMessage(*rulesBinding, prefix, sid, mid);
         case ACTION_ASSERT_SESSION:
@@ -488,7 +498,7 @@ static unsigned int handleSession(ruleset *tree, char *state, void *rulesBinding
     return handleAlpha(tree, sid, NULL, state, &tree->nodePool[NODE_S_OFFSET].value.a, properties, &rulesBinding, actionType, commandCount); 
 }
 
-static unsigned int handleEvent(ruleset *tree, char *message, void *rulesBinding, unsigned short actionType, unsigned short *commandCount) {
+static unsigned int handleEvent(ruleset *tree, char *message, void **rulesBinding, unsigned short actionType, unsigned short *commandCount) {
     jsonProperty properties[MAX_BUCKET_LENGTH * MAX_CONFLICTS];
     memset(properties, 0, sizeof(properties));
     int result = constructObject(NULL, message, properties);
@@ -514,7 +524,7 @@ static unsigned int handleEvent(ruleset *tree, char *message, void *rulesBinding
     strncpy(sid, idProperty->firstValue, idLength);
     sid[idLength] = '\0';
     if (actionType == ACTION_NEGATE_MESSAGE) {
-        result = removeMessage(rulesBinding, mid);
+        result = removeMessage(*rulesBinding, mid);
         if (result != RULES_OK) {
             return result;
         }
@@ -522,13 +532,13 @@ static unsigned int handleEvent(ruleset *tree, char *message, void *rulesBinding
         *commandCount = *commandCount + 1;
     }
 
-    result =  handleAlpha(tree, sid, mid, message, &tree->nodePool[NODE_M_OFFSET].value.a, properties, &rulesBinding, actionType, commandCount); 
+    result =  handleAlpha(tree, sid, mid, message, &tree->nodePool[NODE_M_OFFSET].value.a, properties, rulesBinding, actionType, commandCount); 
     if (result == ERR_NEW_SESSION) {
         char session[11 + idLength];
         strcpy(session, "{\"id\":\"");
         strncpy(session + 7, sid, idLength);
         strcpy(session + 7 + idLength, "\"}");
-        result = handleSession(tree, session, rulesBinding, ACTION_ASSERT_SESSION_IMMEDIATE, commandCount);
+        result = handleSession(tree, session, *rulesBinding, ACTION_ASSERT_SESSION_IMMEDIATE, commandCount);
         if (result == ERR_EVENT_NOT_HANDLED) {
             return RULES_OK;
         }
@@ -540,7 +550,88 @@ static unsigned int handleEvent(ruleset *tree, char *message, void *rulesBinding
 unsigned int assertEvent(void *handle, char *message) {
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
-    return handleEvent(handle, message, rulesBinding, ACTION_ASSERT_MESSAGE_IMMEDIATE, &commandCount);
+    return handleEvent(handle, message, &rulesBinding, ACTION_ASSERT_MESSAGE_IMMEDIATE, &commandCount);
+}
+
+unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results) {
+    unsigned int messagesLength = 10;
+    unsigned int *resultsArray = malloc(sizeof(unsigned int) * messagesLength);
+    if (!resultsArray) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    *resultsLength = 0;
+    unsigned short commandCount = 0;
+    unsigned int result;
+    void *rulesBinding = NULL;
+    char temp;
+    char *first = NULL;
+    char *last = NULL;
+    char *nextFirst = messages;
+    char *nextLast;
+    unsigned char type;
+    unsigned short actionType = ACTION_ASSERT_FIRST_MESSAGE;
+    while (readNextArrayValue(nextFirst, &nextFirst, &nextLast, &type) == RULES_OK) {
+        if (first != NULL) {
+            temp = last[1];
+            last[1] = '\0';
+            result = handleEvent(handle, first, &rulesBinding, actionType, &commandCount);
+            if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+                last[1] = temp;
+                free(resultsArray);
+                return result;
+            }
+
+            if (result == RULES_OK) {
+                actionType = ACTION_ASSERT_MESSAGE;
+            }
+
+            if (*resultsLength >= messagesLength) {
+                messagesLength = messagesLength * 2;
+                resultsArray = realloc(results, sizeof(unsigned int) * messagesLength);
+                if (!resultsArray) {
+                    return ERR_OUT_OF_MEMORY;
+                }
+            }
+
+            resultsArray[*resultsLength] = result;
+            ++*resultsLength;
+            last[1] = temp;
+        }
+
+        first = nextFirst;
+        last = nextLast;
+        nextFirst = nextLast;
+    }
+
+    if (actionType == ACTION_ASSERT_FIRST_MESSAGE) {
+        actionType = ACTION_ASSERT_MESSAGE_IMMEDIATE;
+    } else {
+        actionType = ACTION_ASSERT_LAST_MESSAGE;
+    }
+
+    temp = last[1];
+    last[1] = '\0';
+    result = handleEvent(handle, first, &rulesBinding, actionType, &commandCount);
+    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+        last[1] = temp;
+        free(resultsArray);
+        return result;
+    }
+
+    if (*resultsLength >= messagesLength) {
+        ++messagesLength;
+        resultsArray = realloc(results, sizeof(unsigned int) * messagesLength);
+        if (!resultsArray) {
+            return ERR_OUT_OF_MEMORY;
+        }
+    }
+
+    resultsArray[*resultsLength] = result;
+    ++*resultsLength;
+    last[1] = temp;
+    *results = resultsArray;
+    return RULES_OK;
 }
 
 static unsigned int createSession(redisReply *reply, char *firstSid, char *lastSid, char **session) {
@@ -583,6 +674,7 @@ static unsigned int createMessages(redisReply *reply,  char **firstSid, char **l
                 results[0].firstName = firstName;
                 results[0].lastName = lastName;
                 results[0].hash = hash;
+                results[0].messagesLength = 0;
                 current = &results[0];   
             } else {
                 unsigned char found = 0;
@@ -609,6 +701,7 @@ static unsigned int createMessages(redisReply *reply,  char **firstSid, char **l
                     current->firstName = firstName;
                     current->lastName = lastName;
                     current->hash = hash;
+                    current->messagesLength = 0;
                     ++nodesCount;
                     messagesLength = messagesLength + current->lastName - current->firstName + 7;
                 }
@@ -618,8 +711,12 @@ static unsigned int createMessages(redisReply *reply,  char **firstSid, char **l
             lastName = firstName;
         }
 
-        current->message = reply->element[i + 1]->str;
-        messagesLength = messagesLength + strlen(current->message) + 1;
+        current->messages[current->messagesLength] = reply->element[i + 1]->str;
+        messagesLength = messagesLength + strlen(current->messages[current->messagesLength]) + 1;
+        ++current->messagesLength;
+        if (current->messagesLength == 2) {
+            messagesLength = messagesLength + 2;
+        }
     }
 
     *firstSid = results[0].firstName;
@@ -660,10 +757,28 @@ static unsigned int createMessages(redisReply *reply,  char **firstSid, char **l
                 ++currentPosition;
 
                 if (!current->childrenCount) {
-                   strcpy(currentPosition, current->message);
-                   currentPosition = currentPosition + strlen(current->message); 
-                   currentPosition[0] = ',';
-                   ++currentPosition;
+                    if (current->messagesLength == 1) {
+                        strcpy(currentPosition, current->messages[0]);
+                        currentPosition = currentPosition + strlen(current->messages[0]); 
+                        currentPosition[0] = ',';
+                        ++currentPosition;
+                    } else {
+                        currentPosition[0] = '[';
+                        ++currentPosition;
+                        for (unsigned short i = 0; i < current->messagesLength; ++i) {
+                            strcpy(currentPosition, current->messages[i]);
+                            currentPosition = currentPosition + strlen(current->messages[i]); 
+                            
+                            if (i < (current->messagesLength - 1)) {
+                                currentPosition[0] = ',';
+                                ++currentPosition;
+                            }
+                        }
+                        currentPosition[0] = ']';
+                        ++currentPosition;
+                        currentPosition[0] = ',';
+                        ++currentPosition;
+                    }
                 }
                 else {
                     currentPosition[0] = '{';
@@ -717,7 +832,7 @@ unsigned int startAction(void *handle, char **session, char **messages, void **a
 }
 
 unsigned int completeAction(void *handle, void *actionHandle, char *session) {
-    unsigned short commandCount = 1;
+    unsigned short commandCount = 4;
     actionContext *context = (actionContext*)actionHandle;
     redisReply *reply = context->reply;
     void *rulesBinding = context->rulesBinding;
@@ -743,10 +858,10 @@ unsigned int completeAction(void *handle, void *actionHandle, char *session) {
             return result;
         }
     }
-
+   
     for (unsigned long i = 4; i < reply->elements; i = i + 2) {
         if (strcmp(reply->element[i]->str, "null") != 0) {
-            result = handleEvent(handle, reply->element[i]->str, rulesBinding, ACTION_NEGATE_MESSAGE, &commandCount);
+            result = handleEvent(handle, reply->element[i]->str, &rulesBinding, ACTION_NEGATE_MESSAGE, &commandCount);
             if (result != RULES_OK) {
                 freeReplyObject(reply);
                 free(actionHandle);

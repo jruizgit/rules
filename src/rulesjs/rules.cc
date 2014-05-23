@@ -100,6 +100,41 @@ Handle<Value> jsAssertEvent(const Arguments& args) {
     return scope.Close(Undefined());
 }
 
+Handle<Value> jsAssertEvents(const Arguments& args) {
+    HandleScope scope;
+
+    if (args.Length() < 2) {
+        ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+        ThrowException(Exception::TypeError(String::New("Wrong argument type")));
+    } else {
+        unsigned int *results;
+        unsigned int resultsLength;
+        unsigned int result = assertEvents((void *)args[0]->IntegerValue(), 
+                                           *v8::String::Utf8Value(args[1]->ToString()), &resultsLength, &results);
+        
+        if (result == RULES_OK) {
+            Handle<Array> array = Array::New(resultsLength);
+            for (unsigned int i = 0; i < resultsLength; ++i) {
+                if (results[i] == RULES_OK) {
+                    array->Set(i, Number::New(1));
+                } else {
+                    array->Set(i, Number::New(0));
+                }
+            }
+            free(results);
+            return scope.Close(array);
+        } else {
+            char * message;
+            asprintf(&message, "Could not assert event, error code: %d", result);
+            ThrowException(Exception::TypeError(String::New(message)));
+            free(message);
+        } 
+    }
+
+    return scope.Close(Undefined());
+}
+
 Handle<Value> jsStartAction(const Arguments& args) {
     HandleScope scope;
 
@@ -188,6 +223,9 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewSymbol("assertEvent"),
         FunctionTemplate::New(jsAssertEvent)->GetFunction());
+
+    exports->Set(String::NewSymbol("assertEvents"),
+        FunctionTemplate::New(jsAssertEvents)->GetFunction());
 
     exports->Set(String::NewSymbol("startAction"),
         FunctionTemplate::New(jsStartAction)->GetFunction());

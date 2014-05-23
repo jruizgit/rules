@@ -3,6 +3,16 @@ r = require('../build/release/rules.node');
 handle = r.createRuleset('rules',  
     JSON.stringify({  
         r1: { 
+            whenSome: { $and: [{ amount: 10000 }, { subject: 'approve'}] }, 
+            run: 'pending' 
+        }
+    })
+);
+r.deleteRuleset(handle);
+
+handle = r.createRuleset('rules',  
+    JSON.stringify({  
+        r1: { 
             when: { $and: [{ amount: 10000 }, { subject: 'approve'}] }, 
             run: 'pending' 
         }

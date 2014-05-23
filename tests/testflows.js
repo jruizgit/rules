@@ -1,7 +1,7 @@
 var d = require('../lib/durable');
 
 d.run({
-    approval: {
+    approval1: {
         r1: {
             when: { $and: [
                 { subject: 'approve' },
@@ -113,42 +113,42 @@ d.run({
         }
     },
 }, '', null, function(host) {
-    host.post({ id: '1', sid: 1, ruleset: 'approval', subject: 'approve', amount: 100 }, function (err) {
+    host.post('approval1', { id: '1', sid: 1, subject: 'approve', amount: 100 }, function (err) {
         if (err) {
             console.log(err);
         } else {
             console.log('ok');
         }
     });
-    host.post({ id: '2', sid: 1, ruleset: 'approval', subject: 'approved' }, function (err) {
+    host.post('approval1', { id: '2', sid: 1, subject: 'approved' }, function (err) {
         if (err) {
             console.log(err);
         } else {
             console.log('ok');
         }
     });
-    host.post({ id: '1', sid: 1, ruleset: 'approval2', subject: 'approve', amount: 100 }, function (err) {
+    host.post('approval2', { id: '1', sid: 1, subject: 'approve', amount: 100 }, function (err) {
         if (err) {
             console.log(err);
         } else {
             console.log('ok');
         }
     });
-    host.post({ id: '2', sid: 1, ruleset: 'approval2', subject: 'ok' }, function (err) {
+    host.post('approval2', { id: '2', sid: 1, subject: 'ok' }, function (err) {
         if (err) {
             console.log(err);
         } else {
             console.log('ok');
         }
     });
-    host.post({ id: '1', sid: 1, ruleset: 'approval3', subject: 'approve', amount: 100 }, function (err) {
+    host.post('approval3', { id: '1', sid: 1, subject: 'approve', amount: 100 }, function (err) {
         if (err) {
             console.log(err);
         } else {
             console.log('ok');
         }
     });
-    host.post({ id: '2', sid: 1, ruleset: 'approval3', subject: 'denied' }, function (err) {
+    host.post('approval3', { id: '2', sid: 1, subject: 'denied' }, function (err) {
         if (err) {
             console.log(err);
         } else {
