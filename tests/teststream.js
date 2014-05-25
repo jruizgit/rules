@@ -23,7 +23,7 @@ d.run({
     },
     approval3: {
         r2: {
-            whenAny: { 
+            whenAll: { 
                 a$some: { $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
                 $s: { $nex: { done: 1 } }            
             },

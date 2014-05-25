@@ -123,7 +123,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
             asprintf(&lua, "local signature = \"$s\" .. \",\" .. ARGV[2]\n"
                            "local key = ARGV[1] .. \"!\" .. ARGV[2]\n"
                            "local result = 0\n"
-                           "local limit = tonumber(ARGV[7])\n"
                            "local i\n"
                            "if (ARGV[6] == \"1\") then\n"
                            "  redis.call(\"hset\", KEYS[1], ARGV[2], ARGV[4])\n"
@@ -136,8 +135,9 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                            "local res = redis.call(\"hexists\", \"%s!r\", \"%s\")\n" 
                            "if (res ~= 0) then\n"
                            "  return result\n"
-                           "end\n%s", name, actionName, lua);  
-            free(oldLua);     
+                           "end\n%s"
+                           "return result\n", name, actionName, lua);  
+            free(oldLua); 
             redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
             redisGetReply(reContext, (void**)&reply);
             if (reply->type == REDIS_REPLY_ERROR) {
