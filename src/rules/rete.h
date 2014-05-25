@@ -44,7 +44,6 @@ typedef struct action {
     unsigned int index;
     unsigned int queryLength;
     unsigned int queryOffset;
-    unsigned char multi;
 } action;
 
 typedef struct node {

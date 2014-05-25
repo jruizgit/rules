@@ -590,13 +590,25 @@ static unsigned int createBetaConnector(ruleset *tree, char *rule, path *betaPat
             } else if (!strncmp("$any", last - 4, 4)) {
                 nameLength = nameLength - 4;
                 operator = OP_ANY;
-            } 
-        } 
+            }
+        }        
         
         unsigned int stringOffset;
-        result = storeString(tree, first, &stringOffset, nameLength);
-        if (result != RULES_OK) {
-            return result;
+        if (nameLength >= 5 && !strncmp("$some", last - 5, 5)) {
+            nameLength = nameLength - 4;
+            char temp = first[nameLength - 1];
+            first[nameLength - 1] = '+';
+            result = storeString(tree, first, &stringOffset, nameLength);
+            if (result != RULES_OK) {
+                return result;
+            }
+
+            first[nameLength - 1] = temp;
+        } else {
+            result = storeString(tree, first, &stringOffset, nameLength);
+            if (result != RULES_OK) {
+                return result;
+            }
         }
 
         node *connector;
@@ -966,7 +978,6 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         }
         
         ruleAction->value.c.index = tree->actionCount;
-        ruleAction->value.c.multi = 0;
         ++tree->actionCount;
         ruleAction->type = NODE_ACTION;
 
@@ -974,14 +985,9 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         // need to resolve namespace every time it is used.
         char *namespace = &tree->stringPool[tree->nameOffset];
         int namespaceLength = strlen(namespace); 
-        char actionName[namespaceLength + lastName - firstName + 1];
+        char actionName[namespaceLength + lastName - firstName + 2];
         strncpy(actionName, firstName, lastName - firstName);
-        actionName[lastName - firstName] = '!'; 
-        strncpy(&actionName[lastName - firstName + 1], namespace, namespaceLength);
-        result = storeString(tree, actionName, &ruleAction->nameOffset, namespaceLength + lastName - firstName + 1);
-        if (result != RULES_OK) {
-            return result;
-        }
+        
         readNextValue(lastName, &first, &lastRuleValue, &type);
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
@@ -993,7 +999,8 @@ static unsigned int createTree(ruleset *tree, char *rules) {
                     result = unwrapAndCreateAlpha(tree, first, actionOffset, &betaPath);
                     break;
                 case HASH_WHEN_SOME:
-                    ruleAction->value.c.multi = 1;
+                    actionName[lastName - firstName] = '+';
+                    ++lastName; 
                     result = unwrapAndCreateAlpha(tree, first, actionOffset, &betaPath);
                     break;
                 case HASH_WHEN_ANY:
@@ -1005,6 +1012,18 @@ static unsigned int createTree(ruleset *tree, char *rules) {
             }
             result = readNextName(last, &first, &last, &hash);
         }
+
+        // tree->stringPool can change after storing strings
+        // need to resolve namespace every time it is used.
+        namespace = &tree->stringPool[tree->nameOffset];
+        ruleAction = &tree->nodePool[actionOffset];
+        actionName[lastName - firstName] = '!'; 
+        strncpy(&actionName[lastName - firstName + 1], namespace, namespaceLength);
+        result = storeString(tree, actionName, &ruleAction->nameOffset, namespaceLength + lastName - firstName + 1);
+        if (result != RULES_OK) {
+            return result;
+        }
+        
         result = fixupQueries(tree, actionOffset, betaPath);
         if (result != RULES_OK) {
             return result;

@@ -13,14 +13,24 @@ d.run({
     approval2: {
         r2: {
             whenSome: { 
-                a$all: {
-                    $m: { $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
+                a$any: {
+                    a: { $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
                     $s: { $nex: { done: 1 } }
                 }
             },
             run: requestApproval
         },
+    },
+    approval3: {
+        r2: {
+            whenAny: { 
+                a$some: { $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
+                $s: { $nex: { done: 1 } }            
+            },
+            run: requestApproval
+        },
     }
+
 }, '', null, function(host) {
     host.postBatch('approval1', [{ id: '0', sid: 1, subject: 'approve', amount: 100 }, 
                                 { id: '1', sid: 1, subject: 'approve', amount: 100 },
@@ -39,6 +49,7 @@ d.run({
             console.log('ok');
         }
     });
+
     host.postBatch('approval2', [{ id: '0', sid: 1, subject: 'approve', amount: 100 }, 
                                 { id: '1', sid: 1, subject: 'approve', amount: 100 },
                                 { id: '2', sid: 1, subject: 'approve', amount: 100 },
@@ -51,7 +62,34 @@ d.run({
             console.log('ok');
         }
     });
+
     host.postBatch('approval2', [{ id: '5', sid: 1, subject: 'approve', amount: 100 }, 
+                                { id: '6', sid: 1, subject: 'approve', amount: 100 },
+                                { id: '7', sid: 1, subject: 'approve', amount: 100 },
+                                { id: '8', sid: 1, subject: 'approve', amount: 100 },
+                                { id: '9', sid: 1, subject: 'approve', amount: 100 }], 
+    function (err) {
+        if (err) {
+            console.log(err);
+        } else {
+            console.log('ok');
+        }
+    });
+
+    host.postBatch('approval3', [{ id: '0', sid: 1, subject: 'approve', amount: 100 }, 
+                                { id: '1', sid: 1, subject: 'approve', amount: 100 },
+                                { id: '2', sid: 1, subject: 'approve', amount: 100 },
+                                { id: '3', sid: 1, subject: 'approve', amount: 100 },
+                                { id: '4', sid: 1, subject: 'approve', amount: 100 }], 
+    function (err) {
+        if (err) {
+            console.log(err);
+        } else {
+            console.log('ok');
+        }
+    });
+
+    host.postBatch('approval3', [{ id: '5', sid: 1, subject: 'approve', amount: 100 }, 
                                 { id: '6', sid: 1, subject: 'approve', amount: 100 },
                                 { id: '7', sid: 1, subject: 'approve', amount: 100 },
                                 { id: '8', sid: 1, subject: 'approve', amount: 100 },

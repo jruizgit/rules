@@ -61,7 +61,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
         if (currentNode->type == NODE_ACTION) {
             unsigned int queryLength = currentNode->value.c.queryLength;
             char *actionName = &tree->stringPool[currentNode->nameOffset];
-            unsigned int elseCount = 0;
             for (unsigned int ii = 0; ii < queryLength; ++ii) {
                 unsigned int lineOffset = tree->queryPool[currentNode->value.c.queryOffset + ii];
                 char *currentLine = &tree->stringPool[lineOffset];
@@ -70,20 +69,33 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                 while (last[0] != '\0') {
                     if (last[0] == ' ') {
                         last[0] = '\0';
+                        unsigned char limit = 0;
+                        if (strchr(currentLine, '+')) {
+                            limit = MAX_MESSAGE_BATCH;
+                        }
+
                         if (lua) {
                             oldLua = lua;
                             asprintf(&lua, "%skey = \"%s!\" .. ARGV[2]\n"
-                                           "res = redis.call(\"zrange\", key, i, i)\n"
+                                           "res = redis.call(\"zrange\", key, 0, %d)\n"
                                            "if (res[1]) then\n"
-                                           "signature = signature .. \",\" .. key .. \",\" .. res[1]\n", 
-                                    lua, currentLine);
+                                           "  i = 1\n"
+                                           "  while(res[i]) do\n"
+                                           "    signature = signature .. \",\" .. key .. \",\" .. res[i]\n"
+                                           "    i = i + 1\n"
+                                           "  end\n", 
+                                    lua, currentLine, limit);
                             free(oldLua);
                         } else {
                             asprintf(&lua, "key = \"%s!\" .. ARGV[2]\n"
-                                           "res = redis.call(\"zrange\", key, i, i)\n"
+                                           "res = redis.call(\"zrange\", key, 0, %d)\n"
                                            "if (res[1]) then\n"
-                                           "signature = signature .. \",\" .. key .. \",\" .. res[1]\n", 
-                                    currentLine);
+                                           "  i = 1\n"
+                                           "  while (res[i]) do\n"
+                                           "    signature = signature .. \",\" .. key .. \",\" .. res[i]\n"
+                                           "    i = i + 1\n"
+                                           "  end\n", 
+                                    currentLine, limit);
                         }
 
                         last[0] = ' ';
@@ -94,42 +106,25 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                 } 
 
                 oldLua = lua;
-                asprintf(&lua, "%squeueAction = 1\n"
-                               "i = i + 1\n", lua);
+                asprintf(&lua, "%s  redis.call(\"zadd\", KEYS[2], ARGV[5], \"%s\")\n"
+                               "  redis.call(\"hset\", \"%s!r\", \"%s\", signature)\n"
+                               "  return result\n", lua, actionName, name, actionName);
+              
                 free(oldLua);
 
                 for (unsigned int iii = 0; iii < clauseCount; ++iii) {
                     oldLua = lua;
-                    if (ii < (queryLength -1) && iii == (clauseCount -1)) {
-                        asprintf(&lua, "%selse\n", lua);
-                        ++ elseCount;
-                    } else {
-                        asprintf(&lua, "%send\n", lua);
-                    }
+                    asprintf(&lua, "%send\n", lua);
                     free(oldLua);
                 }
-            }
-
-            for (unsigned int ii = 0; ii < elseCount; ++ii) {
-                oldLua = lua;
-                asprintf(&lua, "%send\n", lua);
-                free(oldLua);
-            }
-
-            if (currentNode->value.c.multi) {
-                oldLua = lua;
-                asprintf(&lua, "res = { 1 }\n"
-                               "while (res[1] and (i < %d)) do\n"
-                               "%send\n", MAX_MESSAGE_BATCH, lua);
-                free(oldLua);
             }
 
             oldLua = lua;
             asprintf(&lua, "local signature = \"$s\" .. \",\" .. ARGV[2]\n"
                            "local key = ARGV[1] .. \"!\" .. ARGV[2]\n"
                            "local result = 0\n"
-                           "local queueAction = 0\n"
-                           "local i = 0\n"
+                           "local limit = tonumber(ARGV[7])\n"
+                           "local i\n"
                            "if (ARGV[6] == \"1\") then\n"
                            "  redis.call(\"hset\", KEYS[1], ARGV[2], ARGV[4])\n"
                            "  redis.call(\"zadd\", key, ARGV[5], ARGV[2])\n"
@@ -141,14 +136,8 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                            "local res = redis.call(\"hexists\", \"%s!r\", \"%s\")\n" 
                            "if (res ~= 0) then\n"
                            "  return result\n"
-                           "end\n"
-                           "%sif (queueAction == 1) then\n"
-                           "  redis.call(\"zadd\", KEYS[2], ARGV[5], \"%s\")\n"
-                           "  redis.call(\"hset\", \"%s!r\", \"%s\", signature)\n"
-                           "end\n"
-                           "return result\n", name, actionName, lua, actionName, name, actionName);  
+                           "end\n%s", name, actionName, lua);  
             free(oldLua);     
-            printf("%s\n", lua);
             redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
             redisGetReply(reContext, (void**)&reply);
             if (reply->type == REDIS_REPLY_ERROR) {
@@ -174,7 +163,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                     "  local res = { action[1] }\n"
                     "  local i = 0\n"
                     "  local skip = 0\n"
-                    "  for token in string.gmatch(signature, \"([%w%.%-%$_!]+)\") do\n"
+                    "  for token in string.gmatch(signature, \"([%w%.%-%$%+_!]+)\") do\n"
                     "    if (i > 1 and string.match(token, \"%$s!\")) then\n"
                     "      table.insert(res, token)\n"
                     "      skip = 1\n"

@@ -226,8 +226,8 @@ static unsigned char compareString(char* leftFirst, char* leftLast, char* right,
 
 }
 
-static unsigned int handleAction(ruleset *tree, char *sid, char *mid, char *state, char *prefix, 
-                                node *node, void **rulesBinding, unsigned short actionType, unsigned short *commandCount) {
+static unsigned int handleAction(ruleset *tree, char *sid, char *mid, char *state, char *prefix, node *node, 
+                                 void **rulesBinding, unsigned short actionType, unsigned short *commandCount) {
     *commandCount = *commandCount + 1;
     switch(actionType) {
         case ACTION_ASSERT_MESSAGE_IMMEDIATE:
@@ -699,7 +699,12 @@ static unsigned int createMessages(redisReply *reply,  char **firstSid, char **l
                     current = &results[nodesCount];
                     current->childrenCount = 0;
                     current->firstName = firstName;
-                    current->lastName = lastName;
+                    if (*lastName != '+') {
+                        current->lastName = lastName;
+                    }
+                    else {
+                        current->lastName = lastName - 1;   
+                    }
                     current->hash = hash;
                     current->messagesLength = 0;
                     ++nodesCount;
