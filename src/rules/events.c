@@ -229,11 +229,22 @@ static unsigned char compareString(char* leftFirst, char* leftLast, char* right,
 static unsigned int handleAction(ruleset *tree, char *sid, char *mid, char *state, char *prefix, node *node, 
                                  void **rulesBinding, unsigned short actionType, unsigned short *commandCount) {
     *commandCount = *commandCount + 1;
+    unsigned int result;
     switch(actionType) {
         case ACTION_ASSERT_MESSAGE_IMMEDIATE:
-            return assertMessageImmediate(tree, rulesBinding, prefix, sid, mid, state, node->value.c.index);
+            result = resolveBinding(tree, sid, rulesBinding);
+            if (result != RULES_OK) {
+                return result;
+            }
+
+            return assertMessageImmediate(*rulesBinding, prefix, sid, mid, state, node->value.c.index);
         case ACTION_ASSERT_FIRST_MESSAGE:
-            return assertFirstMessage(tree, rulesBinding, prefix, sid, mid, state);
+            result = resolveBinding(tree, sid, rulesBinding);
+            if (result != RULES_OK) {
+                return result;
+            }
+
+            return assertFirstMessage(*rulesBinding, prefix, sid, mid, state);
         case ACTION_ASSERT_MESSAGE:
             return assertMessage(*rulesBinding, prefix, sid, mid, state);
         case ACTION_ASSERT_LAST_MESSAGE:
@@ -243,6 +254,11 @@ static unsigned int handleAction(ruleset *tree, char *sid, char *mid, char *stat
         case ACTION_ASSERT_SESSION:
             return assertSession(*rulesBinding, prefix, sid, state, node->value.c.index);
         case ACTION_ASSERT_SESSION_IMMEDIATE:
+            result = resolveBinding(tree, sid, rulesBinding);
+            if (result != RULES_OK) {
+                return result;
+            }
+
             return assertSessionImmediate(*rulesBinding, prefix, sid, state, node->value.c.index);
         case ACTION_NEGATE_SESSION:
             return negateSession(*rulesBinding, prefix, sid);
@@ -634,6 +650,12 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
     return RULES_OK;
 }
 
+unsigned int assertState(void *handle, char *state) {
+    unsigned short commandCount = 0;
+    void *rulesBinding = NULL;
+    return handleSession(handle, state, &rulesBinding, ACTION_ASSERT_SESSION_IMMEDIATE, &commandCount);
+}
+
 static unsigned int createSession(redisReply *reply, char *firstSid, char *lastSid, char **session) {
     if (reply->element[2]->type == REDIS_REPLY_NIL) {        
         int idLength = lastSid - firstSid + 1;
@@ -898,4 +920,14 @@ unsigned int abandonAction(void *handle, void *actionHandle) {
     freeReplyObject(((actionContext*)actionHandle)->reply);
     free(actionHandle);
     return RULES_OK;
+}
+
+unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *timer) {
+    void *rulesBinding;
+    unsigned int result = resolveBinding(handle, sid, &rulesBinding);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    return registerTimer(rulesBinding, duration, timer);
 }

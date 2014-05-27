@@ -135,6 +135,33 @@ Handle<Value> jsAssertEvents(const Arguments& args) {
     return scope.Close(Undefined());
 }
 
+Handle<Value> jsAssertState(const Arguments& args) {
+    HandleScope scope;
+
+    if (args.Length() < 2) {
+        ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+        ThrowException(Exception::TypeError(String::New("Wrong argument type")));
+    } else {
+        unsigned int result = assertState((void *)args[0]->IntegerValue(),
+                                           *v8::String::Utf8Value(args[1]->ToString()));
+        
+        if (result == RULES_OK) {
+            return scope.Close(Number::New(1));
+        }
+        else if (result == ERR_EVENT_NOT_HANDLED) {
+            return scope.Close(Number::New(0));
+        } else {
+            char * message;
+            asprintf(&message, "Could not assert state, error code: %d", result);
+            ThrowException(Exception::TypeError(String::New(message)));
+            free(message);
+        } 
+    }
+
+    return scope.Close(Undefined());
+}
+
 Handle<Value> jsStartAction(const Arguments& args) {
     HandleScope scope;
 
@@ -202,7 +229,31 @@ Handle<Value> jsAbandonAction(const Arguments& args) {
         
         if (result != RULES_OK) {
             char * message;
-            asprintf(&message, "Could not complete action, error code: %d", result);
+            asprintf(&message, "Could not abandon action, error code: %d", result);
+            ThrowException(Exception::TypeError(String::New(message)));
+            free(message);
+        } 
+    }
+
+    return scope.Close(Undefined());
+}
+
+Handle<Value> jsStartTimer(const Arguments& args) {
+    HandleScope scope;
+
+    if (args.Length() < 3) {
+        ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsString() || !args[2]->IsNumber() || !args[3]->IsString()) {
+        ThrowException(Exception::TypeError(String::New("Wrong argument type")));
+    } else {
+        unsigned int result = startTimer((void *)args[0]->IntegerValue(),
+                                         *v8::String::Utf8Value(args[1]->ToString()),
+                                         args[2]->IntegerValue(),
+                                         *v8::String::Utf8Value(args[3]->ToString()));
+        
+        if (result != RULES_OK) {
+            char * message;
+            asprintf(&message, "Could not start timer, error code: %d", result);
             ThrowException(Exception::TypeError(String::New(message)));
             free(message);
         } 
@@ -227,6 +278,9 @@ void init(Handle<Object> exports) {
     exports->Set(String::NewSymbol("assertEvents"),
         FunctionTemplate::New(jsAssertEvents)->GetFunction());
 
+    exports->Set(String::NewSymbol("assertState"),
+        FunctionTemplate::New(jsAssertState)->GetFunction());
+
     exports->Set(String::NewSymbol("startAction"),
         FunctionTemplate::New(jsStartAction)->GetFunction());
 
@@ -235,6 +289,9 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewSymbol("abandonAction"),
         FunctionTemplate::New(jsAbandonAction)->GetFunction());
+
+    exports->Set(String::NewSymbol("startTimer"),
+        FunctionTemplate::New(jsStartTimer)->GetFunction());
 }
 
 NODE_MODULE(rules, init)
