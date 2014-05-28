@@ -6,7 +6,7 @@ d.run({
             when: { start: 'yes' },
             run: function (s) {
                 s.start = new Date().toString();
-                s.startTimer('myTimer', 5000);
+                s.startTimer('myTimer', 5);
             }
         },
         r2: {
