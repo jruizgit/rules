@@ -262,6 +262,31 @@ Handle<Value> jsStartTimer(const Arguments& args) {
     return scope.Close(Undefined());
 }
 
+Handle<Value> jsAssertTimers(const Arguments& args) {
+    HandleScope scope;
+
+    if (args.Length() < 1) {
+        ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
+    } else if (!args[0]->IsNumber()) {
+        ThrowException(Exception::TypeError(String::New("Wrong argument type")));
+    } else {
+        unsigned int result = assertTimers((void *)args[0]->IntegerValue());
+        
+        if (result == RULES_OK) {
+            return scope.Close(Number::New(1));
+        } else if (result == ERR_NO_TIMERS_AVAILABLE) {
+            return scope.Close(Number::New(0));
+        } else {
+            char * message;
+            asprintf(&message, "Could not assert timers, error code: %d", result);
+            ThrowException(Exception::TypeError(String::New(message)));
+            free(message);
+        } 
+    }
+
+    return scope.Close(Undefined());
+}
+
 void init(Handle<Object> exports) {
     exports->Set(String::NewSymbol("createRuleset"),
         FunctionTemplate::New(jsCreateRuleset)->GetFunction());
@@ -277,6 +302,9 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewSymbol("assertEvents"),
         FunctionTemplate::New(jsAssertEvents)->GetFunction());
+
+    exports->Set(String::NewSymbol("assertTimers"),
+        FunctionTemplate::New(jsAssertTimers)->GetFunction());
 
     exports->Set(String::NewSymbol("assertState"),
         FunctionTemplate::New(jsAssertState)->GetFunction());

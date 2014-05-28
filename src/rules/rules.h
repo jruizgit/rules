@@ -22,7 +22,8 @@
 #define ERR_CONNECT_REDIS 301
 #define ERR_REDIS_ERROR 302
 #define ERR_NO_ACTION_AVAILABLE 303
-#define ERR_NEW_SESSION 304
+#define ERR_NO_TIMERS_AVAILABLE 304
+#define ERR_NEW_SESSION 305
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,6 +39,7 @@ unsigned int startAction(void *handle, char **session, char **messages, void **a
 unsigned int completeAction(void *handle, void *actionHandle, char *session);
 unsigned int abandonAction(void *handle, void *actionHandle);
 unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *timer);
+unsigned int assertTimers(void *handle);
 
 #ifdef __cplusplus
 }

@@ -40,6 +40,7 @@
 #define ACTION_ASSERT_SESSION 5
 #define ACTION_ASSERT_SESSION_IMMEDIATE 6
 #define ACTION_NEGATE_SESSION 7
+#define ACTION_ASSERT_TIMER 8
 
 typedef struct actionContext {
     void *rulesBinding;
@@ -262,6 +263,8 @@ static unsigned int handleAction(ruleset *tree, char *sid, char *mid, char *stat
             return assertSessionImmediate(*rulesBinding, prefix, sid, state, node->value.c.index);
         case ACTION_NEGATE_SESSION:
             return negateSession(*rulesBinding, prefix, sid);
+        case ACTION_ASSERT_TIMER:
+            return assertTimer(*rulesBinding, prefix, sid, mid, state, node->value.c.index);
     }
     
     return RULES_OK;
@@ -904,22 +907,51 @@ unsigned int completeAction(void *handle, void *actionHandle, char *session) {
         return result;
     }
 
-    result = executeCommands(rulesBinding, commandCount);
-    if (result != RULES_OK) {
-        freeReplyObject(reply);
-        free(actionHandle);
-        return result;
-    }
-
+    result = executeCommands(rulesBinding, commandCount);    
     freeReplyObject(reply);
     free(actionHandle);
-    return RULES_OK;
+    return result;
 }
 
 unsigned int abandonAction(void *handle, void *actionHandle) {
     freeReplyObject(((actionContext*)actionHandle)->reply);
     free(actionHandle);
     return RULES_OK;
+}
+
+unsigned int assertTimers(void *handle) {
+    unsigned short commandCount = 2;
+    redisReply *reply;
+    void *rulesBinding;
+    unsigned int result = peekTimers(handle, &rulesBinding, &reply);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    result = prepareCommands(rulesBinding);
+    if (result != RULES_OK) {
+        freeReplyObject(reply);
+        return result;
+    }
+
+    for (unsigned long i = 0; i < reply->elements; ++i) {
+        result = removeTimer(rulesBinding, reply->element[i]->str);
+        if (result != RULES_OK) {
+            freeReplyObject(reply);
+            return result;
+        }
+
+        ++commandCount;
+        result = handleEvent(handle, reply->element[i]->str, &rulesBinding, ACTION_ASSERT_TIMER, &commandCount);
+        if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+            freeReplyObject(reply);
+            return result;
+        }
+    }
+
+    result = executeCommands(rulesBinding, commandCount);
+    freeReplyObject(reply);
+    return result;
 }
 
 unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *timer) {
