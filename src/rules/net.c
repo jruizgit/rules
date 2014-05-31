@@ -595,6 +595,17 @@ unsigned int negateMessage(void *rulesBinding, char *key, char *sid, char *mid) 
     return RULES_OK;
 }
 
+unsigned int storeSession(void *rulesBinding, char *sid, char *state) {
+    binding *currentBinding = (binding*)rulesBinding;
+    redisContext *reContext = currentBinding->reContext;
+    int result = redisAppendCommand(reContext, "hset %s %s %s", currentBinding->sessionHashset, sid, state);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    return RULES_OK;
+}
+
 unsigned int assertSession(void *rulesBinding, char *key, char *sid, char *state, unsigned int actionIndex) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;

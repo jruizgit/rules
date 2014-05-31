@@ -497,7 +497,7 @@ static unsigned int getId(jsonProperty *allProperties, unsigned int idHash, json
     return RULES_OK;
 }
 
-static unsigned int handleSession(ruleset *tree, char *state, void *rulesBinding, unsigned short actionType, unsigned short *commandCount) {
+static unsigned int handleSession(ruleset *tree, char *state, void *rulesBinding, unsigned short actionType, unsigned short *commandCount, unsigned char store) {
     jsonProperty properties[MAX_BUCKET_LENGTH * MAX_CONFLICTS];
     memset(properties, 0, sizeof(properties));
     int result = constructObject(NULL, state, properties);
@@ -514,7 +514,13 @@ static unsigned int handleSession(ruleset *tree, char *state, void *rulesBinding
     char sid[sidLength + 1];
     strncpy(sid, sidProperty->firstValue, sidLength);
     sid[sidLength] = '\0';
-    return handleAlpha(tree, sid, NULL, state, &tree->nodePool[NODE_S_OFFSET].value.a, properties, &rulesBinding, actionType, commandCount); 
+    result = handleAlpha(tree, sid, NULL, state, &tree->nodePool[NODE_S_OFFSET].value.a, properties, &rulesBinding, actionType, commandCount); 
+    if (result == ERR_EVENT_NOT_HANDLED && store) {
+        *commandCount = *commandCount + 1;
+        result = storeSession(rulesBinding, sid, state);
+    }
+
+    return result;
 }
 
 static unsigned int handleEvent(ruleset *tree, char *message, void **rulesBinding, unsigned short actionType, unsigned short *commandCount) {
@@ -557,10 +563,13 @@ static unsigned int handleEvent(ruleset *tree, char *message, void **rulesBindin
         strcpy(session, "{\"id\":\"");
         strncpy(session + 7, sid, idLength);
         strcpy(session + 7 + idLength, "\"}");
-        result = handleSession(tree, session, *rulesBinding, ACTION_ASSERT_SESSION_IMMEDIATE, commandCount);
-        if (result == ERR_EVENT_NOT_HANDLED) {
-            return RULES_OK;
+
+        result = handleSession(tree, session, *rulesBinding, ACTION_ASSERT_SESSION_IMMEDIATE, commandCount, 0);
+        if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+            return result;
         }
+
+        return RULES_OK;
     }
 
     return result;
@@ -656,7 +665,8 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
 unsigned int assertState(void *handle, char *state) {
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
-    return handleSession(handle, state, &rulesBinding, ACTION_ASSERT_SESSION_IMMEDIATE, &commandCount);
+
+    return handleSession(handle, state, rulesBinding, ACTION_ASSERT_SESSION_IMMEDIATE, &commandCount, 0);
 }
 
 static unsigned int createSession(redisReply *reply, char *firstSid, char *lastSid, char **session) {
@@ -881,7 +891,7 @@ unsigned int completeAction(void *handle, void *actionHandle, char *session) {
     }
 
     if (reply->element[2]->type != REDIS_REPLY_NIL) {
-        result = handleSession(handle, reply->element[2]->str, rulesBinding, ACTION_NEGATE_SESSION, &commandCount);
+        result = handleSession(handle, reply->element[2]->str, rulesBinding, ACTION_NEGATE_SESSION, &commandCount, 0);
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
             freeReplyObject(reply);
             free(actionHandle);
@@ -900,7 +910,7 @@ unsigned int completeAction(void *handle, void *actionHandle, char *session) {
         }
     }
 
-    result = handleSession(handle, session, rulesBinding, ACTION_ASSERT_SESSION, &commandCount);
+    result = handleSession(handle, session, rulesBinding, ACTION_ASSERT_SESSION, &commandCount, 1);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         freeReplyObject(reply);
         free(actionHandle);

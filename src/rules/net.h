@@ -13,6 +13,7 @@ unsigned int assertLastMessage(void *rulesBinding, char *key, char *sid, char *m
 unsigned int assertTimer(void *rulesBinding, char *key, char *sid, char *mid, char *timer, unsigned int actionIndex);
 unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply);
 unsigned int peekTimers(ruleset *tree, void **bindingContext, redisReply **reply);
+unsigned int storeSession(void *rulesBinding, char *sid, char *state);
 unsigned int assertSession(void *rulesBinding, char *key, char *sid, char *state, unsigned int actionIndex);
 unsigned int assertSessionImmediate(void *rulesBinding, char *key, char *sid, char *state, unsigned int actionIndex);
 unsigned int negateMessage(void *rulesBinding, char *key, char *sid, char *mid);
