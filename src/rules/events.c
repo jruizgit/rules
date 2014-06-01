@@ -616,7 +616,7 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
 
             if (*resultsLength >= messagesLength) {
                 messagesLength = messagesLength * 2;
-                resultsArray = realloc(results, sizeof(unsigned int) * messagesLength);
+                resultsArray = realloc(resultsArray, sizeof(unsigned int) * messagesLength);
                 if (!resultsArray) {
                     return ERR_OUT_OF_MEMORY;
                 }
@@ -649,7 +649,7 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
 
     if (*resultsLength >= messagesLength) {
         ++messagesLength;
-        resultsArray = realloc(results, sizeof(unsigned int) * messagesLength);
+        resultsArray = realloc(resultsArray, sizeof(unsigned int) * messagesLength);
         if (!resultsArray) {
             return ERR_OUT_OF_MEMORY;
         }
