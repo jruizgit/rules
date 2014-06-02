@@ -74,7 +74,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                         last[0] = '\0';
                         unsigned char limit = 0;
                         if (strchr(currentLine, '+')) {
-                            limit = MAX_MESSAGE_BATCH;
+                            limit = MAX_MESSAGE_BATCH - 1;
                         }
 
                         if (lua) {

@@ -49,7 +49,7 @@ if (cluster.isMaster) {
             var events = [];
             for (var ii = 0; ii < 50; ++ii) {
                 events.push({
-                    id: ii + '_' + m,
+                    id: i + '_' + ii + '_' + m,
                     sid: i,
                     name: 'John Smith',
                     address: '1111 NE 22, Seattle, Wa',
@@ -76,7 +76,7 @@ if (cluster.isMaster) {
             var events = [];
             for (var ii = 0; ii < 40; ++ii) {
                 events.push({
-                    id: ii + '_' + m,
+                    id: i + '_' + ii + '_' + m,
                     sid: i,
                     name: 'John Smith',
                     address: '1111 NE 22, Seattle, Wa',

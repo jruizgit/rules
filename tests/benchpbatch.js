@@ -1,7 +1,7 @@
 r = require('../build/release/rules.node');
 var cluster = require('cluster');
 if (cluster.isMaster) {
-    for (var j = 0; j < 8; j++) {
+    for (var j = 0; j < 32; j++) {
         cluster.fork();
     }
 
@@ -9,16 +9,13 @@ if (cluster.isMaster) {
         cluster.fork();
     });
 } else {
-    handle = r.createRuleset('books' + cluster.worker.id,  
+    handle = r.createRuleset('partbooks' + cluster.worker.id,  
         JSON.stringify({
             ship: {
-                when: { 
-                    $and: [
-                        { $lte: { amount: 1000 } },
-                        { country: 'US' },
-                        { currency: 'US' },
-                        { seller: 'bookstore'} 
-                    ]
+
+                whenAll: { 
+                    a$some: { $and: [{ $lte: { amount: 1000 }}, { country: 'US' }, { currency: 'US' }, { seller: 'bookstore'}]},
+                    $s: { $nex: { done: 1 } }            
                 },
                 run: 'ship'
             }
@@ -42,36 +39,14 @@ if (cluster.isMaster) {
     r.bindRuleset(handle, '/tmp/redis14.sock');
     r.bindRuleset(handle, '/tmp/redis15.sock');
 
-    console.log('Start books negative: ' + new Date());
+    console.log('Start partbooks batch send: ' + new Date());
 
-    for (var m = 0; m < 50000; ++m) {
+    for (var m = 0; m < 125; ++m) {
         for (var i = 0; i < 16; ++i) {
-            r.assertEvent(handle, 
-                JSON.stringify({
-                    id: i + '_' + m,
-                    sid: i,
-                    name: 'John Smith',
-                    address: '1111 NE 22, Seattle, Wa',
-                    phone: '206678787',
-                    country: 'US',
-                    currency: 'US',
-                    seller: 'bookstore',
-                    item: 'book',
-                    reference: '75323',
-                    amount: 5000
-                })
-            );
-        }
-    }
-    console.log('End books negative: ' + new Date());
-
-    console.log('Start books positive: ' + new Date());
-
-    for (var m = 0; m < 1250; ++m) {
-        for (var i = 0; i < 16; ++i) {
-            r.assertEvent(handle, 
-                JSON.stringify({
-                    id: i + '_' + m,
+            var events = [];
+            for (var ii = 0; ii < 40; ++ii) {
+                events.push({
+                    id: i + '_' + ii + '_' + m,
                     sid: i,
                     name: 'John Smith',
                     address: '1111 NE 22, Seattle, Wa',
@@ -82,13 +57,26 @@ if (cluster.isMaster) {
                     item: 'book',
                     reference: '75323',
                     amount: 500
-                })
-            );
+                });
+            }
 
-            var result = r.startAction(handle);
-            r.completeAction(handle, result[0], result[1]);
+            r.assertEvents(handle, JSON.stringify(events));
         }
     }
 
-    console.log('End books positive: ' + new Date());
+    console.log('Start partbooks batch actions: ' + new Date());
+
+    try 
+    {
+        var result = r.startAction(handle);
+        while (result) {
+            r.completeAction(handle, result[0], result[1]);
+            result = r.startAction(handle);
+        }
+    }
+    catch(reason) {
+        console.log(reason);
+    }
+
+    console.log('End partbooks actions: ' + new Date());
 }

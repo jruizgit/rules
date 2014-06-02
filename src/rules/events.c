@@ -582,7 +582,7 @@ unsigned int assertEvent(void *handle, char *message) {
 }
 
 unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results) {
-    unsigned int messagesLength = 10;
+    unsigned int messagesLength = 50;
     unsigned int *resultsArray = malloc(sizeof(unsigned int) * messagesLength);
     if (!resultsArray) {
         return ERR_OUT_OF_MEMORY;
