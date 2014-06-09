@@ -749,3 +749,42 @@ unsigned int executeCommands(void *rulesBinding, unsigned int commandCount) {
     
     return result;
 }
+
+unsigned int getState(void *handle, char *sid, char **state) {
+    binding *bindingContext;
+    unsigned int result = resolveBinding(handle, sid, (void**)&bindingContext);
+    if (result != REDIS_OK) {
+        return result;
+    }
+
+    redisContext *reContext = bindingContext->reContext; 
+    result = redisAppendCommand(reContext, "hget %s %s", bindingContext->sessionHashset, sid);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    redisReply *reply;
+    result = redisGetReply(reContext, (void**)&reply);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    if (reply->type == REDIS_REPLY_ERROR) {
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    }
+
+    if (reply->type != REDIS_REPLY_STRING) {
+        freeReplyObject(reply);
+        return ERR_NEW_SESSION;
+    }
+
+    *state = malloc(strlen(reply->str) * sizeof(char));
+    if (!*state) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    strcpy(*state, reply->str);
+    freeReplyObject(reply); 
+    return REDIS_OK;
+}
+

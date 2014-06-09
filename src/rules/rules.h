@@ -40,6 +40,7 @@ unsigned int completeAction(void *handle, void *actionHandle, char *session);
 unsigned int abandonAction(void *handle, void *actionHandle);
 unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *timer);
 unsigned int assertTimers(void *handle);
+unsigned int getState(void *handle, char *sid, char **state);
 
 #ifdef __cplusplus
 }

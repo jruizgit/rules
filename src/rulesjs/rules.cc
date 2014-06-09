@@ -287,6 +287,31 @@ Handle<Value> jsAssertTimers(const Arguments& args) {
     return scope.Close(Undefined());
 }
 
+Handle<Value> jsGetState(const Arguments& args) {
+    HandleScope scope;
+
+    if (args.Length() < 2) {
+        ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+        ThrowException(Exception::TypeError(String::New("Wrong argument type")));
+    } else {
+        char *state;
+        unsigned int result = getState((void *)args[0]->IntegerValue(),  *v8::String::Utf8Value(args[1]->ToString()), &state); 
+        if (result == RULES_OK) {
+            Handle<Value> ret = scope.Close(String::New(state));
+            free(state);
+            return ret;
+        } else if (result != ERR_NEW_SESSION) {
+            char * message;
+            asprintf(&message, "Could not get state, error code: %d", result);
+            ThrowException(Exception::TypeError(String::New(message)));
+            free(message);
+        }
+    }
+
+    return scope.Close(Undefined());
+}
+
 void init(Handle<Object> exports) {
     exports->Set(String::NewSymbol("createRuleset"),
         FunctionTemplate::New(jsCreateRuleset)->GetFunction());
@@ -320,6 +345,9 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewSymbol("startTimer"),
         FunctionTemplate::New(jsStartTimer)->GetFunction());
+
+    exports->Set(String::NewSymbol("getState"),
+        FunctionTemplate::New(jsGetState)->GetFunction());
 }
 
 NODE_MODULE(rules, init)
