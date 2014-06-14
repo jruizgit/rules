@@ -64,31 +64,4 @@ if (cluster.isMaster) {
         }
     }
     console.log('End books negative: ' + new Date());
-
-    console.log('Start books positive: ' + new Date());
-
-    for (var m = 0; m < 1250; ++m) {
-        for (var i = 0; i < 16; ++i) {
-            r.assertEvent(handle, 
-                JSON.stringify({
-                    id: i + '_' + m,
-                    sid: i,
-                    name: 'John Smith',
-                    address: '1111 NE 22, Seattle, Wa',
-                    phone: '206678787',
-                    country: 'US',
-                    currency: 'US',
-                    seller: 'bookstore',
-                    item: 'book',
-                    reference: '75323',
-                    amount: 500
-                })
-            );
-
-            var result = r.startAction(handle);
-            r.completeAction(handle, result[0], result[1]);
-        }
-    }
-
-    console.log('End books positive: ' + new Date());
 }
