@@ -70,7 +70,7 @@ typedef struct jsonResult {
     unsigned char children[MAX_NODE_RESULTS];
 } jsonResult;
 
-static unsigned int constructObject(char *parentName, char *object, jsonProperty *properties) {
+static unsigned int constructObject(char *parentName, char *object, jsonProperty *properties, char **next) {
     char *firstName;
     char *lastName;
     char *first;
@@ -88,7 +88,7 @@ static unsigned int constructObject(char *parentName, char *object, jsonProperty
                 char newParent[nameLength + 1];
                 strncpy(newParent, firstName, nameLength);
                 newParent[nameLength] = '\0';
-                return constructObject(newParent, first, properties);
+                return constructObject(newParent, first, properties, next);
             }
         } else {
             int nameLength = lastName - firstName;
@@ -100,7 +100,7 @@ static unsigned int constructObject(char *parentName, char *object, jsonProperty
             fullName[fullNameLength] = '\0';
             hash = djbHash(fullName, fullNameLength);
             if (type == JSON_OBJECT) {
-                return constructObject(fullName, first, properties);
+                return constructObject(fullName, first, properties, next);
             }
         }
 
@@ -119,6 +119,7 @@ static unsigned int constructObject(char *parentName, char *object, jsonProperty
         property->firstValue = first;
         property->lastValue = last;
         property->type = type;
+        *next = last;
         result = readNextName(last, &firstName, &lastName, &hash);
     }
  
@@ -498,9 +499,10 @@ static unsigned int getId(jsonProperty *allProperties, unsigned int idHash, json
 }
 
 static unsigned int handleSession(ruleset *tree, char *state, void *rulesBinding, unsigned short actionType, unsigned short *commandCount, unsigned char store) {
+    char *next;
     jsonProperty properties[MAX_BUCKET_LENGTH * MAX_CONFLICTS];
     memset(properties, 0, sizeof(properties));
-    int result = constructObject(NULL, state, properties);
+    int result = constructObject(NULL, state, properties, &next);
     if (result != RULES_OK) {
         return result;
     }
@@ -523,17 +525,10 @@ static unsigned int handleSession(ruleset *tree, char *state, void *rulesBinding
     return result;
 }
 
-static unsigned int handleEvent(ruleset *tree, char *message, void **rulesBinding, unsigned short actionType, unsigned short *commandCount) {
-    jsonProperty properties[MAX_BUCKET_LENGTH * MAX_CONFLICTS];
-    memset(properties, 0, sizeof(properties));
-    int result = constructObject(NULL, message, properties);
-    if (result != RULES_OK) {
-        return result;
-    }
-
+static unsigned int handleEventCore(ruleset *tree, char *message, jsonProperty *properties, void **rulesBinding, unsigned short actionType, unsigned short *commandCount) {
     jsonProperty *idProperty;
     int idLength;
-    result = getId(properties, ID_HASH, &idProperty, &idLength);
+    int result = getId(properties, ID_HASH, &idProperty, &idLength);
     if (result != RULES_OK) {
         return result;
     }
@@ -575,6 +570,18 @@ static unsigned int handleEvent(ruleset *tree, char *message, void **rulesBindin
     return result;
 }
 
+static unsigned int handleEvent(ruleset *tree, char *message, void **rulesBinding, unsigned short actionType, unsigned short *commandCount) {
+    char *next;
+    jsonProperty properties[MAX_BUCKET_LENGTH * MAX_CONFLICTS];
+    memset(properties, 0, sizeof(properties));
+    int result = constructObject(NULL, message, properties, &next);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    return handleEventCore(tree, message, properties, rulesBinding, actionType, commandCount);
+}
+
 unsigned int assertEvent(void *handle, char *message) {
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
@@ -582,7 +589,7 @@ unsigned int assertEvent(void *handle, char *message) {
 }
 
 unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results) {
-    unsigned int messagesLength = 50;
+    unsigned int messagesLength = 64;
     unsigned int *resultsArray = malloc(sizeof(unsigned int) * messagesLength);
     if (!resultsArray) {
         return ERR_OUT_OF_MEMORY;
@@ -590,22 +597,28 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
 
     *resultsLength = 0;
     unsigned short commandCount = 0;
+    unsigned short actionType = ACTION_ASSERT_FIRST_MESSAGE;
     unsigned int result;
     void *rulesBinding = NULL;
-    char temp;
+    jsonProperty properties0[MAX_BUCKET_LENGTH * MAX_CONFLICTS];
+    jsonProperty properties1[MAX_BUCKET_LENGTH * MAX_CONFLICTS];
+    jsonProperty *currentProperties = NULL;
+    jsonProperty *nextProperties = properties0;
     char *first = NULL;
     char *last = NULL;
+    char *next = NULL;
     char *nextFirst = messages;
-    char *nextLast;
-    unsigned char type;
-    unsigned short actionType = ACTION_ASSERT_FIRST_MESSAGE;
-    while (readNextArrayValue(nextFirst, &nextFirst, &nextLast, &type) == RULES_OK) {
-        if (first != NULL) {
-            temp = last[1];
-            last[1] = '\0';
-            result = handleEvent(handle, first, &rulesBinding, actionType, &commandCount);
+    char lastTemp;
+
+    memset(nextProperties, 0, sizeof(properties0));
+    while (nextFirst[0] != '{' && nextFirst[0] != '\0' ) {
+        ++nextFirst;
+    }
+    while (constructObject(NULL, nextFirst, nextProperties, &next) == RULES_OK) {
+        if (currentProperties) {
+            result = handleEventCore(handle, first, currentProperties, &rulesBinding, actionType, &commandCount);
+            last[0] = lastTemp;
             if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-                last[1] = temp;
                 free(resultsArray);
                 return result;
             }
@@ -624,12 +637,24 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
 
             resultsArray[*resultsLength] = result;
             ++*resultsLength;
-            last[1] = temp;
         }
 
+        while (next[0] != ',' && next[0] != ']' ) {
+            ++next;
+        }
+        last = next;
+        lastTemp = next[0];
+        next[0] = '\0';
+        currentProperties = nextProperties;
         first = nextFirst;
-        last = nextLast;
-        nextFirst = nextLast;
+        nextFirst = next + 1;
+        if (nextProperties == properties0) {
+            nextProperties = properties1;
+        } else {
+            nextProperties = properties0;
+        }
+
+        memset(nextProperties, 0, sizeof(properties0));    
     }
 
     if (actionType == ACTION_ASSERT_FIRST_MESSAGE) {
@@ -638,11 +663,9 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
         actionType = ACTION_ASSERT_LAST_MESSAGE;
     }
 
-    temp = last[1];
-    last[1] = '\0';
-    result = handleEvent(handle, first, &rulesBinding, actionType, &commandCount);
+    result = handleEventCore(handle, first, currentProperties, &rulesBinding, actionType, &commandCount);
+    last[0] = lastTemp;
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        last[1] = temp;
         free(resultsArray);
         return result;
     }
@@ -657,7 +680,6 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
 
     resultsArray[*resultsLength] = result;
     ++*resultsLength;
-    last[1] = temp;
     *results = resultsArray;
     return RULES_OK;
 }

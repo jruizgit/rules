@@ -1,7 +1,7 @@
 r = require('../build/release/rules.node');
 var cluster = require('cluster');
 if (cluster.isMaster) {
-    for (var j = 0; j < 8; j++) {
+    for (var j = 0; j < 32; j++) {
         cluster.fork();
     }
 

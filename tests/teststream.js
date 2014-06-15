@@ -201,7 +201,6 @@ d.run({
             console.log('ok');
         }
     });
-
 });
 
 function requestApproval(s) {
