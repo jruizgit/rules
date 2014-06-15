@@ -42,26 +42,25 @@ if (cluster.isMaster) {
     r.bindRuleset(handle, '/tmp/redis14.sock');
     r.bindRuleset(handle, '/tmp/redis15.sock');
 
+    var message = JSON.stringify({
+        id: 1,
+        sid: 1,
+        name: 'John Smith',
+        address: '1111 NE 22, Seattle, Wa',
+        phone: '206678787',
+        country: 'US',
+        currency: 'US',
+        seller: 'bookstore',
+        item: 'book',
+        reference: '75323',
+        amount: 5000
+    });
+
     console.log('Start books negative: ' + new Date());
 
-    for (var m = 0; m < 50000; ++m) {
-        for (var i = 0; i < 16; ++i) {
-            r.assertEvent(handle, 
-                JSON.stringify({
-                    id: i + '_' + m,
-                    sid: i,
-                    name: 'John Smith',
-                    address: '1111 NE 22, Seattle, Wa',
-                    phone: '206678787',
-                    country: 'US',
-                    currency: 'US',
-                    seller: 'bookstore',
-                    item: 'book',
-                    reference: '75323',
-                    amount: 5000
-                })
-            );
-        }
+    for (var m = 0; m < 1600000; ++m) {
+        r.assertEvent(handle, message);
     }
+
     console.log('End books negative: ' + new Date());
 }
