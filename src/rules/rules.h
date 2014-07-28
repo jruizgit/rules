@@ -31,7 +31,7 @@ extern "C" {
 
 unsigned int createRuleset(void **handle, char *name, char *rules);
 unsigned int deleteRuleset(void *handle);
-unsigned int bindRuleset(void *handle, char *path);
+unsigned int bindRuleset(void *handle, char *host, unsigned int port, char *password);
 unsigned int assertEvent(void *handle, char *message);
 unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results);
 unsigned int assertState(void *handle, char *state);

@@ -52,14 +52,21 @@ Handle<Value> jsDeleteRuleset(const Arguments& args) {
 Handle<Value> jsBindRuleset(const Arguments& args) {
     HandleScope scope;
 
-    if (args.Length() < 2) {
+    if (args.Length() < 4) {
         ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+    } else if (!args[0]->IsNumber() || !args[1]->IsString() || !args[2]->IsNumber()) {
         ThrowException(Exception::TypeError(String::New("Wrong argument type")));
     } else {
         void *output = NULL;
-        unsigned int result = bindRuleset((void *)args[0]->IntegerValue(), 
-                                            *v8::String::Utf8Value(args[1]->ToString()));
+        unsigned int result;
+        if (args[3]->IsString()) {
+            result = bindRuleset((void *)args[0]->IntegerValue(), *v8::String::Utf8Value(args[1]->ToString()), 
+                                  args[2]->IntegerValue(), *v8::String::Utf8Value(args[3]->ToString()));
+        } else {
+            result = bindRuleset((void *)args[0]->IntegerValue(), *v8::String::Utf8Value(args[1]->ToString()), 
+                                  args[2]->IntegerValue(), NULL);
+        }
+
         if (result != RULES_OK) {
             char * message;
             asprintf(&message, "Could not create connection, error code: %d", result);

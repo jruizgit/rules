@@ -309,7 +309,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     return RULES_OK;
 }
 
-unsigned int bindRuleset(void *handle, char *path) {
+unsigned int bindRuleset(void *handle, char *host, unsigned int port, char *password) {
     ruleset *tree = (ruleset*)handle;
     bindingsMap *map;
     if (tree->bindingsMap) {
@@ -329,11 +329,36 @@ unsigned int bindRuleset(void *handle, char *path) {
         tree->bindingsMap = map;
     }
 
-    redisContext *reContext = redisConnectUnix(path);
-    //redisContext *reContext = redisConnect((char*)"127.0.0.1", atol(path));
+    redisContext *reContext;
+    if (port == 0) {
+        reContext = redisConnectUnix(host);
+    } else {
+        reContext = redisConnect(host, port);
+    }
+    
     if (reContext->err) {
         redisFree(reContext);
         return ERR_CONNECT_REDIS;
+    }
+
+    if (password != NULL) {
+        int result = redisAppendCommand(reContext, "auth %s", password);
+        if (result != REDIS_OK) {
+            return ERR_REDIS_ERROR;
+        }
+
+        redisReply *reply;
+        result = redisGetReply(reContext, (void**)&reply);
+        if (result != REDIS_OK) {
+            return ERR_REDIS_ERROR;
+        }
+        
+        if (reply->type == REDIS_REPLY_ERROR) {
+            freeReplyObject(reply);   
+            return ERR_REDIS_ERROR;
+        }
+
+        freeReplyObject(reply);
     }
 
     if (!map->bindings) {
