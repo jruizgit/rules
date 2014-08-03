@@ -72,7 +72,7 @@ static unsigned int storeString(ruleset *tree, char *newString, unsigned int *st
 
 static unsigned int storeQuery(ruleset *tree, char **query, unsigned int *queryOffset, unsigned int lineCount) {
     if (!tree->queryPool) {
-        tree->queryPool = malloc(lineCount * sizeof(unsigned int) * 1000);
+        tree->queryPool = malloc(lineCount * sizeof(unsigned int));
         if (!tree->queryPool) {
             return ERR_OUT_OF_MEMORY;
         }
@@ -103,7 +103,7 @@ static unsigned int storeQuery(ruleset *tree, char **query, unsigned int *queryO
 
 static unsigned int storeNode(ruleset *tree, node **newNode, unsigned int *nodeOffset) {
     if (!tree->nodePool) {
-        tree->nodePool = malloc(sizeof(node) * 100);
+        tree->nodePool = malloc(sizeof(node));
         if (!tree->nodePool) {
             return ERR_OUT_OF_MEMORY;
         }
