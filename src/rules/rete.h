@@ -31,7 +31,8 @@ typedef struct jsonValue {
 typedef struct alpha {
     unsigned int hash;
     unsigned char operator;
-    unsigned int nextLength;
+    unsigned int betaListOffset;
+    unsigned int nextListOffset;
     unsigned int nextOffset;
     jsonValue right;
 } alpha;

@@ -7,8 +7,8 @@
 #include "rules.h"
 
 #define HASH_LENGTH 40
-#define MAX_BUCKET_LENGTH 256
-#define HASH_MASK 0xFF
+#define SID_BUCKET_LENGTH 256
+#define SID_HASH_MASK 0xFF
 
 typedef char functionHash[HASH_LENGTH + 1];
 
@@ -33,7 +33,7 @@ typedef struct binding {
 } binding;
 
 typedef struct bindingsMap {
-    mapEntry entries[MAX_BUCKET_LENGTH];
+    mapEntry entries[SID_BUCKET_LENGTH];
     binding *bindings;
     unsigned int bindingsLength;
     unsigned int lastBinding;
@@ -321,7 +321,7 @@ unsigned int bindRuleset(void *handle, char *host, unsigned int port, char *pass
             return ERR_OUT_OF_MEMORY;
         }
 
-        memset(map->entries, 0, sizeof(mapEntry) * MAX_BUCKET_LENGTH);
+        memset(map->entries, 0, sizeof(mapEntry) * SID_BUCKET_LENGTH);
         map->bindings = NULL;
         map->bindingsLength = 0;
         map->lastBinding = 0;
@@ -400,7 +400,7 @@ unsigned int deleteBindingsMap(ruleset *tree) {
 unsigned int resolveBinding(ruleset *tree, char *sid, void **rulesBinding) {
     bindingsMap *map = tree->bindingsMap;
     unsigned int sidHash = djbHash(sid, strlen(sid));
-    mapEntry *entry = &map->entries[sidHash & HASH_MASK];
+    mapEntry *entry = &map->entries[sidHash & SID_HASH_MASK];
     if (entry->sidHash != sidHash) {
         binding *firstBinding = &map->bindings[0];
         redisContext *reContext = firstBinding->reContext;

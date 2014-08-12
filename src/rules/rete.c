@@ -6,8 +6,6 @@
 #include "net.h"
 #include "json.h"
 
-#define NEXT_BUCKET_LENGTH 128
-
 #define HASH_RUN 193505114 // run
 #define HASH_WHEN 2090866807 // when
 #define HASH_WHEN_ALL 3322641392 // whenAll 
@@ -131,24 +129,56 @@ static unsigned int storeAlpha(ruleset *tree, node **newNode, unsigned int *node
         return result;
     }
 
+    (*newNode)->value.a.nextListOffset = 0;
+    (*newNode)->value.a.betaListOffset = 0;
+    (*newNode)->value.a.nextOffset = 0;
+    return RULES_OK;
+}
+
+static unsigned int allocateNext(ruleset *tree, unsigned int length, unsigned int *offset) {
     if (!tree->nextPool) {
-        tree->nextPool = malloc(NEXT_BUCKET_LENGTH * sizeof(unsigned int));
+        tree->nextPool = malloc((length + 1) * sizeof(unsigned int));
         if (!tree->nextPool) {
             return ERR_OUT_OF_MEMORY;
         }
 
-        (*newNode)->value.a.nextOffset = 0;
-        (*newNode)->value.a.nextLength = 0;
-        tree->nextOffset = NEXT_BUCKET_LENGTH;
+        memset(tree->nextPool, 0, (length + 1) * sizeof(unsigned int));
+        *offset = 1;
+        tree->nextOffset = length + 1;
     } else {
-        tree->nextPool = realloc(tree->nextPool, (tree->nextOffset + NEXT_BUCKET_LENGTH) * sizeof(unsigned int));
+        tree->nextPool = realloc(tree->nextPool, (tree->nextOffset + length) * sizeof(unsigned int));
         if (!tree->nextPool) {
             return ERR_OUT_OF_MEMORY;
         }
 
-        (*newNode)->value.a.nextOffset = tree->nextOffset;
-        (*newNode)->value.a.nextLength = 0;
-        tree->nextOffset = tree->nextOffset + NEXT_BUCKET_LENGTH;
+        memset(&tree->nextPool[tree->nextOffset], 0, length * sizeof(unsigned int));
+        *offset = tree->nextOffset;
+        tree->nextOffset = tree->nextOffset + length;
+    }
+
+    return RULES_OK;
+}
+
+
+static unsigned int ensureNextHashset(ruleset *tree, node *newNode) {
+    if (!newNode->value.a.nextOffset) {
+        return allocateNext(tree, NEXT_BUCKET_LENGTH, &newNode->value.a.nextOffset);
+    }
+
+    return RULES_OK;
+}
+
+static unsigned int ensureNextList(ruleset *tree, node *newNode) {
+    if (!newNode->value.a.nextListOffset) {
+        return allocateNext(tree, NEXT_LIST_LENGTH, &newNode->value.a.nextListOffset);
+    }
+
+    return RULES_OK;
+}
+
+static unsigned int ensureBetaList(ruleset *tree, node *newNode) {
+    if (!newNode->value.a.betaListOffset) {
+        return allocateNext(tree, BETA_LIST_LENGTH, &newNode->value.a.betaListOffset);
     }
 
     return RULES_OK;
@@ -429,14 +459,59 @@ static unsigned int validateRuleset(char *rules) {
 }
 
 static unsigned int linkAlpha(ruleset *tree, unsigned int parentOffset, unsigned int nextOffset) {
-    node *nodeAlpha = &tree->nodePool[parentOffset];
-    if (nodeAlpha->value.a.nextLength == NEXT_BUCKET_LENGTH) {
-        return ERR_RULE_LIMIT_EXCEEDED;
+    unsigned int result;
+    unsigned int entry;
+    node *parentAlpha = &tree->nodePool[parentOffset];
+    node *nextNode = &tree->nodePool[nextOffset];
+
+    if (nextNode->type != NODE_ALPHA) {
+        result = ensureBetaList(tree, parentAlpha);
+        if (result != RULES_OK) {
+            return result;
+        }
+
+        unsigned int *parentBetaList = &tree->nextPool[parentAlpha->value.a.betaListOffset];
+        for (entry = 0; parentBetaList[entry] != 0; ++entry) {
+            if (entry == BETA_LIST_LENGTH) {
+                return ERR_RULE_BETA_LIMIT_EXCEEDED;
+            }
+        }
+
+        parentBetaList[entry] = nextOffset;
+    }
+    else if (nextNode->value.a.operator == OP_NEX) {
+        result = ensureNextList(tree, parentAlpha);
+        if (result != RULES_OK) {
+            return result;
+        }
+
+        unsigned int *parentNextList = &tree->nextPool[parentAlpha->value.a.nextListOffset];
+        unsigned int entry;
+        for (entry = 0; parentNextList[entry] != 0; ++entry) {
+            if (entry == NEXT_LIST_LENGTH) {
+                return ERR_RULE_EXISTS_LIMIT_EXCEEDED;
+            }
+        }
+
+        parentNextList[entry] = nextOffset;
+    }
+    else {
+        result = ensureNextHashset(tree, parentAlpha);
+        if (result != RULES_OK) {
+            return result;
+        }
+
+        unsigned int *parentNext = &tree->nextPool[parentAlpha->value.a.nextOffset];
+        unsigned int hash = nextNode->value.a.hash;
+        for (entry = hash & HASH_MASK; parentNext[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
+            if ((entry + 1) % NEXT_BUCKET_LENGTH == (hash & HASH_MASK)) {
+                return ERR_RULE_LIMIT_EXCEEDED;
+            }
+        }
+
+        parentNext[entry] = nextOffset;
     }
 
-    unsigned int *nodeAlphaNext = &tree->nextPool[nodeAlpha->value.a.nextOffset];
-    nodeAlphaNext[nodeAlpha->value.a.nextLength] = nextOffset;
-    nodeAlpha->value.a.nextLength = nodeAlpha->value.a.nextLength + 1;
     return RULES_OK;
 }
 
@@ -447,27 +522,36 @@ static unsigned int findAlpha(ruleset *tree, unsigned int parentOffset, unsigned
     char *lastName;
     unsigned int hash;
     unsigned char type;
+    unsigned int entry;
     
     readNextName(rule, &firstName, &lastName, &hash);
     readNextValue(lastName, &first, &last, &type);
 
     node *parent = &tree->nodePool[parentOffset];
-    unsigned int *parentNext = &tree->nextPool[parent->value.a.nextOffset];
-    for (unsigned int i = 0; i < parent->value.a.nextLength; ++i) 
-    {
-        node *currentNode = &tree->nodePool[parentNext[i]];
-        if (currentNode->type == NODE_ALPHA && 
-            currentNode->value.a.hash == hash && 
-            currentNode->value.a.operator == operator) {
-            if (compareValue(tree, &currentNode->value.a.right, first, last, type)) {
-                *resultOffset = parentNext[i];
-                return RULES_OK;
+    unsigned int *parentNext;
+    if (parent->value.a.nextOffset) {
+        parentNext = &tree->nextPool[parent->value.a.nextOffset];
+        for (entry = hash & HASH_MASK; parentNext[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
+            node *currentNode = &tree->nodePool[parentNext[entry]];
+            if (currentNode->value.a.hash == hash && 
+                currentNode->value.a.operator == operator) {
+                if (compareValue(tree, &currentNode->value.a.right, first, last, type)) {
+                    *resultOffset = parentNext[entry];
+                    return RULES_OK;
+                }
             }
         }
     }
     
-    if (parent->value.a.nextLength == NEXT_BUCKET_LENGTH) {
-        return ERR_RULE_LIMIT_EXCEEDED;
+    if (parent->value.a.nextListOffset) {
+        parentNext = &tree->nextPool[parent->value.a.nextListOffset];
+        for (entry = 0; parentNext[entry] != 0; ++entry) {
+            node *currentNode = &tree->nodePool[parentNext[entry]];
+            if (currentNode->value.a.hash == hash) {
+                *resultOffset = parentNext[entry];
+                return RULES_OK;
+            }
+        }
     }
 
     unsigned int stringOffset;
@@ -477,8 +561,7 @@ static unsigned int findAlpha(ruleset *tree, unsigned int parentOffset, unsigned
     }
 
     node *newAlpha;
-    unsigned int nodeOffset;
-    result = storeAlpha(tree, &newAlpha, &nodeOffset);
+    result = storeAlpha(tree, &newAlpha, resultOffset);
     if (result != RULES_OK) {
         return result;
     }
@@ -488,14 +571,7 @@ static unsigned int findAlpha(ruleset *tree, unsigned int parentOffset, unsigned
     newAlpha->value.a.hash = hash;
     newAlpha->value.a.operator = operator;
     copyValue(tree, &newAlpha->value.a.right, first, last, type);
-    // after storing alpha tree.nodePool might have changed
-    // need to recalculate parent and parentNext
-    parent = &tree->nodePool[parentOffset];
-    parentNext = &tree->nextPool[parent->value.a.nextOffset];
-    parentNext[parent->value.a.nextLength] = nodeOffset;
-    parent->value.a.nextLength = parent->value.a.nextLength + 1;
-    *resultOffset = nodeOffset;
-    return RULES_OK;
+    return linkAlpha(tree, parentOffset, *resultOffset);
 }
 
 static unsigned int createAlpha(ruleset *tree, unsigned int *newOffset, char *rule, unsigned int nextOffset) {

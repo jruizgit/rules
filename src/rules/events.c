@@ -8,12 +8,10 @@
 
 #define ID_HASH 5863474
 #define SID_HASH 193505797
-#define MAX_BUCKET_LENGTH 64
+#define MAX_PROPERTIES 256
 #define MAX_RESULT_NODES 32
 #define MAX_NODE_RESULTS 16
-#define MAX_STACK_SIZE 256
-#define MAX_CONFLICTS 3
-#define HASH_MASK 0x3F
+#define MAX_STACK_SIZE 64
 
 #define COMP_BOOL_BOOL 0x0404
 #define COMP_BOOL_INT 0x0402
@@ -70,7 +68,13 @@ typedef struct jsonResult {
     unsigned char children[MAX_NODE_RESULTS];
 } jsonResult;
 
-static unsigned int constructObject(char *parentName, char *object, jsonProperty *properties, char **next) {
+static unsigned int constructObject(char *parentName, 
+                                    char *object, 
+                                    jsonProperty *properties, 
+                                    unsigned int *propertiesLength, 
+                                    unsigned int *midIndex, 
+                                    unsigned int *sidIndex, 
+                                    char **next) {
     char *firstName;
     char *lastName;
     char *first;
@@ -88,7 +92,7 @@ static unsigned int constructObject(char *parentName, char *object, jsonProperty
                 char newParent[nameLength + 1];
                 strncpy(newParent, firstName, nameLength);
                 newParent[nameLength] = '\0';
-                return constructObject(newParent, first, properties, next);
+                return constructObject(newParent, first, properties, propertiesLength, midIndex, sidIndex, next);
             }
         } else {
             int nameLength = lastName - firstName;
@@ -100,21 +104,23 @@ static unsigned int constructObject(char *parentName, char *object, jsonProperty
             fullName[fullNameLength] = '\0';
             hash = djbHash(fullName, fullNameLength);
             if (type == JSON_OBJECT) {
-                return constructObject(fullName, first, properties, next);
+                return constructObject(fullName, first, properties, propertiesLength, midIndex, sidIndex, next);
             }
         }
 
-        int i = 0;
-        jsonProperty *property = &properties[hash & HASH_MASK];
-        while (property->hash != 0){
-            ++i;
-            if (i == MAX_CONFLICTS) {
-                return ERR_EVENT_MAX_CONFLICTS;
-            }
+        jsonProperty *property = &properties[*propertiesLength];
+        if (hash == ID_HASH) {
+            *midIndex = *propertiesLength;
+        } else if (hash == SID_HASH) {
+            *sidIndex = *propertiesLength;
+        }
 
-            property = &properties[(hash & HASH_MASK) + (i * MAX_BUCKET_LENGTH)];
+        *propertiesLength = *propertiesLength + 1;
+        if (*propertiesLength == MAX_PROPERTIES) {
+            return ERR_EVENT_MAX_PROPERTIES;
         }
         
+        property->isMaterial = 0;
         property->hash = hash;
         property->firstValue = first;
         property->lastValue = last;
@@ -228,8 +234,15 @@ static unsigned char compareString(char* leftFirst, char* leftLast, char* right,
 
 }
 
-static unsigned int handleAction(ruleset *tree, char *sid, char *mid, char *state, char *prefix, node *node, 
-                                 void **rulesBinding, unsigned short actionType, unsigned short *commandCount) {
+static unsigned int handleAction(ruleset *tree, 
+                                 char *sid, 
+                                 char *mid, 
+                                 char *state, 
+                                 char *prefix, 
+                                 node *node, 
+                                 void **rulesBinding, 
+                                 unsigned short actionType, 
+                                 unsigned short *commandCount) {
     *commandCount = *commandCount + 1;
     unsigned int result;
     switch(actionType) {
@@ -271,8 +284,14 @@ static unsigned int handleAction(ruleset *tree, char *sid, char *mid, char *stat
     return RULES_OK;
 }
 
-static unsigned int handleBeta(ruleset *tree, char *sid, char *mid, char *state, 
-                                node *betaNode, void **rulesBinding, unsigned short actionType, unsigned short *commandCount) {
+static unsigned int handleBeta(ruleset *tree, 
+                               char *sid, 
+                               char *mid, 
+                               char *state, 
+                               node *betaNode, 
+                               void **rulesBinding, 
+                               unsigned short actionType, 
+                               unsigned short *commandCount) {
     int prefixLength = 0;
     node *currentNode = betaNode;
     while (currentNode != NULL) {
@@ -309,160 +328,203 @@ static unsigned int handleBeta(ruleset *tree, char *sid, char *mid, char *state,
     return handleAction(tree, sid, mid, state, prefix, actionNode, rulesBinding, actionType, commandCount);
 }
 
-static unsigned int handleAlpha(ruleset *tree, char *sid, char *mid, char *state, alpha *alphaNode, jsonProperty *allProperties, 
-                                void **rulesBinding, unsigned short actionType, unsigned short *commandCount) {
-    alpha *alphaStack[MAX_STACK_SIZE];
-    jsonProperty *propertyStack[MAX_STACK_SIZE];
-    alphaStack[0] = alphaNode;    
-    propertyStack[0] = NULL;
-    alpha *currentAlpha;
-    jsonProperty *currentProperty;
-    unsigned short top = 1;
-    unsigned int result = ERR_EVENT_NOT_HANDLED;
-    unsigned int propertyHash = 1;
+static unsigned char isMatch(ruleset *tree, jsonProperty *currentProperty, alpha *currentAlpha) {
+    char *propertyLast = currentProperty->lastValue;
+    char *propertyFirst = currentProperty->firstValue;
+    unsigned char alphaOp = currentAlpha->operator;
+    unsigned char propertyType = currentProperty->type;
+    unsigned char propertyMatch = 0;
+    char temp;
 
-    while (top > 0) {       
+    if (alphaOp == OP_EX) {
+        return 1;
+    }
+    
+    if (!currentProperty->isMaterial) {
+        switch(propertyType) {
+            case JSON_INT:
+                ++propertyLast;
+                temp = propertyLast[0];
+                propertyLast[0] = '\0';
+                currentProperty->value.i = atol(propertyFirst);
+                propertyLast[0] = temp;
+                break;
+            case JSON_DOUBLE:
+                ++propertyLast;
+                temp = propertyLast[0];
+                propertyLast[0] = '\0';
+                currentProperty->value.i = atof(propertyFirst);
+                propertyLast[0] = temp;
+                break;
+            case JSON_BOOL:
+                ++propertyLast;
+                unsigned int leftLength = propertyLast - propertyFirst;
+                unsigned char b = 1;
+                if (leftLength == 5 && strncmp("false", propertyFirst, 5)) {
+                    b = 0;
+                }
+                currentProperty->value.b = b;
+                break;
+        }
+
+        currentProperty->isMaterial = 1;
+    }
+
+    unsigned short type = propertyType << 8;
+    type = type + currentAlpha->right.type;
+    int leftLength;
+    switch(type) {
+        case COMP_BOOL_BOOL:
+            propertyMatch = compareBool(currentProperty->value.b, currentAlpha->right.value.b, alphaOp);
+            break;
+        case COMP_BOOL_INT: 
+            propertyMatch = compareInt(currentProperty->value.b, currentAlpha->right.value.i, alphaOp);
+            break;
+        case COMP_BOOL_DOUBLE: 
+            propertyMatch = compareDouble(currentProperty->value.b, currentAlpha->right.value.d, alphaOp);
+            break;
+        case COMP_BOOL_STRING:
+            propertyMatch = compareString(propertyFirst, 
+                                          propertyLast, 
+                                          &tree->stringPool[currentAlpha->right.value.stringOffset], 
+                                          alphaOp);
+            break;
+        case COMP_INT_BOOL:
+            propertyMatch = compareInt(currentProperty->value.i, currentAlpha->right.value.b, alphaOp);
+            break;
+        case COMP_INT_INT: 
+            propertyMatch = compareInt(currentProperty->value.i, currentAlpha->right.value.i, alphaOp);
+            break;
+        case COMP_INT_DOUBLE: 
+            propertyMatch = compareDouble(currentProperty->value.i, currentAlpha->right.value.d, alphaOp);
+            break;
+        case COMP_INT_STRING:
+            propertyMatch = compareString(propertyFirst, 
+                                          propertyLast, 
+                                          &tree->stringPool[currentAlpha->right.value.stringOffset], 
+                                          alphaOp);
+            break;
+        case COMP_DOUBLE_BOOL:
+            propertyMatch = compareDouble(currentProperty->value.i, currentAlpha->right.value.b, alphaOp);
+            break;
+        case COMP_DOUBLE_INT: 
+            propertyMatch = compareDouble(currentProperty->value.i, currentAlpha->right.value.i, alphaOp);
+            break;
+        case COMP_DOUBLE_DOUBLE: 
+            propertyMatch = compareDouble(currentProperty->value.i, currentAlpha->right.value.d, alphaOp);
+            break;
+        case COMP_DOUBLE_STRING:
+            propertyMatch = compareString(propertyFirst, 
+                                          propertyLast, 
+                                          &tree->stringPool[currentAlpha->right.value.stringOffset], 
+                                          alphaOp);
+            break;
+        case COMP_STRING_BOOL:
+            if (currentAlpha->right.value.b) {
+                propertyMatch = compareString(propertyFirst, propertyLast, "true", alphaOp);
+            }
+            else {
+                propertyMatch = compareString(propertyFirst, propertyLast, "false", alphaOp);
+            }
+            break;
+        case COMP_STRING_INT: 
+            {
+                leftLength = propertyLast - propertyFirst + 1;
+                char rightStringInt[leftLength];
+                snprintf(rightStringInt, leftLength, "%ld", currentAlpha->right.value.i);
+                propertyMatch = compareString(propertyFirst, propertyLast, rightStringInt, alphaOp);
+            }
+            break;
+        case COMP_STRING_DOUBLE: 
+            {
+                leftLength = propertyLast - propertyFirst + 1;
+                char rightStringDouble[leftLength];
+                snprintf(rightStringDouble, leftLength, "%f", currentAlpha->right.value.d);
+                propertyMatch = compareString(propertyFirst, propertyLast, rightStringDouble, alphaOp);
+                break;
+            }
+        case COMP_STRING_STRING:
+            propertyMatch = compareString(propertyFirst, 
+                                          propertyLast, 
+                                          &tree->stringPool[currentAlpha->right.value.stringOffset], 
+                                          alphaOp);
+            break;
+    }
+
+    return propertyMatch;
+}
+
+static unsigned int handleAlpha(ruleset *tree, 
+                                char *sid, 
+                                char *mid, 
+                                char *state, 
+                                alpha *alphaNode, 
+                                jsonProperty *allProperties,
+                                unsigned int propertiesLength, 
+                                void **rulesBinding, 
+                                unsigned short actionType, 
+                                unsigned short *commandCount) {
+    unsigned int result = ERR_EVENT_NOT_HANDLED;
+    unsigned short top = 1;
+    unsigned int entry;
+    alpha *stack[MAX_STACK_SIZE];
+    stack[0] = alphaNode;
+    alpha *currentAlpha;
+    while (top) {
         --top;
-        currentAlpha = alphaStack[top];
-        currentProperty = propertyStack[top];
-        unsigned char alphaOp = currentAlpha->operator;
-        unsigned char propertyMatch = 1;
-        if (alphaOp != OP_NEX && alphaOp != OP_EX && alphaOp != OP_TYPE)
-        {
-            char *propertyLast = currentProperty->lastValue;
-            char *propertyFirst = currentProperty->firstValue;
-            unsigned char propertyType = currentProperty->type;
-            char temp;
-            if (!currentProperty->isMaterial) {
-                switch(propertyType) {
-                    case JSON_INT:
-                        ++propertyLast;
-                        temp = propertyLast[0];
-                        propertyLast[0] = '\0';
-                        currentProperty->value.i = atol(propertyFirst);
-                        propertyLast[0] = temp;
+        currentAlpha = stack[top];
+        if (currentAlpha->nextListOffset) {
+            unsigned int *nextList = &tree->nextPool[currentAlpha->nextListOffset];
+            for (entry = 0; nextList[entry] != 0; ++entry) {
+                node *listNode = &tree->nodePool[nextList[entry]];
+                char exists = 0;
+                for(unsigned int propertyIndex = 0; propertyIndex < propertiesLength; ++propertyIndex) {
+                    if (listNode->value.a.hash == allProperties[propertyIndex].hash) {
+                        exists = 1;
                         break;
-                    case JSON_DOUBLE:
-                        ++propertyLast;
-                        temp = propertyLast[0];
-                        propertyLast[0] = '\0';
-                        currentProperty->value.i = atof(propertyFirst);
-                        propertyLast[0] = temp;
-                        break;
-                    case JSON_BOOL:
-                        ++propertyLast;
-                        unsigned int leftLength = propertyLast - propertyFirst;
-                        unsigned char b = 1;
-                        if (leftLength == 5 && strncmp("false", propertyFirst, 5)) {
-                            b = 0;
-                        }
-                        currentProperty->value.b = b;
-                        break;
+                    }
                 }
 
-                currentProperty->isMaterial = 1;
-            }
-            
-            unsigned short type = propertyType << 8;
-            type = type + currentAlpha->right.type;
-            int leftLength;
-            switch(type) {
-                case COMP_BOOL_BOOL:
-                    propertyMatch = compareBool(currentProperty->value.b, currentAlpha->right.value.b, alphaOp);
-                    break;
-                case COMP_BOOL_INT: 
-                    propertyMatch = compareInt(currentProperty->value.b, currentAlpha->right.value.i, alphaOp);
-                    break;
-                case COMP_BOOL_DOUBLE: 
-                    propertyMatch = compareDouble(currentProperty->value.b, currentAlpha->right.value.d, alphaOp);
-                    break;
-                case COMP_BOOL_STRING:
-                    propertyMatch = compareString(propertyFirst, propertyLast, 
-                                    &tree->stringPool[currentAlpha->right.value.stringOffset], alphaOp);
-                    break;
-                case COMP_INT_BOOL:
-                    propertyMatch = compareInt(currentProperty->value.i, currentAlpha->right.value.b, alphaOp);
-                    break;
-                case COMP_INT_INT: 
-                    propertyMatch = compareInt(currentProperty->value.i, currentAlpha->right.value.i, alphaOp);
-                    break;
-                case COMP_INT_DOUBLE: 
-                    propertyMatch = compareDouble(currentProperty->value.i, currentAlpha->right.value.d, alphaOp);
-                    break;
-                case COMP_INT_STRING:
-                    propertyMatch = compareString(propertyFirst, propertyLast, 
-                                    &tree->stringPool[currentAlpha->right.value.stringOffset], alphaOp);
-                    break;
-                case COMP_DOUBLE_BOOL:
-                    propertyMatch = compareDouble(currentProperty->value.i, currentAlpha->right.value.b, alphaOp);
-                    break;
-                case COMP_DOUBLE_INT: 
-                    propertyMatch = compareDouble(currentProperty->value.i, currentAlpha->right.value.i, alphaOp);
-                    break;
-                case COMP_DOUBLE_DOUBLE: 
-                    propertyMatch = compareDouble(currentProperty->value.i, currentAlpha->right.value.d, alphaOp);
-                    break;
-                case COMP_DOUBLE_STRING:
-                    propertyMatch = compareString(propertyFirst, propertyLast, 
-                                    &tree->stringPool[currentAlpha->right.value.stringOffset], alphaOp);
-                    break;
-                case COMP_STRING_BOOL:
-                    if (currentAlpha->right.value.b) {
-                        propertyMatch = compareString(propertyFirst, propertyLast, "true", alphaOp);
+                if (!exists) {
+                    if (top == MAX_STACK_SIZE) {
+                        return ERR_MAX_STACK_SIZE;
                     }
-                    else {
-                        propertyMatch = compareString(propertyFirst, propertyLast, "false", alphaOp);
-                    }
-                    break;
-                case COMP_STRING_INT: 
-                    {
-                        leftLength = propertyLast - propertyFirst + 1;
-                        char rightStringInt[leftLength];
-                        snprintf(rightStringInt, leftLength, "%ld", currentAlpha->right.value.i);
-                        propertyMatch = compareString(propertyFirst, propertyLast, rightStringInt, alphaOp);
-                    }
-                    break;
-                case COMP_STRING_DOUBLE: 
-                    {
-                        leftLength = propertyLast - propertyFirst + 1;
-                        char rightStringDouble[leftLength];
-                        snprintf(rightStringDouble, leftLength, "%f", currentAlpha->right.value.d);
-                        propertyMatch = compareString(propertyFirst, propertyLast, rightStringDouble, alphaOp);
-                        break;
-                    }
-                case COMP_STRING_STRING:
-                    propertyMatch = compareString(propertyFirst, propertyLast, 
-                                    &tree->stringPool[currentAlpha->right.value.stringOffset], alphaOp);
-                    break;
+                    stack[top] = &listNode->value.a; 
+                    ++top;
+                }
             }
         }
 
-        if (propertyMatch) {
-            unsigned int nextLength = currentAlpha->nextLength;
-            unsigned int nextOffset = currentAlpha->nextOffset;   
-            for (unsigned int i = 0; i < nextLength; ++i) {
-                node *currentNode = &tree->nodePool[tree->nextPool[nextOffset + i]];
-                unsigned int nodeHash;
-                if (currentNode->type != NODE_ALPHA) {
-                    result = handleBeta(tree, sid, mid, state, currentNode, rulesBinding, actionType, commandCount);
-                }
-                else {
-                    nodeHash = currentNode->value.a.hash;
-                    propertyHash = 1;
-                    for (int ii = 0; propertyHash && (propertyHash != nodeHash) && (ii < MAX_CONFLICTS); ++ii) {
-                        currentProperty = &allProperties[(nodeHash & HASH_MASK) + (ii * MAX_BUCKET_LENGTH)];
-                        propertyHash = currentProperty->hash;
-                    }
-                    if (((nodeHash == propertyHash) && (currentNode->value.a.operator != OP_NEX)) || 
-                        ((nodeHash != propertyHash) && (currentNode->value.a.operator == OP_NEX))) {
+        if (currentAlpha->nextOffset) {
+            unsigned int *nextHashset = &tree->nextPool[currentAlpha->nextOffset];
+            for(unsigned int propertyIndex = 0; propertyIndex < propertiesLength; ++propertyIndex) {
+                jsonProperty *currentProperty = &allProperties[propertyIndex];
+                for (entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
+                    node *hashNode = &tree->nodePool[nextHashset[entry]];
+                    if (currentProperty->hash == hashNode->value.a.hash && isMatch(tree, currentProperty, &hashNode->value.a)) {
                         if (top == MAX_STACK_SIZE) {
                             return ERR_MAX_STACK_SIZE;
                         }
-
-                        alphaStack[top] =  &currentNode->value.a;
-                        propertyStack[top] = currentProperty;
+                        stack[top] = &hashNode->value.a; 
                         ++top;
                     }
+                }
+            }   
+        }
+
+        if (currentAlpha->betaListOffset) {
+            unsigned int *betaList = &tree->nextPool[currentAlpha->betaListOffset];
+            for (unsigned int entry = 0; betaList[entry] != 0; ++entry) {
+                result = handleBeta(tree, 
+                                    sid, 
+                                    mid, 
+                                    state, 
+                                    &tree->nodePool[betaList[entry]], 
+                                    rulesBinding, 
+                                    actionType, 
+                                    commandCount);
+                if (result != RULES_OK) {
+                    return result;
                 }
             }
         }
@@ -471,18 +533,16 @@ static unsigned int handleAlpha(ruleset *tree, char *sid, char *mid, char *state
     return result;
 }
 
-static unsigned int getId(jsonProperty *allProperties, unsigned int idHash, jsonProperty **idProperty, int *idLength) {
+static unsigned int getId(jsonProperty *allProperties, 
+                          unsigned int idIndex, 
+                          jsonProperty **idProperty, 
+                          int *idLength) {
     jsonProperty *currentProperty;
-    unsigned int propertyHash = 1;
-    for (int ii = 0; propertyHash && (propertyHash != idHash) && (ii < MAX_CONFLICTS); ++ii) {
-        currentProperty = &allProperties[(idHash & HASH_MASK) + (ii * MAX_BUCKET_LENGTH)];
-        propertyHash = currentProperty->hash;
-    }
-
-    if (propertyHash != idHash) {
+    if (idIndex == MAX_PROPERTIES) {
         return ERR_NO_ID_DEFINED;
     }
 
+    currentProperty = &allProperties[idIndex];
     *idLength = currentProperty->lastValue - currentProperty->firstValue;
     switch(currentProperty->type) {
         case JSON_INT:
@@ -498,25 +558,42 @@ static unsigned int getId(jsonProperty *allProperties, unsigned int idHash, json
     return RULES_OK;
 }
 
-static unsigned int handleSession(ruleset *tree, char *state, void *rulesBinding, unsigned short actionType, unsigned short *commandCount, unsigned char store) {
+static unsigned int handleSession(ruleset *tree, 
+                                  char *state, 
+                                  void *rulesBinding, 
+                                  unsigned short actionType, 
+                                  unsigned short *commandCount, 
+                                  unsigned char store) {
     char *next;
-    jsonProperty properties[MAX_BUCKET_LENGTH * MAX_CONFLICTS];
-    memset(properties, 0, sizeof(properties));
-    int result = constructObject(NULL, state, properties, &next);
+    unsigned int propertiesLength = 0;
+    unsigned int dummyIndex = MAX_PROPERTIES;
+    unsigned int sidIndex = MAX_PROPERTIES;
+    jsonProperty properties[MAX_PROPERTIES];
+    int result = constructObject(NULL, state, properties, &propertiesLength, &sidIndex, &dummyIndex, &next);
     if (result != RULES_OK) {
         return result;
     }
 
     jsonProperty *sidProperty;
     int sidLength;
-    result = getId(properties, ID_HASH, &sidProperty, &sidLength);
+    result = getId(properties, sidIndex, &sidProperty, &sidLength);
     if (result != RULES_OK) {
         return result;
     }
+
     char sid[sidLength + 1];
     strncpy(sid, sidProperty->firstValue, sidLength);
     sid[sidLength] = '\0';
-    result = handleAlpha(tree, sid, NULL, state, &tree->nodePool[NODE_S_OFFSET].value.a, properties, &rulesBinding, actionType, commandCount); 
+    result = handleAlpha(tree, 
+                         sid, 
+                         NULL, 
+                         state, 
+                         &tree->nodePool[NODE_S_OFFSET].value.a, properties, 
+                         propertiesLength, 
+                         &rulesBinding, 
+                         actionType, 
+                         commandCount); 
+
     if (result == ERR_EVENT_NOT_HANDLED && store) {
         *commandCount = *commandCount + 1;
         result = storeSession(rulesBinding, sid, state);
@@ -525,10 +602,18 @@ static unsigned int handleSession(ruleset *tree, char *state, void *rulesBinding
     return result;
 }
 
-static unsigned int handleEventCore(ruleset *tree, char *message, jsonProperty *properties, void **rulesBinding, unsigned short actionType, unsigned short *commandCount) {
+static unsigned int handleEventCore(ruleset *tree,
+                                    char *message, 
+                                    jsonProperty *properties, 
+                                    unsigned int propertiesLength, 
+                                    unsigned int midIndex, 
+                                    unsigned int sidIndex, 
+                                    void **rulesBinding, 
+                                    unsigned short actionType, 
+                                    unsigned short *commandCount) {
     jsonProperty *idProperty;
     int idLength;
-    int result = getId(properties, ID_HASH, &idProperty, &idLength);
+    int result = getId(properties, midIndex, &idProperty, &idLength);
     if (result != RULES_OK) {
         return result;
     }
@@ -536,7 +621,7 @@ static unsigned int handleEventCore(ruleset *tree, char *message, jsonProperty *
     strncpy(mid, idProperty->firstValue, idLength);
     mid[idLength] = '\0';
     
-    result = getId(properties, SID_HASH, &idProperty, &idLength);
+    result = getId(properties, sidIndex, &idProperty, &idLength);
     if (result != RULES_OK) {
         return result;
     }
@@ -552,7 +637,17 @@ static unsigned int handleEventCore(ruleset *tree, char *message, jsonProperty *
         *commandCount = *commandCount + 1;
     }
 
-    result =  handleAlpha(tree, sid, mid, message, &tree->nodePool[NODE_M_OFFSET].value.a, properties, rulesBinding, actionType, commandCount); 
+    result =  handleAlpha(tree, 
+                          sid, 
+                          mid, 
+                          message, 
+                          &tree->nodePool[NODE_M_OFFSET].value.a, 
+                          properties, 
+                          propertiesLength, 
+                          rulesBinding, 
+                          actionType, 
+                          commandCount);
+
     if (result == ERR_NEW_SESSION) {
         char session[11 + idLength];
         strcpy(session, "{\"id\":\"");
@@ -570,16 +665,30 @@ static unsigned int handleEventCore(ruleset *tree, char *message, jsonProperty *
     return result;
 }
 
-static unsigned int handleEvent(ruleset *tree, char *message, void **rulesBinding, unsigned short actionType, unsigned short *commandCount) {
+static unsigned int handleEvent(ruleset *tree, 
+                                char *message, 
+                                void **rulesBinding, 
+                                unsigned short actionType, 
+                                unsigned short *commandCount) {
     char *next;
-    jsonProperty properties[MAX_BUCKET_LENGTH * MAX_CONFLICTS];
-    memset(properties, 0, sizeof(properties));
-    int result = constructObject(NULL, message, properties, &next);
+    unsigned int propertiesLength = 0;
+    unsigned int midIndex = MAX_PROPERTIES;
+    unsigned int sidIndex = MAX_PROPERTIES;
+    jsonProperty properties[MAX_PROPERTIES];
+    int result = constructObject(NULL, message, properties, &propertiesLength, &midIndex, &sidIndex, &next);
     if (result != RULES_OK) {
         return result;
     }
 
-    return handleEventCore(tree, message, properties, rulesBinding, actionType, commandCount);
+    return handleEventCore(tree, 
+                           message, 
+                           properties, 
+                           propertiesLength, 
+                           midIndex, 
+                           sidIndex, 
+                           rulesBinding, 
+                           actionType, 
+                           commandCount);
 }
 
 unsigned int assertEvent(void *handle, char *message) {
@@ -600,9 +709,16 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
     unsigned short actionType = ACTION_ASSERT_FIRST_MESSAGE;
     unsigned int result;
     void *rulesBinding = NULL;
-    jsonProperty properties0[MAX_BUCKET_LENGTH * MAX_CONFLICTS];
-    jsonProperty properties1[MAX_BUCKET_LENGTH * MAX_CONFLICTS];
+    jsonProperty properties0[MAX_PROPERTIES];
+    jsonProperty properties1[MAX_PROPERTIES];
     jsonProperty *currentProperties = NULL;
+    unsigned int currentPropertiesLength = 0;
+    unsigned int currentPropertiesMidIndex = MAX_PROPERTIES;
+    unsigned int currentPropertiesSidIndex = MAX_PROPERTIES;
+    unsigned int nextPropertiesLength = 0;
+    unsigned int nextPropertiesMidIndex = MAX_PROPERTIES;
+    unsigned int nextPropertiesSidIndex = MAX_PROPERTIES;
+    
     jsonProperty *nextProperties = properties0;
     char *first = NULL;
     char *last = NULL;
@@ -610,13 +726,28 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
     char *nextFirst = messages;
     char lastTemp;
 
-    memset(nextProperties, 0, sizeof(properties0));
     while (nextFirst[0] != '{' && nextFirst[0] != '\0' ) {
         ++nextFirst;
     }
-    while (constructObject(NULL, nextFirst, nextProperties, &next) == RULES_OK) {
+
+    while (constructObject(NULL, 
+                           nextFirst, 
+                           nextProperties, 
+                           &nextPropertiesLength, 
+                           &nextPropertiesMidIndex,
+                           &nextPropertiesSidIndex,
+                           &next) == RULES_OK) {
         if (currentProperties) {
-            result = handleEventCore(handle, first, currentProperties, &rulesBinding, actionType, &commandCount);
+
+            result = handleEventCore(handle, 
+                                     first, 
+                                     currentProperties, 
+                                     currentPropertiesLength,
+                                     currentPropertiesMidIndex,
+                                     currentPropertiesSidIndex,
+                                     &rulesBinding, 
+                                     actionType, 
+                                     &commandCount);
             last[0] = lastTemp;
             if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
                 free(resultsArray);
@@ -646,6 +777,9 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
         lastTemp = next[0];
         next[0] = '\0';
         currentProperties = nextProperties;
+        currentPropertiesLength = nextPropertiesLength;
+        currentPropertiesMidIndex = nextPropertiesMidIndex;
+        currentPropertiesSidIndex = nextPropertiesSidIndex;
         first = nextFirst;
         nextFirst = next + 1;
         if (nextProperties == properties0) {
@@ -654,7 +788,9 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
             nextProperties = properties0;
         }
 
-        memset(nextProperties, 0, sizeof(properties0));    
+        nextPropertiesLength = 0;
+        nextPropertiesMidIndex = MAX_PROPERTIES;
+        nextPropertiesSidIndex = MAX_PROPERTIES;
     }
 
     if (actionType == ACTION_ASSERT_FIRST_MESSAGE) {
@@ -663,7 +799,15 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
         actionType = ACTION_ASSERT_LAST_MESSAGE;
     }
 
-    result = handleEventCore(handle, first, currentProperties, &rulesBinding, actionType, &commandCount);
+    result = handleEventCore(handle, 
+                             first, 
+                             currentProperties, 
+                             currentPropertiesLength,
+                             currentPropertiesMidIndex,
+                             currentPropertiesSidIndex,
+                             &rulesBinding, 
+                             actionType, 
+                             &commandCount);
     last[0] = lastTemp;
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         free(resultsArray);

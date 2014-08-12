@@ -32,7 +32,7 @@ d.run({
                 first: { end: 'one' },
                 second: { end: 'two' }
             },
-            run: function (s) { console.log('done'); }
+            run: function (s) { console.log('done 1'); }
         }
     },
     paralel2$state: {
@@ -77,12 +77,12 @@ d.run({
         result: {
             approve: {
                 when: { subject: 'approved' },
-                run: function (s) { console.log('approved'); },
+                run: function (s) { console.log('approved 2'); },
                 to: 'approved'
             },
             deny: {
                 when: { subject: 'denied' },
-                run: function (s) { console.log('denied'); },
+                run: function (s) { console.log('denied 2'); },
                 to: 'denied'
             }
         },
@@ -125,10 +125,10 @@ d.run({
             }
         },
         approve: {
-            run: function (s) { console.log('approved'); }
+            run: function (s) { console.log('approved 3'); }
         },
         deny: {
-            run: function (s) { console.log('denied'); }
+            run: function (s) { console.log('denied 3'); }
         }
     },
 }, '', null, function(host) {

@@ -1,6 +1,7 @@
 r = require('../build/release/rules.node');
 var cluster = require('cluster');
 
+console.log('books');
 
 handle = r.createRuleset('books',  
     JSON.stringify({
@@ -28,7 +29,7 @@ handle = r.createRuleset('books',
     })
 );
 
-r.bindRuleset(handle, '/tmp/redis.sock');
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
 
 r.assertEvent(handle, 
     JSON.stringify({
@@ -63,6 +64,160 @@ console.log(JSON.parse(result[2]));
 r.completeAction(handle, result[0], result[1]);
 r.deleteRuleset(handle);
 
+console.log('books2');
+
+handle = r.createRuleset('books2',  
+    JSON.stringify({
+        ship: {
+            whenAll: {
+                order: { 
+                    $and: [
+                        { country: 'US' },
+                        { seller: 'bookstore'},
+                        { currency: 'US' },
+                        { $lte: { amount: 1000 } },
+                    ]
+                },
+                available:  { 
+                    $and: [
+                        { country: 'US' },
+                        { seller: 'bookstore' },
+                        { status: 'available'},
+                        { item: 'book' },
+                    ]
+                }
+            },
+            run: 'ship'
+        }
+    })
+);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 1,
+        sid: 'first',
+        name: 'John Smith',
+        address: '1111 NE 22, Seattle, Wa',
+        phone: '206678787',
+        country: 'US',
+        currency: 'US',
+        seller: 'bookstore',
+        item: 'book',
+        reference: '75323',
+        amount: 500
+    })
+);
+
+r.assertEvent(handle,
+    JSON.stringify({
+        id: 2,
+        sid: 'first',
+        item: 'book',
+        status: 'available',
+        country: 'US',
+        seller: 'bookstore'
+    })
+);
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+r.deleteRuleset(handle);
+
+console.log('books3');
+
+handle = r.createRuleset('books3',  
+    JSON.stringify({
+        ship: {
+            when: { 
+                $and: [
+                    { country: 'US' },
+                    { seller: 'bookstore'},
+                    { currency: 'US' },
+                    { $lte: { amount: 1000 } },
+                ]
+            },
+            run: 'ship'
+        },
+        order: {
+            when: { 
+                $and: [
+                    { country: 'US' },
+                    { seller: 'bookstore'},
+                    { currency: 'US' },
+                    { $lte: { amount: 1000 } },
+                ]
+            },
+            run: 'order'
+        },
+    })
+);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 1,
+        sid: 'first',
+        name: 'John Smith',
+        address: '1111 NE 22, Seattle, Wa',
+        phone: '206678787',
+        country: 'US',
+        currency: 'US',
+        seller: 'bookstore',
+        item: 'book',
+        reference: '75323',
+        amount: 500
+    })
+);
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+r.deleteRuleset(handle);
+
+console.log('books4');
+
+handle = r.createRuleset('books4',  
+    JSON.stringify({
+        ship: {
+            when: { $nex: { label: 1 }},
+            run: 'ship'
+        }
+    })
+);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 1,
+        sid: 'first',
+        name: 'John Smith',
+        address: '1111 NE 22, Seattle, Wa',
+        phone: '206678787',
+        country: 'US',
+        currency: 'US',
+        seller: 'bookstore',
+        item: 'book',
+        reference: '75323',
+        amount: 500
+    })
+);
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+r.deleteRuleset(handle);
+
+
+console.log('approval1');
+
 handle = r.createRuleset('approval1', 
     JSON.stringify({ r1: {
             whenAll: {
@@ -80,7 +235,7 @@ handle = r.createRuleset('approval1',
     })
 );
 
-r.bindRuleset(handle, '/tmp/redis.sock');
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
 
 r.assertEvent(handle,
     JSON.stringify({
@@ -102,8 +257,9 @@ result = r.startAction(handle);
 console.log(JSON.parse(result[1]));
 console.log(JSON.parse(result[2]));
 r.completeAction(handle, result[0], result[1]);
-
 r.deleteRuleset(handle);
+
+console.log('approval2');
 
 handle = r.createRuleset('approval2', 
     JSON.stringify({ r2: {
@@ -122,7 +278,7 @@ handle = r.createRuleset('approval2',
     })
 );
 
-r.bindRuleset(handle, '/tmp/redis.sock');
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
 
 r.assertEvent(handle,
     JSON.stringify({

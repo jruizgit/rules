@@ -10,6 +10,8 @@ handle = r.createRuleset('rules',
 );
 r.deleteRuleset(handle);
 
+console.log('created rules1');
+
 handle = r.createRuleset('rules',  
     JSON.stringify({  
         r1: { 
@@ -20,6 +22,8 @@ handle = r.createRuleset('rules',
 );
 r.deleteRuleset(handle);
 
+console.log('created rules2');
+
 handle = r.createRuleset('rules',  
     JSON.stringify({ 
         r1: { 
@@ -29,6 +33,8 @@ handle = r.createRuleset('rules',
     })
 );
 r.deleteRuleset(handle);
+
+console.log('created rules3');
 
 handle = r.createRuleset('rules',  
     JSON.stringify({ 
@@ -43,6 +49,8 @@ handle = r.createRuleset('rules',
 );
 r.deleteRuleset(handle);
 
+console.log('created rules4');
+
 handle = r.createRuleset('rules',  
     JSON.stringify({
         r1: {
@@ -52,6 +60,8 @@ handle = r.createRuleset('rules',
     })
 );
 r.deleteRuleset(handle);
+
+console.log('created rules5');
 
 handle = r.createRuleset('rules', 
     JSON.stringify({ 
@@ -67,6 +77,8 @@ handle = r.createRuleset('rules',
 );
 r.deleteRuleset(handle);
 
+console.log('created rules6');
+
 handle = r.createRuleset('rules', 
     JSON.stringify({ r1: {
             whenAll: {
@@ -84,6 +96,8 @@ handle = r.createRuleset('rules',
     })
 );
 r.deleteRuleset(handle);
+
+console.log('created rules7');
 
 handle = r.createRuleset('rules', 
     JSON.stringify({ r1: {
@@ -103,6 +117,8 @@ handle = r.createRuleset('rules',
 );
 r.deleteRuleset(handle);
 
+console.log('created rules8');
+
 handle = r.createRuleset('rules', 
     JSON.stringify({ r1: {
             whenAll: {
@@ -121,6 +137,8 @@ handle = r.createRuleset('rules',
 );
 r.deleteRuleset(handle);
 
+console.log('created rules9');
+
 handle = r.createRuleset('rules', 
     JSON.stringify({ r1: {
             whenAny: {
@@ -138,6 +156,8 @@ handle = r.createRuleset('rules',
     })
 );
 r.deleteRuleset(handle);
+
+console.log('created rules10');
 
 handle = r.createRuleset('rules', 
     JSON.stringify({ r1: {
@@ -153,6 +173,8 @@ handle = r.createRuleset('rules',
     })
 );
 r.deleteRuleset(handle);
+
+console.log('created rules11');
 
 handle = r.createRuleset('rules', 
     JSON.stringify({ r1: {
@@ -170,6 +192,8 @@ handle = r.createRuleset('rules',
 );
 r.deleteRuleset(handle);
 
+console.log('created rules12');
+
 handle = r.createRuleset('rules', 
     JSON.stringify({ r1: {
             whenAll: {
@@ -184,3 +208,5 @@ handle = r.createRuleset('rules',
     })
 );
 r.deleteRuleset(handle);
+
+console.log('created rules13');
