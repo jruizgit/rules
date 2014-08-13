@@ -3,7 +3,7 @@
   "version": "0.10.2",
   "description": "A lightweight library for real-time, consistent and scalable coordination of events.",
   "keywords": ["business rules", "rules", "rete", "forward chaining", "event streams", "state machine", "flowchart", "workflow", "consistency" ],
-  "dependencies": { "express": "2.5.x" , "node-static": "0.7.x", "redis": "0.10.x", "hiredis":"0.1.x"},
+  "dependencies": { "express": "3.4.x" , "node-static": "0.7.x", "connect": "2.19.x"},
   "repository": { "type": "git", "url": "http://github.com/jruizgit/rules" },
   "main" : "./lib/durable",
   "license": "MIT",
