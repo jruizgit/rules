@@ -40,7 +40,9 @@ To learn more:
 * [Concepts](https://github.com/jruizgit/rules/blob/master/concepts.md)  
  
 Blog posts:
-* [Inference: From Expert Systems to Cloud Scale Event Processing](http://jruizblog.com/2014/01/27/event-processing/)
-* [Rete Meets Redis](http://jruizblog.com/2014/02/02/rete-meets-redis/)
+* [Boosting Performance with C, 08/2014](http://jruizblog.com/2014/08/19/boosting-performance-with-c/)
+* [Rete Meets Redis, 02/2014](http://jruizblog.com/2014/02/02/rete-meets-redis/)
+* [Inference: From Expert Systems to Cloud Scale Event Processing, 01/2014](http://jruizblog.com/2014/01/27/event-processing/)
+
 
 
