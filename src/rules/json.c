@@ -38,7 +38,7 @@ unsigned int readNextName(char *start, char **first, char **last, unsigned int *
             case ST_OBJECT_SEEK:
                 if (start[0] == '{') {
                     state = ST_OBJECT_PROP_NAME;
-                } else {
+                } else if (start[0] != ' ' && start[0] != '\t') {
                     state = ST_OBJECT_PROP_SEEK;
                 } 
                 break;

@@ -1010,7 +1010,7 @@ static unsigned int createMessages(redisReply *reply,  char **firstSid, char **l
     return RULES_OK;
 }
 
-unsigned int startAction(void *handle, char **session, char **messages, void **actionHandle) {
+unsigned int startAction(void *handle, char **state, char **messages, void **actionHandle) {
     redisReply *reply;
     char *firstSid;
     char *lastSid;
@@ -1025,7 +1025,7 @@ unsigned int startAction(void *handle, char **session, char **messages, void **a
         return result;
     }
 
-    result = createSession(reply, firstSid, lastSid, session);
+    result = createSession(reply, firstSid, lastSid, state);
     if (result != RULES_OK) {
         return result;
     } 
@@ -1037,7 +1037,7 @@ unsigned int startAction(void *handle, char **session, char **messages, void **a
     return RULES_OK;
 }
 
-unsigned int completeAction(void *handle, void *actionHandle, char *session) {
+unsigned int completeAction(void *handle, void *actionHandle, char *state) {
     unsigned short commandCount = 4;
     actionContext *context = (actionContext*)actionHandle;
     redisReply *reply = context->reply;
@@ -1076,7 +1076,7 @@ unsigned int completeAction(void *handle, void *actionHandle, char *session) {
         }
     }
 
-    result = handleSession(handle, session, rulesBinding, ACTION_ASSERT_SESSION, &commandCount, 1);
+    result = handleSession(handle, state, rulesBinding, ACTION_ASSERT_SESSION, &commandCount, 1);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         freeReplyObject(reply);
         free(actionHandle);

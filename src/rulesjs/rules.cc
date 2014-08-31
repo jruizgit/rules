@@ -57,7 +57,6 @@ Handle<Value> jsBindRuleset(const Arguments& args) {
     } else if (!args[0]->IsNumber() || !args[1]->IsString() || !args[2]->IsNumber()) {
         ThrowException(Exception::TypeError(String::New("Wrong argument type")));
     } else {
-        void *output = NULL;
         unsigned int result;
         if (args[3]->IsString()) {
             result = bindRuleset((void *)args[0]->IntegerValue(), *v8::String::Utf8Value(args[1]->ToString()), 
@@ -72,9 +71,7 @@ Handle<Value> jsBindRuleset(const Arguments& args) {
             asprintf(&message, "Could not create connection, error code: %d", result);
             ThrowException(Exception::TypeError(String::New(message)));
             free(message);
-        } else {
-            return scope.Close(Number::New((long)output));
-        }
+        } 
     }
 
     return scope.Close(Undefined());
