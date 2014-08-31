@@ -10,36 +10,36 @@ if (cluster.isMaster) {
     });
 } else {
     var chargeRules = {
-        charge1: { when: { $and: [ { country: 'GB' }, { store: 'books'} ] }, run: 'charge' },
-        charge2: { when: { $and: [ { country: 'DE' }, { store: 'books'} ] }, run: 'charge' },
-        charge3: { when: { $and: [ { country: 'FR' }, { store: 'books'} ] }, run: 'charge' },
-        charge4: { when: { $and: [ { country: 'SP' }, { store: 'books'} ] }, run: 'charge' },
-        charge5: { when: { $and: [ { country: 'IT' }, { store: 'books'} ] }, run: 'charge' },
-        charge6: { when: { $and: [ { country: 'DM' }, { store: 'books'} ] }, run: 'charge' },
-        charge7: { when: { $and: [ { country: 'SW' }, { store: 'books'} ] }, run: 'charge' },
-        charge8: { when: { $and: [ { country: 'NW' }, { store: 'books'} ] }, run: 'charge' },
-        charge9: { when: { $and: [ { country: 'NL' }, { store: 'books'} ] }, run: 'charge' },
-        charge10: { when: { $and: [ { country: 'FN' }, { store: 'books'} ] }, run: 'charge' },
-        charge11: { when: { $and: [ { country: 'GB' }, { store: 'cars'} ] }, run: 'charge' },
-        charge12: { when: { $and: [ { country: 'DE' }, { store: 'cars'} ] }, run: 'charge' },
-        charge13: { when: { $and: [ { country: 'FR' }, { store: 'cars'} ] }, run: 'charge' },
-        charge14: { when: { $and: [ { country: 'SP' }, { store: 'cars'} ] }, run: 'charge' },
-        charge15: { when: { $and: [ { country: 'IT' }, { store: 'cars'} ] }, run: 'charge' },
-        charge16: { when: { $and: [ { country: 'DM' }, { store: 'cars'} ] }, run: 'charge' },
-        charge17: { when: { $and: [ { country: 'SW' }, { store: 'cars'} ] }, run: 'charge' },
-        charge18: { when: { $and: [ { country: 'NW' }, { store: 'cars'} ] }, run: 'charge' },
-        charge19: { when: { $and: [ { country: 'NL' }, { store: 'cars'} ] }, run: 'charge' },
-        charge20: { when: { $and: [ { country: 'FN' }, { store: 'cars'} ] }, run: 'charge' },
-        charge21: { when: { $and: [ { country: 'GB' }, { store: 'planes'} ] }, run: 'charge' },
-        charge22: { when: { $and: [ { country: 'DE' }, { store: 'planes'} ] }, run: 'charge' },
-        charge23: { when: { $and: [ { country: 'FR' }, { store: 'planes'} ] }, run: 'charge' },
-        charge24: { when: { $and: [ { country: 'SP' }, { store: 'planes'} ] }, run: 'charge' },
-        charge25: { when: { $and: [ { country: 'IT' }, { store: 'planes'} ] }, run: 'charge' },
-        charge26: { when: { $and: [ { country: 'DM' }, { store: 'planes'} ] }, run: 'charge' },
-        charge27: { when: { $and: [ { country: 'SW' }, { store: 'planes'} ] }, run: 'charge' },
-        charge28: { when: { $and: [ { country: 'NW' }, { store: 'planes'} ] }, run: 'charge' },
-        charge29: { when: { $and: [ { country: 'NL' }, { store: 'planes'} ] }, run: 'charge' },
-        charge30: { when: { $and: [ { country: 'FN' }, { store: 'planes'} ] }, run: 'charge' },
+        charge1: { whenSome: { $and: [ { country: 'GB' }, { store: 'books'} ] }, run: 'charge' },
+        charge2: { whenSome: { $and: [ { country: 'DE' }, { store: 'books'} ] }, run: 'charge' },
+        charge3: { whenSome: { $and: [ { country: 'FR' }, { store: 'books'} ] }, run: 'charge' },
+        charge4: { whenSome: { $and: [ { country: 'SP' }, { store: 'books'} ] }, run: 'charge' },
+        charge5: { whenSome: { $and: [ { country: 'IT' }, { store: 'books'} ] }, run: 'charge' },
+        charge6: { whenSome: { $and: [ { country: 'DM' }, { store: 'books'} ] }, run: 'charge' },
+        charge7: { whenSome: { $and: [ { country: 'SW' }, { store: 'books'} ] }, run: 'charge' },
+        charge8: { whenSome: { $and: [ { country: 'NW' }, { store: 'books'} ] }, run: 'charge' },
+        charge9: { whenSome: { $and: [ { country: 'NL' }, { store: 'books'} ] }, run: 'charge' },
+        charge10: { whenSome: { $and: [ { country: 'FN' }, { store: 'books'} ] }, run: 'charge' },
+        charge11: { whenSome: { $and: [ { country: 'GB' }, { store: 'cars'} ] }, run: 'charge' },
+        charge12: { whenSome: { $and: [ { country: 'DE' }, { store: 'cars'} ] }, run: 'charge' },
+        charge13: { whenSome: { $and: [ { country: 'FR' }, { store: 'cars'} ] }, run: 'charge' },
+        charge14: { whenSome: { $and: [ { country: 'SP' }, { store: 'cars'} ] }, run: 'charge' },
+        charge15: { whenSome: { $and: [ { country: 'IT' }, { store: 'cars'} ] }, run: 'charge' },
+        charge16: { whenSome: { $and: [ { country: 'DM' }, { store: 'cars'} ] }, run: 'charge' },
+        charge17: { whenSome: { $and: [ { country: 'SW' }, { store: 'cars'} ] }, run: 'charge' },
+        charge18: { whenSome: { $and: [ { country: 'NW' }, { store: 'cars'} ] }, run: 'charge' },
+        charge19: { whenSome: { $and: [ { country: 'NL' }, { store: 'cars'} ] }, run: 'charge' },
+        charge20: { whenSome: { $and: [ { country: 'FN' }, { store: 'cars'} ] }, run: 'charge' },
+        charge21: { whenSome: { $and: [ { country: 'GB' }, { store: 'planes'} ] }, run: 'charge' },
+        charge22: { whenSome: { $and: [ { country: 'DE' }, { store: 'planes'} ] }, run: 'charge' },
+        charge23: { whenSome: { $and: [ { country: 'FR' }, { store: 'planes'} ] }, run: 'charge' },
+        charge24: { whenSome: { $and: [ { country: 'SP' }, { store: 'planes'} ] }, run: 'charge' },
+        charge25: { whenSome: { $and: [ { country: 'IT' }, { store: 'planes'} ] }, run: 'charge' },
+        charge26: { whenSome: { $and: [ { country: 'DM' }, { store: 'planes'} ] }, run: 'charge' },
+        charge27: { whenSome: { $and: [ { country: 'SW' }, { store: 'planes'} ] }, run: 'charge' },
+        charge28: { whenSome: { $and: [ { country: 'NW' }, { store: 'planes'} ] }, run: 'charge' },
+        charge29: { whenSome: { $and: [ { country: 'NL' }, { store: 'planes'} ] }, run: 'charge' },
+        charge30: { whenSome: { $and: [ { country: 'FN' }, { store: 'planes'} ] }, run: 'charge' },
     };
 
     // handle = getRuleset('books', chargeRules);
@@ -66,6 +66,8 @@ if (cluster.isMaster) {
     //         }
 
     //         r.assertEvents(handle, JSON.stringify(events));
+    //         var result = r.startAction(handle);
+    //         r.completeAction(handle, result[0], result[1]);
     //     }
     // }
 
@@ -92,7 +94,7 @@ if (cluster.isMaster) {
 
     // console.log('Start books send 10: ' + new Date() + ' size: ' + sample.length);
 
-    // for (var m = 0; m < 125; ++m) {
+    // for (var m = 0; m < 90; ++m) {
     //     for (var i = 0; i < 16; ++i) {
     //         var events = [];
     //         for (var ii = 0; ii < 40; ++ii) {
@@ -115,6 +117,8 @@ if (cluster.isMaster) {
     //         }
 
     //         r.assertEvents(handle, JSON.stringify(events));
+    //         var result = r.startAction(handle);
+    //         r.completeAction(handle, result[0], result[1]);
     //     }
     // }
 
@@ -152,7 +156,7 @@ if (cluster.isMaster) {
 
     // console.log('Start books send 20: ' + new Date() + ' size: ' + sample.length);
 
-    // for (var m = 0; m < 125; ++m) {
+    // for (var m = 0; m < 90; ++m) {
     //     for (var i = 0; i < 16; ++i) {
     //         var events = [];
     //         for (var ii = 0; ii < 40; ++ii) {
@@ -186,6 +190,8 @@ if (cluster.isMaster) {
     //         }
 
     //         r.assertEvents(handle, JSON.stringify(events));
+    //         var result = r.startAction(handle);
+    //         r.completeAction(handle, result[0], result[1]);
     //     }
     // }
 
@@ -242,7 +248,7 @@ if (cluster.isMaster) {
 
     // console.log('Start books send 40: ' + new Date() + ' size: ' + sample.length);
 
-    // for (var m = 0; m < 125; ++m) {
+    // for (var m = 0; m < 90; ++m) {
     //     for (var i = 0; i < 16; ++i) {
     //         var events = [];
     //         for (var ii = 0; ii < 40; ++ii) {
@@ -295,6 +301,8 @@ if (cluster.isMaster) {
     //         }
 
     //         r.assertEvents(handle, JSON.stringify(events));
+    //         var result = r.startAction(handle);
+    //         r.completeAction(handle, result[0], result[1]);
     //     }
     // }
 
@@ -392,7 +400,7 @@ if (cluster.isMaster) {
 
     console.log('Start books send 80: ' + new Date() + ' size: ' + sample.length);
 
-    for (var m = 0; m < 125; ++m) {
+    for (var m = 0; m < 90; ++m) {
         for (var i = 0; i < 16; ++i) {
             var events = [];
             for (var ii = 0; ii < 40; ++ii) {
@@ -486,6 +494,8 @@ if (cluster.isMaster) {
             }
 
             r.assertEvents(handle, JSON.stringify(events));
+            var result = r.startAction(handle);
+            r.completeAction(handle, result[0], result[1]);
         }
     }
 

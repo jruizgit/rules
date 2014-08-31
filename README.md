@@ -1,7 +1,3 @@
-Under construction - just finishing c implementation with two objectives  
-- boost performance 3x to 10x depending on the scenario
-- support polyglot platfrom
-
 Durable Rules
 =====
 Durable Rules provides real-time, consistent and scalable coordination of events. With Durable Rules you can track and analyze information about things that happen (events) by combining data from multiple sources to infer more complicated circumstances.
@@ -39,8 +35,10 @@ To learn more:
 * [Tutorial](https://github.com/jruizgit/rules/blob/master/tutorial.md)
 * [Concepts](https://github.com/jruizgit/rules/blob/master/concepts.md)  
  
-Blog posts:
-* [Inference: From Expert Systems to Cloud Scale Event Processing](http://jruizblog.com/2014/01/27/event-processing/)
-* [Rete Meets Redis](http://jruizblog.com/2014/02/02/rete-meets-redis/)
+Blog:
+* [Boosting Performance with C (08/2014)](http://jruizblog.com/2014/08/19/boosting-performance-with-c/)
+* [Rete Meets Redis (02/2014)](http://jruizblog.com/2014/02/02/rete-meets-redis/)
+* [Inference: From Expert Systems to Cloud Scale Event Processing (01/2014)](http://jruizblog.com/2014/01/27/event-processing/)
+
 
 
