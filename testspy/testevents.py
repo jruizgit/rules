@@ -3,23 +3,23 @@ import json
 
 print('books1 *****')
 
-handle = rules.createRuleset('books1',  json.dumps({ 
+handle = rules.create_ruleset('books1',  json.dumps({
     'ship': {
         'whenAll': {
-            'order': { 
+            'order': {
                 '$and': [
-                    { '$lte': { 'amount': 1000 } },
-                    { 'country': 'US' },
-                    { 'currency': 'US' },
-                    { 'seller': 'bookstore'} 
+                    {'$lte': {'amount': 1000}},
+                    {'country': 'US'},
+                    {'currency': 'US'},
+                    {'seller': 'bookstore'} 
                 ]
             },
-            'available':  { 
+            'available':  {
                 '$and': [
-                    { 'item': 'book' },
-                    { 'country': 'US' },
-                    { 'seller': 'bookstore' },
-                    { 'status': 'available'} 
+                    {'item': 'book'},
+                    {'country': 'US'},
+                    {'seller': 'bookstore'},
+                    {'status': 'available'} 
                 ]
             }
         },
@@ -27,9 +27,9 @@ handle = rules.createRuleset('books1',  json.dumps({
     }
 }))
 
-rules.bindRuleset(handle, None , 0 , '/tmp/redis.sock')
+rules.bind_ruleset(handle, None , 0 , '/tmp/redis.sock')
 
-rules.assertEvent(handle, json.dumps({
+rules.assert_event(handle, json.dumps({
     'id': 1,
     'sid': 'first',
     'name': 'John Smith',
@@ -43,7 +43,7 @@ rules.assertEvent(handle, json.dumps({
     'amount': 500
 }))
 
-rules.assertEvent(handle, json.dumps({
+rules.assert_event(handle, json.dumps({
     'id': 1,
     'sid': 'first',
     'item': 'book',
@@ -52,44 +52,44 @@ rules.assertEvent(handle, json.dumps({
     'seller': 'bookstore'
 }))
 
-result = rules.startAction(handle)
+result = rules.start_action(handle)
 
 print(repr(json.loads(result[0])))
 print(repr(json.loads(result[1])))
 
-rules.completeAction(handle, result[2], result[0])
-rules.deleteRuleset(handle)
+rules.complete_action(handle, result[2], result[0])
+rules.delete_ruleset(handle)
 
 print('books2 ******')
 
-handle = rules.createRuleset('books2',  json.dumps({ 
+handle = rules.create_ruleset('books2',  json.dumps({
     'ship': {
-        'when': { 
+        'when': {
             '$and': [
-                { 'country': 'US' },
-                { 'seller': 'bookstore'},
-                { 'currency': 'US' },
-                { '$lte': { 'amount': 1000 } },
+                {'country': 'US'},
+                {'seller': 'bookstore'},
+                {'currency': 'US'},
+                {'$lte': {'amount': 1000}},
             ]
         },
         'run': 'ship'
     },
     'order': {
-        'when': { 
+        'when': {
             '$and': [
-                { 'country': 'US' },
-                { 'seller': 'bookstore'},
-                { 'currency': 'US' },
-                { '$lte': { 'amount': 1000 } },
+                {'country': 'US'},
+                {'seller': 'bookstore'},
+                {'currency': 'US'},
+                {'$lte': {'amount': 1000}},
             ]
         },
         'run': 'order'
     }
 }))
 
-rules.bindRuleset(handle, None , 0 , '/tmp/redis.sock')
+rules.bind_ruleset(handle, None , 0 , '/tmp/redis.sock')
 
-rules.assertEvent(handle, json.dumps({
+rules.assert_event(handle, json.dumps({
     'id': 1,
     'sid': 'first',
     'name': 'John Smith',
@@ -103,151 +103,151 @@ rules.assertEvent(handle, json.dumps({
     'amount': 500
 }))
 
-result = rules.startAction(handle)
+result = rules.start_action(handle)
 
 print(repr(json.loads(result[0])))
 print(repr(json.loads(result[1])))
 
-rules.completeAction(handle, result[2], result[0])
-rules.deleteRuleset(handle)
+rules.complete_action(handle, result[2], result[0])
+rules.delete_ruleset(handle)
 
 print('books3 ******')
 
-handle = rules.createRuleset('books3',  json.dumps({ 
+handle = rules.create_ruleset('books3',  json.dumps({
     'ship': {
-        'when': { '$nex': { 'label': 1 }},
+        'when': {'$nex': {'label': 1}},
         'run': 'ship'
-    }
+   }
 }))
 
-rules.bindRuleset(handle, None , 0 , '/tmp/redis.sock')
+rules.bind_ruleset(handle, None , 0 , '/tmp/redis.sock')
 
-rules.assertEvent(handle, json.dumps({
+rules.assert_event(handle, json.dumps({
     'id': 1,
     'sid': 'first',
     'name': 'John Smith',
     'address': '1111 NE 22, Seattle, Wa',
 }))
 
-result = rules.startAction(handle)
+result = rules.start_action(handle)
 
 print(repr(json.loads(result[0])))
 print(repr(json.loads(result[1])))
 
-rules.completeAction(handle, result[2], result[0])
-rules.deleteRuleset(handle)
+rules.complete_action(handle, result[2], result[0])
+rules.delete_ruleset(handle)
 
 print('books4 ******')
 
-handle = rules.createRuleset('books4', json.dumps({ 
+handle = rules.create_ruleset('books4', json.dumps({
     'ship': {
-        'whenSome': { 
+        'whenSome': {
             '$and': [
-                { '$lte': { 'amount': 1000 } },
-                { 'subject': 'approve' }
+                {'$lte': {'amount': 1000}},
+                {'subject': 'approve'}
             ]
         },
         'run': 'ship'
     }
 }))
 
-rules.bindRuleset(handle, None , 0 , '/tmp/redis.sock')
+rules.bind_ruleset(handle, None , 0 , '/tmp/redis.sock')
 
-rules.assertEvents(handle, json.dumps([
-    { 'id': '0', 'sid': 1, 'subject': 'approve', 'amount': 100 }, 
-    { 'id': '1', 'sid': 1, 'subject': 'approve', 'amount': 100 },
-    { 'id': '2', 'sid': 1, 'subject': 'approve', 'amount': 100 },
-    { 'id': '3', 'sid': 1, 'subject': 'approve', 'amount': 100 },
-    { 'id': '4', 'sid': 1, 'subject': 'approve', 'amount': 100 }, 
+rules.assert_events(handle, json.dumps([
+    {'id': '0', 'sid': 1, 'subject': 'approve', 'amount': 100}, 
+    {'id': '1', 'sid': 1, 'subject': 'approve', 'amount': 100},
+    {'id': '2', 'sid': 1, 'subject': 'approve', 'amount': 100},
+    {'id': '3', 'sid': 1, 'subject': 'approve', 'amount': 100},
+    {'id': '4', 'sid': 1, 'subject': 'approve', 'amount': 100}, 
 ]))
 
-result = rules.startAction(handle)
+result = rules.start_action(handle)
 
 print(repr(json.loads(result[0])))
 print(repr(json.loads(result[1])))
 
-rules.completeAction(handle, result[2], result[0])
-rules.deleteRuleset(handle)
+rules.complete_action(handle, result[2], result[0])
+rules.delete_ruleset(handle)
 
 print('approval1 ******')
 
-handle = rules.createRuleset('approval1',  json.dumps({ 
+handle = rules.create_ruleset('approval1',  json.dumps({
     'r1': {
         'whenAll': {
             'a$any': {
-                'b': { 'subject': 'approve' },
-                'c': { 'subject': 'review' }
+                'b': {'subject': 'approve'},
+                'c': {'subject': 'review'}
             },
             'd$any': {
-                'e': { '$lt': { 'total': 1000 }},
-                'f': { '$lt': { 'amount': 1000 }}
+                'e': {'$lt': {'total': 1000}},
+                'f': {'$lt': {'amount': 1000}}
             }
         },
         'run': 'unitTest'
     }
 }))
 
-rules.bindRuleset(handle, None , 0 , '/tmp/redis.sock')
+rules.bind_ruleset(handle, None , 0 , '/tmp/redis.sock')
 
-rules.assertEvent(handle, json.dumps({
+rules.assert_event(handle, json.dumps({
     'id': 3,
     'sid': 'second',
     'subject': 'approve'
 }))
 
-rules.assertEvent(handle, json.dumps({
+rules.assert_event(handle, json.dumps({
     'id': 4,
     'sid': 'second',
     'amount': 100
 }))
 
-result = rules.startAction(handle)
+result = rules.start_action(handle)
 
 print(repr(json.loads(result[0])))
 print(repr(json.loads(result[1])))
 
-rules.completeAction(handle, result[2], result[0])
-rules.deleteRuleset(handle)
+rules.complete_action(handle, result[2], result[0])
+rules.delete_ruleset(handle)
 
 print('approval2 ******')
 
-handle = rules.createRuleset('approval2',  json.dumps({ 
+handle = rules.create_ruleset('approval2',  json.dumps({
     'r2': {
         'whenAny': {
             'a$all': {
-                'b': { 'subject': 'approve' },
-                'c': { 'subject': 'review' }
+                'b': {'subject': 'approve'},
+                'c': {'subject': 'review'}
             },
             'd$all': {
-                'e': { '$lt': { 'total': 1000 }},
-                'f': { '$lt': { 'amount': 1000 }}
+                'e': {'$lt': {'total': 1000}},
+                'f': {'$lt': {'amount': 1000}}
             }
         },
         'run': 'unitTest'
     }
 }))
 
-rules.bindRuleset(handle, None , 0 , '/tmp/redis.sock')
+rules.bind_ruleset(handle, None , 0 , '/tmp/redis.sock')
 
-rules.assertEvent(handle, json.dumps({
+rules.assert_event(handle, json.dumps({
     'id': 5,
     'sid': 'second',
     'subject': 'approve'
 }))
 
-rules.assertEvent(handle, json.dumps({
+rules.assert_event(handle, json.dumps({
     'id': 6,
     'sid': 'second',
     'subject': 'review'
 }))
 
-result = rules.startAction(handle)
+result = rules.start_action(handle)
 
 print(repr(json.loads(result[0])))
 print(repr(json.loads(result[1])))
 
-rules.completeAction(handle, result[2], result[0])
-rules.deleteRuleset(handle)
+rules.complete_action(handle, result[2], result[0])
+rules.delete_ruleset(handle)
 
 
 

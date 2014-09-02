@@ -41,9 +41,18 @@ typedef struct all {
     unsigned int namesLength;
 } all;
 
-static unsigned int createBeta(ruleset *tree, char *rule, unsigned char operator, unsigned int nextOffset, path *nextPath, path **outPath);
+static unsigned int createBeta(ruleset *tree, 
+                               char *rule, 
+                               unsigned char operator, 
+                               unsigned int nextOffset, 
+                               path *nextPath, 
+                               path **outPath);
 
-static unsigned int storeString(ruleset *tree, char *newString, unsigned int *stringOffset, unsigned int length) {
+static unsigned int storeString(ruleset *tree, 
+                                char *newString, 
+                                unsigned int *stringOffset, 
+                                unsigned int length) {
+
     unsigned int newStringLength = length + 1;
     if (!tree->stringPool) {
         tree->stringPool = malloc(newStringLength * sizeof(char));
@@ -68,7 +77,11 @@ static unsigned int storeString(ruleset *tree, char *newString, unsigned int *st
     return RULES_OK;
 }
 
-static unsigned int storeQuery(ruleset *tree, char **query, unsigned int *queryOffset, unsigned int lineCount) {
+static unsigned int storeQuery(ruleset *tree, 
+                               char **query, 
+                               unsigned int *queryOffset, 
+                               unsigned int lineCount) {
+
     if (!tree->queryPool) {
         tree->queryPool = malloc(lineCount * sizeof(unsigned int));
         if (!tree->queryPool) {
@@ -99,7 +112,10 @@ static unsigned int storeQuery(ruleset *tree, char **query, unsigned int *queryO
     return RULES_OK;
 }
 
-static unsigned int storeNode(ruleset *tree, node **newNode, unsigned int *nodeOffset) {
+static unsigned int storeNode(ruleset *tree, 
+                              node **newNode, 
+                              unsigned int *nodeOffset) {
+
     if (!tree->nodePool) {
         tree->nodePool = malloc(sizeof(node));
         if (!tree->nodePool) {
@@ -123,7 +139,10 @@ static unsigned int storeNode(ruleset *tree, node **newNode, unsigned int *nodeO
     return RULES_OK;
 }
 
-static unsigned int storeAlpha(ruleset *tree, node **newNode, unsigned int *nodeOffset) {
+static unsigned int storeAlpha(ruleset *tree, 
+                               node **newNode, 
+                               unsigned int *nodeOffset) {
+
     unsigned int result = storeNode(tree, newNode, nodeOffset);
     if (result != RULES_OK) {
         return result;
@@ -135,7 +154,10 @@ static unsigned int storeAlpha(ruleset *tree, node **newNode, unsigned int *node
     return RULES_OK;
 }
 
-static unsigned int allocateNext(ruleset *tree, unsigned int length, unsigned int *offset) {
+static unsigned int allocateNext(ruleset *tree, 
+                                 unsigned int length, 
+                                 unsigned int *offset) {
+
     if (!tree->nextPool) {
         tree->nextPool = malloc((length + 1) * sizeof(unsigned int));
         if (!tree->nextPool) {
@@ -184,7 +206,12 @@ static unsigned int ensureBetaList(ruleset *tree, node *newNode) {
     return RULES_OK;
 }
 
-static void copyValue(ruleset *tree, jsonValue *right, char *first, char* last, unsigned char type) {
+static void copyValue(ruleset *tree, 
+                      jsonValue *right, 
+                      char *first, 
+                      char* last, 
+                      unsigned char type) {
+
     right->type = type;
     unsigned int leftLength;
     char temp;
@@ -216,7 +243,12 @@ static void copyValue(ruleset *tree, jsonValue *right, char *first, char* last, 
     }
 }
 
-static unsigned char compareValue(ruleset *tree, jsonValue *right, char *first, char* last, unsigned char type) {
+static unsigned char compareValue(ruleset *tree, 
+                                  jsonValue *right, 
+                                  char *first, 
+                                  char* last, 
+                                  unsigned char type) {
+    
     if (right->type != type) {
         return 0;
     }
@@ -458,7 +490,9 @@ static unsigned int validateRuleset(char *rules) {
     return (result == PARSE_END ? PARSE_OK: result);
 }
 
-static unsigned int linkAlpha(ruleset *tree, unsigned int parentOffset, unsigned int nextOffset) {
+static unsigned int linkAlpha(ruleset *tree, 
+                              unsigned int parentOffset, 
+                              unsigned int nextOffset) {
     unsigned int result;
     unsigned int entry;
     node *parentAlpha = &tree->nodePool[parentOffset];
@@ -515,7 +549,11 @@ static unsigned int linkAlpha(ruleset *tree, unsigned int parentOffset, unsigned
     return RULES_OK;
 }
 
-static unsigned int findAlpha(ruleset *tree, unsigned int parentOffset, unsigned char operator, char *rule, unsigned int *resultOffset) {
+static unsigned int findAlpha(ruleset *tree, 
+                              unsigned int parentOffset, 
+                              unsigned char operator, 
+                              char *rule, 
+                              unsigned int *resultOffset) {
     char *first;
     char *last;
     char *firstName;
@@ -574,7 +612,10 @@ static unsigned int findAlpha(ruleset *tree, unsigned int parentOffset, unsigned
     return linkAlpha(tree, parentOffset, *resultOffset);
 }
 
-static unsigned int createAlpha(ruleset *tree, unsigned int *newOffset, char *rule, unsigned int nextOffset) {
+static unsigned int createAlpha(ruleset *tree, 
+                                unsigned int *newOffset, 
+                                char *rule, 
+                                unsigned int nextOffset) {
     char *first;
     char *last;
     unsigned char type;
@@ -650,7 +691,10 @@ static unsigned int createAlpha(ruleset *tree, unsigned int *newOffset, char *ru
     }
 }
 
-static unsigned int createBetaConnector(ruleset *tree, char *rule, path *betaPath, unsigned int nextOffset) {
+static unsigned int createBetaConnector(ruleset *tree, 
+                                        char *rule, 
+                                        path *betaPath, 
+                                        unsigned int nextOffset) {
     char *first;
     char *last;
     unsigned int hash;
@@ -746,7 +790,13 @@ static unsigned int createBetaConnector(ruleset *tree, char *rule, path *betaPat
     return (result == PARSE_END ? RULES_OK: result);
 }
 
-static unsigned int createBeta(ruleset *tree, char *rule, unsigned char operator, unsigned int nextOffset, path *nextPath, path **outPath) {
+static unsigned int createBeta(ruleset *tree, 
+                               char *rule, 
+                               unsigned char operator, 
+                               unsigned int nextOffset, 
+                               path *nextPath, 
+                               path **outPath) {
+
     path *betaPath = malloc(sizeof(path));
     if (!betaPath) {
         return ERR_OUT_OF_MEMORY;
@@ -790,7 +840,10 @@ static unsigned int createBeta(ruleset *tree, char *rule, unsigned char operator
     return createBetaConnector(tree, rule, betaPath, nextOffset);    
 }
 
-static unsigned int unwrapAndCreateAlpha(ruleset *tree, char *rule, unsigned int nextOffset, path **outPath) {
+static unsigned int unwrapAndCreateAlpha(ruleset *tree, 
+                                         char *rule, 
+                                         unsigned int nextOffset, 
+                                         path **outPath) {
     char *first;
     char *last;
     unsigned int hash;
@@ -933,7 +986,10 @@ static unsigned int createSingleQuery(char *name, any **result) {
     return RULES_OK;
 }
 
-static unsigned int createQueries(ruleset *tree, char *postfix, path *betaPath, any **result) {
+static unsigned int createQueries(ruleset *tree, 
+                                  char *postfix, 
+                                  path *betaPath, 
+                                  any **result) {
     if (!betaPath) {
         return createSingleQuery(postfix, result);
     }

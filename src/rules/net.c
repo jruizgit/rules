@@ -309,7 +309,11 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     return RULES_OK;
 }
 
-unsigned int bindRuleset(void *handle, char *host, unsigned int port, char *password) {
+unsigned int bindRuleset(void *handle, 
+                         char *host, 
+                         unsigned int port, 
+                         char *password) {
+
     ruleset *tree = (ruleset*)handle;
     bindingsMap *map;
     if (tree->bindingsMap) {
@@ -404,8 +408,14 @@ unsigned int resolveBinding(ruleset *tree, char *sid, void **rulesBinding) {
     if (entry->sidHash != sidHash) {
         binding *firstBinding = &map->bindings[0];
         redisContext *reContext = firstBinding->reContext;
-        int result = redisAppendCommand(reContext, "evalsha %s %d %s %d %d", firstBinding->partitionHash, 1, 
-                                        firstBinding->partitionHashset, sidHash, map->bindingsLength);
+        
+        int result = redisAppendCommand(reContext, 
+                                        "evalsha %s %d %s %d %d", 
+                                        firstBinding->partitionHash, 
+                                        1, 
+                                        firstBinding->partitionHashset, 
+                                        sidHash, 
+                                        map->bindingsLength);
         if (result != REDIS_OK) {
             return ERR_REDIS_ERROR;
         }
@@ -429,13 +439,30 @@ unsigned int resolveBinding(ruleset *tree, char *sid, void **rulesBinding) {
     return RULES_OK;
 }
 
-unsigned int assertMessageImmediate(void *rulesBinding, char *key, char *sid, char *mid, char *message, unsigned int actionIndex) {
+unsigned int assertMessageImmediate(void *rulesBinding, 
+                                    char *key, 
+                                    char *sid, 
+                                    char *mid, 
+                                    char *message, 
+                                    unsigned int actionIndex) {
+
     binding *bindingContext = (binding*)rulesBinding;
     redisContext *reContext = bindingContext->reContext;
     time_t currentTime = time(NULL);
     functionHash *currentAssertHash = &bindingContext->hashArray[actionIndex];
-    int result = redisAppendCommand(reContext, "evalsha %s %d %s %s %s %s %s %s %s %ld 0", *currentAssertHash, 3, bindingContext->messageHashset, 
-                            bindingContext->actionSortedset, bindingContext->sessionHashset, key, sid, mid, message, currentTime); 
+
+    int result = redisAppendCommand(reContext, 
+                                    "evalsha %s %d %s %s %s %s %s %s %s %ld 0", 
+                                    *currentAssertHash, 
+                                    3, 
+                                    bindingContext->messageHashset, 
+                                    bindingContext->actionSortedset, 
+                                    bindingContext->sessionHashset, 
+                                    key, 
+                                    sid, 
+                                    mid, 
+                                    message, 
+                                    currentTime); 
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -460,7 +487,12 @@ unsigned int assertMessageImmediate(void *rulesBinding, char *key, char *sid, ch
     return RULES_OK;
 }
 
-unsigned int assertFirstMessage(void *rulesBinding, char *key, char *sid, char *mid, char *message) {
+unsigned int assertFirstMessage(void *rulesBinding, 
+                                char *key, 
+                                char *sid, 
+                                char *mid, 
+                                char *message) {
+
     redisContext *reContext = ((binding*)rulesBinding)->reContext;
     int result = redisAppendCommand(reContext, "multi");
     if (result != REDIS_OK) {
@@ -470,15 +502,31 @@ unsigned int assertFirstMessage(void *rulesBinding, char *key, char *sid, char *
     return assertMessage(rulesBinding, key, sid, mid, message);
 }
 
-unsigned int assertMessage(void *rulesBinding, char *key, char *sid, char *mid, char *message) {
+unsigned int assertMessage(void *rulesBinding, 
+                           char *key, 
+                           char *sid, 
+                           char *mid, 
+                           char *message) {
+
     redisContext *reContext = ((binding*)rulesBinding)->reContext;
-    int result = redisAppendCommand(reContext, "hsetnx %s %s %s", ((binding*)rulesBinding)->messageHashset, mid, message);
+
+    int result = redisAppendCommand(reContext, 
+                                    "hsetnx %s %s %s", 
+                                    ((binding*)rulesBinding)->messageHashset, 
+                                    mid, 
+                                    message);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
 
     time_t currentTime = time(NULL);
-    result = redisAppendCommand(reContext, "zadd %s!%s %ld %s", key, sid, currentTime, mid);
+
+    result = redisAppendCommand(reContext, 
+                                "zadd %s!%s %ld %s", 
+                                key, 
+                                sid, 
+                                currentTime, 
+                                mid);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -486,13 +534,31 @@ unsigned int assertMessage(void *rulesBinding, char *key, char *sid, char *mid, 
     return RULES_OK;
 }
 
-unsigned int assertLastMessage(void *rulesBinding, char *key, char *sid, char *mid, char *message, int actionIndex, unsigned int messageCount) {
+unsigned int assertLastMessage(void *rulesBinding, 
+                               char *key, 
+                               char *sid, 
+                               char *mid, 
+                               char *message, 
+                               int actionIndex, 
+                               unsigned int messageCount) {
+
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;
     time_t currentTime = time(NULL);
     functionHash *currentAssertHash = &currentBinding->hashArray[actionIndex];
-    unsigned int result = redisAppendCommand(reContext, "evalsha %s %d %s %s %s %s %s %s %s %ld 0", *currentAssertHash, 3, currentBinding->messageHashset, 
-                            currentBinding->actionSortedset, currentBinding->sessionHashset, key, sid, mid, message, currentTime); 
+
+    unsigned int result = redisAppendCommand(reContext, 
+                                             "evalsha %s %d %s %s %s %s %s %s %s %ld 0", 
+                                             *currentAssertHash, 
+                                             3, 
+                                             currentBinding->messageHashset, 
+                                             currentBinding->actionSortedset, 
+                                             currentBinding->sessionHashset, 
+                                             key, 
+                                             sid, 
+                                             mid, 
+                                             message, 
+                                             currentTime); 
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -527,13 +593,30 @@ unsigned int assertLastMessage(void *rulesBinding, char *key, char *sid, char *m
     return result;
 }
 
-unsigned int assertTimer(void *rulesBinding, char *key, char *sid, char *mid, char *timer, unsigned int actionIndex) {
+unsigned int assertTimer(void *rulesBinding, 
+                         char *key, 
+                         char *sid, 
+                         char *mid, 
+                         char *timer, 
+                         unsigned int actionIndex) {
+
     binding *bindingContext = (binding*)rulesBinding;
     redisContext *reContext = bindingContext->reContext;
     time_t currentTime = time(NULL);
     functionHash *currentAssertHash = &bindingContext->hashArray[actionIndex];
-    int result = redisAppendCommand(reContext, "evalsha %s %d %s %s %s %s %s %s %s %ld 0", *currentAssertHash, 3, bindingContext->messageHashset, 
-                            bindingContext->actionSortedset, bindingContext->sessionHashset, key, sid, mid, timer, currentTime); 
+
+    int result = redisAppendCommand(reContext, 
+                                    "evalsha %s %d %s %s %s %s %s %s %s %ld 0", 
+                                    *currentAssertHash, 
+                                    3, 
+                                    bindingContext->messageHashset, 
+                                    bindingContext->actionSortedset, 
+                                    bindingContext->sessionHashset, 
+                                    key, 
+                                    sid, 
+                                    mid, 
+                                    timer, 
+                                    currentTime); 
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -548,9 +631,16 @@ unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply
         ++map->lastBinding;
         redisContext *reContext = currentBinding->reContext;
         time_t currentTime = time(NULL);
-        int result = redisAppendCommand(reContext, "evalsha %s %d %s %s %s %s %ld", currentBinding->dequeueActionHash, 4, 
-                           currentBinding->sessionHashset, currentBinding->messageHashset, currentBinding->actionSortedset, 
-                           currentBinding->resultsHashset, currentTime); 
+
+        int result = redisAppendCommand(reContext, 
+                                        "evalsha %s %d %s %s %s %s %ld", 
+                                        currentBinding->dequeueActionHash, 
+                                        4, 
+                                        currentBinding->sessionHashset, 
+                                        currentBinding->messageHashset, 
+                                        currentBinding->actionSortedset, 
+                                        currentBinding->resultsHashset, 
+                                        currentTime); 
         if (result != REDIS_OK) {
             continue;
         }
@@ -583,8 +673,13 @@ unsigned int peekTimers(ruleset *tree, void **bindingContext, redisReply **reply
         ++map->lastTimersBinding;
         redisContext *reContext = currentBinding->reContext;
         time_t currentTime = time(NULL);
-        int result = redisAppendCommand(reContext, "evalsha %s %d %s %ld", currentBinding->timersHash, 1, 
-                           currentBinding->timersSortedset, currentTime); 
+
+        int result = redisAppendCommand(reContext, 
+                                        "evalsha %s %d %s %ld", 
+                                        currentBinding->timersHash, 
+                                        1, 
+                                        currentBinding->timersSortedset, 
+                                        currentTime); 
         if (result != REDIS_OK) {
             continue;
         }
@@ -610,9 +705,18 @@ unsigned int peekTimers(ruleset *tree, void **bindingContext, redisReply **reply
     return ERR_NO_TIMERS_AVAILABLE;
 }
 
-unsigned int negateMessage(void *rulesBinding, char *key, char *sid, char *mid) {
+unsigned int negateMessage(void *rulesBinding, 
+                           char *key, 
+                           char *sid, 
+                           char *mid) {
+
     redisContext *reContext = ((binding*)rulesBinding)->reContext;
-    int result = redisAppendCommand(reContext, "zrem %s!%s %s", key, sid, mid);
+
+    int result = redisAppendCommand(reContext, 
+                                    "zrem %s!%s %s", 
+                                    key, 
+                                    sid, 
+                                    mid);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -623,7 +727,12 @@ unsigned int negateMessage(void *rulesBinding, char *key, char *sid, char *mid) 
 unsigned int storeSession(void *rulesBinding, char *sid, char *state) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;
-    int result = redisAppendCommand(reContext, "hset %s %s %s", currentBinding->sessionHashset, sid, state);
+
+    int result = redisAppendCommand(reContext, 
+                                    "hset %s %s %s", 
+                                    currentBinding->sessionHashset, 
+                                    sid, 
+                                    state);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -631,13 +740,28 @@ unsigned int storeSession(void *rulesBinding, char *sid, char *state) {
     return RULES_OK;
 }
 
-unsigned int assertSession(void *rulesBinding, char *key, char *sid, char *state, unsigned int actionIndex) {
+unsigned int assertSession(void *rulesBinding, 
+                           char *key, 
+                           char *sid, 
+                           char *state, 
+                           unsigned int actionIndex) {
+
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;
     time_t currentTime = time(NULL);
     functionHash *currentAssertHash = &currentBinding->hashArray[actionIndex];
-    int result = redisAppendCommand(reContext, "evalsha %s %d %s %s %s %s %s %s %ld 1", *currentAssertHash, 2, 
-                       currentBinding->sessionHashset, currentBinding->actionSortedset, key, sid, sid, state, currentTime); 
+
+    int result = redisAppendCommand(reContext, 
+                                    "evalsha %s %d %s %s %s %s %s %s %ld 1", 
+                                    *currentAssertHash, 
+                                    2, 
+                                    currentBinding->sessionHashset, 
+                                    currentBinding->actionSortedset, 
+                                    key, 
+                                    sid, 
+                                    sid, 
+                                    state, 
+                                    currentTime); 
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -645,7 +769,12 @@ unsigned int assertSession(void *rulesBinding, char *key, char *sid, char *state
     return RULES_OK;
 }
 
-unsigned int assertSessionImmediate(void *rulesBinding, char *key, char *sid, char *state, unsigned int actionIndex) {
+unsigned int assertSessionImmediate(void *rulesBinding, 
+                                    char *key, 
+                                    char *sid, 
+                                    char *state, 
+                                    unsigned int actionIndex) {
+
     int result = assertSession(rulesBinding, key, sid, state, actionIndex);
     if (result != RULES_OK) {
         return result;
@@ -670,7 +799,12 @@ unsigned int assertSessionImmediate(void *rulesBinding, char *key, char *sid, ch
 
 unsigned int negateSession(void *rulesBinding, char *key, char *sid) {
     redisContext *reContext = ((binding*)rulesBinding)->reContext;
-    int result = redisAppendCommand(reContext, "zrem %s!%s %s", key, sid, sid);
+
+    int result = redisAppendCommand(reContext, 
+                                    "zrem %s!%s %s", 
+                                    key, 
+                                    sid, 
+                                    sid);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -681,12 +815,19 @@ unsigned int negateSession(void *rulesBinding, char *key, char *sid) {
 unsigned int removeAction(void *rulesBinding, char *action) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;   
-    int result = redisAppendCommand(reContext, "zrem %s %s", currentBinding->actionSortedset, action);
+
+    int result = redisAppendCommand(reContext, 
+                                    "zrem %s %s", 
+                                    currentBinding->actionSortedset, 
+                                    action);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
     
-    result = redisAppendCommand(reContext, "hdel %s %s", currentBinding->resultsHashset, action);
+    result = redisAppendCommand(reContext, 
+                                "hdel %s %s", 
+                                currentBinding->resultsHashset, 
+                                action);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -697,7 +838,11 @@ unsigned int removeAction(void *rulesBinding, char *action) {
 unsigned int removeMessage(void *rulesBinding, char *mid) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;  
-    int result = redisAppendCommand(reContext, "hdel %s %s", currentBinding->messageHashset, mid);
+
+    int result = redisAppendCommand(reContext, 
+                                    "hdel %s %s", 
+                                    currentBinding->messageHashset, 
+                                    mid);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -708,7 +853,11 @@ unsigned int removeMessage(void *rulesBinding, char *mid) {
 unsigned int removeTimer(void *rulesBinding, char *timer) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;  
-    int result = redisAppendCommand(reContext, "zrem %s %s", currentBinding->timersSortedset, timer);
+
+    int result = redisAppendCommand(reContext, 
+                                    "zrem %s %s", 
+                                    currentBinding->timersSortedset, 
+                                    timer);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -720,7 +869,11 @@ unsigned int registerTimer(void *rulesBinding, unsigned int duration, char *time
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;   
     time_t currentTime = time(NULL);
-    int result = redisAppendCommand(reContext, "zadd %s %ld %s", currentBinding->timersSortedset, currentTime + duration, timer);
+
+    int result = redisAppendCommand(reContext, 
+                                    "zadd %s %ld %s", 
+                                    currentBinding->timersSortedset, 
+                                    currentTime + duration, timer);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -783,7 +936,11 @@ unsigned int getState(void *handle, char *sid, char **state) {
     }
 
     redisContext *reContext = bindingContext->reContext; 
-    result = redisAppendCommand(reContext, "hget %s %s", bindingContext->sessionHashset, sid);
+
+    result = redisAppendCommand(reContext, 
+                                "hget %s %s", 
+                                bindingContext->sessionHashset, 
+                                sid);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }

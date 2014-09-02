@@ -3,11 +3,11 @@
 
 static PyObject *RulesError;
 
-static PyObject *rules_createRuleset(PyObject *self, PyObject *args) {
+static PyObject *pyCreateRuleset(PyObject *self, PyObject *args) {
     char *name;
     char *rules;
     if (!PyArg_ParseTuple(args, "ss", &name, &rules)) {
-        PyErr_SetString(RulesError, "Invalid argument");
+        PyErr_SetString(RulesError, "pyCreateRuleset Invalid argument");
         return NULL;
     }
 
@@ -28,10 +28,10 @@ static PyObject *rules_createRuleset(PyObject *self, PyObject *args) {
     return Py_BuildValue("l", output);
 }
 
-static PyObject *rules_deleteRuleset(PyObject *self, PyObject *args) {
+static PyObject *pyDeleteRuleset(PyObject *self, PyObject *args) {
     void *handle;
     if (!PyArg_ParseTuple(args, "l", &handle)) {
-        PyErr_SetString(RulesError, "Invalid argument");
+        PyErr_SetString(RulesError, "pyDeleteRuleset Invalid argument");
         return NULL;
     }
 
@@ -51,7 +51,7 @@ static PyObject *rules_deleteRuleset(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
-static PyObject *rules_bindRuleset(PyObject *self, PyObject *args) {
+static PyObject *pyBindRuleset(PyObject *self, PyObject *args) {
     void *handle;
     char *host;
     unsigned int port;
@@ -60,7 +60,7 @@ static PyObject *rules_bindRuleset(PyObject *self, PyObject *args) {
     if (PyArg_ParseTuple(args, "lzls", &handle, &password, &port, &host)) {
         result = bindRuleset(handle, host, port, password);
     } else {
-        PyErr_SetString(RulesError, "Invalid argument");
+        PyErr_SetString(RulesError, "pyBindRuleset Invalid argument");
         return NULL;
     }
 
@@ -79,11 +79,11 @@ static PyObject *rules_bindRuleset(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
-static PyObject *rules_assertEvent(PyObject *self, PyObject *args) {
+static PyObject *pyAssertEvent(PyObject *self, PyObject *args) {
     void *handle;
     char *event;
     if (!PyArg_ParseTuple(args, "ls", &handle, &event)) {
-        PyErr_SetString(RulesError, "Invalid argument");
+        PyErr_SetString(RulesError, "pyAssertEvent Invalid argument");
         return NULL;
     }
 
@@ -105,11 +105,11 @@ static PyObject *rules_assertEvent(PyObject *self, PyObject *args) {
     }
 }
 
-static PyObject *rules_assertEvents(PyObject *self, PyObject *args) {
+static PyObject *pyAssertEvents(PyObject *self, PyObject *args) {
     void *handle;
     char *events;
     if (!PyArg_ParseTuple(args, "ls", &handle, &events)) {
-        PyErr_SetString(RulesError, "Invalid argument");
+        PyErr_SetString(RulesError, "pyAssertEvents Invalid argument");
         return NULL;
     }
 
@@ -132,11 +132,11 @@ static PyObject *rules_assertEvents(PyObject *self, PyObject *args) {
     }
 }
 
-static PyObject *rules_assertState(PyObject *self, PyObject *args) {
+static PyObject *pyAssertState(PyObject *self, PyObject *args) {
     void *handle;
     char *state;
     if (!PyArg_ParseTuple(args, "ls", &handle, &state)) {
-        PyErr_SetString(RulesError, "Invalid argument");
+        PyErr_SetString(RulesError, "pyAssertState Invalid argument");
         return NULL;
     }
 
@@ -158,10 +158,10 @@ static PyObject *rules_assertState(PyObject *self, PyObject *args) {
     }
 }
 
-static PyObject *rules_startAction(PyObject *self, PyObject *args) {
+static PyObject *pyStartAction(PyObject *self, PyObject *args) {
     void *handle;
     if (!PyArg_ParseTuple(args, "l", &handle)) {
-        PyErr_SetString(RulesError, "Invalid argument");
+        PyErr_SetString(RulesError, "pyStartAction Invalid argument");
         return NULL;
     }
     
@@ -169,7 +169,9 @@ static PyObject *rules_startAction(PyObject *self, PyObject *args) {
     char *messages;
     void *actionHandle;
     unsigned int result = startAction(handle, &state, &messages, &actionHandle);
-    if (result != RULES_OK) {
+    if (result == ERR_NO_ACTION_AVAILABLE) {
+        Py_RETURN_NONE;
+    } else if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
@@ -184,12 +186,12 @@ static PyObject *rules_startAction(PyObject *self, PyObject *args) {
     return Py_BuildValue("ssl", state, messages, actionHandle);
 }
 
-static PyObject *rules_completeAction(PyObject *self, PyObject *args) {
+static PyObject *pyCompleteAction(PyObject *self, PyObject *args) {
     void *handle;
     void *actionHandle;
     char *state;
     if (!PyArg_ParseTuple(args, "lls", &handle, &actionHandle, &state)) {
-        PyErr_SetString(RulesError, "Invalid argument");
+        PyErr_SetString(RulesError, "pyCompleteAction Invalid argument");
         return NULL;
     }
 
@@ -209,11 +211,11 @@ static PyObject *rules_completeAction(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;  
 }
 
-static PyObject *rules_abandonAction(PyObject *self, PyObject *args) {
+static PyObject *pyAbandonAction(PyObject *self, PyObject *args) {
     void *handle;
     void *actionHandle;
     if (!PyArg_ParseTuple(args, "ll", &handle, &actionHandle)) {
-        PyErr_SetString(RulesError, "Invalid argument");
+        PyErr_SetString(RulesError, "pyAbandonAction Invalid argument");
         return NULL;
     }
 
@@ -233,13 +235,13 @@ static PyObject *rules_abandonAction(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
-static PyObject *rules_startTimer(PyObject *self, PyObject *args) {
+static PyObject *pyStartTimer(PyObject *self, PyObject *args) {
     void *handle;
     char *sid;
     unsigned int duration;
     char *timer;
     if (!PyArg_ParseTuple(args, "lsls", &handle, &sid, &duration, &timer)) {
-        PyErr_SetString(RulesError, "Invalid argument");
+        PyErr_SetString(RulesError, "pyStartTimer Invalid argument");
         return NULL;
     }
 
@@ -259,10 +261,10 @@ static PyObject *rules_startTimer(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
-static PyObject *rules_assertTimers(PyObject *self, PyObject *args) {
+static PyObject *pyAssertTimers(PyObject *self, PyObject *args) {
     void *handle;
     if (!PyArg_ParseTuple(args, "l", &handle)) {
-        PyErr_SetString(RulesError, "Invalid argument");
+        PyErr_SetString(RulesError, "pyAssertTimers Invalid argument");
         return NULL;
     }
 
@@ -284,11 +286,11 @@ static PyObject *rules_assertTimers(PyObject *self, PyObject *args) {
     }
 }
 
-static PyObject *rules_getState(PyObject *self, PyObject *args) {
+static PyObject *pyGetState(PyObject *self, PyObject *args) {
     void *handle;
     char *sid;
     if (!PyArg_ParseTuple(args, "ls", &handle, &sid)) {
-        PyErr_SetString(RulesError, "Invalid argument");
+        PyErr_SetString(RulesError, "pyGetState Invalid argument");
         return NULL;
     }
 
@@ -311,18 +313,18 @@ static PyObject *rules_getState(PyObject *self, PyObject *args) {
 }
 
 static PyMethodDef myModule_methods[] = {
-    {"createRuleset", rules_createRuleset, METH_VARARGS},
-    {"deleteRuleset", rules_deleteRuleset, METH_VARARGS},
-    {"bindRuleset", rules_bindRuleset, METH_VARARGS},
-    {"assertEvent", rules_assertEvent, METH_VARARGS},
-    {"assertEvents", rules_assertEvents, METH_VARARGS},
-    {"assertState", rules_assertState, METH_VARARGS},
-    {"startAction", rules_startAction, METH_VARARGS},
-    {"completeAction", rules_completeAction, METH_VARARGS},
-    {"abandonAction", rules_abandonAction, METH_VARARGS},
-    {"startTimer", rules_startTimer, METH_VARARGS},
-    {"assertTimers", rules_assertTimers, METH_VARARGS},
-    {"getState", rules_getState, METH_VARARGS},
+    {"create_ruleset", pyCreateRuleset, METH_VARARGS},
+    {"delete_ruleset", pyDeleteRuleset, METH_VARARGS},
+    {"bind_ruleset", pyBindRuleset, METH_VARARGS},
+    {"assert_event", pyAssertEvent, METH_VARARGS},
+    {"assert_events", pyAssertEvents, METH_VARARGS},
+    {"assert_state", pyAssertState, METH_VARARGS},
+    {"start_action", pyStartAction, METH_VARARGS},
+    {"complete_action", pyCompleteAction, METH_VARARGS},
+    {"abandon_action", pyAbandonAction, METH_VARARGS},
+    {"start_timer", pyStartTimer, METH_VARARGS},
+    {"assert_timers", pyAssertTimers, METH_VARARGS},
+    {"get_state", pyGetState, METH_VARARGS},
     {NULL, NULL}
 };
 
