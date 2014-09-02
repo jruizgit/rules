@@ -238,9 +238,9 @@ static PyObject *pyAbandonAction(PyObject *self, PyObject *args) {
 static PyObject *pyStartTimer(PyObject *self, PyObject *args) {
     void *handle;
     char *sid;
-    unsigned int duration;
-    char *timer;
-    if (!PyArg_ParseTuple(args, "lsls", &handle, &sid, &duration, &timer)) {
+    int duration = 0;
+    char *timer = NULL;
+    if (!PyArg_ParseTuple(args, "lsis", &handle, &sid, &duration, &timer)) {
         PyErr_SetString(RulesError, "pyStartTimer Invalid argument");
         return NULL;
     }

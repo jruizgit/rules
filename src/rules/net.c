@@ -873,7 +873,8 @@ unsigned int registerTimer(void *rulesBinding, unsigned int duration, char *time
     int result = redisAppendCommand(reContext, 
                                     "zadd %s %ld %s", 
                                     currentBinding->timersSortedset, 
-                                    currentTime + duration, timer);
+                                    currentTime + duration, 
+                                    timer);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }

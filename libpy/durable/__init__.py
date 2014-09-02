@@ -9,8 +9,19 @@ class Session(object):
         self.event = event
         self._handle = handle
         self._namespace = namespace
+        self._timer_directory = {}
+        self._message_directory = {}
+        
 
+    def get_timers(self):
+        return self._timer_directory
 
+    def start_timer(self, timer_name, duration):
+        if timer_name in self._timer_directory:
+            raise Exception('Timer with name {0} already added', timer_name)
+        else:
+            self._timer_directory[timer_name] = duration
+            
 class Promise(object):
 
     def __init__(self, func):
@@ -99,6 +110,27 @@ class Ruleset(object):
         except Exception as error:
             complete(error, None)
 
+    def _start_timers(self, timers, index, s, complete):
+        if index == len(timers):
+            complete(None, s)
+        else:
+            try:
+                timer_data = timers[index]
+                timer = {'sid':s.state['id'], 'id':timer_data[0], '$t':timer_data[0]}
+                rules.start_timer(self._handle, str(s.state['id']), timer_data[1], json.dumps(timer))
+                self._start_timers(timers, index + 1, s, complete)
+            except Exception as error:
+                complete(error, s)
+
+    def dispatch_timers(self, complete):
+        try:
+            rules.assert_timers(self._handle)
+        except Exception as error:
+            complete(error, None)
+            return
+
+        complete(None, None)
+
     def dispatch(self, complete):
         result = None
         try:
@@ -118,7 +150,8 @@ class Ruleset(object):
 
             s = Session(document, event, result[2], self._name)
             action = self._actions[actionName]
-            def callback(e, s):
+                        
+            def timer_callback(e, s):
                 if e:
                     try:
                         rules.abandon_action(self._handle, s._handle)
@@ -131,8 +164,19 @@ class Ruleset(object):
                         complete(None, None)
                     except Exception as error:
                         complete(error, None)
-            
-            action.run(s, callback)
+
+            def action_callback(e, s):
+                if e:
+                    try:
+                        rules.abandon_action(self._handle, s._handle)
+                        complete(e, None)
+                    except Exception as error:
+                        complete(error, None)
+                else:
+                    timers = list(s.get_timers().items())
+                    self._start_timers(timers, 0, s, timer_callback)
+
+            action.run(s, action_callback)
 
 
 class Host(object):
@@ -173,19 +217,26 @@ class Host(object):
     def run(self):
         def dispatch_ruleset(index):
             def callback(e, result):
-                if e:
-                    print(e)
-                
                 if index % 10:
                     dispatch_ruleset(index + 1)
                 else:
-                    self._ruleset_timer = threading.Timer(0.1, dispatch_ruleset, (index + 1,))
+                    self._ruleset_timer = threading.Timer(0.01, dispatch_ruleset, (index + 1, ))
                     self._ruleset_timer.start()
 
+            def timers_callback(e, result):
+                if e:
+                    print(e)
+
+                if index % 10:
+                    ruleset = self._ruleset_list[(index / 10) % len(self._ruleset_list)]
+                    ruleset.dispatch_timers(callback)
+                else:
+                    callback(e, result)
+
             ruleset = self._ruleset_list[index % len(self._ruleset_list)]
-            ruleset.dispatch(callback)
-       
-        self._timer = threading.Timer(0.1, dispatch_ruleset, (0,))
+            ruleset.dispatch(timers_callback)
+
+        self._timer = threading.Timer(0.01, dispatch_ruleset, (0,))
         self._timer.start()
         self._exit.wait()
 
