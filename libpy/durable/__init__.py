@@ -11,16 +11,23 @@ class Session(object):
         self._namespace = namespace
         self._timer_directory = {}
         self._message_directory = {}
+        self._branch_directory = {}
         
-
     def get_timers(self):
         return self._timer_directory
 
     def start_timer(self, timer_name, duration):
         if timer_name in self._timer_directory:
-            raise Exception('Timer with name {0} already added', timer_name)
+            raise Exception('Timer with name {0} already added'.format(timer_name))
         else:
             self._timer_directory[timer_name] = duration
+
+    def fork(self, branch_name, branch_state):
+        if branch_name in self._branch_directory:
+            raise Exception('Branch with name {0} already forked'.format(branch_name))
+        else:
+            self._branch_directory[branch_name] = branch_state
+
             
 class Promise(object):
 
@@ -42,27 +49,38 @@ class Promise(object):
             try:
                 self._func(s)
             except Exception as error:
-                complete(error, s)
+                complete(error)
                 return
 
             if self._next:
                 self._next.run(s, complete)
             else:
-                complete(None, s)
+                complete(None)
         else:
             try:
-                def callback(e, result):
+                def callback(e):
                     if e: 
-                        complete(e, s) 
+                        complete(e) 
                     elif self._next: 
                         self._next.run(s, complete) 
                     else: 
-                        complete(None, s)
+                        complete(None)
 
                 self._func(s, callback)
             except Exception as error:
-                complete(error, s)
+                complete(error)
 
+class Fork(Promise):
+
+    def __init__(self, branch_names):
+        super(Promise, self).__init__(_execute)
+        self.branch_names = branch_names
+        
+    def _execute(self, s):
+        for branch_name in self.branch_names:
+            state = copy.deepcopy(s.state)
+            s.fork(branch_name, state)
+        
 
 class Ruleset(object):
 
@@ -76,6 +94,8 @@ class Ruleset(object):
                 self._actions[rule_name] = action.get_root()
             elif (hasattr(action, '__call__')):
                 self._actions[rule_name] = Promise(action)
+            else:
+                self._actions[rule_name] = Fork(Ruleset.parse_definitions(name, host, action))
 
         self._handle = rules.create_ruleset(name, json.dumps(ruleset_definition))
         
@@ -110,9 +130,44 @@ class Ruleset(object):
         except Exception as error:
             complete(error, None)
 
+    def parse_definitions(parent_name, host, ruleset_definitions):
+        branch_names = []
+        for name, definition in ruleset_definitions.iteritems():
+            branch_name = name
+            if parent_name:
+                branch_name = '{0}.{1}'.format(parent_name, name) 
+
+            host.register_ruleset(branch_name, definition)
+            branch_names.append(branch_name)
+
+        return branch_names
+
+    def dispatch_timers(self, complete):
+        try:
+            rules.assert_timers(self._handle)
+        except Exception as error:
+            complete(error)
+            return
+
+        complete(None)
+
+    def _start_branches(self, branches, index, s, complete):
+        def callback(e):
+            if e:
+                complete(e)
+            else:
+                self._start_branches(branches, index + 1, s, complete)
+
+        if index == len(timers):
+            complete(None)
+        else:
+            try:
+                branch_data = branches[index]
+                host.start(branch_data[0], branch_data[1], callback)    
+
     def _start_timers(self, timers, index, s, complete):
         if index == len(timers):
-            complete(None, s)
+            complete(None)
         else:
             try:
                 timer_data = timers[index]
@@ -120,27 +175,18 @@ class Ruleset(object):
                 rules.start_timer(self._handle, str(s.state['id']), timer_data[1], json.dumps(timer))
                 self._start_timers(timers, index + 1, s, complete)
             except Exception as error:
-                complete(error, s)
-
-    def dispatch_timers(self, complete):
-        try:
-            rules.assert_timers(self._handle)
-        except Exception as error:
-            complete(error, None)
-            return
-
-        complete(None, None)
+                complete(error)
 
     def dispatch(self, complete):
         result = None
         try:
             result = rules.start_action(self._handle)
         except Exception as error:
-            complete(error, None)
+            complete(error)
             return
 
         if not result:
-            complete(None, None)
+            complete(None)
         else:
             document = json.loads(result[0])
             event = json.loads(result[1])[self._name]
@@ -151,30 +197,41 @@ class Ruleset(object):
             s = Session(document, event, result[2], self._name)
             action = self._actions[actionName]
                         
-            def timer_callback(e, s):
+            def timers_callback(e):
                 if e:
                     try:
                         rules.abandon_action(self._handle, s._handle)
-                        complete(e, None)
+                        complete(e)
                     except Exception as error:
-                        complete(error, None)
+                        complete(error)
                 else:
                     try:
                         rules.complete_action(self._handle, s._handle, json.dumps(s.state))
-                        complete(None, None)
+                        complete(None)
                     except Exception as error:
-                        complete(error, None)
+                        complete(error)
 
-            def action_callback(e, s):
+            def branches_callback(e):
                 if e:
                     try:
                         rules.abandon_action(self._handle, s._handle)
-                        complete(e, None)
+                        complete(e)
                     except Exception as error:
-                        complete(error, None)
+                        complete(error)
                 else:
                     timers = list(s.get_timers().items())
-                    self._start_timers(timers, 0, s, timer_callback)
+                    self._start_timers(timers, 0, s, timers_callback)
+
+            def action_callback(e):
+                if e:
+                    try:
+                        rules.abandon_action(self._handle, s._handle)
+                        complete(e)
+                    except Exception as error:
+                        complete(error)
+                else:
+                    branches = list(s.get_branches().items())
+                    self._start_branches(branches, 0, s, branches_callback)
 
             action.run(s, action_callback)
 
@@ -194,21 +251,26 @@ class Host(object):
         if ruleset_name in self._ruleset_directory:
             self._ruleset_directory[ruleset_name].assert_events(messages, complete)
         else:
-            raise Exception('Ruleset with name {0} not found', ruleset_name)
+            raise Exception('Ruleset with name {0} not found'.format(ruleset_name))
 
     def post(self, ruleset_name, message, complete):
         if ruleset_name in self._ruleset_directory:
             self._ruleset_directory[ruleset_name].assert_event(message, complete)
         else:
-            raise Exception('Ruleset with name {0} not found', ruleset_name)
+            raise Exception('Ruleset with name {0} not found'.format(ruleset_name))
+
+    def start(self, ruleset_name, state, complete):
+        if ruleset_name in self._ruleset_directory:
+            self._ruleset_directory[ruleset_name].assert_state(message, complete)
+        else:
+            raise Exception('Ruleset with name {0} not found'.format(ruleset_name))
 
     def register_rulesets(self, ruleset_definitions):
-        for ruleset_name, ruleset_definition in ruleset_definitions.iteritems():
-            self.register_ruleset(ruleset_name, ruleset_definition)
+        Ruleset.parse_definitions(None, self, ruleset_definitions)
 
     def register_ruleset(self, ruleset_name, ruleset_definition):
         if ruleset_name in self._ruleset_directory:
-            raise Exception('Ruleset with name {0} already registered', ruleset_name)
+            raise Exception('Ruleset with name {0} already registered'.format(ruleset_name))
         else:
             ruleset = Ruleset(ruleset_name, self, ruleset_definition)
             self._ruleset_directory[ruleset_name] = ruleset
@@ -216,14 +278,14 @@ class Host(object):
 
     def run(self):
         def dispatch_ruleset(index):
-            def callback(e, result):
+            def callback(e):
                 if index % 10:
                     dispatch_ruleset(index + 1)
                 else:
                     self._ruleset_timer = threading.Timer(0.01, dispatch_ruleset, (index + 1, ))
                     self._ruleset_timer.start()
 
-            def timers_callback(e, result):
+            def timers_callback(e):
                 if e:
                     print(e)
 
@@ -231,7 +293,7 @@ class Host(object):
                     ruleset = self._ruleset_list[(index / 10) % len(self._ruleset_list)]
                     ruleset.dispatch_timers(callback)
                 else:
-                    callback(e, result)
+                    callback(e)
 
             ruleset = self._ruleset_list[index % len(self._ruleset_list)]
             ruleset.dispatch(timers_callback)

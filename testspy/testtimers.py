@@ -20,13 +20,7 @@ def start(host):
     
 durable.run({
     'timer1': {
-        'r1': {
-            'when': {'start': 'yes'},
-            'run': start_timer
-        },
-        'r2': {
-            'when': { '$t': 'my_timer' },
-            'run': end_timer
-        }
+        'r1': {'when': {'start': 'yes'}, 'run': start_timer},
+        'r2': {'when': {'$t': 'my_timer'}, 'run': end_timer}
     }
 }, ['/tmp/redis.sock'], start)

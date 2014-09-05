@@ -32,36 +32,21 @@ def start(host):
 durable.run({
     'a1': {
         'r1': {
-            'when': {'$and': [
-                {'subject': 'approve'},
-                {'$gt': {'amount': 1000}}
-            ]},
+            'when': {'$and': [{'subject': 'approve'}, {'$gt': {'amount': 1000}}]},
             'run': denied
         },
         'r2': {
-            'when': {'$and': [
-                {'subject': 'approve' },
-                {'$lte': {'amount': 1000 }}
-            ]},
+            'when': {'$and': [{'subject': 'approve' }, {'$lte': {'amount': 1000 }}]},
             'run': request_approval
         },
         'r3': {
             'whenAll': {
-                'm$any': {
-                    'a': {'subject': 'approved'},
-                    'b': {'subject': 'ok'}
-                },
+                'm$any': {'a': {'subject': 'approved'}, 'b': {'subject': 'ok'}},
                 '$s': {'status': 'pending'}
             },
             'run': request_approval
         },
-        'r4': {
-            'when': {'$s': {'status': 'approved'}},
-            'run': approved
-        },
-        'r5': {
-            'when': {'subject': 'denied'},
-            'run': denied
-        }
+        'r4': {'when': {'$s': {'status': 'approved'}}, 'run': approved},
+        'r5': {'when': {'subject': 'denied'}, 'run': denied}
     }
 }, ['/tmp/redis.sock'], start)
