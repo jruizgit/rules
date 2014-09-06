@@ -1,20 +1,46 @@
 import threading
 import json
+import copy
 import rules
 
 class Session(object):
 
-    def __init__(self, document, event, handle, namespace):
-        self.state = document
+    def __init__(self, state, event, handle, ruleset_name):
+        self.state = state
         self.event = event
+        self.ruleset_name = ruleset_name
+        self.id = state['id']
         self._handle = handle
-        self._namespace = namespace
         self._timer_directory = {}
         self._message_directory = {}
         self._branch_directory = {}
-        
+        self._message_directory = {}
+
     def get_timers(self):
         return self._timer_directory
+
+    def get_branches(self):
+        return self._branch_directory
+
+    def get_messages(self):
+        return self._message_directory
+
+    def signal(self, message):
+        name_index = self.ruleset_name.rindex('.')
+        parent_ruleset_name = self.ruleset_name[:name_index]
+        name = self.ruleset_name[name_index + 1:]
+        message['sid'] = self.id
+        message['id'] = '{0}.{1}'.format(name, message['id'])
+        self.post(parent_ruleset_name, message)
+
+    def post(self, ruleset_name, message):
+        message_list = []
+        if  ruleset_name in self._message_directory:
+            message_list = self._message_directory[ruleset_name]
+        else:
+            self._message_directory[ruleset_name] = message_list
+
+        message_list.append(message)
 
     def start_timer(self, timer_name, duration):
         if timer_name in self._timer_directory:
@@ -73,7 +99,7 @@ class Promise(object):
 class Fork(Promise):
 
     def __init__(self, branch_names):
-        super(Promise, self).__init__(_execute)
+        super(Fork, self).__init__(self._execute)
         self.branch_names = branch_names
         
     def _execute(self, s):
@@ -87,6 +113,7 @@ class Ruleset(object):
     def __init__(self, name, host, ruleset_definition):
         self._actions = {}
         self._name = name
+        self._host = host
         for rule_name, rule in ruleset_definition.iteritems():
             action = rule['run']
             del rule['run']
@@ -130,6 +157,7 @@ class Ruleset(object):
         except Exception as error:
             complete(error, None)
 
+    @staticmethod
     def parse_definitions(parent_name, host, ruleset_definitions):
         branch_names = []
         for name, definition in ruleset_definitions.iteritems():
@@ -152,18 +180,20 @@ class Ruleset(object):
         complete(None)
 
     def _start_branches(self, branches, index, s, complete):
-        def callback(e):
+        def callback(e, result):
             if e:
                 complete(e)
             else:
                 self._start_branches(branches, index + 1, s, complete)
 
-        if index == len(timers):
+        if index == len(branches):
             complete(None)
         else:
             try:
                 branch_data = branches[index]
-                host.start(branch_data[0], branch_data[1], callback)    
+                self._host.start(branch_data[0], branch_data[1], callback)  
+            except Exception as error:
+                complete(error)  
 
     def _start_timers(self, timers, index, s, complete):
         if index == len(timers):
@@ -171,11 +201,30 @@ class Ruleset(object):
         else:
             try:
                 timer_data = timers[index]
-                timer = {'sid':s.state['id'], 'id':timer_data[0], '$t':timer_data[0]}
+                timer = {'sid':s.id, 'id':timer_data[0], '$t':timer_data[0]}
                 rules.start_timer(self._handle, str(s.state['id']), timer_data[1], json.dumps(timer))
                 self._start_timers(timers, index + 1, s, complete)
             except Exception as error:
                 complete(error)
+
+    def _post_messages(self, messages, index, s, complete):
+        def callback(e, result):
+            if e:
+                complete(e)
+            else:
+                self._post_messages(messages, index + 1, s, complete)
+
+        if index == len(messages):
+            complete(None)
+        else:
+            try:
+                message_data = messages[index]
+                if len(message_data[1]) == 1:
+                    self._host.post(message_data[0], message_data[1][0], callback)
+                else:
+                    self._host.post_batch(message_data[0], message_data[1], callback)
+            except Exception as error:
+                complete(error)            
 
     def dispatch(self, complete):
         result = None
@@ -188,13 +237,13 @@ class Ruleset(object):
         if not result:
             complete(None)
         else:
-            document = json.loads(result[0])
+            state = json.loads(result[0])
             event = json.loads(result[1])[self._name]
             actionName = None
             for actionName, event in event.iteritems():
                 break
 
-            s = Session(document, event, result[2], self._name)
+            s = Session(state, event, result[2], self._name)
             action = self._actions[actionName]
                         
             def timers_callback(e):
@@ -222,6 +271,17 @@ class Ruleset(object):
                     timers = list(s.get_timers().items())
                     self._start_timers(timers, 0, s, timers_callback)
 
+            def messages_callback(e):
+                if e:
+                    try:
+                        rules.abandon_action(self._handle, s._handle)
+                        complete(e)
+                    except Exception as error:
+                        complete(error)
+                else:
+                    messages = list(s.get_messages().items())
+                    self._post_messages(messages, 0, s, branches_callback)
+
             def action_callback(e):
                 if e:
                     try:
@@ -231,7 +291,7 @@ class Ruleset(object):
                         complete(error)
                 else:
                     branches = list(s.get_branches().items())
-                    self._start_branches(branches, 0, s, branches_callback)
+                    self._start_branches(branches, 0, s, messages_callback)
 
             action.run(s, action_callback)
 
@@ -261,7 +321,7 @@ class Host(object):
 
     def start(self, ruleset_name, state, complete):
         if ruleset_name in self._ruleset_directory:
-            self._ruleset_directory[ruleset_name].assert_state(message, complete)
+            self._ruleset_directory[ruleset_name].assert_state(state, complete)
         else:
             raise Exception('Ruleset with name {0} not found'.format(ruleset_name))
 
