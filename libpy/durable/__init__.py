@@ -61,6 +61,7 @@ class Promise(object):
         self._func = func
         self._next = None
         self._sync = True
+        self.root = self
 
     def continue_with(self, next):
         if (isinstance(next, Promise)):
@@ -69,6 +70,8 @@ class Promise(object):
             self._next = Promise(next)
         else:
             raise Exception('Unexpected Promise Type')
+
+        self._next.root = self.root
 
     def run(self, s, complete):
         if self._sync:
@@ -96,6 +99,7 @@ class Promise(object):
             except Exception as error:
                 complete(error)
 
+
 class Fork(Promise):
 
     def __init__(self, branch_names):
@@ -108,6 +112,16 @@ class Fork(Promise):
             s.fork(branch_name, state)
         
 
+class To(Promise):
+
+    def __init__(self, state):
+        super(To, self).__init__(self._execute)
+        self._state = state
+        
+    def _execute(self, s):
+        s.state['label'] = self._state
+
+
 class Ruleset(object):
 
     def __init__(self, name, host, ruleset_definition):
@@ -118,13 +132,14 @@ class Ruleset(object):
             action = rule['run']
             del rule['run']
             if (isinstance(action, Promise)):
-                self._actions[rule_name] = action.get_root()
+                self._actions[rule_name] = action.root
             elif (hasattr(action, '__call__')):
                 self._actions[rule_name] = Promise(action)
             else:
-                self._actions[rule_name] = Fork(Ruleset.parse_definitions(name, host, action))
+                self._actions[rule_name] = Fork(host.register_rulesets(name, action))
 
         self._handle = rules.create_ruleset(name, json.dumps(ruleset_definition))
+        self._definition = ruleset_definition
         
     def bind(self, databases):
         for db in databases:
@@ -158,17 +173,28 @@ class Ruleset(object):
             complete(error, None)
 
     @staticmethod
-    def parse_definitions(parent_name, host, ruleset_definitions):
-        branch_names = []
-        for name, definition in ruleset_definitions.iteritems():
-            branch_name = name
-            if parent_name:
-                branch_name = '{0}.{1}'.format(parent_name, name) 
+    def create_rulesets(parent_name, host, ruleset_definitions):
+        branches = {}
+        for name, definition in ruleset_definitions.iteritems():  
+            if name.rfind('$state') != -1:
+                name = name[:name.rfind('$state')]
+                if parent_name:
+                    name = '{0}.{1}'.format(parent_name, name) 
 
-            host.register_ruleset(branch_name, definition)
-            branch_names.append(branch_name)
+                branches[name] = Statechart(name, host, definition)
+            elif name.rfind('$flow') != -1:
+                name = name[:name.rfind('$flow')]
+                if parent_name:
+                    name = '{0}.{1}'.format(parent_name, name) 
 
-        return branch_names
+                branches[name] = Flowchart(name, host, definition)
+            else:
+                if parent_name:
+                    name = '{0}.{1}'.format(parent_name, name)
+
+                branches[name] = Ruleset(name, host, definition)
+
+        return branches
 
     def dispatch_timers(self, complete):
         try:
@@ -296,6 +322,110 @@ class Ruleset(object):
             action.run(s, action_callback)
 
 
+class Statechart(Ruleset):
+
+    def __init__(self, name, host, chart_definition):
+        self._name = name
+        self._host = host
+        ruleset_definition = {}
+        self._transform(None, None, None, chart_definition, ruleset_definition)
+        super(Statechart, self).__init__(name, host, ruleset_definition)
+        self._definition = chart_definition
+
+    def _transform(self, parent_name, parent_triggers, parent_start_state, chart_definition, rules):
+        start_state = {}
+
+        for state_name, state in chart_definition.iteritems():
+            qualified_name = state_name
+            if parent_name:
+                qualified_name = '{0}.{1}'.format(parent_name, state_name)
+
+            start_state[qualified_name] = True
+
+        for state_name, state in chart_definition.iteritems():
+            qualified_name = state_name
+            if parent_name:
+                qualified_name = '{0}.{1}'.format(parent_name, state_name)
+
+            triggers = {}
+            if parent_triggers:
+                for parent_trigger_name, trigger in parent_triggers.iteritems():
+                    trigger_name = parent_trigger_name[parent_trigger_name.rindex('.') + 1:]
+                    triggers['{0}.{1}'.format(qualified_name, trigger_name)] = trigger 
+
+            for trigger_name, trigger in state.iteritems():
+                if trigger_name != '$state':
+                    if ('to' in trigger) and parent_name:
+                        trigger['to'] = '{0}.{1}'.format(parent_name, trigger['to'])
+
+                triggers['{0}.{1}'.format(qualified_name, trigger_name)] = trigger
+
+            if '$chart' in state:
+                self._transform(qualified_name, triggers, start_state, state['$chart'], rules)
+            else:
+                for trigger_name, trigger in triggers.iteritems():
+                    rule = {}
+                    state_test = {'label': qualified_name} 
+                    if 'when' in trigger:
+                        if '$s' in trigger['when']:
+                            rule['when'] = {'$s': {'$and': [state_test, trigger['when']['$s']]}}
+                        else:
+                            rule['whenAll'] = {'$s': state_test, '$m': trigger['when']}
+
+                    elif 'whenAll' in trigger:
+                        test = {'$s': state_test}
+                        for test_name, current_test in trigger['whenAll']:
+                            if test_name != '$s':
+                                test[test_name] = current_test
+                            else:
+                                test['$s'] = {'$and': [state_test, current_test]}
+                        rule['whenAll'] = test
+                    elif 'whenAny' in trigger:
+                        rule['whenAll'] = {'$s': state_test, 'm$any': trigger['whenAny']}
+                    elif 'whenSome' in trigger:
+                        rule['whenAll'] = {'$s': state_test, 'm$some': trigger['whenSome']}
+                    else:
+                        rule['when'] = {'$s': state_test}
+
+                    if 'run' in trigger:
+                        if (isinstance(trigger['run'], Promise)):
+                            rule['run'] = trigger['run']
+                        elif (hasattr(trigger['run'], '__call__')):
+                            rule['run'] = Promise(trigger['run'])
+                        else:
+                            rule['run'] = Fork(host.register_rulesets(self._name, trigger['run']))
+
+                    if 'to' in trigger:
+                        if 'run' in rule:
+                            rule['run'].continue_with(To(trigger['to']))
+                        else:
+                            rule['run'] = To(trigger['to'])
+
+                        if trigger['to'] in start_state: 
+                            del start_state[trigger['to']]
+
+                        if parent_start_state and trigger['to'] in parent_start_state:
+                            del parent_start_state[trigger['to']]
+                    else:
+                        raise Exception('Trigger {0} destination not defined'.format(trigger_name))
+
+                    rules[trigger_name] = rule;
+                    
+        started = False 
+        for state_name in start_state.keys():
+            if started:
+                raise Exception('Chart {0} has more than one start state'.format(self._name))
+
+            started = True
+            if parent_name:
+                rules[parent_name + '$start'] = {'when': {'$s': {'label': parent_name}}, 'run': To(state_name)}
+            else:
+                rules['$start'] = {'when': {'$s': {'$nex': {'label': 1}}}, 'run': To(state_name)}
+
+        if not started:
+            raise Exception('Chart {0} has no start state'.format(self._name))
+
+
 class Host(object):
 
     def __init__(self):
@@ -325,16 +455,16 @@ class Host(object):
         else:
             raise Exception('Ruleset with name {0} not found'.format(ruleset_name))
 
-    def register_rulesets(self, ruleset_definitions):
-        Ruleset.parse_definitions(None, self, ruleset_definitions)
+    def register_rulesets(self, parent_name, ruleset_definitions):
+        rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions)
+        for ruleset_name, ruleset_definition in rulesets.iteritems():
+            if ruleset_name in self._ruleset_directory:
+                raise Exception('Ruleset with name {0} already registered'.format(ruleset_name))
+            else:    
+                self._ruleset_directory[ruleset_name] = ruleset_definition
+                self._ruleset_list.append(ruleset_definition)
 
-    def register_ruleset(self, ruleset_name, ruleset_definition):
-        if ruleset_name in self._ruleset_directory:
-            raise Exception('Ruleset with name {0} already registered'.format(ruleset_name))
-        else:
-            ruleset = Ruleset(ruleset_name, self, ruleset_definition)
-            self._ruleset_directory[ruleset_name] = ruleset
-            self._ruleset_list.append(ruleset)
+        return list(rulesets.keys())
 
     def run(self):
         def dispatch_ruleset(index):
@@ -364,7 +494,7 @@ class Host(object):
 
 def run(ruleset_definitions, databases, start):
     main_host = Host()
-    main_host.register_rulesets(ruleset_definitions)
+    main_host.register_rulesets(None, ruleset_definitions)
     main_host.bind(databases)
     if start:
         start(main_host)
