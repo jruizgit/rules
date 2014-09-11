@@ -497,7 +497,6 @@ static unsigned int linkAlpha(ruleset *tree,
     unsigned int entry;
     node *parentAlpha = &tree->nodePool[parentOffset];
     node *nextNode = &tree->nodePool[nextOffset];
-
     if (nextNode->type != NODE_ALPHA) {
         result = ensureBetaList(tree, parentAlpha);
         if (result != RULES_OK) {
@@ -564,7 +563,6 @@ static unsigned int findAlpha(ruleset *tree,
     
     readNextName(rule, &firstName, &lastName, &hash);
     readNextValue(lastName, &first, &last, &type);
-
     node *parent = &tree->nodePool[parentOffset];
     unsigned int *parentNext;
     if (parent->value.a.nextOffset) {
@@ -585,9 +583,12 @@ static unsigned int findAlpha(ruleset *tree,
         parentNext = &tree->nextPool[parent->value.a.nextListOffset];
         for (entry = 0; parentNext[entry] != 0; ++entry) {
             node *currentNode = &tree->nodePool[parentNext[entry]];
-            if (currentNode->value.a.hash == hash) {
-                *resultOffset = parentNext[entry];
-                return RULES_OK;
+            if (currentNode->value.a.hash == hash&& 
+                currentNode->value.a.operator == operator) {
+                if (compareValue(tree, &currentNode->value.a.right, first, last, type)) {
+                    *resultOffset = parentNext[entry];
+                    return RULES_OK;
+                }
             }
         }
     }

@@ -335,7 +335,7 @@ static unsigned char isMatch(ruleset *tree, jsonProperty *currentProperty, alpha
     unsigned char propertyType = currentProperty->type;
     unsigned char propertyMatch = 0;
     char temp;
-
+    
     if (alphaOp == OP_EX) {
         return 1;
     }
