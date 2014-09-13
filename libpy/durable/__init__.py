@@ -7,7 +7,6 @@ class Session(object):
 
     def __init__(self, state, event, handle, ruleset_name):
         self.state = state
-        self.event = event
         self.ruleset_name = ruleset_name
         self.id = state['id']
         self._handle = handle
@@ -15,6 +14,10 @@ class Session(object):
         self._message_directory = {}
         self._branch_directory = {}
         self._message_directory = {}
+        if '$m' in event:
+            self.event = event['$m']
+        else:
+            self.event = event
 
     def get_timers(self):
         return self._timer_directory
@@ -102,13 +105,17 @@ class Promise(object):
 
 class Fork(Promise):
 
-    def __init__(self, branch_names):
+    def __init__(self, branch_names, state_filter = None):
         super(Fork, self).__init__(self._execute)
         self.branch_names = branch_names
+        self.state_filter = state_filter
         
     def _execute(self, s):
         for branch_name in self.branch_names:
             state = copy.deepcopy(s.state)
+            if self.state_filter:
+                self.state_filter(state)
+
             s.fork(branch_name, state)
         
 
@@ -286,7 +293,7 @@ class Ruleset(object):
                     except Exception as error:
                         complete(error)
 
-            def branches_callback(e):
+            def messages_callback(e):
                 if e:
                     try:
                         rules.abandon_action(self._handle, s._handle)
@@ -297,7 +304,7 @@ class Ruleset(object):
                     timers = list(s.get_timers().items())
                     self._start_timers(timers, 0, s, timers_callback)
 
-            def messages_callback(e):
+            def branches_callback(e):
                 if e:
                     try:
                         rules.abandon_action(self._handle, s._handle)
@@ -306,7 +313,7 @@ class Ruleset(object):
                         complete(error)
                 else:
                     messages = list(s.get_messages().items())
-                    self._post_messages(messages, 0, s, branches_callback)
+                    self._post_messages(messages, 0, s, messages_callback)
 
             def action_callback(e):
                 if e:
@@ -317,7 +324,7 @@ class Ruleset(object):
                         complete(error)
                 else:
                     branches = list(s.get_branches().items())
-                    self._start_branches(branches, 0, s, messages_callback)
+                    self._start_branches(branches, 0, s, branches_callback)
 
             action.run(s, action_callback)
 
@@ -333,6 +340,10 @@ class Statechart(Ruleset):
         self._definition = chart_definition
 
     def _transform(self, parent_name, parent_triggers, parent_start_state, chart_definition, rules):
+        def state_filter(s):
+            if 'label' in s:
+                del s['label']
+
         start_state = {}
 
         for state_name, state in chart_definition.iteritems():
@@ -393,7 +404,7 @@ class Statechart(Ruleset):
                         elif (hasattr(trigger['run'], '__call__')):
                             rule['run'] = Promise(trigger['run'])
                         else:
-                            rule['run'] = Fork(host.register_rulesets(self._name, trigger['run']))
+                            rule['run'] = Fork(self._host.register_rulesets(self._name, trigger['run']), state_filter)
 
                     if 'to' in trigger:
                         if 'run' in rule:
