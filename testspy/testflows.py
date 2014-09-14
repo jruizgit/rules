@@ -1,15 +1,15 @@
 import durable
 
 def denied(s):
-    print ('denied from: {0}'.format(s.ruleset_name))
+    print ('denied from: {0}, {1}'.format(s.ruleset_name, s.id))
     s.state['status'] = 'done'
 
 def approved(s):
-    print ('approved from: {0}'.format(s.ruleset_name))
+    print ('approved from: {0}, {1}'.format(s.ruleset_name, s.id))
     s.state['status'] = 'done'
 
 def request_approval(s):
-    print ('request approval from: {0}'.format(s.ruleset_name))
+    print ('request approval from: {0}, {1}'.format(s.ruleset_name, s.id))
     print (s.event)
     if 'status' in s.state:
         s.state['status'] = 'approved'
@@ -29,12 +29,19 @@ def start(host):
     host.post('a1', {'id': 4, 'sid': 2, 'subject': 'denied'}, callback)
     host.post('a1', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000}, callback)
    
-    host.post('a2', {'id': '1', 'sid': '1', 'subject': 'approve', 'amount': 100}, callback)
-    host.post('a2', {'id': '2', 'sid': '1', 'subject': 'approved'}, callback)
+    host.post('a2', {'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100}, callback)
+    host.post('a2', {'id': 2, 'sid': 1, 'subject': 'approved'}, callback)
     host.post('a2', {'id': 3, 'sid': 2, 'subject': 'approve', 'amount': 100}, callback)
     host.post('a2', {'id': 4, 'sid': 2, 'subject': 'denied'}, callback)
     host.post('a2', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000}, callback)
     
+    host.post('a3', {'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100}, callback)
+    host.post('a3', {'id': 2, 'sid': 1, 'subject': 'approved'}, callback)
+    host.post('a3', {'id': 3, 'sid': 2, 'subject': 'approve', 'amount': 100}, callback)
+    host.post('a3', {'id': 4, 'sid': 2, 'subject': 'denied'}, callback)
+    host.post('a3', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000}, callback)
+    
+
 durable.run({
     'a1': {
         'r1': {
@@ -89,5 +96,23 @@ durable.run({
         },
         'approved': {
         }
+    },
+    'a3$flow': {
+        'input': {
+            'to': {
+                'request': {'$and': [{'subject': 'approve' }, {'$lte': {'amount': 1000}}]},
+                'deny': {'$and': [{'subject': 'approve'}, {'$gt': {'amount': 1000}}]}
+            }
+        },
+        'request': {
+            'run': request_approval,
+            'to': {
+                'approve': {'$s': {'status': 'approved'}},
+                'deny': {'subject': 'denied'},
+                'request': {'$any': {'a': {'subject': 'approved'},'b': {'subject': 'ok'}}}
+            }
+        },
+        'approve': {'run': approved},
+        'deny': {'run': denied}
     }
 }, ['/tmp/redis.sock'], start)

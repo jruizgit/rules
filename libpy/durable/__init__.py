@@ -69,12 +69,13 @@ class Promise(object):
     def continue_with(self, next):
         if (isinstance(next, Promise)):
             self._next = next
-        elif (hasattr(action, '__call__')):
+        elif (hasattr(next, '__call__')):
             self._next = Promise(next)
         else:
             raise Exception('Unexpected Promise Type')
 
         self._next.root = self.root
+        return self._next
 
     def run(self, s, complete):
         if self._sync:
@@ -435,6 +436,103 @@ class Statechart(Ruleset):
 
         if not started:
             raise Exception('Chart {0} has no start state'.format(self._name))
+
+
+class Flowchart(Ruleset):
+
+    def __init__(self, name, host, chart_definition):
+        self._name = name
+        self._host = host
+        ruleset_definition = {} 
+        self._transform(chart_definition, ruleset_definition)
+        super(Flowchart, self).__init__(name, host, ruleset_definition)
+        self._definition = chart_definition
+
+    def _transform(self, chart_definition, rules):
+        def stage_filter(s):
+            if 'label' in s:
+                del s['label']
+
+        visited = {}
+        for stage_name, stage in chart_definition.iteritems():
+            stage_test = {'label': stage_name}
+            if 'to' in stage:
+                if isinstance(stage['to'], basestring):
+                    next_stage = None
+                    rule = {'when': {'$s': stage_test}}
+                    if stage['to'] in chart_definition:
+                        next_stage = chart_definition[stage['to']]
+                    else:
+                        raise Exception('Stage {0} not found'.format(stage['to']))
+
+                    if not 'run' in next_stage:
+                        rule['run'] = To(stage['to'])
+                    else:
+                        if isinstance(next_stage['run'], Promise) or hasattr(next_stage['run'], '__call__'):
+                            rule['run'] = To(stage['to']).continue_with(next_stage['run'])
+                        else:
+                            fork_promise = Fork(self._host.register_rulesets(self._name, next_stage['run']), stage_filter)
+                            rule['run'] = To(stage['to']).continue_with(fork_promise)
+
+                    rules['{0}.{1}'.format(stage_name, stage['to'])] = rule
+                    visited[stage['to']] = True
+                else:
+                    for transition_name, transition in stage['to'].iteritems():
+                        rule = None
+                        next_stage = None
+                        if '$s' in transition:
+                            rule = {'when': {'$s': {'$and': [stage_test, transition['$s']]}}}
+                        elif '$all' in transition:
+                            for test_name, all_test in transition['$all'].iteritems():
+                                test = {'$s': stage_test}
+                                if test_name != '$s':
+                                    test[test_name] = all_test
+                                else:
+                                    test['$s'] = {'$and': [stage_test, all_test]}
+
+                            rule = {'whenAll': test}
+                        elif '$any' in transition:
+                            rule = {'whenAll': {'$s': stage_test, 'm$any': transition['$any']}}
+                        elif '$some' in transition:
+                            rule = {'whenAll': {'$s': stage_test, 'm$some': transition['$some']}}
+                        else:
+                            rule = {'whenAll': {'$s': stage_test, '$m': transition}}
+
+                        if transition_name in chart_definition:
+                            next_stage = chart_definition[transition_name]
+                        else:
+                            raise Exception('Stage {0} not found'.format(transition_name))
+
+                        if not 'run' in next_stage:
+                            rule['run'] = To(transition_name)
+                        else:
+                            if isinstance(next_stage['run'], Promise) or hasattr(next_stage['run'], '__call__'):
+                                rule['run'] = To(transition_name).continue_with(next_stage['run'])
+                            else:
+                                fork_promise = Fork(self._host.register_rulesets(self._name, next_stage['run']), stage_filter)
+                                rule['run'] = To(transition_name).continue_with(fork_promise)
+
+                        rules['{0}.{1}'.format(stage_name, transition_name)] = rule
+                        visited[transition_name] = True
+
+        started = False
+        for stage_name, stage in chart_definition.iteritems():
+            if not stage_name in visited:
+                if started:
+                    raise Exception('Chart {0} has more than one start state'.format(self._name))
+
+                rule = {'when': {'$s': {'$nex': {'label': 1}}}}
+                if not 'run' in stage:
+                    rule['run'] = To(stage_name)
+                else:
+                    if isinstance(stage['run'], Promise) or hasattr(stage['run'], '__call__'):
+                        rule['run'] = To(stage_name).continue_with(stage['run'])
+                    else:
+                        fork_promise = Fork(self._host.register_rulesets(self._name, stage['run']), stage_filter)
+                        rule['run'] = To(stage_name).continue_with(fork_promise)
+
+                rules['$start.{0}'.format(stage_name)] = rule
+                started = True
 
 
 class Host(object):
