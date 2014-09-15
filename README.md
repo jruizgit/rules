@@ -22,6 +22,31 @@ d.run({
     }
 });
 ```
+```python
+import durable
+
+def pending(s):
+    s.state['status'] = 'pending'
+
+def approved(s):
+    print('approved')
+    
+durable.run({
+    'approve': {
+        'r1': {
+            'when': {'$lt': {'amount': 1000}},
+            'run': pending
+        },
+        'r2': {
+            'whenAll': {
+                '$m': {'subject': 'approved'},
+                '$s': {'status': 'pending'}
+            },
+            'run': approved
+        }
+    }
+})
+```
 
 Durable Rules relies on state of the art technologies:
 
