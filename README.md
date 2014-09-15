@@ -2,9 +2,9 @@ Durable Rules
 =====
 Durable Rules is a polyglot micro-framework for real-time, consistent and scalable coordination of events. With Durable Rules you can track and analyze information about things that happen (events) by combining data from multiple sources to infer more complicated circumstances.
 
-A forward chaining algorithm (A.K.A. Rete) is used to evaluate massive streams of data. A simple, yet powerful meta-liguistic abstraction lets you define simple and complex rulesets, such as flowcharts, statecharts, nested statecharts, paralel and time based flows. 
+A forward chaining algorithm (A.K.A. Rete) is used to evaluate massive streams of data. A simple, yet powerful meta-liguistic abstraction lets you define simple and complex rulesets, such as flowcharts, statecharts, nested statecharts, paralel and time driven flows. 
 
-Durable Rules core engine is implemented in C, which allows for high performance rule evalation and mutiple language support. Below is an example on how easy it is to define a couple of rules that act on incoming web messages.
+The Durable Rules core engine is implemented in C, which enables ultra fast rule evaluation and inference as well as muti-language support. Below is an example on how easy it is to define a couple of rules that act on incoming web messages.
 
 ####Javascript
 ```javascript
