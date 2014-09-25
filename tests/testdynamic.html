@@ -46,8 +46,9 @@
                 d3.select('iframe')
                   .attr('src', '/' + rulesetName + '/sample/admin.html?disableScratchpad=true&size=330');
 
+                result = JSON.parse(result);
                 d3.select('textarea[id="rulesetpad"]')
-                  .text(result);
+                  .text(JSON.stringify(result, null, 4));
             }
         });
     }
@@ -86,7 +87,8 @@
     body.append('input')
         .attr('type', 'text')
         .attr('value', 'first')
-        .attr('id', 'name');
+        .attr('id', 'name')
+        .attr('style', "border:1px solid grey");
 
     body.append('small')
         .append('span')
@@ -95,7 +97,8 @@
     body.append('input')
         .attr('type', 'text')
         .attr('value', 'state')
-        .attr('id', 'type');
+        .attr('id', 'type')
+        .attr('style', "border:1px solid grey");
 
     body.append('br');
         
@@ -106,42 +109,44 @@
         .text('{\r\n' + 
               '    "wait": {\r\n' +
               '        "approve": {\r\n' +
-              '            "when": {"subject": "approve"},\r\n' +
+              '            "when": {\r\n' +
+              '                "subject": "approve"\r\n' +
+              '            },\r\n' +
               '            "run": "approve action",\r\n' +
               '            "to": "approved"\r\n' +
               '        },\r\n' +
               '        "deny": {\r\n' +
-              '            "when": {"subject": "deny"},\r\n' +
+              '            "when": {\r\n' +
+              '                "subject": "deny"\r\n' +
+              '            },\r\n' +
               '            "run": "deny action",\r\n' +
               '            "to": "denied"\r\n' +
               '        }\r\n' +
               '    },\r\n' +
-              '    "approved": {\r\n' +
-              '    },\r\n' +
-              '    "denied": {\r\n' +
-              '    }\r\n' +
+              '    "approved": {},\r\n' +
+              '    "denied": {}\r\n' +
               '}');
 
 
     body.append('iframe')
         .attr('width', 330)
-        .attr('height', 330)
+        .attr('height', 331)
         .attr('scrolling', 'no')
-        .attr('frameborder', 1);
+        .attr('style', "border:1px solid grey");
 
     body.append('br');
 
     body.append('input')
         .attr('type', 'button')
         .attr('id', 'approve')
-        .attr('value', 'Load')
-        .on('click', get);
+        .attr('value', 'Register')
+        .on('click', register);
 
     body.append('input')
         .attr('type', 'button')
         .attr('id', 'approve')
-        .attr('value', 'Save')
-        .on('click', register);
+        .attr('value', 'Restore')
+        .on('click', get);
 
     body.append('br');
     body.append('br');
