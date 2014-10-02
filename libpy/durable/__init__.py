@@ -139,7 +139,9 @@ class Ruleset(object):
         for rule_name, rule in ruleset_definition.iteritems():
             action = rule['run']
             del rule['run']
-            if (isinstance(action, Promise)):
+            if isinstance(action, basestring):
+                self._actions[rule_name] = Promise(host.get_action(action))
+            elif isinstance(action, Promise):
                 self._actions[rule_name] = action.root
             elif (hasattr(action, '__call__')):
                 self._actions[rule_name] = Promise(action)
@@ -225,7 +227,7 @@ class Ruleset(object):
         else:
             try:
                 branch_data = branches[index]
-                self._host.start(branch_data[0], branch_data[1], callback)  
+                self._host.patch_state(branch_data[0], branch_data[1], callback)  
             except Exception as error:
                 complete(error)  
 
@@ -400,9 +402,11 @@ class Statechart(Ruleset):
                         rule['when'] = {'$s': state_test}
 
                     if 'run' in trigger:
-                        if (isinstance(trigger['run'], Promise)):
+                        if isinstance(trigger['run'], basestring):
+                            rule['run'] = Promise(self._host.get_action(trigger['run']))
+                        if isinstance(trigger['run'], Promise):
                             rule['run'] = trigger['run']
-                        elif (hasattr(trigger['run'], '__call__')):
+                        elif hasattr(trigger['run'], '__call__'):
                             rule['run'] = Promise(trigger['run'])
                         else:
                             rule['run'] = Fork(self._host.register_rulesets(self._name, trigger['run']), state_filter)
@@ -468,7 +472,9 @@ class Flowchart(Ruleset):
                     if not 'run' in next_stage:
                         rule['run'] = To(stage['to'])
                     else:
-                        if isinstance(next_stage['run'], Promise) or hasattr(next_stage['run'], '__call__'):
+                        if isinstance(next_stage['run'], basestring):
+                            rule['run'] = To(stage['to']).continue_with(Promise(self._host.get_action(next_stage['run'])))
+                        elif isinstance(next_stage['run'], Promise) or hasattr(next_stage['run'], '__call__'):
                             rule['run'] = To(stage['to']).continue_with(next_stage['run'])
                         else:
                             fork_promise = Fork(self._host.register_rulesets(self._name, next_stage['run']), stage_filter)
@@ -506,7 +512,9 @@ class Flowchart(Ruleset):
                         if not 'run' in next_stage:
                             rule['run'] = To(transition_name)
                         else:
-                            if isinstance(next_stage['run'], Promise) or hasattr(next_stage['run'], '__call__'):
+                            if isinstance(next_stage['run'], basestring):
+                                rule['run'] = To(transition_name).continue_with(Promise(self._host.get_action(next_stage['run'])))
+                            elif isinstance(next_stage['run'], Promise) or hasattr(next_stage['run'], '__call__'):
                                 rule['run'] = To(transition_name).continue_with(next_stage['run'])
                             else:
                                 fork_promise = Fork(self._host.register_rulesets(self._name, next_stage['run']), stage_filter)
@@ -525,7 +533,9 @@ class Flowchart(Ruleset):
                 if not 'run' in stage:
                     rule['run'] = To(stage_name)
                 else:
-                    if isinstance(stage['run'], Promise) or hasattr(stage['run'], '__call__'):
+                    if isinstance(stage['run'], basestring):
+                        rule['run'] = To(stage_name).continue_with(Promise(self._host.get_action(stage['run'])))
+                    elif isinstance(stage['run'], Promise) or hasattr(stage['run'], '__call__'):
                         rule['run'] = To(stage_name).continue_with(stage['run'])
                     else:
                         fork_promise = Fork(self._host.register_rulesets(self._name, stage['run']), stage_filter)
@@ -537,41 +547,80 @@ class Flowchart(Ruleset):
 
 class Host(object):
 
-    def __init__(self):
+    def __init__(self, databases = ['/tmp/redis.sock']):
         self._ruleset_directory = {}
         self._ruleset_list = []
         self._exit = threading.Event()
+        self._databases = databases
 
-    def bind(self, databases):
-        for ruleset in self._ruleset_list:
-            ruleset.bind(databases)
+    def get_action(self, action_name):
+        raise Exception('Action wiht name {0} not found'.format(action_name))
+
+    def load_ruleset(self, ruleset_name, complete):
+        complete('Ruleset with name {0} not found'.format(ruleset_name))
+
+    def get_ruleset(self, ruleset_name, complete):
+        def callback(e, ruleset_definition):
+            if e:
+                complete(e)
+            else:
+                try:
+                    self.register_rulesets(null, ruleset_definition)
+                    ruleset = self._ruleset_directory[ruleset_name]
+                    complete(None, ruleset)
+                except Exception as error:
+                    complete(error)
+
+        if ruleset_name in self._ruleset_directory:
+            complete(None, self._ruleset_directory[ruleset_name])
+        else:
+            self.load_ruleset(ruleset_name, callback)
+
+    def get_state(self, ruleset_name, sid, complete):
+        def callback(e, ruleset):
+            if e:
+                complete(e)
+            else:
+                ruleset.get_state(sid, complete)
+
+        self.get_ruleset(ruleset_name, callback)
 
     def post_batch(self, ruleset_name, messages, complete):
-        if ruleset_name in self._ruleset_directory:
-            self._ruleset_directory[ruleset_name].assert_events(messages, complete)
-        else:
-            raise Exception('Ruleset with name {0} not found'.format(ruleset_name))
+        def callback(e, ruleset):
+            if e:
+                complete(e)
+            else:
+                ruleset.assert_events(messages, complete)
+
+        self.get_ruleset(ruleset_name, callback)
 
     def post(self, ruleset_name, message, complete):
-        if ruleset_name in self._ruleset_directory:
-            self._ruleset_directory[ruleset_name].assert_event(message, complete)
-        else:
-            raise Exception('Ruleset with name {0} not found'.format(ruleset_name))
+        def callback(e, ruleset):
+            if e:
+                complete(e)
+            else:
+                ruleset.assert_event(message, complete)
 
-    def start(self, ruleset_name, state, complete):
-        if ruleset_name in self._ruleset_directory:
-            self._ruleset_directory[ruleset_name].assert_state(state, complete)
-        else:
-            raise Exception('Ruleset with name {0} not found'.format(ruleset_name))
+        self.get_ruleset(ruleset_name, callback)
+
+    def patch_state(self, ruleset_name, state, complete):
+        def callback(e, ruleset):
+            if e:
+                complete(e)
+            else:
+                ruleset.assert_state(state, complete)
+
+        self.get_ruleset(ruleset_name, callback)
 
     def register_rulesets(self, parent_name, ruleset_definitions):
         rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions)
-        for ruleset_name, ruleset_definition in rulesets.iteritems():
+        for ruleset_name, ruleset in rulesets.iteritems():
             if ruleset_name in self._ruleset_directory:
                 raise Exception('Ruleset with name {0} already registered'.format(ruleset_name))
             else:    
-                self._ruleset_directory[ruleset_name] = ruleset_definition
-                self._ruleset_list.append(ruleset_definition)
+                self._ruleset_directory[ruleset_name] = ruleset
+                self._ruleset_list.append(ruleset)
+                ruleset.bind(self._databases)
 
         return list(rulesets.keys())
 
@@ -602,9 +651,8 @@ class Host(object):
         self._exit.wait()
 
 def run(ruleset_definitions, databases, start):
-    main_host = Host()
+    main_host = Host(databases)
     main_host.register_rulesets(None, ruleset_definitions)
-    main_host.bind(databases)
     if start:
         start(main_host)
 
