@@ -17,29 +17,23 @@ def request_approval(s):
         s.state['status'] = 'pending'
 
 def start(host):
-    def callback(e, result):
-        if e:
-            print(e)
-        else:
-            print('ok')
-
-    host.post('a1', {'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100}, callback)
-    host.post('a1', {'id': 2, 'sid': 1, 'subject': 'approved'}, callback)
-    host.post('a1', {'id': 3, 'sid': 2, 'subject': 'approve', 'amount': 100}, callback)
-    host.post('a1', {'id': 4, 'sid': 2, 'subject': 'denied'}, callback)
-    host.post('a1', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000}, callback)
+    host.post('a1', {'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100})
+    host.post('a1', {'id': 2, 'sid': 1, 'subject': 'approved'})
+    host.post('a1', {'id': 3, 'sid': 2, 'subject': 'approve', 'amount': 100})
+    host.post('a1', {'id': 4, 'sid': 2, 'subject': 'denied'})
+    host.post('a1', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000})
    
-    host.post('a2', {'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100}, callback)
-    host.post('a2', {'id': 2, 'sid': 1, 'subject': 'approved'}, callback)
-    host.post('a2', {'id': 3, 'sid': 2, 'subject': 'approve', 'amount': 100}, callback)
-    host.post('a2', {'id': 4, 'sid': 2, 'subject': 'denied'}, callback)
-    host.post('a2', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000}, callback)
+    host.post('a2', {'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100})
+    host.post('a2', {'id': 2, 'sid': 1, 'subject': 'approved'})
+    host.post('a2', {'id': 3, 'sid': 2, 'subject': 'approve', 'amount': 100})
+    host.post('a2', {'id': 4, 'sid': 2, 'subject': 'denied'})
+    host.post('a2', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000})
     
-    host.post('a3', {'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100}, callback)
-    host.post('a3', {'id': 2, 'sid': 1, 'subject': 'approved'}, callback)
-    host.post('a3', {'id': 3, 'sid': 2, 'subject': 'approve', 'amount': 100}, callback)
-    host.post('a3', {'id': 4, 'sid': 2, 'subject': 'denied'}, callback)
-    host.post('a3', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000}, callback)
+    host.post('a3', {'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100})
+    host.post('a3', {'id': 2, 'sid': 1, 'subject': 'approved'})
+    host.post('a3', {'id': 3, 'sid': 2, 'subject': 'approve', 'amount': 100})
+    host.post('a3', {'id': 4, 'sid': 2, 'subject': 'denied'})
+    host.post('a3', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000})
     
 
 durable.run({

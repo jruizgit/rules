@@ -2,6 +2,11 @@ import threading
 import json
 import copy
 import rules
+from werkzeug.wrappers import Request, Response
+from werkzeug.routing import Map, Rule
+from werkzeug.exceptions import HTTPException, NotFound
+from werkzeug.wsgi import SharedDataMiddleware
+from werkzeug.serving import run_simple
 
 class Session(object):
 
@@ -158,29 +163,20 @@ class Ruleset(object):
             else: 
                 rules.bind_ruleset(self._handle, db['password'], db['port'], db['host'])
 
-    def assert_event(self, message, complete):
-        try:
-            complete(None, rules.assert_event(self._handle, json.dumps(message)))
-        except Exception as error:
-            complete(error, None)
-
-    def assert_events(self, messages, complete):
-        try:
-            complete(None, rules.assert_events(self._handle, json.dumps(messages)))
-        except Exception as error:
-            complete(error, None)
-
-    def assert_state(self, state, complete):
-        try:
-            complete(None, rules.assert_state(self._handle, json.dumps(state)))
-        except Exception as error:
-            complete(error, None)
-
-    def get_state(self, complete):
-        try:
-            complete(None, json.loads(rules.get_state(self._handle)))
-        except Exception as error:
-            complete(error, None)
+    def assert_event(self, message):
+        rules.assert_event(self._handle, json.dumps(message))
+        
+    def assert_events(self, messages):
+        rules.assert_events(self._handle, json.dumps(messages))
+        
+    def assert_state(self, state):
+        rules.assert_state(self._handle, json.dumps(state))
+        
+    def get_state(self, sid):
+        return json.loads(rules.get_state(self._handle, sid))
+        
+    def get_definition(self):
+        return self._definition
 
     @staticmethod
     def create_rulesets(parent_name, host, ruleset_definitions):
@@ -215,53 +211,6 @@ class Ruleset(object):
 
         complete(None)
 
-    def _start_branches(self, branches, index, s, complete):
-        def callback(e, result):
-            if e:
-                complete(e)
-            else:
-                self._start_branches(branches, index + 1, s, complete)
-
-        if index == len(branches):
-            complete(None)
-        else:
-            try:
-                branch_data = branches[index]
-                self._host.patch_state(branch_data[0], branch_data[1], callback)  
-            except Exception as error:
-                complete(error)  
-
-    def _start_timers(self, timers, index, s, complete):
-        if index == len(timers):
-            complete(None)
-        else:
-            try:
-                timer_data = timers[index]
-                timer = {'sid':s.id, 'id':timer_data[0], '$t':timer_data[0]}
-                rules.start_timer(self._handle, str(s.state['id']), timer_data[1], json.dumps(timer))
-                self._start_timers(timers, index + 1, s, complete)
-            except Exception as error:
-                complete(error)
-
-    def _post_messages(self, messages, index, s, complete):
-        def callback(e, result):
-            if e:
-                complete(e)
-            else:
-                self._post_messages(messages, index + 1, s, complete)
-
-        if index == len(messages):
-            complete(None)
-        else:
-            try:
-                message_data = messages[index]
-                if len(message_data[1]) == 1:
-                    self._host.post(message_data[0], message_data[1][0], callback)
-                else:
-                    self._host.post_batch(message_data[0], message_data[1], callback)
-            except Exception as error:
-                complete(error)            
-
     def dispatch(self, complete):
         result = None
         try:
@@ -280,56 +229,36 @@ class Ruleset(object):
                 break
 
             s = Session(state, event, result[2], self._name)
-            action = self._actions[actionName]
-                        
-            def timers_callback(e):
+            
+            def action_callback(e):
                 if e:
-                    try:
-                        rules.abandon_action(self._handle, s._handle)
-                        complete(e)
-                    except Exception as error:
-                        complete(error)
+                    rules.abandon_action(self._handle, s._handle)
+                    complete(e)
                 else:
                     try:
+                        branches = list(s.get_branches().items())
+                        for branch_data in branches:
+                            self._host.patch_state(branch_data[0], branch_data[1])  
+
+                        messages = list(s.get_messages().items())
+                        for message_data in messages:
+                            if len(message_data[1]) == 1:
+                                self._host.post(message_data[0], message_data[1][0])
+                            else:
+                                self._host.post_batch(message_data[0], message_data[1])
+
+                        timers = list(s.get_timers().items())
+                        for timer_data in timers:
+                            timer = {'sid':s.id, 'id':timer_data[0], '$t':timer_data[0]}
+                            rules.start_timer(self._handle, str(s.state['id']), timer_data[1], json.dumps(timer))
+
                         rules.complete_action(self._handle, s._handle, json.dumps(s.state))
                         complete(None)
                     except Exception as error:
-                        complete(error)
-
-            def messages_callback(e):
-                if e:
-                    try:
                         rules.abandon_action(self._handle, s._handle)
-                        complete(e)
-                    except Exception as error:
                         complete(error)
-                else:
-                    timers = list(s.get_timers().items())
-                    self._start_timers(timers, 0, s, timers_callback)
-
-            def branches_callback(e):
-                if e:
-                    try:
-                        rules.abandon_action(self._handle, s._handle)
-                        complete(e)
-                    except Exception as error:
-                        complete(error)
-                else:
-                    messages = list(s.get_messages().items())
-                    self._post_messages(messages, 0, s, messages_callback)
-
-            def action_callback(e):
-                if e:
-                    try:
-                        rules.abandon_action(self._handle, s._handle)
-                        complete(e)
-                    except Exception as error:
-                        complete(error)
-                else:
-                    branches = list(s.get_branches().items())
-                    self._start_branches(branches, 0, s, branches_callback)
-
-            action.run(s, action_callback)
+            
+            self._actions[actionName].run(s, action_callback)         
 
 
 class Statechart(Ruleset):
@@ -547,70 +476,38 @@ class Flowchart(Ruleset):
 
 class Host(object):
 
-    def __init__(self, databases = ['/tmp/redis.sock']):
+    def __init__(self, ruleset_definitions = None, databases = ['/tmp/redis.sock']):
         self._ruleset_directory = {}
         self._ruleset_list = []
-        self._exit = threading.Event()
         self._databases = databases
+        if ruleset_definitions:
+            self.register_rulesets(None, ruleset_definitions)
 
     def get_action(self, action_name):
         raise Exception('Action wiht name {0} not found'.format(action_name))
 
-    def load_ruleset(self, ruleset_name, complete):
-        complete('Ruleset with name {0} not found'.format(ruleset_name))
+    def load_ruleset(self, ruleset_name):
+        raise Exception('Ruleset with name {0} not found'.format(ruleset_name))
 
-    def get_ruleset(self, ruleset_name, complete):
-        def callback(e, ruleset_definition):
-            if e:
-                complete(e)
-            else:
-                try:
-                    self.register_rulesets(null, ruleset_definition)
-                    ruleset = self._ruleset_directory[ruleset_name]
-                    complete(None, ruleset)
-                except Exception as error:
-                    complete(error)
-
+    def get_ruleset(self, ruleset_name):
         if ruleset_name in self._ruleset_directory:
-            complete(None, self._ruleset_directory[ruleset_name])
+            return self._ruleset_directory[ruleset_name]
         else:
-            self.load_ruleset(ruleset_name, callback)
+            ruleset_definition = self.load_ruleset(ruleset_name)
+            self.register_rulesets(null, ruleset_definition)
+            return self._ruleset_directory[ruleset_name]
 
-    def get_state(self, ruleset_name, sid, complete):
-        def callback(e, ruleset):
-            if e:
-                complete(e)
-            else:
-                ruleset.get_state(sid, complete)
-
-        self.get_ruleset(ruleset_name, callback)
-
-    def post_batch(self, ruleset_name, messages, complete):
-        def callback(e, ruleset):
-            if e:
-                complete(e)
-            else:
-                ruleset.assert_events(messages, complete)
-
-        self.get_ruleset(ruleset_name, callback)
-
-    def post(self, ruleset_name, message, complete):
-        def callback(e, ruleset):
-            if e:
-                complete(e)
-            else:
-                ruleset.assert_event(message, complete)
-
-        self.get_ruleset(ruleset_name, callback)
-
-    def patch_state(self, ruleset_name, state, complete):
-        def callback(e, ruleset):
-            if e:
-                complete(e)
-            else:
-                ruleset.assert_state(state, complete)
-
-        self.get_ruleset(ruleset_name, callback)
+    def get_state(self, ruleset_name, sid):
+        return self.get_ruleset(ruleset_name).get_state(sid)
+        
+    def post_batch(self, ruleset_name, messages):
+        self.get_ruleset(ruleset_name).assert_events(messages)
+        
+    def post(self, ruleset_name, message):
+        self.get_ruleset(ruleset_name).assert_event(message)
+        
+    def patch_state(self, ruleset_name, state):
+        self.get_ruleset(ruleset_name).assert_state(state)
 
     def register_rulesets(self, parent_name, ruleset_definitions):
         rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions)
@@ -637,27 +534,71 @@ class Host(object):
                 if e:
                     print(e)
 
-                if index % 10:
+                if index % 10 and len(self._ruleset_list):
                     ruleset = self._ruleset_list[(index / 10) % len(self._ruleset_list)]
                     ruleset.dispatch_timers(callback)
                 else:
                     callback(e)
 
-            ruleset = self._ruleset_list[index % len(self._ruleset_list)]
-            ruleset.dispatch(timers_callback)
+            if len(self._ruleset_list):
+                ruleset = self._ruleset_list[index % len(self._ruleset_list)]
+                ruleset.dispatch(timers_callback)
+            else:
+                timers_callback(None)
 
         self._timer = threading.Timer(0.01, dispatch_ruleset, (0,))
         self._timer.start()
-        self._exit.wait()
+        
+class Application(object):
 
-def run(ruleset_definitions, databases, start):
-    main_host = Host(databases)
-    main_host.register_rulesets(None, ruleset_definitions)
+    def __init__(self, host):
+        self._host = host
+        self._url_map = Map([
+            Rule('/<ruleset_name>', endpoint='ruleset_definition_request'),
+            Rule('/<ruleset_name>/<sid>', endpoint='ruleset_state_request')
+        ])
+
+    def ruleset_definition_request(self, request, ruleset_name):
+        if request.method == 'GET':
+            result = self._host.get_ruleset(ruleset_name)
+            return Response(json.dumps(result.get_definition()))
+        elif request.method == 'POST':
+            self._host.register_rulesets(None, {ruleset_name: request.form})
+        
+        return Response()
+
+    def ruleset_state_request(self, request, ruleset_name, sid):
+        if request.method == 'GET':
+            result = self._host.get_state(ruleset_name, sid)
+            return Response(json.dumps(result))
+        elif request.method == 'POST':
+            self._host.post_batch(ruleset_name, sid, request.form)
+        elif request.method == 'PATCH':
+            self._host.patch_state(ruleset_name, sid, request.form)
+        
+        return Response()
+
+    def __call__(self, environ, start_response):
+        request = Request(environ)
+        adapter = self._url_map.bind_to_environ(request.environ)
+        try:
+            endpoint, values = adapter.match()
+            response = getattr(self, endpoint)(request, **values)
+            return response(environ, start_response)
+        except HTTPException as e:
+            return e
+
+    def run(self):
+        self._host.run()
+        run_simple('127.0.0.1', 5000, self, use_debugger=True, use_reloader=False)
+
+def run(ruleset_definitions = None, databases = ['/tmp/redis.sock'], start = None):
+    main_host = Host(ruleset_definitions, databases)
     if start:
         start(main_host)
 
-    main_host.run()
-
+    main_app = Application(main_host)
+    main_app.run()
 
 
 

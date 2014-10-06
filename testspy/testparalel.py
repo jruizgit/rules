@@ -35,19 +35,13 @@ def report_denied(s):
     print('denied from: {0}, {1}'.format(s.ruleset_name, s.id))    
 
 def start(host):
-    def callback(e, result):
-        if e:
-            print(e)
-        else:
-            print('ok')
+    host.post('p1', {'id': 1, 'sid': 1, 'start': 'yes'})
 
-    host.post('p1', {'id': 1, 'sid': 1, 'start': 'yes'}, callback)
+    host.post('p2', {'id': 1, 'sid': 1, 'subject': 'approve', 'quantity': 3})
+    host.post('p2', {'id': 2, 'sid': 2, 'subject': 'approve', 'quantity': 10})
 
-    host.post('p2', {'id': 1, 'sid': 1, 'subject': 'approve', 'quantity': 3}, callback)
-    host.post('p2', {'id': 2, 'sid': 2, 'subject': 'approve', 'quantity': 10}, callback)
-
-    host.post('p3', {'id': 1, 'sid': 1, 'subject': 'approve', 'quantity': 3}, callback)
-    host.post('p3', {'id': 2, 'sid': 2, 'subject': 'approve', 'quantity': 10}, callback)
+    host.post('p3', {'id': 1, 'sid': 1, 'subject': 'approve', 'quantity': 3})
+    host.post('p3', {'id': 2, 'sid': 2, 'subject': 'approve', 'quantity': 10})
 
 durable.run({
     'p1': {

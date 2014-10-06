@@ -35,14 +35,8 @@ def report_denied(s):
     print('Ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
 
 def start(host):
-    def callback(e, result):
-        if e:
-            print(e)
-        else:
-            print('ok')
-
-    host.post('t1', {'id': 1, 'sid': 1, 'start': 'yes'}, callback)
-    host.post('t2', {'id': 1, 'sid': 1, 'subject': 'approve'}, callback)
+    host.post('t1', {'id': 1, 'sid': 1, 'start': 'yes'})
+    host.post('t2', {'id': 1, 'sid': 1, 'subject': 'approve'})
     
 durable.run({
     't1': {
