@@ -1,6 +1,6 @@
 var stat = require('node-static');
 var redis = require('redis');
-var d = require('../lib/durable');
+var d = require('../libjs/durable');
 
 var host = d.host(['/tmp/redis.sock']);
 var app = d.application(host);

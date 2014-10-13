@@ -1,4 +1,4 @@
-var d = require('../lib/durable');
+var d = require('../libjs/durable');
 
 d.run({
     paralel1: {
