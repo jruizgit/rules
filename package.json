@@ -1,12 +1,14 @@
 {
   "name": "durable",
-  "version": "0.10.2",
+  "version": "0.20.2",
   "description": "A lightweight library for real-time, consistent and scalable coordination of events.",
-  "keywords": ["business rules", "rules", "rete", "forward chaining", "event streams", "state machine", "flowchart", "workflow", "consistency" ],
-  "dependencies": { "express": "3.4.x" , "node-static": "0.7.x", "connect": "2.19.x"},
+  "keywords": ["business rules", "rules engine", "rete", "rules", "forward chaining", "event streams", "state machine", "flowchart", "workflow", "consistency" ],
+  "dependencies": { "express": "3.4.x" , "node-static": "0.7.x", "connect": "2.19.x", "hiredis": "0.1.x" },
   "repository": { "type": "git", "url": "http://github.com/jruizgit/rules" },
   "main" : "./libjs/durable",
+  "scripts": { "install": "node-gyp rebuild" },
   "license": "MIT",
+  "gypfile": true,
   "readmeFilename": "README.md",
   "engines": { "node": "0.8.x", "npm": "1.1.x" },
   "author": { "name": "Jesus Ruiz", "email": "jr3791@live.com"}
