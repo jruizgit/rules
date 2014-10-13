@@ -10,4 +10,5 @@ setup (name = 'RulesEngine',
        description = 'Durable Rules Engine',
        packages = ['durable'],
        package_dir = {'': 'libpy'},
+       package_data={'': ['ux/*']},
        ext_modules = [rules])
