@@ -738,11 +738,15 @@ exports = module.exports = durable = function () {
         
         that.getAction = function (actionName) {
             throw 'Action ' + actionName + ' not found';
-        }
+        };
 
         that.loadRuleset = function(rulesetName, complete) {
             complete('Ruleset ' + rulesetName + ' not found');
-        }
+        };
+
+        that.saveRuleset = function(rulesetName, rulesetDefinition, complete) {
+            complete();
+        };
 
         that.getState = function (rulesetName, sid, complete) {
             that.getRuleset(rulesetName, function(err, rules) {
@@ -775,13 +779,20 @@ exports = module.exports = durable = function () {
                     } else {
                         try {
                             that.registerRulesets(null, result);
-                            rules = rulesDirectory[rulesetName];
-                            complete(null, rules);
-                        } catch (err) {
-                            complete(err);
+                        } catch (reason) {
+                            complete(reason);
                         }
                     }
                 });
+            }
+        };
+
+        that.setRuleset = function (rulesetName, rulesetDefinition, complete) {
+            try {
+                that.registerRulesets(null, rulesetDefinition);
+                that.saveRuleset(rulesetName, rulesetDefinition, complete);
+            } catch (reason) {
+                complete(reason);
             }
         };
 
@@ -885,17 +896,15 @@ exports = module.exports = durable = function () {
 
         that.run = function () {
 
-            that.get(basePath + '/:rules/:sid/admin.html', function (request, response) {
+            that.get(basePath + '/:rulesetName/:sid/admin.html', function (request, response) {
                 request.addListener('end',function () {
                     fileServer.serveFile('/admin.html', 200, {}, request, response);
                 }).resume();
             });
 
-            that.get(basePath + '/:rules/:sid', function (request, response) {
+            that.get(basePath + '/:rulesetName/:sid', function (request, response) {
                 response.contentType = 'application/json; charset=utf-8';
-                host.getState(request.params.rules,
-                    request.params.sid,
-                    function (err, result) {
+                host.getState(request.params.rulesetName, request.params.sid, function (err, result) {
                         if (err) {
                             response.send({ error: err }, 500);
                         }
@@ -905,12 +914,11 @@ exports = module.exports = durable = function () {
                     });
             });
 
-            that.post(basePath + '/:rules/:sid', function (request, response) {
+            that.post(basePath + '/:rulesetName/:sid', function (request, response) {
                 response.contentType = "application/json; charset=utf-8";
                 var message = request.body;
-                var rules = request.params.rules;
                 message.sid = request.params.sid;
-                host.post(rules, message, function (err) {
+                host.post(request.params.rulesetName, message, function (err) {
                     if (err)
                         response.send({ error: err }, 500);
                     else
@@ -918,12 +926,11 @@ exports = module.exports = durable = function () {
                 });
             });
 
-            that.patch(basePath + '/:rules/:sid', function (request, response) {
+            that.patch(basePath + '/:rulesetName/:sid', function (request, response) {
                 response.contentType = 'application/json; charset=utf-8';
                 var document = request.body;
-                var rules = request.params.rules;
                 document.id = request.params.sid;
-                host.patchState(rules, document, function (err) {
+                host.patchState(request.params.rulesetName, document, function (err) {
                     if (err) {
                         response.send({ error: err }, 500);
                     } else {
@@ -932,10 +939,9 @@ exports = module.exports = durable = function () {
                 });
             });
 
-            that.get(basePath + '/:rules', function (request, response) {
+            that.get(basePath + '/:rulesetName', function (request, response) {
                 response.contentType = 'application/json; charset=utf-8';
-                var rules = request.params.rules;
-                host.getRuleset(rules, function (err, result) {
+                host.getRuleset(request.params.rulesetName, function (err, result) {
                     if (err) {
                         response.send({ error: err }, 500);
                     }
@@ -945,6 +951,17 @@ exports = module.exports = durable = function () {
                 });
             });
 
+            that.post('/:rulesetName', function (request, response) {
+                response.contentType = "application/json; charset=utf-8";
+                host.setRuleset(request.params.rulesetName, request.body, function (err, result) {
+                    if (err) {
+                        response.send({ error: err }, 500);
+                    }
+                    else {
+                        response.send();
+                    }
+                });
+            });
 
             that.listen(port, function () {
                 console.log('Listening on ' + port);
