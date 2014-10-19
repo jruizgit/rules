@@ -10,14 +10,13 @@ from werkzeug.serving import run_simple
 
 class Application(object):
 
-    def __init__(self, host):
+    def __init__(self, host, routing_rules = []):
         self._host = host
-        self._url_map = Map([
-            Rule('/<ruleset_name>', endpoint=self._ruleset_definition_request),
-            Rule('/durableVisual.js', endpoint=self._visual_request),
-            Rule('/<ruleset_name>/<sid>', endpoint=self._ruleset_state_request),
-            Rule('/<ruleset_name>/<sid>/admin.html', endpoint=self._admin_request),
-        ])
+        routing_rules.append(Rule('/<ruleset_name>', endpoint=self._ruleset_definition_request))
+        routing_rules.append(Rule('/durableVisual.js', endpoint=self._visual_request))
+        routing_rules.append(Rule('/<ruleset_name>/<sid>', endpoint=self._ruleset_state_request))
+        routing_rules.append(Rule('/<ruleset_name>/<sid>/admin.html', endpoint=self._admin_request))
+        self._url_map = Map(routing_rules)
 
     def _ruleset_definition_request(self, environ, start_response, ruleset_name):
         def encode_promise(obj):
@@ -30,8 +29,9 @@ class Application(object):
             result = self._host.get_ruleset(ruleset_name)
             return Response(json.dumps(result.get_definition(), default=encode_promise))(environ, start_response)
         elif request.method == 'POST':
-            self._host.register_rulesets(None, {ruleset_name: request.form})
-        
+            ruleset_definition = json.loads(request.stream.read())
+            self._host.set_ruleset(ruleset_name, ruleset_definition)
+
         return Response()(environ, start_response)
 
     def _ruleset_state_request(self, environ, start_response, ruleset_name, sid):
@@ -40,9 +40,13 @@ class Application(object):
             result = self._host.get_state(ruleset_name, sid)
             return Response(json.dumps(result))(environ, start_response)
         elif request.method == 'POST':
-            self._host.post_batch(ruleset_name, sid, request.form)
+            message = json.loads(request.stream.read())
+            message['sid'] = sid
+            self._host.post(ruleset_name, message)
         elif request.method == 'PATCH':
-            self._host.patch_state(ruleset_name, sid, request.form)
+            document = json.loads(request.stream.read())
+            document['id'] = sid
+            self._host.patch_state(ruleset_name, document)
         
         return Response()(environ, start_response)
 

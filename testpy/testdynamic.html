@@ -1,0 +1,177 @@
+<html>
+<head>
+    <title>Ruleset registration page</title>
+</head>
+<body>
+<script type="text/javascript" src="http://d3js.org/d3.v3.min.js?3.1.9"></script>
+<script type="text/javascript">
+
+    function register() {
+        try {
+            var rulesetText = document.getElementById('rulesetpad').value;
+            var ruleset = JSON.parse(rulesetText);
+            var rulesetName = document.getElementById('name').value;
+            var rulesetType = document.getElementById('type').value;
+            var rulesetDefinition = {};
+            if (rulesetType && rulesetType != '') {
+                rulesetDefinition[rulesetName + '$' + rulesetType] = ruleset;
+            } else {
+                rulesetDefinition[rulesetName] = ruleset;
+            } 
+
+            server = d3.xhr('http://localhost:5000/' + rulesetName)
+                       .header('content-type', 'application/json; charset=utf-8');
+
+            server.post(JSON.stringify(rulesetDefinition), function(err) {
+                if (err) {
+                    alert('Server error ' + err.responseText);
+                }
+                else {
+                    d3.select('iframe')
+                      .attr('src', '/' + rulesetName + '/sample/admin.html?disableScratchpad=true&size=330');
+                }
+            });
+        } catch (err) {
+            alert('Could not parse ruleset ' + err);
+        }
+    }
+
+    function get() {
+        var rulesetName = document.getElementById('name').value;    
+        d3.json('http://localhost:5000/' + rulesetName, function(err, result) {
+            if (err) {
+                alert('Server error ' + err.responseText);
+            }
+            else {
+                d3.select('iframe')
+                  .attr('src', '/' + rulesetName + '/sample/admin.html?disableScratchpad=true&size=330');
+
+                result = JSON.parse(result);
+                d3.select('textarea[id="rulesetpad"]')
+                  .text(JSON.stringify(result, null, 4));
+            }
+        });
+    }
+
+    function post() {
+        try {
+            var messageText = document.getElementById('messagepad').value;
+            var message = JSON.parse(messageText);
+            var rulesetName = document.getElementById('name').value;
+            server = d3.xhr('http://localhost:5000/' + rulesetName + '/sample')
+                       .header('content-type', 'application/json; charset=utf-8');
+
+            server.post(messageText, function(err) {
+                if (err) {
+                    alert('Server error ' + err.responseText);
+                }
+            });
+        } catch (err) {
+            alert('Could not parse message ' + err);
+        }
+    }
+
+    var body = d3.select('body');
+
+    body.append('span')
+        .append('b')
+        .text('Enter dynamic ruleset: ');
+
+    body.append('br');
+    body.append('br');
+
+    body.append('small')
+        .append('span')
+        .text('Name: ');
+
+    body.append('input')
+        .attr('type', 'text')
+        .attr('value', 'first')
+        .attr('id', 'name')
+        .attr('style', "border:1px solid grey");
+
+    body.append('small')
+        .append('span')
+        .text(' Type: ');
+
+    body.append('input')
+        .attr('type', 'text')
+        .attr('value', 'state')
+        .attr('id', 'type')
+        .attr('style', "border:1px solid grey");
+
+    body.append('br');
+        
+    body.append('textarea')
+        .attr('rows', '25')
+        .attr('cols', '44')
+        .attr('id', 'rulesetpad')
+        .text('{\r\n' + 
+              '    "wait": {\r\n' +
+              '        "approve": {\r\n' +
+              '            "when": {\r\n' +
+              '                "subject": "approve"\r\n' +
+              '            },\r\n' +
+              '            "run": "approve action",\r\n' +
+              '            "to": "approved"\r\n' +
+              '        },\r\n' +
+              '        "deny": {\r\n' +
+              '            "when": {\r\n' +
+              '                "subject": "deny"\r\n' +
+              '            },\r\n' +
+              '            "run": "deny action",\r\n' +
+              '            "to": "denied"\r\n' +
+              '        }\r\n' +
+              '    },\r\n' +
+              '    "approved": {},\r\n' +
+              '    "denied": {}\r\n' +
+              '}');
+
+
+    body.append('iframe')
+        .attr('width', 330)
+        .attr('height', 331)
+        .attr('scrolling', 'no')
+        .attr('style', "border:1px solid grey");
+
+    body.append('br');
+
+    body.append('input')
+        .attr('type', 'button')
+        .attr('id', 'approve')
+        .attr('value', 'Register')
+        .on('click', register);
+
+    body.append('input')
+        .attr('type', 'button')
+        .attr('id', 'approve')
+        .attr('value', 'Restore')
+        .on('click', get);
+
+    body.append('br');
+    body.append('br');
+    body.append('span')
+        .append('b')
+        .text('Message: ');
+
+    body.append('br');
+
+    body.append('textarea')
+        .attr('rows', '5')
+        .attr('cols', '44')
+        .attr('id', 'messagepad')
+        .text('{\r\n' + 
+              '    "id": 1, "sid": "sample", "subject": "approve"\r\n' +
+              '}');
+
+    body.append('br');
+
+    body.append('input')
+        .attr('type', 'button')
+        .attr('id', 'approve')
+        .attr('value', 'Post')
+        .on('click', post);
+    
+</script>
+</body>
+</html>

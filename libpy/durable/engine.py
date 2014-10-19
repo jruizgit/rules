@@ -3,6 +3,7 @@ import copy
 import rules
 import threading
 
+
 class Session(object):
 
     def __init__(self, state, event, handle, ruleset_name):
@@ -329,7 +330,7 @@ class Statechart(Ruleset):
                     if 'run' in trigger:
                         if isinstance(trigger['run'], basestring):
                             rule['run'] = Promise(self._host.get_action(trigger['run']))
-                        if isinstance(trigger['run'], Promise):
+                        elif isinstance(trigger['run'], Promise):
                             rule['run'] = trigger['run']
                             trigger['run'] = 'function'
                         elif hasattr(trigger['run'], '__call__'):
@@ -488,6 +489,9 @@ class Host(object):
     def load_ruleset(self, ruleset_name):
         raise Exception('Ruleset with name {0} not found'.format(ruleset_name))
 
+    def save_ruleset(self, ruleset_name, ruleset_definition):
+        return
+
     def get_ruleset(self, ruleset_name):
         if ruleset_name in self._ruleset_directory:
             return self._ruleset_directory[ruleset_name]
@@ -495,6 +499,10 @@ class Host(object):
             ruleset_definition = self.load_ruleset(ruleset_name)
             self.register_rulesets(null, ruleset_definition)
             return self._ruleset_directory[ruleset_name]
+
+    def set_ruleset(self, ruleset_name, ruleset_definition):
+        self.register_rulesets(None, ruleset_definition)
+        self.save_ruleset(ruleset_name, ruleset_definition)
 
     def get_state(self, ruleset_name, sid):
         return self.get_ruleset(ruleset_name).get_state(sid)
