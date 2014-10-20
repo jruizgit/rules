@@ -46,7 +46,6 @@
                 d3.select('iframe')
                   .attr('src', '/' + rulesetName + '/sample/admin.html?disableScratchpad=true&size=330');
 
-                result = JSON.parse(result);
                 d3.select('textarea[id="rulesetpad"]')
                   .text(JSON.stringify(result, null, 4));
             }

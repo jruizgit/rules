@@ -1,14 +1,37 @@
-from distutils.core import setup, Extension
+from setuptools import setup, Extension
+from codecs import open
+from os import path
 
 rules = Extension('rules',
                     sources = ['src/rulespy/rules.c'],
                     include_dirs=['src/rules'],
                     extra_link_args=['build/release/rules.a', 'build/release/hiredis.a'])
 
-setup (name = 'RulesEngine',
-       version = '1.0',
-       description = 'Durable Rules Engine',
-       packages = ['durable'],
-       package_dir = {'': 'libpy'},
-       package_data={'': ['ux/*']},
-       ext_modules = [rules])
+here = path.abspath(path.dirname(__file__))
+with open(path.join(here, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
+
+setup (
+    name = 'durable',
+    version = '0.1.1',
+    description = 'Durable Rules Engine',
+    long_description=long_description,
+    url='https://github.com/jruizgit/rules',
+    author='The Python Packaging Authority',
+    author_email='jr3791@live.com',
+    license='MIT',
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Developers',
+        'Topic :: Software Development :: Libraries',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 2.6',
+        'Programming Language :: Python :: 2.7',
+    ],
+    keywords='rules_engine rete forward_chaining event_stream state_machine workflow consistency',
+    install_requires=['werkzeug'],
+    packages = ['durable'],
+    package_dir = {'': 'libpy'},
+    package_data={'': ['ux/*']},
+    ext_modules = [rules]
+)
