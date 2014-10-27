@@ -23,6 +23,7 @@
 #define ST_NUMBER_FRA 2
 #define ST_NUMBER_EXP 3
 
+#define IS_WHITESPACE(value) (value == ' ' || value == '\t' || value == '\n' || value == '\t') 
 
 static unsigned int getValue(char *start, char **first, char **last, unsigned char *type);
 static unsigned int getObject(char *start, char **first, char **last);
@@ -38,7 +39,7 @@ unsigned int readNextName(char *start, char **first, char **last, unsigned int *
             case ST_OBJECT_SEEK:
                 if (start[0] == '{') {
                     state = ST_OBJECT_PROP_NAME;
-                } else if (start[0] != ' ' && start[0] != '\t') {
+                } else if (!IS_WHITESPACE(start[0])) {
                     state = ST_OBJECT_PROP_SEEK;
                 } 
                 break;
@@ -49,12 +50,12 @@ unsigned int readNextName(char *start, char **first, char **last, unsigned int *
                     *first = start;
                     *last = start;
                     return PARSE_END;
-                } else if (start[0] != ' ' && start[0] != '\t') {
+                } else if (!IS_WHITESPACE(start[0])) {
                     return ERR_PARSE_OBJECT;
                 }
                 break;
             case ST_OBJECT_PROP_NAME: 
-                if (start[0] != ' ' && start[0] != '\t') {
+                if (!IS_WHITESPACE(start[0])) {
                     return getStringAndHash(start, first, last, hash);
                 }
                 break;
@@ -74,7 +75,7 @@ unsigned int readNextValue(char *start, char **first, char **last, unsigned char
             case ST_OBJECT_PROP_PARSE:
                 if (start[0] == ':') {
                     state = ST_OBJECT_PROP_VAL;
-                } else if (start[0] != ' ' && start[0] != '\t') {
+                } else if (!IS_WHITESPACE(start[0])) {
                     return ERR_PARSE_OBJECT;
                 }
                 break;
@@ -104,7 +105,7 @@ unsigned int readNextArrayValue(char *start, char **first, char **last, unsigned
                     *first = start;
                     *last = start;
                     return PARSE_END;    
-                } else if (start[0] != ' ' && start[0] != '\t') {
+                } else if (!IS_WHITESPACE(start[0])) {
                     return ERR_PARSE_OBJECT;
                 }
                 break;
@@ -134,7 +135,7 @@ static unsigned int getValue(char *start, char **first, char **last, unsigned ch
         } else if (start[0] == '[') {
             *type = JSON_ARRAY;
             return getArray(start, first, last);
-        } else if (start[0] != ' ' && start[0] != '\t') {
+        } else if (!IS_WHITESPACE(start[0])) {
             return ERR_PARSE_STRING;
         } 
 
@@ -155,7 +156,7 @@ static unsigned int getObject(char *start, char **first, char **last) {
                 if (start[0] == '{') {
                     state = ST_OBJECT_PROP_NAME;
                     *first = start;
-                } else if (start[0] != ' ' && start[0] != '\t') {
+                } else if (!IS_WHITESPACE(start[0])) {
                     return ERR_PARSE_OBJECT;
                 }
                 break;
@@ -165,7 +166,7 @@ static unsigned int getObject(char *start, char **first, char **last) {
                     return PARSE_OK;
                 } else if (start[0] == ',') {
                     state = ST_OBJECT_PROP_NAME;
-                } else if (start[0] != ' ' && start[0] != '\t') {
+                } else if (!IS_WHITESPACE(start[0])) {
                     return ERR_PARSE_OBJECT;
                 }
                 break;
@@ -173,7 +174,7 @@ static unsigned int getObject(char *start, char **first, char **last) {
                 if (start[0] == '}') {
                     *last = start;
                     return PARSE_OK;
-                } else if (start[0] != ' ' && start[0] != '\t') {
+                } else if (!IS_WHITESPACE(start[0])) {
                     result = getString(start, &dummy , &start); 
                     if (result != PARSE_OK) {
                         return result;
@@ -185,7 +186,7 @@ static unsigned int getObject(char *start, char **first, char **last) {
             case ST_OBJECT_PROP_PARSE:
                 if (start[0] == ':') {
                     state = ST_OBJECT_PROP_VAL;
-                } else if (start[0] != ' ' && start[0] != '\t') {
+                } else if (!IS_WHITESPACE(start[0])) {
                     return ERR_PARSE_OBJECT;
                 }
                 break;
@@ -216,7 +217,7 @@ static unsigned int getArray(char *start, char** first, char **last) {
                 if (start[0] == '[') {
                     state = ST_ARRAY_VAL_PARSE;
                     *first = start;
-                } else if (start[0] != ' ' && start[0] != '\t') {
+                } else if (!IS_WHITESPACE(start[0])) {
                     return ERR_PARSE_ARRAY;
                 }
                 break;
@@ -227,7 +228,7 @@ static unsigned int getArray(char *start, char** first, char **last) {
                 }
                 else if (start[0] == ',') {
                     state = ST_ARRAY_VAL_PARSE;
-                } else if (start[0] != ' ' && start[0] != '\t') {
+                } else if (!IS_WHITESPACE(start[0])) {
                     return ERR_PARSE_ARRAY;
                 }
                 break;
@@ -235,7 +236,7 @@ static unsigned int getArray(char *start, char** first, char **last) {
                 if (start[0] == ']') {
                     *last = start;
                     return PARSE_OK;
-                } else if (start[0] != ' ' && start[0] != '\t') {
+                } else if (!IS_WHITESPACE(start[0])) {
                     result = getValue(start, &dummy , &start, &dummyType); 
                     if (result != PARSE_OK) {
                         return result;
@@ -261,7 +262,7 @@ static unsigned int getNumber(char *start, char **first, char **last, unsigned c
                 if (start[0] >= '0' && start[0] <= '9') {
                     state = ST_NUMBER_INT;
                     *first = start;
-                } else if (start[0] != ' ' && start[0] != '\t') {
+                } else if (!IS_WHITESPACE(start[0])) {
                     return ERR_PARSE_NUMBER;
                 }
                 break;
@@ -310,7 +311,7 @@ static unsigned int getString(char *start, char **first, char **last) {
                     delimiter = start[0];
                     *first = start + 1;
                 }
-                else if (start[0] != ' ' && start[0] != '\t') {
+                else if (!IS_WHITESPACE(start[0])) {
                     return ERR_PARSE_STRING;
                 }
                 break;
@@ -345,7 +346,7 @@ static unsigned int getStringAndHash(char *start, char **first, char **last, uns
                     delimiter = start[0];
                     *first = start + 1;
                 }
-                else if (start[0] != ' ' && start[0] != '\t') {
+                else if (!IS_WHITESPACE(start[0])) {
                     return ERR_PARSE_STRING;
                 }
                 break;

@@ -124,7 +124,7 @@ static PyObject *pyAssertEvents(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char * message;
-            asprintf(&message, "Could not assert event, error code: %d", result);  
+            asprintf(&message, "Could not assert events, error code: %d", result);  
             PyErr_SetString(RulesError, message);
             free(message);
         }
@@ -183,7 +183,10 @@ static PyObject *pyStartAction(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    return Py_BuildValue("ssl", state, messages, actionHandle);
+    PyObject *returnValue = Py_BuildValue("ssl", state, messages, actionHandle);
+    free(state);
+    free(messages);
+    return returnValue;
 }
 
 static PyObject *pyCompleteAction(PyObject *self, PyObject *args) {

@@ -313,7 +313,6 @@ unsigned int bindRuleset(void *handle,
                          char *host, 
                          unsigned int port, 
                          char *password) {
-
     ruleset *tree = (ruleset*)handle;
     bindingsMap *map;
     if (tree->bindingsMap) {
