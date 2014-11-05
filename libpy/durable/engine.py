@@ -14,7 +14,6 @@ class Session(object):
         self._timer_directory = {}
         self._message_directory = {}
         self._branch_directory = {}
-        self._message_directory = {}
         if '$m' in event:
             self.event = event['$m']
         else:
@@ -220,8 +219,8 @@ class Ruleset(object):
         else:
             state = json.loads(result[0])
             event = json.loads(result[1])[self._name]
-            actionName = None
-            for actionName, event in event.iteritems():
+            action_name = None
+            for action_name, event in event.iteritems():
                 break
 
             s = Session(state, event, result[2], self._name)
@@ -232,21 +231,18 @@ class Ruleset(object):
                     complete(e)
                 else:
                     try:
-                        branches = list(s.get_branches().items())
-                        for branch_data in branches:
-                            self._host.patch_state(branch_data[0], branch_data[1])  
+                        for branch_name, branch_state in s.get_branches().iteritems():
+                            self._host.patch_state(branch_name, branch_state)  
 
-                        messages = list(s.get_messages().items())
-                        for message_data in messages:
-                            if len(message_data[1]) == 1:
-                                self._host.post(message_data[0], message_data[1][0])
+                        for ruleset_name, messages in s.get_messages().iteritems():
+                            if len(messages) == 1:
+                                self._host.post(ruleset_name, messages[0])
                             else:
-                                self._host.post_batch(message_data[0], message_data[1])
+                                self._host.post_batch(rule_name, messages)
 
-                        timers = list(s.get_timers().items())
-                        for timer_data in timers:
-                            timer = {'sid':s.id, 'id':timer_data[0], '$t':timer_data[0]}
-                            rules.start_timer(self._handle, str(s.state['id']), timer_data[1], json.dumps(timer))
+                        for timer_name, timer_duration in s.get_timers().iteritems():
+                            timer = {'sid':s.id, 'id':timer_name, '$t':timer_name}
+                            rules.start_timer(self._handle, str(s.id), timer_duration, json.dumps(timer))
 
                         rules.complete_action(self._handle, s._handle, json.dumps(s.state))
                         complete(None)
@@ -254,7 +250,7 @@ class Ruleset(object):
                         rules.abandon_action(self._handle, s._handle)
                         complete(error)
             
-            self._actions[actionName].run(s, action_callback)         
+            self._actions[action_name].run(s, action_callback)         
 
 
 class Statechart(Ruleset):
@@ -541,7 +537,7 @@ class Host(object):
                 if e:
                     print(e)
 
-                if index % 10 and len(self._ruleset_list):
+                if (index % 10 == 0) and len(self._ruleset_list):
                     ruleset = self._ruleset_list[(index / 10) % len(self._ruleset_list)]
                     ruleset.dispatch_timers(callback)
                 else:

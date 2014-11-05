@@ -129,7 +129,7 @@ static VALUE rbStartAction(VALUE self, VALUE handle) {
     void *actionHandle;
     unsigned int result = startAction((void *)FIX2LONG(handle), &state, &messages, &actionHandle);
     if (result == ERR_NO_ACTION_AVAILABLE) {
-        Qnil;
+        return Qnil;
     } else if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -238,18 +238,18 @@ static VALUE rbGetState(VALUE self, VALUE handle, VALUE sid) {
 
 void Init_rules() {
     rulesModule = rb_define_module("Rules");
-    rb_define_method(rulesModule, "create_ruleset", rbCreateRuleset, 2);
-    rb_define_method(rulesModule, "delete_ruleset", rbDeleteRuleset, 1);
-    rb_define_method(rulesModule, "bind_ruleset", rbBindRuleset, 4);
-    rb_define_method(rulesModule, "assert_event", rbAssertEvent, 2);
-    rb_define_method(rulesModule, "assert_events", rbAssertEvents, 2);
-    rb_define_method(rulesModule, "assert_state", rbAssertState, 2);
-    rb_define_method(rulesModule, "start_action", rbStartAction, 1);
-    rb_define_method(rulesModule, "complete_action", rbCompleteAction, 3);
-    rb_define_method(rulesModule, "abandon_action", rbAbandonAction, 2);
-    rb_define_method(rulesModule, "start_timer", rbStartTimer, 4);
-    rb_define_method(rulesModule, "assert_timers", rbAssertTimers, 2);
-    rb_define_method(rulesModule, "get_state", rbGetState, 2);
+    rb_define_singleton_method(rulesModule, "create_ruleset", rbCreateRuleset, 2);
+    rb_define_singleton_method(rulesModule, "delete_ruleset", rbDeleteRuleset, 1);
+    rb_define_singleton_method(rulesModule, "bind_ruleset", rbBindRuleset, 4);
+    rb_define_singleton_method(rulesModule, "assert_event", rbAssertEvent, 2);
+    rb_define_singleton_method(rulesModule, "assert_events", rbAssertEvents, 2);
+    rb_define_singleton_method(rulesModule, "assert_state", rbAssertState, 2);
+    rb_define_singleton_method(rulesModule, "start_action", rbStartAction, 1);
+    rb_define_singleton_method(rulesModule, "complete_action", rbCompleteAction, 3);
+    rb_define_singleton_method(rulesModule, "abandon_action", rbAbandonAction, 2);
+    rb_define_singleton_method(rulesModule, "start_timer", rbStartTimer, 4);
+    rb_define_singleton_method(rulesModule, "assert_timers", rbAssertTimers, 2);
+    rb_define_singleton_method(rulesModule, "get_state", rbGetState, 2);
 }
 
 
