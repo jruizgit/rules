@@ -310,7 +310,7 @@ class Statechart(Ruleset):
 
                     elif 'whenAll' in trigger:
                         test = {'$s': state_test}
-                        for test_name, current_test in trigger['whenAll']:
+                        for test_name, current_test in trigger['whenAll'].iteritems():
                             if test_name != '$s':
                                 test[test_name] = current_test
                             else:

@@ -5,7 +5,7 @@ require_relative "../src/rulesrb/rules"
 module Engine
   
   class Session
-    attr_reader :handle, :state, :ruleset_name, :timers, :branches, :messages
+    attr_reader :handle, :state, :ruleset_name, :timers, :branches, :messages, :event
 
     def initialize(state, event, handle, ruleset_name)
       @state = state
@@ -14,8 +14,8 @@ module Engine
       @timers = {}
       @messages = {}
       @branches = {}
-      if event.key? :$m
-        @event = event[:$m]
+      if event.key? ":$m"
+        @event = event[":$m"]
       else
         @event = event
       end
@@ -63,6 +63,8 @@ module Engine
       if name.end_with? '='
         @state[name[0..-2]] = value
         nil
+      elsif name.end_with? '?'
+        state.key? name[0..-2]
       else
         @state[name]
       end
@@ -84,12 +86,12 @@ module Engine
     end
 
     def continue_with(next_func)
-      if next_func.insance_of? Promise
+      if next_func.kind_of? Promise
         @next = next_func
-      elsif next_func.insance_of? Proc && next_func.lambda?
+      elsif next_func.kind_of? Proc
         @next = Promise.new next_func
       else
-        raise ArgumentError, "Unexpected Promise Type"
+        raise ArgumentError, "Unexpected Promise Type #{next_func}"
       end
 
       @next.root = @root
@@ -165,13 +167,15 @@ module Engine
       @host = host
       for rule_name, rule in ruleset_definition do
         rule_name = rule_name.to_s
-        action = rule[:run]
-        rule.delete :run
-        if action.instance_of? String
+        action = rule["run"]
+        rule.delete "run"
+        if !action
+          raise ArgumentError, "Action for #{rule_name} is null"
+        elsif action.kind_of? String
           @actions[rule_name] = Promise.new host.get_action action
-        elsif action.instance_of? Promise
+        elsif action.kind_of? Promise
           @actions[rule_name] = action.root
-        elsif action.instance_of? Proc
+        elsif action.kind_of? Proc
           @actions[rule_name] = Promise.new action
         else
           @actions[rule_name] = Fork.new host.register_rulesets(name, action)
@@ -183,7 +187,7 @@ module Engine
 
     def bind(databases)
       for db in databases do
-        if db.instance_of? String
+        if db.kind_of? String
           Rules.bind_ruleset @handle, db, 0, nil
         else 
           Rules.bind_ruleset @handle, db[:host], db[:port], db[:password] 
@@ -212,11 +216,11 @@ module Engine
       for name, definition in ruleset_definitions do  
         name = name.to_s
         if name.end_with? "$state"
-          name = name[0..-6]
+          name = name[0..-7]
           name = "#{parent_name}.#{name}" if parent_name
           branches[name] = Statechart.new name, host, definition
         elsif name.end_with? "$flow"
-          name = name[0..-5]
+          name = name[0..-6]
           name = "#{parent_name}.#{name}" if parent_name
           branches[name] = Flowchart.new name, host, definition
         else
@@ -295,6 +299,130 @@ module Engine
 
   end
 
+  class Statechart < Ruleset
+
+    def initialize(name, host, chart_definition)
+      @name = name
+      @host = host
+      ruleset_definition = {}
+      transform nil, nil, nil, chart_definition, ruleset_definition
+      super name, host, ruleset_definition
+      @definition = chart_definition
+      @definition[:$type] = "stateChart"
+    end
+
+    def transform(parent_name, parent_triggers, parent_start_state, chart_definition, rules)
+      state_filter = -> s { s.delete "label" if s.key? "label"}
+      
+      start_state = {}
+      
+      for state_name, state in chart_definition do
+        qualified_name = state_name
+        qualified_name = "#{parent_name}.#{state_name}" if parent_name
+        start_state[qualified_name] = true
+      end 
+
+      for state_name, state in chart_definition do
+        qualified_name = state_name
+        qualified_name = "#{parent_name}.#{state_name}" if parent_name
+
+        triggers = {}
+        if parent_triggers
+          for parent_trigger_name, trigger in parent_triggers do
+            trigger_name = parent_trigger_name[parent_trigger_name.rindex('.')..-1]
+            triggers["#{qualified_name}.#{trigger_name}"] = trigger
+          end
+        end
+
+        for trigger_name, trigger in state do
+          if (trigger_name != "$state") && (trigger.key? "to") && parent_name
+            to_name = trigger["to"]
+            trigger["to"] = "#{parent_name}.#{to_name}"
+          end
+
+          triggers["#{qualified_name}.#{trigger_name}"] = trigger
+        end
+
+        if state.key? "$chart" 
+          transform qualified_name, triggers, start_state, state["$chart"], rules
+        else
+          for trigger_name, trigger in triggers do
+            rule = {}
+            state_test = {"label" => qualified_name}
+            if trigger.key? "when"
+              if trigger["when"].key? "$s"
+                rule["when"] = {"$s" => {"$and" => [state_test, trigger["when"]["$s"]]}}
+              else
+                rule["whenAll"] = {"$s" => state_test, "$m" => trigger["when"]}
+              end
+            elsif trigger.key? "whenAll"
+              test = {:$s => state_test}
+              for test_name, current_test in trigger["whenAll"] do
+                test_name = test_name.to_s
+                if test_name != "$s"
+                  test[test_name] = current_test
+                else
+                  test["$s"] = {"$and" => [state_test, current_test]}
+                end 
+              end
+              rule["whenAll"] = test
+            elsif trigger.key? "whenAny"
+              rule["whenAll"] = {"$s" => state_test, "m$any" => trigger["whenAny"]}
+            elsif trigger.key? "whenSome"
+              rule["whenAll"] = {"$s" => state_test, "m$some" => trigger["whenSome"]}
+            else
+              rule["when"] = {"$s" => state_test}
+            end
+
+            if trigger.key? "run"
+              if trigger["run"].kind_of? String
+                rule["run"] = Promise.new host.get_action trigger["run"]
+              elsif trigger["run"].kind_of? Promise
+                rule["run"] = trigger["run"]
+                trigger["run"] = "function"
+              elsif trigger["run"].kind_of? Proc
+                rule["run"] = Promise.new trigger["run"]
+                trigger["run"] = "function"
+              else
+                rule["run"] = Fork.new host.register_rulesets(@name, trigger["run"])
+              end     
+            end
+
+            if trigger.key? "to"
+              if rule.key? "run"
+                rule["run"].continue_with To.new(trigger["to"])
+              else
+                rule["run"] = To.new trigger["to"]
+              end
+
+              start_state.delete trigger["to"] if start_state.key? trigger["to"]
+              if parent_start_state && (parent_start_state.key? trigger["to"])
+                parent_start_state.delete trigger["to"] 
+              end
+            else
+              raise ArgumentError, "Trigger #{trigger_name} destination not defined"
+            end
+
+            rules[trigger_name] = rule
+          end
+        end
+      end
+
+      started = false
+      for state_name in start_state.keys do
+        raise ArgumentError, "Chart #{@name} has more than one start state" if started
+        started = true
+        if parent_name
+          rules[parent_name + "$start"] = {"when"  => {"$s" => {"label" => parent_name}}, "run" => To.new(state_name)}
+        else
+          rules["$start"] = {"when" => {"$s" => {"$nex" => {"label" => 1}}}, "run" => To.new(state_name)}
+        end
+      end
+
+      raise ArgumentError, "Chart #{@name} has no start state" if not started
+    end
+  end
+
 
   class Host
 
@@ -306,11 +434,11 @@ module Engine
     end
 
     def get_action(action_name)
-      raise ArgumentError "Action with name #{action_name} not found"
+      raise ArgumentError, "Action with name #{action_name} not found"
     end
 
     def load_ruleset(ruleset_name)
-      raise ArgumentError "Ruleset with name #{ruleset_name} not found"
+      raise ArgumentError, "Ruleset with name #{ruleset_name} not found"
     end
 
     def save_ruleset(ruleset_name, ruleset_definition)
@@ -351,7 +479,7 @@ module Engine
       rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions)
       for ruleset_name, ruleset in rulesets do
         if @ruleset_directory.key? ruleset_name
-          raise ArgumentError "Ruleset with name #{ruleset_name} already registered" 
+          raise ArgumentError, "Ruleset with name #{ruleset_name} already registered" 
         end
 
         @ruleset_directory[ruleset_name] = ruleset

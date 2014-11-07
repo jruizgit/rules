@@ -112,7 +112,7 @@ module Durable
     end
 
     def merge(other, op)
-      raise ArgumentError "Right type doesn't match" if other.type != @type
+      raise ArgumentError, "Right type doesn't match" if other.type != @type
       @definitions = [self.definition] if !@definitions
       @op = op
       if other.op == @op
