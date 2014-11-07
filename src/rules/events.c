@@ -1044,23 +1044,17 @@ unsigned int completeAction(void *handle, void *actionHandle, char *state) {
     void *rulesBinding = context->rulesBinding;
     unsigned int result = prepareCommands(rulesBinding);
     if (result != RULES_OK) {
-        freeReplyObject(reply);
-        free(actionHandle);
         return result;
     }
     
     result = removeAction(rulesBinding, reply->element[0]->str);
     if (result != RULES_OK) {
-        freeReplyObject(reply);
-        free(actionHandle);
         return result;
     }
 
     if (reply->element[2]->type != REDIS_REPLY_NIL) {
         result = handleSession(handle, reply->element[2]->str, rulesBinding, ACTION_NEGATE_SESSION, &commandCount, 0);
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-            freeReplyObject(reply);
-            free(actionHandle);
             return result;
         }
     }
@@ -1069,8 +1063,6 @@ unsigned int completeAction(void *handle, void *actionHandle, char *state) {
         if (strcmp(reply->element[i]->str, "null") != 0) {
             result = handleEvent(handle, reply->element[i]->str, &rulesBinding, ACTION_NEGATE_MESSAGE, &commandCount);
             if (result != RULES_OK) {
-                freeReplyObject(reply);
-                free(actionHandle);
                 return result;
             }
         }
@@ -1078,14 +1070,14 @@ unsigned int completeAction(void *handle, void *actionHandle, char *state) {
 
     result = handleSession(handle, state, rulesBinding, ACTION_ASSERT_SESSION, &commandCount, 1);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        freeReplyObject(reply);
-        free(actionHandle);
         return result;
     }
 
     result = executeCommands(rulesBinding, commandCount);    
-    freeReplyObject(reply);
-    free(actionHandle);
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
+        freeReplyObject(reply);
+        free(actionHandle);
+    }
     return result;
 }
 

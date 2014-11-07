@@ -1,16 +1,15 @@
-require 'json'
-require 'timers'
-require_relative '../src/rulesrb/rules'
+require "json"
+require "timers"
+require_relative "../src/rulesrb/rules"
 
 module Engine
   
   class Session
-    attr_reader :handle, :state, :ruleset_name, :id, :timers, :branches, :messages
+    attr_reader :handle, :state, :ruleset_name, :timers, :branches, :messages
 
     def initialize(state, event, handle, ruleset_name)
       @state = state
       @ruleset_name = ruleset_name
-      @id = state[:id]
       @handle = handle
       @timers = {}
       @messages = {}
@@ -23,12 +22,12 @@ module Engine
     end
 
     def signal(message)
-      name_index = @ruleset_name.rindex '.'
+      name_index = @ruleset_name.rindex "."
       parent_ruleset_name = ruleset_name[0, name_index]
       name = ruleset_name[name_index + 1..-1]
       message_id = message[:id]
       message[:sid] = @id
-      message[:id] = '#{name}.#{message_id}'
+      message[:id] = "#{name}.#{message_id}"
       post parent_ruleset_name, message
     end
 
@@ -44,7 +43,7 @@ module Engine
 
     def start_timer(timer_name, duration)
       if @timers.key? timer_name
-        raise ArgumentError, 'Timer with name #{timer_name} already added'
+        raise ArgumentError, "Timer with name #{timer_name} already added"
       else
         @timers[timer_name] = duration
       end
@@ -52,11 +51,24 @@ module Engine
 
     def fork(branch_name, branch_state)
       if @branches.key? branch_name
-        raise ArgumentError, 'Branch with name #{branch_name} already forked'
+        raise ArgumentError, "Branch with name #{branch_name} already forked"
       else
         @branches[branch_name] = branch_state
       end
     end
+
+    
+    def handle_state(name, value=nil)
+      name = name.to_s
+      if name.end_with? '='
+        @state[name[0..-2]] = value
+        nil
+      else
+        @state[name]
+      end
+    end
+
+    alias method_missing handle_state
 
   end
 
@@ -77,7 +89,7 @@ module Engine
       elsif next_func.insance_of? Proc && next_func.lambda?
         @next = Promise.new next_func
       else
-        raise ArgumentError, 'Unexpected Promise Type'
+        raise ArgumentError, "Unexpected Promise Type"
       end
 
       @next.root = @root
@@ -163,11 +175,10 @@ module Engine
           @actions[rule_name] = Promise.new action
         else
           @actions[rule_name] = Fork.new host.register_rulesets(name, action)
-        end
-
-        @handle = Rules.create_ruleset name, JSON.generate(ruleset_definition)  
-        @definition = ruleset_definition        
+        end      
       end
+      @handle = Rules.create_ruleset name, JSON.generate(ruleset_definition)  
+      @definition = ruleset_definition
     end    
 
     def bind(databases)
@@ -200,16 +211,16 @@ module Engine
       branches = {}
       for name, definition in ruleset_definitions do  
         name = name.to_s
-        if name.end_with? '$state'
+        if name.end_with? "$state"
           name = name[0..-6]
-          name = '#{parent_name}.#{name}' if parent_name
+          name = "#{parent_name}.#{name}" if parent_name
           branches[name] = Statechart.new name, host, definition
-        elsif name.end_with? '$flow'
+        elsif name.end_with? "$flow"
           name = name[0..-5]
-          name = '#{parent_name}.#{name}' if parent_name
+          name = "#{parent_name}.#{name}" if parent_name
           branches[name] = Flowchart.new name, host, definition
         else
-          name = '#{parent_name}.#{name}' if parent_name
+          name = "#{parent_name}.#{name}" if parent_name
           branches[name] = Ruleset.new name, host, definition
         end
       end
@@ -287,7 +298,7 @@ module Engine
 
   class Host
 
-    def initialize(ruleset_definitions = nil, databases = ['/tmp/redis.sock'])
+    def initialize(ruleset_definitions = nil, databases = ["/tmp/redis.sock"])
       @ruleset_directory = {}
       @ruleset_list = []
       @databases = databases
@@ -295,17 +306,18 @@ module Engine
     end
 
     def get_action(action_name)
-      raise ArgumentError 'Action with name #{action_name} not found'
+      raise ArgumentError "Action with name #{action_name} not found"
     end
 
     def load_ruleset(ruleset_name)
-      raise ArgumentError 'Ruleset with name #{ruleset_name} not found'
+      raise ArgumentError "Ruleset with name #{ruleset_name} not found"
     end
 
     def save_ruleset(ruleset_name, ruleset_definition)
     end
 
     def get_ruleset(ruleset_name)
+      ruleset_name = ruleset_name.to_s
       if !(@ruleset_directory.key? ruleset_name)
         ruleset_definition = load_ruleset ruleset_name
         register_rulesets nil, ruleset_definition
@@ -339,7 +351,7 @@ module Engine
       rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions)
       for ruleset_name, ruleset in rulesets do
         if @ruleset_directory.key? ruleset_name
-          raise ArgumentError 'Ruleset with name #{ruleset_name} already registered' 
+          raise ArgumentError "Ruleset with name #{ruleset_name} already registered" 
         end
 
         @ruleset_directory[ruleset_name] = ruleset
@@ -365,7 +377,7 @@ module Engine
         }
 
         timers_callback = -> e {
-          puts e if e
+          puts "internal error #{e}" if e
           if index % 10 == 0 && @ruleset_list.length > 0
             ruleset = @ruleset_list[(index / 10) % @ruleset_list.length]
             ruleset.dispatch_timers callback
