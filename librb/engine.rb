@@ -453,13 +453,13 @@ module Engine
               end
 
               if trigger_run.kind_of? String
-                rule[:run] = Promise.new host.get_action trigger_run
+                rule[:run] = Promise.new @host.get_action(trigger_run)
               elsif trigger_run.kind_of? Promise
                 rule[:run] = trigger_run
               elsif trigger_run.kind_of? Proc
                 rule[:run] = Promise.new trigger_run
               else
-                rule[:run] = Fork.new host.register_rulesets(@name, trigger_run)
+                rule[:run] = Fork.new @host.register_rulesets(@name, trigger_run)
               end     
             end
 
@@ -507,6 +507,141 @@ module Engine
     end
   end
 
+  class Flowchart < Ruleset
+
+    def initialize(name, host, chart_definition)
+      @name = name
+      @host = host
+      ruleset_definition = {}
+      transform chart_definition, ruleset_definition
+      super name, host, ruleset_definition
+      @definition = chart_definition
+      @definition["$type"] = "flowChart"
+    end
+
+    def transform(chart_definition, rules)
+      stage_filter = -> s { s.delete("label") if s.key? "label"}
+      visited = {}
+      for stage_name, stage in chart_definition do
+        stage_name = stage_name.to_s
+        stage_test = {:label => stage_name}
+        if (stage.key? :to) || (stage.key? "to")
+          stage_to = (stage.key? :to) ? stage[:to]: stage["to"]
+          if (stage_to.kind_of? String) || (stage_to.kind_of? Symbol)
+            stage_to = stage_to.to_s
+            next_stage = nil
+            rule = {:when => {:$s => stage_test}}
+            if chart_definition.key? stage_to
+              next_stage = chart_definition[stage_to]
+            else
+              raise ArgumentError, "Stage #{stage_to.to_s} not found"
+            end
+
+            if !(next_stage.key? :run) && !(next_stage.key? "run")
+              rule[:run] = To.new stage_to
+            else
+              next_stage_run = (next_stage.key? :run) ? next_stage[:run]: next_stage["run"]
+              if next_stage_run.kind_of? String
+                rule[:run] = To.new(stage_to).continue_with Promise(@host.get_action(next_stage_run))
+              elsif (next_stage_run.kind_of? Promise) || (next_stage_run.kind_of? Proc)
+                rule[:run] = To.new(stage_to).continue_with next_stage_run
+              else
+                fork_promise = Fork.new @host.register_rulesets(@name, next_stage_run), stage_filter
+                rule[:run] = To.new(stage_to).continue_with fork_promise
+              end
+            end
+
+            rules["#{stage_name}.#{stage_to}"] = rule
+            visited[stage_to] = true
+          else
+            for transition_name, transition in stage_to do
+              rule = nil
+              next_stage = nil
+              if transition.key? :$s
+                rule = {:when => {:$s => {:$and => [stage_test, transition[:$s]]}}}
+              elsif transition.key? :$any 
+                rule = {:whenAll => {:$s => stage_test, "m$any" => transition[:$any]}}
+              elsif transition.key? :$some
+                rule = {:whenAll => {:$s => stage_test, "m$some" => transition[:$some]}}
+              elsif (transition.key? :$all) || (transition.key? "$all")
+                transition_all = (transition.key? :$all) ? transition[:$all]: transition["$all"]
+                for test_name, all_test in transition_all do
+                  test = {:$s => stage_test}
+                  if test_name != :$s && test_name != "$s"
+                    test[test_name] = all_test
+                  else
+                    test[:$s] = {:$and => [state_test, all_test]}
+                  end
+                end 
+                rule = {:whenAll => test}
+              elsif transition.key? "$s"
+                rule = {:when => {:$s => {:$and => [stage_test, transition["$s"]]}}}
+              elsif transition.key? "$any"
+                rule = {:whenAll => {:$s => stage_test, "m$any" => transition["$any"]}}
+              elsif transition.key? "$some"
+                rule = {:whenAll => {:$s => stage_test, "m$some" => transition["$some"]}}
+              else
+                rule = {:whenAll => {:$s => stage_test, :$m => transition}}
+              end
+
+              if chart_definition.key? transition_name
+                next_stage = chart_definition[transition_name]
+              else
+                raise ArgumentError, "Stage #{transition_name.to_s} not found"
+              end
+
+              transition_name = transition_name.to_s
+              if !(next_stage.key? :run) && !(next_stage.key? "run")
+                rule[:run] = To.new transition_name
+              else
+                next_stage_run = (next_stage.key? :run) ? next_stage[:run]: next_stage["run"]
+                if next_stage_run.kind_of? String
+                  rule[:run] = To.new(transition_name).continue_with Promise(@host.get_action(next_stage_run))
+                elsif (next_stage_run.kind_of? Promise) || (next_stage_run.kind_of? Proc)
+                  rule[:run] = To.new(transition_name).continue_with next_stage_run
+                else
+                  fork_promise = Fork.new @host.register_rulesets(@name, next_stage_run), stage_filter
+                  rule[:run] = To.new(transition_name).continue_with fork_promise
+                end
+              end
+
+              rules["#{stage_name}.#{transition_name}"] = rule
+              visited[transition_name] = true
+            end
+          end
+        end
+      end
+
+      started = false
+      for stage_name, stage in chart_definition do
+        stage_name = stage_name.to_s
+        if !(visited.key? stage_name)
+          if started
+            raise ArgumentError, "Chart #{@name} has more than one start state"
+          end
+
+          started = true
+          rule = {:when => {:$s =>{:$nex => {:label => 1}}}}
+          if !(stage.key? :run) && !(stage.key? "run")
+            rule[:run] = To.new stage_name
+          else
+            stage_run = stage.key? :run ? stage[:run]: stage["run"]
+            if stage_run.kind_of? String
+              rule[:run] = To.new(stage_name).continue_with Promise(@host.get_action(stage_run))
+            elsif (stage_run.kind_of? Promise) || (stage_run.kind_of? Proc)
+              rule[:run] = To.new(stage_name).continue_with stage_run
+            else
+              fork_promise = Fork @host.register_rulesets(@name, stage_run), stage_filter
+              rule[:run] = To.new(stage_name).continue_with fork_promise
+            end
+          end
+          rules["$start.#{stage_name}"] = rule
+        end
+      end
+
+    end
+
+  end
 
   class Host
 

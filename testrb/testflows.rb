@@ -80,6 +80,24 @@ Durable.run({
     },
     :approved => {
     }
+  },
+  "a3$flow" => {
+    :input => {
+      :to => {
+        :request => {:$and => [{:subject => "approve" }, {:$lte => {:amount => 1000}}]},
+        :deny => {:$and => [{:subject => "approve"}, {:$gt => {:amount => 1000}}]}
+      }
+    },
+    :request => {
+      :run => request_approval,
+      :to => {
+        :approve => {:$s => {:status => "approved"}},
+        :deny => {:subject => "denied"},
+        :request => {:$any => {:a => {:subject => "approved"}, :b => {:subject => "ok"}}}
+      }
+    },
+    :approve => {:run => approved},
+    :deny => {:run => denied}
   }
 }, ["/tmp/redis.sock"], -> host {
   host.post "a1", {:id => 1, :sid => 1, :subject => "approve", :amount => 100}
@@ -93,4 +111,10 @@ Durable.run({
   host.post "a2", {:id => 3, :sid => 2, :subject => "approve", :amount => 100}
   host.post "a2", {:id => 4, :sid => 2, :subject => "denied"}
   host.post "a2", {:id => 5, :sid => 3, :subject => "approve", :amount => 10000}
+
+  host.post "a3", {:id => 1, :sid => 1, :subject => "approve", :amount => 100}
+  host.post "a3", {:id => 2, :sid => 1, :subject => "approved"}
+  host.post "a3", {:id => 3, :sid => 2, :subject => "approve", :amount => 100}
+  host.post "a3", {:id => 4, :sid => 2, :subject => "denied"}
+  host.post "a3", {:id => 5, :sid => 3, :subject => "approve", :amount => 10000}
 })
