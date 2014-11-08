@@ -57,6 +57,7 @@ module Engine
       end
     end
 
+    private
     
     def handle_state(name, value=nil)
       name = name.to_s
@@ -65,6 +66,10 @@ module Engine
         nil
       elsif name.end_with? '?'
         state.key? name[0..-2]
+      elsif name == 's'
+        self
+      elsif name == 'm'
+        Event.new @event
       else
         @state[name]
       end
@@ -74,6 +79,35 @@ module Engine
 
   end
 
+  class Event
+
+    def initialize(data)
+      @data = data
+    end
+
+    def to_s
+      @data.to_s
+    end
+    
+    private
+
+    def handle_property(name, value=nil)
+      name = name.to_s
+      if name.end_with? '?'
+        @data.key? name[0..-2]
+      else
+        current = @data[name]
+        if current.kind_of? Hash
+          Event.new current
+        else
+          current
+        end
+      end
+    end
+
+    alias method_missing handle_property
+
+  end
 
   class Promise
     attr_accessor :root
@@ -167,8 +201,15 @@ module Engine
       @host = host
       for rule_name, rule in ruleset_definition do
         rule_name = rule_name.to_s
-        action = rule["run"]
-        rule.delete "run"
+        action = nil
+        if rule.key? "run"
+          action = rule["run"]
+          rule.delete "run"
+        elsif rule.key? :run
+          action = rule[:run]
+          rule.delete :rum
+        end
+
         if !action
           raise ArgumentError, "Action for #{rule_name} is null"
         elsif action.kind_of? String
@@ -313,31 +354,37 @@ module Engine
 
     def transform(parent_name, parent_triggers, parent_start_state, chart_definition, rules)
       state_filter = -> s { s.delete "label" if s.key? "label"}
-      
       start_state = {}
       
       for state_name, state in chart_definition do
-        qualified_name = state_name
+        qualified_name = state_name.to_s
         qualified_name = "#{parent_name}.#{state_name}" if parent_name
         start_state[qualified_name] = true
       end 
 
       for state_name, state in chart_definition do
-        qualified_name = state_name
+        qualified_name = state_name.to_s
         qualified_name = "#{parent_name}.#{state_name}" if parent_name
 
         triggers = {}
         if parent_triggers
           for parent_trigger_name, trigger in parent_triggers do
+            parent_trigger_name = parent_trigger_name.to_s
             trigger_name = parent_trigger_name[parent_trigger_name.rindex('.')..-1]
             triggers["#{qualified_name}.#{trigger_name}"] = trigger
           end
         end
 
         for trigger_name, trigger in state do
-          if (trigger_name != "$state") && (trigger.key? "to") && parent_name
-            to_name = trigger["to"]
-            trigger["to"] = "#{parent_name}.#{to_name}"
+          trigger_name = trigger_name.to_s
+          if parent_name &&  (trigger_name != "$state") 
+            if trigger.key? "to"
+              to_name = trigger["to"].to_s
+              trigger["to"] = "#{parent_name}.#{to_name}"
+            elsif trigger.key? :to
+              to_name = trigger[:to].to_s
+              trigger[:to] = "#{parent_name}.#{to_name}"
+            end
           end
 
           triggers["#{qualified_name}.#{trigger_name}"] = trigger
@@ -345,59 +392,95 @@ module Engine
 
         if state.key? "$chart" 
           transform qualified_name, triggers, start_state, state["$chart"], rules
+        elsif state.key? :$chart
+          transform qualified_name, triggers, start_state, state[:$chart], rules
         else
           for trigger_name, trigger in triggers do
+            trigger_name = trigger_name.to_s
             rule = {}
-            state_test = {"label" => qualified_name}
-            if trigger.key? "when"
-              if trigger["when"].key? "$s"
-                rule["when"] = {"$s" => {"$and" => [state_test, trigger["when"]["$s"]]}}
+            state_test = {:label => qualified_name}
+            if (trigger.key? :when) || (trigger.key? "when")
+              when_trigger = nil
+              if trigger.key? :when
+                when_trigger = trigger[:when]
               else
-                rule["whenAll"] = {"$s" => state_test, "$m" => trigger["when"]}
+                when_trigger = trigger["when"]
               end
-            elsif trigger.key? "whenAll"
+
+              if when_trigger.key? :$s 
+                rule[:when] = {:$s => {:$and => [state_test, when_trigger[:$s]]}}
+              elsif when_trigger.key? "$s"
+                rule[:when] = {:$s => {:$and => [state_test, when_trigger["$s"]]}}
+              else
+                rule[:whenAll] = {:$s => state_test, :$m => when_trigger}
+              end
+            elsif (trigger.key? :whenAll) || (trigger.key? "whenAll")
               test = {:$s => state_test}
-              for test_name, current_test in trigger["whenAll"] do
+              when_trigger = nil
+              if trigger.key? :whenAll
+                when_trigger = trigger[:whenAll]
+              else
+                when_trigger = trigger["whenAll"]
+              end
+
+              for test_name, current_test in when_trigger do
                 test_name = test_name.to_s
                 if test_name != "$s"
                   test[test_name] = current_test
                 else
-                  test["$s"] = {"$and" => [state_test, current_test]}
+                  test[:$s] = {:$and => [state_test, current_test]}
                 end 
               end
-              rule["whenAll"] = test
+              rule[:whenAll] = test
+            elsif trigger.key? :whenAny
+              rule[:whenAll] = {:$s => state_test, "m$any" => trigger[:whenAny]}
+            elsif trigger.key? :whenSome
+              rule[:whenAll] = {:$s => state_test, "m$some" => trigger[:whenSome]}
             elsif trigger.key? "whenAny"
-              rule["whenAll"] = {"$s" => state_test, "m$any" => trigger["whenAny"]}
+              rule[:whenAll] = {:$s => state_test, "m$any" => trigger["whenAny"]}
             elsif trigger.key? "whenSome"
-              rule["whenAll"] = {"$s" => state_test, "m$some" => trigger["whenSome"]}
+              rule[:whenAll] = {:$s => state_test, "m$some" => trigger["whenSome"]}
             else
-              rule["when"] = {"$s" => state_test}
+              rule[:when] = {:$s => state_test}
             end
 
-            if trigger.key? "run"
-              if trigger["run"].kind_of? String
-                rule["run"] = Promise.new host.get_action trigger["run"]
-              elsif trigger["run"].kind_of? Promise
-                rule["run"] = trigger["run"]
-                trigger["run"] = "function"
-              elsif trigger["run"].kind_of? Proc
-                rule["run"] = Promise.new trigger["run"]
-                trigger["run"] = "function"
+            if (trigger.key? "run") || (trigger.key? :run)
+              trigger_run = nil
+              if trigger.key? :run
+                trigger_run = trigger[:run]
               else
-                rule["run"] = Fork.new host.register_rulesets(@name, trigger["run"])
+                trigger_run = trigger["run"]
+              end
+
+              if trigger_run.kind_of? String
+                rule[:run] = Promise.new host.get_action trigger_run
+              elsif trigger_run.kind_of? Promise
+                rule[:run] = trigger_run
+              elsif trigger_run.kind_of? Proc
+                rule[:run] = Promise.new trigger_run
+              else
+                rule[:run] = Fork.new host.register_rulesets(@name, trigger_run)
               end     
             end
 
-            if trigger.key? "to"
-              if rule.key? "run"
-                rule["run"].continue_with To.new(trigger["to"])
+            if (trigger.key? "to") || (trigger.key? :to)
+              trigger_to = nil
+              if trigger.key? :to
+                trigger_to = trigger[:to]
               else
-                rule["run"] = To.new trigger["to"]
+                trigger_to = trigger["to"]
               end
 
-              start_state.delete trigger["to"] if start_state.key? trigger["to"]
-              if parent_start_state && (parent_start_state.key? trigger["to"])
-                parent_start_state.delete trigger["to"] 
+              trigger_to = trigger_to.to_s
+              if rule.key? :run
+                rule[:run].continue_with To.new(trigger_to)
+              else
+                rule[:run] = To.new trigger_to
+              end
+
+              start_state.delete trigger_to if start_state.key? trigger_to
+              if parent_start_state && (parent_start_state.key? trigger_to)
+                parent_start_state.delete trigger_to
               end
             else
               raise ArgumentError, "Trigger #{trigger_name} destination not defined"
@@ -411,11 +494,12 @@ module Engine
       started = false
       for state_name in start_state.keys do
         raise ArgumentError, "Chart #{@name} has more than one start state" if started
+        state_name = state_name.to_s
         started = true
         if parent_name
-          rules[parent_name + "$start"] = {"when"  => {"$s" => {"label" => parent_name}}, "run" => To.new(state_name)}
+          rules[parent_name + "$start"] = {:when => {:$s => {:label => parent_name}}, :run => To.new(state_name)}
         else
-          rules["$start"] = {"when" => {"$s" => {"$nex" => {"label" => 1}}}, "run" => To.new(state_name)}
+          rules[:$start] = {:when => {:$s => {:$nex => {:label => 1}}}, :run => To.new(state_name)}
         end
       end
 

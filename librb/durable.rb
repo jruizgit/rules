@@ -2,20 +2,33 @@ require_relative "engine"
 
 
 module Durable
+  @@rulesets = {}
+  @@start_blocks = []
+
   def self.run(ruleset_definitions = nil, databases = ["/tmp/redis.sock"], start = nil)
     main_host = Engine::Host.new ruleset_definitions, databases
     start.call main_host if start
     main_host.run
   end
 
-  def self.run_ruleset(name, databases = ["/tmp/redis.sock"], &block) 
-    ruleset = Ruleset.new name
-    ruleset.instance_eval &block
-    main_host = Engine::Host.new({ruleset.name => ruleset.rules}, databases)
-    if ruleset.start
-      main_host.instance_exec main_host, &ruleset.start
+  def self.run_all(databases = ["/tmp/redis.sock"])
+    main_host = Engine::Host.new @@rulesets, databases
+    for block in @@start_blocks
+      main_host.instance_exec(main_host, &block)
     end
     main_host.run
+  end
+
+  def self.ruleset(name, &block) 
+    ruleset = Ruleset.new name, block
+    @@rulesets[name] = ruleset.rules
+    @@start_blocks << ruleset.start if ruleset.start
+  end
+
+  def self.statechart(name, &block)
+    statechart = Statechart.new name, block
+    @@rulesets[name.to_s + "$state"] = statechart.states
+    @@start_blocks << statechart.start if statechart.start
   end
 
   class Expression
@@ -127,37 +140,48 @@ module Durable
   end
 
   class Ruleset
-    attr_reader :name, :rules, :start
+    attr_reader :name, :start
+    attr_accessor :rules
 
-    def initialize(name)
+    def initialize(name, block)
       @name = name
-      @expressions = []
       @rules = {}
       @rule_index = 0
       @expression_index = 0
       @start = nil
+      self.instance_eval &block
     end        
 
     def when_one(expression, &block)
-      @rules[rule_name] = {:when => @expressions[0].definition, :run => -> s {s.instance_exec(s, &block)}}
-      @expressions = []
-      self
+      if block
+        add_rule :when => expression.definition, :run => -> s {s.instance_exec(s, &block)}
+      else
+        add_rule :when => expression.definition
+      end
     end
 
     def when_some(expression, &block)
-      @rules[rule_name] = {:whenSome => @expressions[0].definition, :run => -> s {s.instance_exec(s, &block)}}
-      @expressions = []
-      self
+      if block
+        add_rule :whenSome => expression.definition, :run => -> s {s.instance_exec(s, &block)}
+      else
+        add_rule :whenSome => expression.definition
+      end
     end
 
-    def when_all(expression, &block)
-      @rules[rule_name] = {:whenAll => expressions_definition, :run => -> s {s.instance_exec(s, &block)}}
-      self
+    def when_all(expressions, &block)
+      if block
+        add_rule :whenAll => define(expressions), :run => -> s {s.instance_exec(s, &block)}
+      else
+        add_rule :whenAll => define(expressions)
+      end
     end
 
-    def when_any(expression, &block)
-      @rules[rule_name] = {:whenAny => expressions_definition, :run => -> s {s.instance_exec(s, &block)}}
-      self
+    def when_any(expressions, &block)
+      if block
+        add_rule :whenAny => define(expressions), :run => -> s {s.instance_exec(s, &block)}
+      else
+        add_rule :whenAny => define(expressions)
+      end 
     end
 
     def when_start(&block)
@@ -166,36 +190,29 @@ module Durable
     end
 
     def s
-      new_expression = Expression.new(:$s)
-      @expressions << new_expression
-      new_expression
+      Expression.new(:$s)
     end
     
     def m
-      new_expression = Expression.new(:$m)
-      @expressions << new_expression
-      new_expression
+      Expression.new(:$m)
     end
     
     private
 
-    def default(name, value = nil)
-      new_expression = Expression.new(:$s)
-      new_expression.left = name
-      @expressions << new_expression
-      new_expression
+    def add_rule(rule)
+      @rules[rule_name] = rule
+      rule
     end
 
-    def expressions_definition
+    def define(expressions)
       new_definition = {}
-      for expression in @expressions do
+      for expression in expressions do
         if expression.type == :$s
           new_definition[:$s] = expression.definition[:$s]
         else
           new_definition[expression_name] = expression.definition
         end
       end
-      @expressions = []
       new_definition
     end
 
@@ -211,6 +228,37 @@ module Durable
       "m_#{index}"
     end
 
-    alias method_missing default
+  end
+
+
+  class Statechart < Ruleset
+    attr_reader :states
+
+    def initialize(name, block)
+      @states = {}
+      @trigger_index = 0
+      super name, block
+    end
+
+    def to(state_name, rule, &block)
+      rule[:to] = state_name
+      rule[:run] = -> s {s.instance_exec(s, &block)} if block
+      self
+    end
+
+    def state(state_name, &block)
+      self.instance_eval &block if block
+      @states[state_name] = self.rules
+      self.rules = {}
+    end
+
+    private
+
+    def trigger_name
+      index = @trigger_index.to_s
+      @trigger_index += 1
+      "t_#{index}"
+    end
+
   end
 end

@@ -27,58 +27,58 @@ def request_approval
 end
 
 Durable.run({
-  "a1" => {
-    "r1" => {
-      "when" => {"$and" => [{"subject" => "approve"}, {"$gt" => {"amount" => 1000}}]},
-      "run" => denied
+  :a1 => {
+    :r1 => {
+      :when => {:$and => [{:subject => "approve"}, {:$gt => {:amount => 1000}}]},
+      :run => denied
     },
-    "r2" => {
-      "when" => {"$and" => [{"subject" => "approve" }, {"$lte" => {"amount" => 1000 }}]},
-      "run" => request_approval
+    :r2 => {
+      :when => {:$and => [{:subject => "approve" }, {:$lte => {:amount => 1000 }}]},
+      :run => request_approval
     },
-    "r3" => {
-      "whenAll" => {
-        "m$any" => {"a" => {"subject" => "approved"}, "b" => {"subject" => "ok"}},
-        "$s" => {"status" => "pending"}
+    :r3 => {
+      :whenAll => {
+        "m$any" => {:a => {:subject => "approved"}, :b => {:subject => "ok"}},
+        :$s => {:status => "pending"}
       },
-      "run" => request_approval
+      :run => request_approval
     },
-    "r4" => {"when" => {"$s" => {"status" => "approved"}}, "run" => approved},
-    "r5" => {"when" => {"subject" => "denied"}, "run" => denied}
+    :r4 => {:when => {:$s => {:status => "approved"}}, :run => approved},
+    :r5 => {:when => {:subject => "denied"}, :run => denied}
   },
   "a2$state" => {
-    "input" => {
-      "deny" => {
-        "when" => {"$and" => [{"subject" => "approve"}, {"$gt" => {"amount" => 1000}}]},
-        "run" => denied,
-        "to" => "denied"
+    :input => {
+      :deny => {
+        :when => {:$and => [{:subject => "approve"}, {:$gt => {:amount => 1000}}]},
+        :run => denied,
+        :to => :denied
       },
-      "request" => {
-        "when" => {"$and" => [{"subject" => "approve"}, {"$lte" => {"amount" => 1000}}]},
-        "run" => request_approval,
-        "to" => "pending"
+      :request => {
+        :when => {:$and => [{:subject => "approve"}, {:$lte => {:amount => 1000}}]},
+        :run => request_approval,
+        :to => :pending
       }
     },
-    "pending" => {
-      "request" => {
-        "whenAny" => {"a" => {"subject" => "approved"}, "b" => {"subject" => "ok"}},
-        "run" => request_approval,
-        "to" => "pending"
+    :pending => {
+      :request => {
+        :whenAny => {:a => {:subject => "approved"}, :b => {:subject => "ok"}},
+        :run => request_approval,
+        :to => :pending
       },
-      "approve" => {
-        "when" => {"$s" => {"status" => "approved"}},
-        "run" => approved,
-        "to" => "approved"
+      :approve => {
+        :when => {:$s => {:status => "approved"}},
+        :run => approved,
+        :to => :approved
       },
-      "deny" => {
-        "when" => {"subject" => "denied"},
-        "run" => denied,
-        "to" => "denied"
+      :deny => {
+        :when => {:subject => "denied"},
+        :run => denied,
+        :to => :denied
       }
     },
-    "denied" => {
+    :denied => {
     },
-    "approved" => {
+    :approved => {
     }
   }
 }, ["/tmp/redis.sock"], -> host {
