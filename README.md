@@ -52,6 +52,20 @@ durable.run({
 })
 ```
 
+####Ruby
+```ruby
+require_relative 'durable'
+
+Durable.ruleset :approve do
+  when_one (m.amount < 1000) | (m.amount > 10000) do
+    s.status = 'pending'
+  end
+  when_all [m.subject == 'approved', s.status == 'pending'] do
+    puts 'approved'
+  end
+end
+```
+
 Durable Rules relies on state of the art technologies:
 
 * [Node.js](http://www.nodejs.org) is used as the host. This allows leveraging the vast amount of available libraries.
