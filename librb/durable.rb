@@ -31,6 +31,12 @@ module Durable
     @@start_blocks << statechart.start if statechart.start
   end
 
+  def self.flowchart(name, &block)
+    flowchart = Flowchart.new name, block
+    @@rulesets[name.to_s + "$flow"] = flowchart.stages
+    @@start_blocks << flowchart.start if flowchart.start
+  end
+
   class Expression
     attr_reader :type, :op
     attr_accessor :left
@@ -249,7 +255,7 @@ module Durable
     def state(state_name, &block)
       self.instance_eval &block if block
       @states[state_name] = self.rules
-      self.rules = {}
+      @rules = {}
     end
 
     private
@@ -261,4 +267,39 @@ module Durable
     end
 
   end
+
+  class Flowchart < Ruleset
+    attr_reader :stages
+
+    def initialize(name, block)
+      @stages = {}
+      @current_stage = nil
+      super name, block
+    end
+
+    def to(stage_name, rule)
+      if rule.key? :when
+        stages[@current_stage][:to][stage_name] = rule[:when]
+      elsif rule.key? :whenAll
+        stages[@current_stage][:to][stage_name] = {:$all => rule[:whenAll]}
+      elsif rule.key? :whenSome
+        stages[@current_stage][:to][stage_name] = {:$some => rule[:whenSome]}
+      else
+        stages[@current_stage][:to][stage_name] = {:$any => rule[:whenAny]}
+      end
+    end
+
+    def stage(stage_name, &block)
+      if block
+        @stages[stage_name] = {:run => -> s {s.instance_exec(s, &block)}, :to => {}}
+      else
+        @stages[stage_name] = {:to => {}}
+      end
+
+      @current_stage = stage_name
+      self
+    end
+
+  end
+
 end

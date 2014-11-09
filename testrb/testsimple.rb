@@ -18,21 +18,21 @@ end
 Durable.statechart :approve2 do
   state :input do
     to :denied, when_one((m.subject == 'approve') & (m.amount > 1000)) do
-      puts "denied: #{s.id}"
+      puts "state denied: #{s.id}"
     end
     to :pending, when_one((m.subject == 'approve') & (m.amount <= 1000)) do
-      puts "request approval from: #{s.id}"
-      s.status = "pending"
+      puts "state request approval from: #{s.id}"
+      s.status? ? s.status = "approved": s.status = "pending"
     end
   end  
   state :pending do
     to :pending, when_any([m.subject == 'approved', m.subject == 'ok']) do
-      puts "received approval for: #{s.id}"
+      puts "state received approval for: #{s.id}"
       s.status = "approved"
     end
     to :approved, when_one(s.status == 'approved')
     to :denied, when_one(m.subject == 'denied') do
-      puts "denied: #{s.id}"
+      puts "state denied: #{s.id}"
     end
   end
   state :approved
@@ -46,4 +46,34 @@ Durable.statechart :approve2 do
   end
 end
 
+Durable.flowchart :approve3 do
+  stage :input
+  to :request, when_one((m.subject == 'approve') & (m.amount <= 1000))
+  to :deny, when_one((m.subject == 'approve') & (m.amount > 1000))
+  
+  stage :request do
+    puts "flow requesting approval for: #{s.id}"
+    s.status? ? s.status = "approved": s.status = "pending"
+  end
+  to :approve, when_one(s.status == 'approved')
+  to :deny, when_one(m.subject == 'denied')
+  to :request, when_any([m.subject == 'approved', m.subject == 'ok'])
+  
+  stage :approve do
+    puts "flow aprroved: #{s.id}"
+  end
+  stage :deny do
+    puts "flow denied: #{s.id}"
+  end
+
+  when_start do
+    post :approve3, {:id => 1, :sid => 1, :subject => "approve", :amount => 100}
+    post :approve3, {:id => 2, :sid => 1, :subject => "approved"}
+    post :approve3, {:id => 3, :sid => 2, :subject => "approve", :amount => 100}
+    post :approve3, {:id => 4, :sid => 2, :subject => "denied"}
+    post :approve3, {:id => 5, :sid => 3, :subject => "approve", :amount => 10000}
+  end
+end
+
 Durable.run_all
+
