@@ -54,7 +54,7 @@ durable.run({
 
 ####Ruby
 ```ruby
-require_relative 'durable'
+require 'durable'
 
 Durable.ruleset :approve do
   when_one (m.amount < 1000) | (m.amount > 10000) do
