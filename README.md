@@ -6,6 +6,19 @@ A forward chaining algorithm (A.K.A. Rete) is used to evaluate massive streams o
 
 The Durable Rules core engine is implemented in C, which enables ultra fast rule evaluation and inference as well as muti-language support. Below is an example on how easy it is to define a couple of rules that act on incoming web messages.
 
+####Ruby
+```ruby
+require 'durable'
+
+Durable.ruleset :approve do
+  when_one m.amount < 1000 do
+    s.status = 'pending'
+  end
+  when_all [m.subject == 'approved', s.status == 'pending'] do
+    puts 'approved'
+  end
+end
+```
 ####JavaScript
 ```javascript
 var d = require('durable');
