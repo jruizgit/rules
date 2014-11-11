@@ -115,10 +115,10 @@
 
         var url = window.location.pathname;
         var query = getQueryVariables(window.location.search);
-        var history = promiseHistory(url);
-        promiseGraph(url, history).createVisual(query.size ,function(err) { 
+        var theHistory = promiseHistory(url);
+        promiseGraph(url, theHistory).createVisual(query.size ,function(err) { 
             if (!query.disableScratchpad) {
-                var pad = scratchPad(url, history)
+                var pad = scratchPad(url, theHistory)
                 if (err) { 
                     pad.setStatus(err.error); 
                 } 
