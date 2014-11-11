@@ -38,7 +38,7 @@ For more information go to: http://nodejs.org/download
 Now that your cache and web server are ready, let's write our first program:  
 
 1. Start a terminal  
-2. Create a directory for your app: `md /firstapp`  
+2. Create a directory for your app: `mkdir firstapp` `cd firstapp`  
 3. In the new directory `npm install durable` (this will download durable.js and its dependencies)  
 4. In that same directory create a test.js file using your favorite editor  
 5. Type or copy and save the following code:
