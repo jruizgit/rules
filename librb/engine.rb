@@ -14,19 +14,15 @@ module Engine
       @timers = {}
       @messages = {}
       @branches = {}
-      if event.key? ":$m"
-        @event = event[":$m"]
-      else
-        @event = event
-      end
+      @event = (event.key? "$m") ? event["$m"]: event
     end
 
     def signal(message)
       name_index = @ruleset_name.rindex "."
       parent_ruleset_name = ruleset_name[0, name_index]
       name = ruleset_name[name_index + 1..-1]
-      message_id = message[:id]
-      message[:sid] = @id
+      message_id = (message.key? :id) ? message[:id]: message["id"] 
+      message[:sid] = @state["id"]
       message[:id] = "#{name}.#{message_id}"
       post parent_ruleset_name, message
     end
@@ -169,11 +165,11 @@ module Engine
   class Fork < Promise
 
     def initialize(branch_names, state_filter = nil)
-      super ->s {
+      super -> s {
         for branch_name in branch_names do
           state = s.state.dup
           state_filter.call state if state_filter
-          s.fork branch_name 
+          s.fork branch_name, state
         end 
       }
     end
@@ -353,7 +349,10 @@ module Engine
     end
 
     def transform(parent_name, parent_triggers, parent_start_state, chart_definition, rules)
-      state_filter = -> s { s.delete "label" if s.key? "label"}
+      state_filter = stage_filter = -> s { 
+        s.delete :label if (s.key? :label)
+        s.delete "label" if (s.key? "label")
+      }
       start_state = {}
       
       for state_name, state in chart_definition do
@@ -459,7 +458,7 @@ module Engine
               elsif trigger_run.kind_of? Proc
                 rule[:run] = Promise.new trigger_run
               else
-                rule[:run] = Fork.new @host.register_rulesets(@name, trigger_run)
+                rule[:run] = Fork.new @host.register_rulesets(@name, trigger_run), state_filter
               end     
             end
 
@@ -520,7 +519,11 @@ module Engine
     end
 
     def transform(chart_definition, rules)
-      stage_filter = -> s { s.delete("label") if s.key? "label"}
+      stage_filter = -> s { 
+        s.delete :label if (s.key? :label)
+        s.delete "label" if (s.key? "label")
+      }
+
       visited = {}
       for stage_name, stage in chart_definition do
         stage_name = stage_name.to_s
@@ -528,15 +531,17 @@ module Engine
         if (stage.key? :to) || (stage.key? "to")
           stage_to = (stage.key? :to) ? stage[:to]: stage["to"]
           if (stage_to.kind_of? String) || (stage_to.kind_of? Symbol)
-            stage_to = stage_to.to_s
             next_stage = nil
             rule = {:when => {:$s => stage_test}}
             if chart_definition.key? stage_to
               next_stage = chart_definition[stage_to]
+            elsif chart_definition.key? stage_to.to_s
+              next_stage = chart_definition[stage_to.to_s]
             else
               raise ArgumentError, "Stage #{stage_to.to_s} not found"
             end
 
+            stage_to = stage_to.to_s
             if !(next_stage.key? :run) && !(next_stage.key? "run")
               rule[:run] = To.new stage_to
             else
@@ -705,6 +710,8 @@ module Engine
         @ruleset_list << ruleset
         ruleset.bind @databases
       end
+
+      rulesets.keys
     end
 
     def run
@@ -716,7 +723,7 @@ module Engine
         callback = -> e {
           if index % 10 == 0
             index += 1
-            timers.after 1, &dispatch_ruleset
+            timers.after 0.1, &dispatch_ruleset
           else
             index += 1
             dispatch_ruleset.call 0
@@ -741,7 +748,7 @@ module Engine
         end
       }
 
-      timers.after 1, &dispatch_ruleset
+      timers.after 0.1, &dispatch_ruleset
       
       loop { timers.wait }
     end
