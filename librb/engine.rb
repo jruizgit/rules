@@ -302,7 +302,6 @@ module Engine
         s = Session.new state, event, result[2], @name
         @actions[action_name].run s, -> e {
           if e
-            puts "abandoning1 " << e.to_s
             Rules.abandon_action @handle, s.handle
             complete.call e
           else
@@ -327,7 +326,6 @@ module Engine
               Rules.complete_action @handle, s.handle, JSON.generate(s.state)
               complete.call nil
             rescue Exception => e
-              puts "abandoning2 " << e.to_s
               Rules.abandon_action @handle, s.handle
               complete.call e
             end

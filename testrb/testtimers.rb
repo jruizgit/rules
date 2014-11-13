@@ -62,7 +62,7 @@ end
 Durable.run({
   :t1 => {
     :r1 => {:when => {:start => "yes"}, :run => start_timer},
-    :r2 => {:when => {:$t => "my_timer"}, :run => end_timer}
+    "r:2" => {:when => {:$t => "my_timer"}, :run => end_timer}
   },
   "t2$state" => {
     :input => {

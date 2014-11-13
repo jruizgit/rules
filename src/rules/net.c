@@ -167,7 +167,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                     "  local res = { action[1] }\n"
                     "  local i = 0\n"
                     "  local skip = 0\n"
-                    "  for token in string.gmatch(signature, \"([%w%.%-%$%+_!]+)\") do\n"
+                    "  for token in string.gmatch(signature, \"([%w%.%-%$%+_!:]+)\") do\n"
                     "    if (i > 1 and string.match(token, \"%$s!\")) then\n"
                     "      table.insert(res, token)\n"
                     "      skip = 1\n"
