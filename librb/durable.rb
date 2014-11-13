@@ -14,7 +14,7 @@ module Durable
   def self.run_all(databases = ["/tmp/redis.sock"])
     main_host = Engine::Host.new @@rulesets, databases
     for block in @@start_blocks
-      main_host.instance_exec(main_host, &block)
+      main_host.instance_exec main_host, &block
     end
     main_host.run
   end
@@ -158,41 +158,41 @@ module Durable
       self.instance_eval &block
     end        
 
-    def when_one(expression, &block)
-      if block
-        add_rule :when => expression.definition, :run => -> s {s.instance_exec(s, &block)}
-      else
-        add_rule :when => expression.definition
-      end
+    def when_one(expression, paralel = nil, &block)
+      define_rule :when, expression.definition, paralel, &block
     end
 
-    def when_some(expression, &block)
-      if block
-        add_rule :whenSome => expression.definition, :run => -> s {s.instance_exec(s, &block)}
-      else
-        add_rule :whenSome => expression.definition
-      end
+    def when_some(expression, paralel = nil, &block)
+      define_rule :whenSome, expression.definition, paralel, &block
     end
 
-    def when_all(expressions, &block)
-      if block
-        add_rule :whenAll => define(expressions), :run => -> s {s.instance_exec(s, &block)}
-      else
-        add_rule :whenAll => define(expressions)
-      end
+    def when_all(expressions, paralel = nil, &block)
+      define_rule :whenAll, define_expression(expressions), paralel, &block
     end
 
-    def when_any(expressions, &block)
-      if block
-        add_rule :whenAny => define(expressions), :run => -> s {s.instance_exec(s, &block)}
-      else
-        add_rule :whenAny => define(expressions)
-      end 
+    def when_any(expressions, paralel = nil, &block)
+      define_rule :whenAny, define_expression(expressions), paralel, &block
     end
 
     def when_start(&block)
       @start = block
       self
+    end
+
+    def paralel
+      true
+    end
+
+    def ruleset(name, &block)
+      @paralel_rulesets[name] = Ruleset.new(name, block).rules
+    end
+
+    def statechart(name, &block)
+      @paralel_rulesets[name.to_s + "$state"] = Statechart.new(name, block).states
+    end
+
+    def flowchart(name, &block)
+      @paralel_rulesets[name.to_s + "$flow"] = Flowchart.new(name, block).stages
     end
 
     def s
@@ -205,12 +205,28 @@ module Durable
     
     private
 
-    def add_rule(rule)
+    def define_rule(operator, expression_definition, paralel, &block)
+      index = @rule_index.to_s
+      @rule_index += 1
+      rule_name = "r_#{index}"
+      rule = nil
+      if paralel
+        @paralel_rulesets = {}
+        self.instance_exec &block
+        rule = {operator => expression_definition, :run => @paralel_rulesets}
+      elsif block
+        rule = {operator => expression_definition, :run => -> s {s.instance_exec s, &block}}
+      else
+        rule = {operator => expression_definition}
+      end
       @rules[rule_name] = rule
       rule
     end
 
-    def define(expressions)
+    def define_expression(expressions)
+      index = @expression_index.to_s
+      @expression_index += 1
+      expression_name = "m_#{index}"
       new_definition = {}
       for expression in expressions do
         if expression.type == :$s
@@ -220,18 +236,6 @@ module Durable
         end
       end
       new_definition
-    end
-
-    def rule_name
-      index = @rule_index.to_s
-      @rule_index += 1
-      "r_#{index}"
-    end
-
-    def expression_name
-      index = @expression_index.to_s
-      @expression_index += 1
-      "m_#{index}"
     end
 
   end
@@ -246,9 +250,15 @@ module Durable
       super name, block
     end
 
-    def to(state_name, rule, &block)
+    def to(state_name, rule, paralel = nil, &block)
       rule[:to] = state_name
-      rule[:run] = -> s {s.instance_exec(s, &block)} if block
+      if paralel
+        @paralel_rulesets = {}
+        self.instance_exec &block
+        rule[:run] = @paralel_rulesets
+      elsif block   
+        rule[:run] = -> s {s.instance_exec(s, &block)}
+      end
       self
     end
 
@@ -256,14 +266,6 @@ module Durable
       self.instance_eval &block if block
       @states[state_name] = self.rules
       @rules = {}
-    end
-
-    private
-
-    def trigger_name
-      index = @trigger_index.to_s
-      @trigger_index += 1
-      "t_#{index}"
     end
 
   end
@@ -277,8 +279,10 @@ module Durable
       super name, block
     end
 
-    def to(stage_name, rule)
-      if rule.key? :when
+    def to(stage_name, rule = nil)
+      if !rule
+        stages[@current_stage][:to] = stage_name
+      elsif rule.key? :when
         stages[@current_stage][:to][stage_name] = rule[:when]
       elsif rule.key? :whenAll
         stages[@current_stage][:to][stage_name] = {:$all => rule[:whenAll]}
@@ -289,8 +293,12 @@ module Durable
       end
     end
 
-    def stage(stage_name, &block)
-      if block
+    def stage(stage_name, paralel = nil, &block)
+      if paralel
+        @paralel_rulesets = {}
+        self.instance_exec &block
+        @stages[stage_name] = {:run => @paralel_rulesets, :to => {}}
+      elsif block
         @stages[stage_name] = {:run => -> s {s.instance_exec(s, &block)}, :to => {}}
       else
         @stages[stage_name] = {:to => {}}
