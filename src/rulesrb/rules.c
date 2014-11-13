@@ -248,7 +248,7 @@ void Init_rules() {
     rb_define_singleton_method(rulesModule, "complete_action", rbCompleteAction, 3);
     rb_define_singleton_method(rulesModule, "abandon_action", rbAbandonAction, 2);
     rb_define_singleton_method(rulesModule, "start_timer", rbStartTimer, 4);
-    rb_define_singleton_method(rulesModule, "assert_timers", rbAssertTimers, 2);
+    rb_define_singleton_method(rulesModule, "assert_timers", rbAssertTimers, 1);
     rb_define_singleton_method(rulesModule, "get_state", rbGetState, 2);
 }
 
