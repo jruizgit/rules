@@ -203,7 +203,13 @@ module Durable
       Expression.new(:$m)
     end
     
-    private
+    def timeout(name)
+      expression = Expression.new(:$m)
+      expression.left = :$t
+      expression == name
+    end
+    
+    protected
 
     def define_rule(operator, expression_definition, paralel, &block)
       index = @rule_index.to_s
@@ -213,11 +219,11 @@ module Durable
       if paralel
         @paralel_rulesets = {}
         self.instance_exec &block
-        rule = {operator => expression_definition, :run => @paralel_rulesets}
+        rule = operator ? {operator => expression_definition, :run => @paralel_rulesets} : {:run => @paralel_rulesets}
       elsif block
-        rule = {operator => expression_definition, :run => -> s {s.instance_exec s, &block}}
+        rule = operator ? {operator => expression_definition, :run => -> s {s.instance_exec s, &block}} : {:run => -> s {s.instance_exec s, &block}}
       else
-        rule = {operator => expression_definition}
+        rule = operator ? {operator => expression_definition} : {}
       end
       @rules[rule_name] = rule
       rule
@@ -250,7 +256,8 @@ module Durable
       super name, block
     end
 
-    def to(state_name, rule, paralel = nil, &block)
+    def to(state_name, rule = nil, paralel = nil, &block)
+      rule = define_rule(nil, nil, paralel, &block) if !rule
       rule[:to] = state_name
       if paralel
         @paralel_rulesets = {}

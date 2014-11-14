@@ -191,5 +191,72 @@ Durable.flowchart :p3 do
   end
 end
 
+Durable.ruleset :t1 do
+  when_one m.start == "yes" do
+    s.start = Time.now
+    start_timer(:my_timer, 5)
+  end
+  when_one timeout :my_timer do
+    puts "End"
+    puts "Started #{s.start}"
+    puts "Ended #{Time.now}"
+  end
+  when_start do
+    post :t1, {:id => 1, :sid => 1, :start => "yes"}
+  end
+end
+
+Durable.statechart :t2 do
+  state :input do
+    to :pending, when_one(m.subject == "approve"), paralel do
+      statechart :first do
+        state :send do
+          to :evaluate do
+            s.start = Time.now
+            start_timer :first, 4
+          end
+        end
+        state :evaluate do
+          to :end, when_one(timeout :first) do
+            s.signal :id => 2, :subject => "approved", :start => s.start
+          end
+        end
+        state :end
+      end
+      statechart :second do
+        state :send do
+          to :evaluate do
+            s.start = Time.now
+            start_timer :second, 3
+          end
+        end
+        state :evaluate do
+          to :end, when_one(timeout :second) do
+            s.signal :id => 3, :subject => "denied", :start => s.start
+          end
+        end
+        state :end
+      end
+    end
+  end
+  state :pending do
+    to :approved, when_one(m.subject == "approved") do
+      puts "Approved t2"
+      puts "Started #{m.start}"
+      puts "Ended #{Time.now}"
+    end
+    to :denied, when_one(m.subject == "denied") do
+      puts "Denied t2"
+      puts "Started #{m.start}"
+      puts "Ended #{Time.now}"
+    end
+  end
+  state :approved
+  state :denied
+  when_start do
+    post :t2, {:id => 1, :sid => 1, :subject => "approve"}
+  end
+end
+
 Durable.run_all
 
