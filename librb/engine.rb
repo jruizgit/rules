@@ -334,6 +334,10 @@ module Engine
       end
     end
 
+    def to_json
+      JSON.generate @definition
+    end
+
   end
 
   class Statechart < Ruleset
@@ -714,7 +718,7 @@ module Engine
       rulesets.keys
     end
 
-    def run
+    def start!
       index = 1
       timers = Timers::Group.new
   
@@ -749,8 +753,9 @@ module Engine
       }
 
       timers.after 0.1, &dispatch_ruleset
-      
-      loop { timers.wait }
+      Thread.new do
+        loop { timers.wait }
+      end
     end
 
   end

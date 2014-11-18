@@ -1,5 +1,5 @@
 require_relative "engine"
-
+require_relative "interface"
 
 module Durable
   @@rulesets = {}
@@ -8,7 +8,9 @@ module Durable
   def self.run(ruleset_definitions = nil, databases = ["/tmp/redis.sock"], start = nil)
     main_host = Engine::Host.new ruleset_definitions, databases
     start.call main_host if start
-    main_host.run
+    main_host.start!
+    Interface::Application.set_host main_host
+    Interface::Application.run!
   end
 
   def self.run_all(databases = ["/tmp/redis.sock"])
@@ -16,7 +18,9 @@ module Durable
     for block in @@start_blocks
       main_host.instance_exec main_host, &block
     end
-    main_host.run
+    main_host.start!
+    Interface::Application.set_host main_host
+    Interface::Application.run!
   end
 
   def self.ruleset(name, &block) 
