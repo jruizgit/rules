@@ -7,9 +7,8 @@ import threading
 class Session(object):
 
     def __init__(self, state, event, handle, ruleset_name):
-        self.state = state
         self.ruleset_name = ruleset_name
-        self.id = state['id']
+        self.state = state
         self._handle = handle
         self._timer_directory = {}
         self._message_directory = {}
@@ -56,6 +55,18 @@ class Session(object):
             raise Exception('Branch with name {0} already forked'.format(branch_name))
         else:
             self._branch_directory[branch_name] = branch_state
+
+    def __getattr__(self, name):   
+        if name in self.state:
+            return self.state[name]
+        else:
+            return None
+
+    def __setattr__(self, name, value):
+        if name in ['state', 'ruleset_name', 'event', '_handle', '_timer_directory', '_message_directory', '_branch_directory']:
+            self.__dict__[name] = value
+        else:
+            self.state[name] = value
 
 
 class Promise(object):

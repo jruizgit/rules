@@ -13,11 +13,11 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup (
     name = 'durable',
-    version = '0.1.1',
+    version = '0.1.4',
     description = 'Durable Rules Engine',
     long_description=long_description,
     url='https://github.com/jruizgit/rules',
-    author='The Python Packaging Authority',
+    author='Jesus Ruiz',
     author_email='jr3791@live.com',
     license='MIT',
     classifiers=[
@@ -28,7 +28,7 @@ setup (
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
     ],
-    keywords='rules_engine rete forward_chaining event_stream state_machine workflow consistency',
+    keywords='rules_engine rete forward_chaining event_stream state_machine workflow consistency streaming_analytics',
     install_requires=['werkzeug'],
     packages = ['durable'],
     package_dir = {'': 'libpy'},

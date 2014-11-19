@@ -470,6 +470,10 @@ static unsigned int validateRuleset(char *rules) {
                 return result;
             }
 
+            if (type != JSON_OBJECT) {
+                return ERR_UNEXPECTED_TYPE;
+            }
+            
             switch (hash) {
                 case HASH_WHEN:
                 case HASH_WHEN_SOME:
