@@ -84,7 +84,10 @@ static unsigned int constructObject(char *parentName,
     int parentNameLength = (parentName ? strlen(parentName): 0);
     unsigned int result = readNextName(object, &firstName, &lastName, &hash);
     while (result == PARSE_OK) {
-        readNextValue(lastName, &first, &last, &type);
+        result = readNextValue(lastName, &first, &last, &type);
+        if (result != PARSE_OK) {
+            return result;
+        }
         
         if (!parentName) {
             if (type == JSON_OBJECT) {
