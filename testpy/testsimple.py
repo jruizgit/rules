@@ -35,7 +35,7 @@ def done(s):
 
 def get_input(s):
     print('input {0} from: {1}, {2}'.format(s.event['quantity'], s.ruleset_name, s.id))
-    s.state['quantity'] = s.event['quantity']
+    s.quantity = s.event['quantity']
 
 def signal_approved(s):
     print('signaling approved from: {0}, {1}'.format(s.ruleset_name, s.id))
@@ -68,18 +68,18 @@ def start_second_timer(s):
     s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
     s.start_timer('second', 3)
 
-def signal_approved(s):
+def signal_timer_approved(s):
     s.signal({'id': 2, 'subject': 'approved', 'start': s.start})
 
-def signal_denied(s):
+def signal_timer_denied(s):
     s.signal({'id': 3, 'subject': 'denied', 'start': s.start})
 
-def report_approved(s):
+def report_timer_approved(s):
     print('Approved {0}, {1}'.format(s.ruleset_name, s.id))
     print('Started @%s' % s.event['start'])
     print('Ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
 
-def report_denied(s):
+def report_timer_denied(s):
     print('Denied {0}, {1}'.format(s.ruleset_name, s.id))
     print('Started @%s' % s.event['start'])
     print('Ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
@@ -233,19 +233,19 @@ with statechart('t2'):
                 with state('send'):
                     to('evaluate', start_first_timer)
                 with state('evaluate'):
-                    to('end').when(timeout('first'), signal_approved)
+                    to('end').when(timeout('first'), signal_timer_approved)
                 state('end')
 
             with statechart('second'):
                 with state('send'):
                     to('evaluate', start_second_timer)
                 with state('evaluate'):
-                    to('end').when(timeout('second'), signal_denied)
+                    to('end').when(timeout('second'), signal_timer_denied)
                 state('end')
 
     with state('pending'):
-        to('approved').when(m.subject == 'approved', report_approved)
-        to('denied').when(m.subject == 'denied', report_denied)
+        to('approved').when(m.subject == 'approved', report_timer_approved)
+        to('denied').when(m.subject == 'denied', report_timer_denied)
 
     state('approved')
     state('denied')
