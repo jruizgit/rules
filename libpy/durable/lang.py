@@ -39,6 +39,14 @@ class value(object):
         self.right = other
         return self
 
+    def __neg__(self):
+        self.op = '$nex'
+        return self
+
+    def __pos__(self):
+        self.op = '$ex'
+        return self
+
     def __and__(self, other):
         return value(self.type, self, '$and', other)
     
@@ -54,6 +62,8 @@ class value(object):
             definitions = [ self.left.define() ]
             definitions.append(self.right.define())
             new_definition = {self.op: definitions}
+        elif self.op == '$nex' or self.op == '$ex':
+            new_definition = {self.op: {self.left: 1}}
         elif self.op == '$eq':
             new_definition = {self.left: self.right}
         else:
@@ -64,15 +74,46 @@ class value(object):
         else:
             return new_definition
 
+class run(object):
+
+    def __init__(self, func):
+        if len(_rule_stack) > 0:
+            _rule_stack[-1].func = [func]
+        else:
+            raise Exception('Invalid rule context')
+
 
 class rule(object):
 
-    def __init__(self, operator, expression, func, multi = False):
-        self.expression = expression
+    def __init__(self, operator, register, multi, *args):
         self.operator = operator
-        self.func = func
         self.multi = multi
+        
+        if register:
+            if not len(_ruleset_stack) or not isinstance(_ruleset_stack[-1], ruleset):
+                raise Exception('Invalid ruleset context')
 
+            _ruleset_stack[-1].rules.append(self)
+        
+        if not len(args):
+            raise Exception('Invalid number of arguments')
+
+        if isinstance(args[-1], value):
+            self.func = []
+        else:
+            self.func = args[-1:]
+            args = args[:-1]
+
+        if not multi:
+            self.expression = args[0]
+        else:
+            self.expression = args
+
+    def __enter__(self):
+        _rule_stack.append(self)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        _rule_stack.pop()
 
     def define(self):
         defined_expression = None
@@ -88,48 +129,74 @@ class rule(object):
                     expression_name = 'm_{0}'.format(index)
 
                 defined_expression[expression_name] = current_expression.define()
-                    
-        if self.func:
-            return {self.operator: defined_expression, 'run': self.func}
+              
+        if len(self.func):
+            if len(self.func) == 1 and not hasattr(self.func[0], 'define'):
+                return {self.operator: defined_expression, 'run': self.func[0]}
+            else:
+                ruleset_definitions = {}
+                for rset in self.func:
+                    ruleset_name, ruleset_definition = rset.define()
+                    ruleset_definitions[ruleset_name] = ruleset_definition
+
+                return {self.operator: defined_expression, 'run': ruleset_definitions}   
         else:
             return {self.operator: defined_expression}
 
 
-class when_one(rule):
+class when(rule):
 
-    def __init__(self, value, func = None):
-        super(when_one, self).__init__('when', value, func)
+    def __init__(self, *args):
+        super(when, self).__init__('when', True, False, *args)
 
 
 class when_some(rule):
 
-    def __init__(self, value, func = None):
-        super(when_some, self).__init__('whenSome', value, func)
+    def __init__(self, *args):
+        super(when_some, self).__init__('whenSome', True, False, *args)
 
 
 class when_all(rule):
 
-    def __init__(self, value, func = None):
-        super(when_all, self).__init__('whenAll', value, func, True)
+    def __init__(self, *args):
+        super(when_all, self).__init__('whenAll', True, True, *args)
 
 
 class when_any(rule):
 
-    def __init__(self, value, func = None):
-        super(when_any, self).__init__('whenAny', value, func, True)
+    def __init__(self, *args):
+        super(when_any, self).__init__('whenAny', True, True, *args)
 
 
 class when_start(object):
 
     def __init__(self, func):
+        if isinstance(_ruleset_stack[-1], ruleset):
+            _ruleset_stack[-1].rules.append(self)
+        elif isinstance(_ruleset_stack[-1], statechart):
+            _ruleset_stack[-1].states.append(self)
+        elif isinstance(_ruleset_stack[-1], flowchart):
+            _ruleset_stack[-1].stages.append(self)
+
         self.func = func
 
 class ruleset(object):
     
-    def __init__(self, name, *rules):
+    def __init__(self, name):
         self.name = name
-        self.rules = rules
-        _ruleset_definitions[name] = self.define()
+        self.rules = []
+        if not len(_ruleset_stack):
+            _rulesets.append(self)
+        elif len(_rule_stack) > 0:
+            _rule_stack[-1].func.append(self)
+        else:
+            raise Exception('Invalid rule context')
+
+    def __enter__(self):
+        _ruleset_stack.append(self)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        _ruleset_stack.pop()
 
     def define(self):
         index = 0
@@ -141,45 +208,72 @@ class ruleset(object):
                 new_definition['r_{0}'.format(index)] = rule.define()
                 index += 1   
         
-        return new_definition
+        return self.name, new_definition
         
 
 class to(object):
 
     def __init__(self, state_name):
+        if not len(_state_stack):
+            raise Exception('Invalid state context')
+
+        if isinstance(_state_stack[-1], state):
+            _state_stack[-1].triggers.append(self)
+        elif isinstance(_state_stack[-1], stage):
+            _state_stack[-1].switches.append(self)
+        else:
+            raise Exception('Invalid state context')
+
         self.state_name = state_name
+        self.rule = None
 
-    def when_one(self, value, func = None):
-        self.rule = when_one(value, func)
-        return self
+    def when(self, *args):
+        self.rule = rule('when', False, False, *args)
+        return self.rule
 
-    def wehn_all(self, value, func = None):
-        self.rule = when_all(value, func)
-        return self
+    def when_some(self, *args):
+        self.rule = rule('whenSome', False, False, *args)
+        return self.rule
 
-    def when_any(self, value, func = None):
-        self.rule = when_any(value, func)
-        return self 
+    def wehn_all(self, *args):
+        self.rule = rule('whenAll', False, True, *args)
+        return self.rule
 
-    def when_some(self, value, func = None):
-        self.rule = when_some(value, func)
-        return self
+    def when_any(self, *args):
+        self.rule = rule('whenAny', False, True, *args)
+        return self.rule 
 
     def define(self):
-        return self.state_name, self.rule.define()
+        if self.rule:
+            return self.state_name, self.rule.define()
+        else:
+            return self.state_name, None
 
 
 class state(object):
     
-    def __init__(self, state_name, *triggers):
+    def __init__(self, state_name):
+        if not len(_ruleset_stack) or not isinstance(_ruleset_stack[-1], statechart):
+            raise Exception('Invalid statechart context')
+
+        _ruleset_stack[-1].states.append(self)
         self.state_name = state_name
-        self.triggers = triggers
+        self.triggers = []
+
+    def __enter__(self):
+        _state_stack.append(self)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        _state_stack.pop()
 
     def define(self):
         index = 0
         new_definition = {}
         for trigger in self.triggers:
             trigger_to, trigger_rule = trigger.define()
+            if not trigger_rule:
+                trigger_rule = {}
+
             trigger_rule['to'] = trigger_to
             new_definition['t_{0}'.format(index)] = trigger_rule
             index += 1
@@ -189,11 +283,22 @@ class state(object):
 
 class statechart(object):
     
-    def __init__(self, name, *states):
+    def __init__(self, name):
         self.name = name
-        self.states = states
-        ruleset_name, ruleset_definition = self.define()
-        _ruleset_definitions[ruleset_name] = ruleset_definition
+        self.states = []
+        self.root = True
+        if not len(_ruleset_stack):
+            _rulesets.append(self)
+        elif len(_rule_stack) > 0:
+            _rule_stack[-1].func.append(self)
+        else:
+            raise Exception('Invalid rule context')
+
+    def __enter__(self):
+        _ruleset_stack.append(self)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        _ruleset_stack.pop()
 
     def define(self):
         new_definition = {}
@@ -209,21 +314,48 @@ class statechart(object):
 
 class stage(object):
 
-    def __init__(self, stage_name, func, *switches):
+    def __init__(self, stage_name, func = None):
+        if not len(_ruleset_stack) or not isinstance(_ruleset_stack[-1], flowchart):
+            raise Exception('Invalid flowchart context')
+
+        _ruleset_stack[-1].stages.append(self)
         self.stage_name = stage_name
-        self.func = func
-        self.switches = switches
+        if func:
+            self.func = [func]
+        else:
+            self.func = []
+        
+        self.switches = []
+
+    def __enter__(self):
+        _state_stack.append(self)
+        _rule_stack.append(self)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        _state_stack.pop()
+        _rule_stack.pop()
 
     def define(self):
         new_definition = {}
-        if self.func:
-            new_definition['run'] = self.func
+        if len(self.func):
+            if len(self.func) == 1 and not hasattr(self.func[0], 'define'):
+                new_definition['run'] = self.func[0]
+            else:
+                ruleset_definitions = {}
+                for rset in self.func:
+                    ruleset_name, ruleset_definition = rset.define()
+                    ruleset_definitions[ruleset_name] = ruleset_definition
+
+                new_definition['run'] = ruleset_definitions
 
         if (len(self.switches)):
             to = {}
             for switch in self.switches:
                 stage_name, switch_definition = switch.define()
-                if 'when' in switch_definition:
+                if not switch_definition:
+                    to = stage_name
+                    break
+                elif 'when' in switch_definition:
                     switch_definition = switch_definition['when']
                 elif 'whenSome' in switch_definition:
                     switch_definition = {'$some': switch_definition['whenSome']}
@@ -241,11 +373,21 @@ class stage(object):
 
 class flowchart(object):
     
-    def __init__(self, name, *stages):
+    def __init__(self, name):
         self.name = name
-        self.stages = stages
-        ruleset_name, ruleset_definition = self.define()
-        _ruleset_definitions[ruleset_name] = ruleset_definition
+        self.stages = []
+        if not len(_ruleset_stack):
+            _rulesets.append(self)
+        elif len(_rule_stack) > 0:
+            _rule_stack[-1].func.append(self)
+        else:
+            raise Exception('Invalid rule context')
+
+    def __enter__(self):
+        _ruleset_stack.append(self)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        _ruleset_stack.pop()
 
     def define(self):
         new_definition = {}
@@ -260,11 +402,19 @@ class flowchart(object):
 
 m = value('$m')
 s = value('$s')
-_ruleset_definitions = {}
+_rule_stack = []
+_state_stack = []
+_ruleset_stack = []
+_rulesets = []
 _start_functions = []
 
 def run_all(databases = ['/tmp/redis.sock']):
-    main_host = engine.Host(_ruleset_definitions, databases)
+    ruleset_definitions = {}
+    for rset in _rulesets:
+        ruleset_name, ruleset_definition = rset.define()
+        ruleset_definitions[ruleset_name] = ruleset_definition
+
+    main_host = engine.Host(ruleset_definitions, databases)
     for start in _start_functions:
         start(main_host)
 
