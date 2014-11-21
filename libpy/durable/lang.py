@@ -213,7 +213,7 @@ class ruleset(object):
 
 class to(object):
 
-    def __init__(self, state_name):
+    def __init__(self, state_name, func = None):
         if not len(_state_stack):
             raise Exception('Invalid state context')
 
@@ -226,6 +226,7 @@ class to(object):
 
         self.state_name = state_name
         self.rule = None
+        self.func = func
 
     def when(self, *args):
         self.rule = rule('when', False, False, *args)
@@ -247,7 +248,10 @@ class to(object):
         if self.rule:
             return self.state_name, self.rule.define()
         else:
-            return self.state_name, None
+            if self.func:
+                return self.state_name, {'run': self.func}
+            else:
+                return self.state_name, None
 
 
 class state(object):
@@ -399,6 +403,9 @@ class flowchart(object):
                 new_definition[stage_name] = stage_definition
 
         return '{0}$flow'.format(self.name), new_definition
+
+def timeout(name):
+    return (value('$m', '$t') == name) 
 
 m = value('$m')
 s = value('$s')

@@ -1,4 +1,5 @@
 from durable.lang import *
+import datetime
 
 def denied(s):
     print ('denied from: {0}, {1}'.format(s.ruleset_name, s.id))
@@ -50,6 +51,39 @@ def report_approved(s):
 def report_denied(s):
     print('denied from: {0}, {1}'.format(s.ruleset_name, s.id))   
 
+def start_timer(s):
+    s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
+    s.start_timer('my_timer', 5)
+
+def end_timer(s):
+    print('End')
+    print('Started @%s' % s.start)
+    print('Ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
+
+def start_first_timer(s):
+    s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
+    s.start_timer('first', 4)   
+
+def start_second_timer(s):
+    s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
+    s.start_timer('second', 3)
+
+def signal_approved(s):
+    s.signal({'id': 2, 'subject': 'approved', 'start': s.start})
+
+def signal_denied(s):
+    s.signal({'id': 3, 'subject': 'denied', 'start': s.start})
+
+def report_approved(s):
+    print('Approved {0}, {1}'.format(s.ruleset_name, s.id))
+    print('Started @%s' % s.event['start'])
+    print('Ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
+
+def report_denied(s):
+    print('Denied {0}, {1}'.format(s.ruleset_name, s.id))
+    print('Started @%s' % s.event['start'])
+    print('Ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
+
 def start_a1(host):
     host.post('a1', {'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100})
     host.post('a1', {'id': 2, 'sid': 1, 'subject': 'approved'})
@@ -81,6 +115,12 @@ def start_p2(host):
 def start_p3(host):
     host.post('p3', {'id': 1, 'sid': 1, 'subject': 'approve', 'quantity': 3})
     host.post('p3', {'id': 2, 'sid': 2, 'subject': 'approve', 'quantity': 10})
+
+def start_t1(host):
+    host.post('t1', {'id': 1, 'sid': 1, 'start': 'yes'})
+
+def start_t2(host):
+    host.post('t2', {'id': 1, 'sid': 1, 'subject': 'approve'})
 
 with ruleset('a1'):
     when((m.subject == 'approve') & (m.amount > 1000), denied)
@@ -180,5 +220,35 @@ with flowchart('p3'):
     stage('approve', report_approved)
     stage('deny', report_denied)
     when_start(start_p3)
+
+with ruleset('t1'): 
+    when(m.start == 'yes', start_timer)
+    when(timeout('my_timer'), end_timer)
+    when_start(start_t1)
+
+with statechart('t2'):
+    with state('input'):
+        with to('pending').when(m.subject == 'approve'):
+            with statechart('first'):
+                with state('send'):
+                    to('evaluate', start_first_timer)
+                with state('evaluate'):
+                    to('end').when(timeout('first'), signal_approved)
+                state('end')
+
+            with statechart('second'):
+                with state('send'):
+                    to('evaluate', start_second_timer)
+                with state('evaluate'):
+                    to('end').when(timeout('second'), signal_denied)
+                state('end')
+
+    with state('pending'):
+        to('approved').when(m.subject == 'approved', report_approved)
+        to('denied').when(m.subject == 'denied', report_denied)
+
+    state('approved')
+    state('denied')
+    when_start(start_t2)
 
 run_all()
