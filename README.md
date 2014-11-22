@@ -28,7 +28,7 @@ with ruleset('approve'):
         def pending(s):
         s.state['status'] = 'pending'
 
-    @whenAll(m.subject == 'approved', s.status == 'pending')
+    @when_all(m.subject == 'approved', s.status == 'pending')
         def approved(s):
         print('approved')
 ```
