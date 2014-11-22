@@ -19,6 +19,19 @@ Durable.ruleset :approve do
   end
 end
 ```
+####Python
+```python
+from durable.lang import *
+
+with ruleset('approve'):
+    @when(m.amount > 1000)
+        def pending(s):
+        s.state['status'] = 'pending'
+
+    @whenAll(m.subject == 'approved', s.status == 'pending')
+        def approved(s):
+        print('approved')
+```
 ####JavaScript
 ```javascript
 var d = require('durable');
@@ -38,32 +51,7 @@ d.run({
     }
 });
 ```
-####Python
-```python
-import durable
 
-def pending(s):
-    s.state['status'] = 'pending'
-
-def approved(s):
-    print('approved')
-    
-durable.run({
-    'approve': {
-        'r1': {
-            'when': {'$lt': {'amount': 1000}},
-            'run': pending
-        },
-        'r2': {
-            'whenAll': {
-                '$m': {'subject': 'approved'},
-                '$s': {'status': 'pending'}
-            },
-            'run': approved
-        }
-    }
-})
-```
 
 Durable Rules relies on state of the art technologies:
 
