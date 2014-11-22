@@ -468,7 +468,6 @@ def run_all(databases = ['/tmp/redis.sock']):
     ruleset_definitions = {}
     for rset in _rulesets:
         ruleset_name, ruleset_definition = rset.define()
-        print ('{0} -> {1}'.format(ruleset_name, ruleset_definition))
         ruleset_definitions[ruleset_name] = ruleset_definition
 
     main_host = engine.Host(ruleset_definitions, databases)
