@@ -74,6 +74,7 @@ class value(object):
         else:
             return new_definition
 
+
 class run(object):
 
     def __init__(self, func):
@@ -82,17 +83,16 @@ class run(object):
         else:
             raise Exception('Invalid rule context')
 
+        self.func = func
+
 
 class rule(object):
 
-    def __init__(self, operator, register, multi, *args):
+    def __init__(self, operator, multi, *args):
         self.operator = operator
         self.multi = multi
         
-        if register:
-            if not len(_ruleset_stack) or not isinstance(_ruleset_stack[-1], ruleset):
-                raise Exception('Invalid ruleset context')
-
+        if len(_ruleset_stack) and isinstance(_ruleset_stack[-1], ruleset):
             _ruleset_stack[-1].rules.append(self)
         
         if not len(args):
@@ -114,6 +114,12 @@ class rule(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         _rule_stack.pop()
+
+    def __call__(self, *args):
+        if (len(args) == 1 and hasattr(args[0], '__call__')):
+            self.func = [args[0]]
+
+        return self
 
     def define(self):
         defined_expression = None
@@ -147,25 +153,25 @@ class rule(object):
 class when(rule):
 
     def __init__(self, *args):
-        super(when, self).__init__('when', True, False, *args)
+        super(when, self).__init__('when', False, *args)
 
 
 class when_some(rule):
 
     def __init__(self, *args):
-        super(when_some, self).__init__('whenSome', True, False, *args)
+        super(when_some, self).__init__('whenSome', False, *args)
 
 
 class when_all(rule):
 
     def __init__(self, *args):
-        super(when_all, self).__init__('whenAll', True, True, *args)
+        super(when_all, self).__init__('whenAll', True, *args)
 
 
 class when_any(rule):
 
     def __init__(self, *args):
-        super(when_any, self).__init__('whenAny', True, True, *args)
+        super(when_any, self).__init__('whenAny', True, *args)
 
 
 class when_start(object):
@@ -179,6 +185,10 @@ class when_start(object):
             _ruleset_stack[-1].stages.append(self)
 
         self.func = func
+
+    def __call__(self, *args):
+        return self.func(*args)
+    
 
 class ruleset(object):
     
@@ -229,20 +239,29 @@ class to(object):
         self.func = func
 
     def when(self, *args):
-        self.rule = rule('when', False, False, *args)
+        self.rule = rule('when', False, *args)
         return self.rule
 
     def when_some(self, *args):
-        self.rule = rule('whenSome', False, False, *args)
+        self.rule = rule('whenSome', False, *args)
         return self.rule
 
     def wehn_all(self, *args):
-        self.rule = rule('whenAll', False, True, *args)
+        self.rule = rule('whenAll', True, *args)
         return self.rule
 
     def when_any(self, *args):
-        self.rule = rule('whenAny', False, True, *args)
+        self.rule = rule('whenAny', True, *args)
         return self.rule 
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            if isinstance(args[0], rule):
+                self.rule = args[0]
+            elif hasattr(args[0], '__call__'):
+                self.func = args[0]
+
+        return self
 
     def define(self):
         if self.rule:
