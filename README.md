@@ -55,7 +55,7 @@ d.run({
 
 Durable Rules relies on state of the art technologies:
 
-* [Node.js](http://www.nodejs.org) is used as the host. This allows leveraging the vast amount of available libraries.
+* [Node.js](http://www.nodejs.org), [Werkzeug](http://werkzeug.pocoo.org/), [Sinatra](http://www.sinatrarb.com/) are used to host rulesets written in JavaScript, Python and Ruby respectively.
 * Inference state is cached using [Redis](http://www.redis.io), which lets scaling out without giving up performance.
 * A web client based on [D3.js](http://www.d3js.org) provides powerful data visualization and test tools.
 
