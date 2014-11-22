@@ -24,7 +24,7 @@ end
 from durable.lang import *
 
 with ruleset('approve'):
-    @when(m.amount > 1000)
+    @when(m.amount < 1000)
         def pending(s):
             s.state['status'] = 'pending'
 
