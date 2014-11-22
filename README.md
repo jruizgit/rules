@@ -26,11 +26,11 @@ from durable.lang import *
 with ruleset('approve'):
     @when(m.amount > 1000)
         def pending(s):
-        s.state['status'] = 'pending'
+            s.state['status'] = 'pending'
 
     @when_all(m.subject == 'approved', s.status == 'pending')
         def approved(s):
-        print('approved')
+            print('approved')
 ```
 ####JavaScript
 ```javascript
