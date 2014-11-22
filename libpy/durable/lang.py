@@ -98,7 +98,7 @@ class rule(object):
         if not len(args):
             raise Exception('Invalid number of arguments')
 
-        if isinstance(args[-1], value):
+        if isinstance(args[-1], value) or isinstance(args[-1], rule):
             self.func = []
         else:
             self.func = args[-1:]
@@ -129,12 +129,18 @@ class rule(object):
             index = 0
             defined_expression = {}
             for current_expression in self.expression:
-                if current_expression.type == '$s':
-                    expression_name = '$s'
+                if isinstance(current_expression, all):
+                    defined_expression['m_{0}$all'.format(index)] = current_expression.define()['whenAll']
+                elif isinstance(current_expression, any):
+                    defined_expression['m_{0}$any'.format(index)] = current_expression.define()['whenAny']
+                elif isinstance(current_expression, some):
+                    defined_expression['m_{0}$some'.format(index)] = current_expression.define()['whenSome']
+                elif current_expression.type == '$s':
+                    defined_expression['$s'] = current_expression.define()['$s']
                 else:    
-                    expression_name = 'm_{0}'.format(index)
-
-                defined_expression[expression_name] = current_expression.define()
+                    defined_expression['m_{0}'.format(index)] = current_expression.define()
+                
+                index += 1
               
         if len(self.func):
             if len(self.func) == 1 and not hasattr(self.func[0], 'define'):
@@ -172,6 +178,30 @@ class when_any(rule):
 
     def __init__(self, *args):
         super(when_any, self).__init__('whenAny', True, *args)
+
+
+class all(rule):
+
+    def __init__(self, *args):
+        _ruleset_stack.append(self)
+        super(all, self).__init__('whenAll', True, *args)
+        _ruleset_stack.pop()
+
+
+class any(rule):
+
+    def __init__(self, *args):
+        _ruleset_stack.append(self)
+        super(any, self).__init__('whenAny', True, *args)
+        _ruleset_stack.pop()
+
+
+class some(rule):
+
+    def __init__(self, *args):
+        _ruleset_stack.append(self)
+        super(some, self).__init__('whenSome', True, *args)
+        _ruleset_stack.pop()
 
 
 class when_start(object):
@@ -438,6 +468,7 @@ def run_all(databases = ['/tmp/redis.sock']):
     ruleset_definitions = {}
     for rset in _rulesets:
         ruleset_name, ruleset_definition = rset.define()
+        print ('{0} -> {1}'.format(ruleset_name, ruleset_definition))
         ruleset_definitions[ruleset_name] = ruleset_definition
 
     main_host = engine.Host(ruleset_definitions, databases)

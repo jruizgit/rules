@@ -1,6 +1,35 @@
 from durable.lang import *
 import datetime
 
+
+with ruleset('a4'):
+    @when_any(all(m.subject == 'approve', m.amount == 1000), 
+              all(m.subject == 'jumbo', m.amount == 10000))
+    def action(s):
+        print ('a4 action {0}'.format(s.event))
+    
+    @when_start
+    def start(host):
+        host.post('a4', {'id': 1, 'sid': 1, 'subject': 'approve'})
+        host.post('a4', {'id': 2, 'sid': 1, 'amount': 1000})
+        host.post('a4', {'id': 3, 'sid': 2, 'subject': 'jumbo'})
+        host.post('a4', {'id': 4, 'sid': 2, 'amount': 10000})
+
+
+with ruleset('a5'):
+    @when_all(any(m.subject == 'approve', m.subject == 'jumbo'), 
+              any(m.amount == 100, m.amount == 10000))
+    def action(s):
+        print ('a5 action {0}'.format(s.event))
+    
+    @when_start
+    def start(host):
+        host.post('a5', {'id': 1, 'sid': 1, 'subject': 'approve'})
+        host.post('a5', {'id': 2, 'sid': 1, 'amount': 100})
+        host.post('a5', {'id': 3, 'sid': 2, 'subject': 'jumbo'})
+        host.post('a5', {'id': 4, 'sid': 2, 'amount': 10000})
+
+
 with ruleset('a1'):
     @when((m.subject == 'approve') & (m.amount > 1000))
     def denied(s):
