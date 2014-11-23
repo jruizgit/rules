@@ -1,35 +1,6 @@
 from durable.lang import *
 import datetime
 
-
-with ruleset('a4'):
-    @when_any(all(m.subject == 'approve', m.amount == 1000), 
-              all(m.subject == 'jumbo', m.amount == 10000))
-    def action(s):
-        print ('a4 action {0}'.format(s.event))
-    
-    @when_start
-    def start(host):
-        host.post('a4', {'id': 1, 'sid': 1, 'subject': 'approve'})
-        host.post('a4', {'id': 2, 'sid': 1, 'amount': 1000})
-        host.post('a4', {'id': 3, 'sid': 2, 'subject': 'jumbo'})
-        host.post('a4', {'id': 4, 'sid': 2, 'amount': 10000})
-
-
-with ruleset('a5'):
-    @when_all(any(m.subject == 'approve', m.subject == 'jumbo'), 
-              any(m.amount == 100, m.amount == 10000))
-    def action(s):
-        print ('a5 action {0}'.format(s.event))
-    
-    @when_start
-    def start(host):
-        host.post('a5', {'id': 1, 'sid': 1, 'subject': 'approve'})
-        host.post('a5', {'id': 2, 'sid': 1, 'amount': 100})
-        host.post('a5', {'id': 3, 'sid': 2, 'subject': 'jumbo'})
-        host.post('a5', {'id': 4, 'sid': 2, 'amount': 10000})
-
-
 with ruleset('a1'):
     @when((m.subject == 'approve') & (m.amount > 1000))
     def denied(s):
@@ -104,6 +75,40 @@ with statechart('a2'):
         host.post('a2', {'id': 4, 'sid': 2, 'subject': 'denied'})
         host.post('a2', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000})
 
+with statechart('a6'):
+    with state('work'):
+        with state('enter'):
+            @to('process')
+            @when(m.subject == 'enter')
+            def continue_process(s):
+                print('a6 continue_process')
+    
+        with state('process'):
+            @to('process')
+            @when(m.subject == 'continue')
+            def continue_process(s):
+                print('a6 processing')
+
+        @to('work')
+        @when(m.subject == 'reset')
+        def reset(s):
+            print('a6 resetting')
+
+        @to('canceled')
+        @when(m.subject == 'cancel')
+        def cancel(s):
+            print('a6 canceling')
+
+    state('canceled')
+    @when_start
+    def start(host):
+        host.post('a6', {'id': 1, 'sid': 1, 'subject': 'enter'})
+        host.post('a6', {'id': 2, 'sid': 1, 'subject': 'continue'})
+        host.post('a6', {'id': 3, 'sid': 1, 'subject': 'continue'})
+        #host.post('a6', {'id': 4, 'sid': 1, 'subject': 'reset'})
+        #host.post('a6', {'id': 5, 'sid': 1, 'subject': 'enter'})
+        #host.post('a6', {'id': 6, 'sid': 1, 'subject': 'cancel'})
+        
 
 with flowchart('a3'):
     with stage('input'): 
@@ -140,6 +145,35 @@ with flowchart('a3'):
         host.post('a3', {'id': 3, 'sid': 2, 'subject': 'approve', 'amount': 100})
         host.post('a3', {'id': 4, 'sid': 2, 'subject': 'denied'})
         host.post('a3', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000})
+
+
+with ruleset('a4'):
+    @when_any(all(m.subject == 'approve', m.amount == 1000), 
+              all(m.subject == 'jumbo', m.amount == 10000))
+    def action(s):
+        print ('a4 action {0}'.format(s.id))
+    
+    @when_start
+    def start(host):
+        host.post('a4', {'id': 1, 'sid': 1, 'subject': 'approve'})
+        host.post('a4', {'id': 2, 'sid': 1, 'amount': 1000})
+        host.post('a4', {'id': 3, 'sid': 2, 'subject': 'jumbo'})
+        host.post('a4', {'id': 4, 'sid': 2, 'amount': 10000})
+
+
+with ruleset('a5'):
+    @when_all(any(m.subject == 'approve', m.subject == 'jumbo'), 
+              any(m.amount == 100, m.amount == 10000))
+    def action(s):
+        print ('a5 action {0}'.format(s.id))
+    
+    @when_start
+    def start(host):
+        host.post('a5', {'id': 1, 'sid': 1, 'subject': 'approve'})
+        host.post('a5', {'id': 2, 'sid': 1, 'amount': 100})
+        host.post('a5', {'id': 3, 'sid': 2, 'subject': 'jumbo'})
+        host.post('a5', {'id': 4, 'sid': 2, 'amount': 10000})
+
 
 
 with ruleset('p1'):

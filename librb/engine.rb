@@ -380,17 +380,16 @@ module Engine
 
         for trigger_name, trigger in state do
           trigger_name = trigger_name.to_s
-          if parent_name &&  (trigger_name != "$state") 
-            if trigger.key? "to"
+          if trigger_name != "$chart" 
+            if parent_name && (trigger.key? "to")
               to_name = trigger["to"].to_s
               trigger["to"] = "#{parent_name}.#{to_name}"
-            elsif trigger.key? :to
+            elsif parent_name && (trigger.key? :to)
               to_name = trigger[:to].to_s
               trigger[:to] = "#{parent_name}.#{to_name}"
             end
+            triggers["#{qualified_name}.#{trigger_name}"] = trigger
           end
-
-          triggers["#{qualified_name}.#{trigger_name}"] = trigger
         end
 
         if state.key? "$chart" 

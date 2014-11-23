@@ -301,11 +301,11 @@ class Statechart(Ruleset):
                     triggers['{0}.{1}'.format(qualified_name, trigger_name)] = trigger 
 
             for trigger_name, trigger in state.iteritems():
-                if trigger_name != '$state':
+                if trigger_name != '$chart':
                     if ('to' in trigger) and parent_name:
                         trigger['to'] = '{0}.{1}'.format(parent_name, trigger['to'])
 
-                triggers['{0}.{1}'.format(qualified_name, trigger_name)] = trigger
+                    triggers['{0}.{1}'.format(qualified_name, trigger_name)] = trigger
 
             if '$chart' in state:
                 self._transform(qualified_name, triggers, start_state, state['$chart'], rules)
@@ -335,14 +335,13 @@ class Statechart(Ruleset):
                         rule['when'] = {'$s': state_test}
 
                     if 'run' in trigger:
+                        print('looking at {0}, {1}'.format(trigger_name, trigger))    
                         if isinstance(trigger['run'], basestring):
                             rule['run'] = Promise(self._host.get_action(trigger['run']))
                         elif isinstance(trigger['run'], Promise):
                             rule['run'] = trigger['run']
-                            trigger['run'] = 'function'
                         elif hasattr(trigger['run'], '__call__'):
                             rule['run'] = Promise(trigger['run'])
-                            trigger['run'] = 'function'
                         else:
                             rule['run'] = Fork(self._host.register_rulesets(self._name, trigger['run']), state_filter)
 

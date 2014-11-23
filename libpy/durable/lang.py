@@ -254,13 +254,13 @@ class ruleset(object):
 class to(object):
 
     def __init__(self, state_name, func = None):
-        if not len(_state_stack):
+        if not len(_ruleset_stack):
             raise Exception('Invalid state context')
 
-        if isinstance(_state_stack[-1], state):
-            _state_stack[-1].triggers.append(self)
-        elif isinstance(_state_stack[-1], stage):
-            _state_stack[-1].switches.append(self)
+        if isinstance(_ruleset_stack[-1], state):
+            _ruleset_stack[-1].triggers.append(self)
+        elif isinstance(_ruleset_stack[-1], stage):
+            _ruleset_stack[-1].switches.append(self)
         else:
             raise Exception('Invalid state context')
 
@@ -306,18 +306,25 @@ class to(object):
 class state(object):
     
     def __init__(self, state_name):
-        if not len(_ruleset_stack) or not isinstance(_ruleset_stack[-1], statechart):
+        if not len(_ruleset_stack):
             raise Exception('Invalid statechart context')
 
-        _ruleset_stack[-1].states.append(self)
+        if isinstance(_ruleset_stack[-1], state):
+            _ruleset_stack[-1].states.append(self)    
+        elif isinstance(_ruleset_stack[-1], statechart):
+            _ruleset_stack[-1].states.append(self)
+        else:
+            raise Exception('Invalid statechart context')
+
         self.state_name = state_name
         self.triggers = []
+        self.states = []
 
     def __enter__(self):
-        _state_stack.append(self)
+        _ruleset_stack.append(self)
 
     def __exit__(self, exc_type, exc_value, traceback):
-        _state_stack.pop()
+        _ruleset_stack.pop()
 
     def define(self):
         index = 0
@@ -331,6 +338,14 @@ class state(object):
             new_definition['t_{0}'.format(index)] = trigger_rule
             index += 1
         
+        if len(self.states):
+            chart = {}
+            for state in self.states:
+                state_name, state_definition = state.define()
+                chart[state_name] = state_definition
+
+            new_definition['$chart'] = chart
+
         return self.state_name, new_definition
 
 
@@ -381,11 +396,11 @@ class stage(object):
         self.switches = []
 
     def __enter__(self):
-        _state_stack.append(self)
+        _ruleset_stack.append(self)
         _rule_stack.append(self)
 
     def __exit__(self, exc_type, exc_value, traceback):
-        _state_stack.pop()
+        _ruleset_stack.pop()
         _rule_stack.pop()
 
     def define(self):
@@ -459,7 +474,6 @@ def timeout(name):
 m = value('$m')
 s = value('$s')
 _rule_stack = []
-_state_stack = []
 _ruleset_stack = []
 _rulesets = []
 _start_functions = []
@@ -468,6 +482,7 @@ def run_all(databases = ['/tmp/redis.sock']):
     ruleset_definitions = {}
     for rset in _rulesets:
         ruleset_name, ruleset_definition = rset.define()
+        print('{0} => {1}'.format(ruleset_name, ruleset_definition))
         ruleset_definitions[ruleset_name] = ruleset_definition
 
     main_host = engine.Host(ruleset_definitions, databases)

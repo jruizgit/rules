@@ -467,7 +467,7 @@ exports = module.exports = durable = function () {
                 }
 
                 for (triggerName in state) {
-                    if (triggerName !== '$state') {
+                    if (triggerName !== '$chart') {
                         trigger = state[triggerName];
                         if (trigger.to && parentName) {
                             trigger.to = parentName + '.' + trigger.to;
@@ -906,7 +906,7 @@ exports = module.exports = durable = function () {
                 response.contentType = 'application/json; charset=utf-8';
                 host.getState(request.params.rulesetName, request.params.sid, function (err, result) {
                         if (err) {
-                            response.send({ error: err }, 500);
+                            response.send({ error: err }, 404);
                         }
                         else {
                             response.send(result);
@@ -943,7 +943,7 @@ exports = module.exports = durable = function () {
                 response.contentType = 'application/json; charset=utf-8';
                 host.getRuleset(request.params.rulesetName, function (err, result) {
                     if (err) {
-                        response.send({ error: err }, 500);
+                        response.send({ error: err }, 404);
                     }
                     else {
                         response.send(result);
