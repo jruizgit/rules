@@ -19,6 +19,19 @@ Durable.ruleset :approve do
   end
 end
 ```
+####Python
+```python
+from durable.lang import *
+
+with ruleset('approve'):
+    @when(m.amount < 1000)
+        def pending(s):
+            s.status = 'pending'
+
+    @when_all(m.subject == 'approved', s.status == 'pending')
+        def approved(s):
+            print('approved')
+```
 ####JavaScript
 ```javascript
 var d = require('durable');
@@ -38,36 +51,11 @@ d.run({
     }
 });
 ```
-####Python
-```python
-import durable
 
-def pending(s):
-    s.state['status'] = 'pending'
-
-def approved(s):
-    print('approved')
-    
-durable.run({
-    'approve': {
-        'r1': {
-            'when': {'$lt': {'amount': 1000}},
-            'run': pending
-        },
-        'r2': {
-            'whenAll': {
-                '$m': {'subject': 'approved'},
-                '$s': {'status': 'pending'}
-            },
-            'run': approved
-        }
-    }
-})
-```
 
 Durable Rules relies on state of the art technologies:
 
-* [Node.js](http://www.nodejs.org) is used as the host. This allows leveraging the vast amount of available libraries.
+* [Node.js](http://www.nodejs.org), [Werkzeug](http://werkzeug.pocoo.org/), [Sinatra](http://www.sinatrarb.com/) are used to host rulesets written in JavaScript, Python and Ruby respectively.
 * Inference state is cached using [Redis](http://www.redis.io), which lets scaling out without giving up performance.
 * A web client based on [D3.js](http://www.d3js.org) provides powerful data visualization and test tools.
 
