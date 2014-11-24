@@ -14,7 +14,7 @@ Durable.ruleset :approve do
   when_one m.amount < 1000 do
     s.status = 'pending'
   end
-  when_all [m.subject == 'approved', s.status == 'pending'] do
+  when_all m.subject == 'approved', s.status == 'pending' do
     puts 'approved'
   end
 end
