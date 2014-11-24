@@ -149,6 +149,35 @@ module Durable
 
   end
 
+  class Expressions
+    attr_reader :type
+
+    def initialize(type, expressions)
+      @type = type
+      @expressions = expressions
+    end
+
+    def definition
+      index = 0
+      new_definition = {}
+      for expression in @expressions do
+        expression_name = "m_#{index}"
+        if expression.type == :$s
+          new_definition[:$s] = expression.definition[:$s]
+        elsif expression.type == :$all
+          new_definition[expression_name + "$all"] = expression.definition
+        elsif expression.type == :$any
+          new_definition[expression_name + "$any"] = expression.definition
+        else
+          new_definition[expression_name] = expression.definition
+        end
+        index += 1
+      end
+      new_definition
+    end
+
+  end
+
   class Ruleset
     attr_reader :name, :start
     attr_accessor :rules
@@ -170,12 +199,28 @@ module Durable
       define_rule :whenSome, expression.definition, paralel, &block
     end
 
-    def when_all(expressions, paralel = nil, &block)
-      define_rule :whenAll, define_expression(expressions), paralel, &block
+    def when_all(*args, &block)
+      if (args[-1].kind_of? Expression) || (args[-1].kind_of? Expressions) 
+        define_rule :whenAll, Expressions.new(:$all, args).definition, nil, &block
+      else
+        define_rule :whenAll, Expressions.new(:$all, args[0..-1]).definition, args[-1], &block
+      end
     end
 
-    def when_any(expressions, paralel = nil, &block)
-      define_rule :whenAny, define_expression(expressions), paralel, &block
+    def when_any(*args, &block)
+      if (args[-1].kind_of? Expression) || (args[-1].kind_of? Expressions)
+        define_rule :whenAny, Expressions.new(:$any, args).definition, nil, &block
+      else
+        define_rule :whenAny, Expressions.new(:$any, args[0..-1]).definition, args[-1], &block
+      end
+    end
+
+    def all(*args)
+      Expressions.new :$all, args
+    end
+
+    def any(*args)
+      Expressions.new :$any, args
     end
 
     def when_start(&block)
@@ -232,22 +277,6 @@ module Durable
       @rules[rule_name] = rule
       rule
     end
-
-    def define_expression(expressions)
-      index = @expression_index.to_s
-      @expression_index += 1
-      expression_name = "m_#{index}"
-      new_definition = {}
-      for expression in expressions do
-        if expression.type == :$s
-          new_definition[:$s] = expression.definition[:$s]
-        else
-          new_definition[expression_name] = expression.definition
-        end
-      end
-      new_definition
-    end
-
   end
 
 
