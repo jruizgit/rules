@@ -1,32 +1,5 @@
 require_relative '../librb/durable'
 
-
-Durable.ruleset :a4 do
-  when_any all(m.subject == "approve", m.amount == 1000),
-           all(m.subject == "jumbo", m.amount == 10000) do
-    puts "a4 action #{s.id}"
-  end
-  when_start do
-    post :a4, {:id => 1, :sid => 1, :subject => "approve"}
-    post :a4, {:id => 2, :sid => 1, :amount => 1000}
-    post :a4, {:id => 3, :sid => 2, :subject => "jumbo"}
-    post :a4, {:id => 4, :sid => 2, :amount => 10000}
-  end
-end
-   
-Durable.ruleset :a5 do
-  when_all any(m.subject == "approve", m.subject == "jumbo"),
-           any(m.amount == 100, m.amount == 10000) do
-    puts "a5 action #{s.id}"
-  end
-  when_start do
-    post :a5, {:id => 1, :sid => 1, :subject => "approve"}
-    post :a5, {:id => 2, :sid => 1, :amount => 100}
-    post :a5, {:id => 3, :sid => 2, :subject => "jumbo"}
-    post :a5, {:id => 4, :sid => 2, :amount => 10000}
-  end
-end 
-
 Durable.ruleset :a1 do
   when_one (m.amount < 1000) | (m.amount > 10000) do
     puts "a1 approving " + m.amount.to_s
@@ -99,6 +72,62 @@ Durable.flowchart :a3 do
     post :a3, {:id => 3, :sid => 2, :subject => "approve", :amount => 100}
     post :a3, {:id => 4, :sid => 2, :subject => "denied"}
     post :a3, {:id => 5, :sid => 3, :subject => "approve", :amount => 10000}
+  end
+end
+
+Durable.ruleset :a4 do
+  when_any all(m.subject == "approve", m.amount == 1000),
+           all(m.subject == "jumbo", m.amount == 10000) do
+    puts "a4 action #{s.id}"
+  end
+  when_start do
+    post :a4, {:id => 1, :sid => 1, :subject => "approve"}
+    post :a4, {:id => 2, :sid => 1, :amount => 1000}
+    post :a4, {:id => 3, :sid => 2, :subject => "jumbo"}
+    post :a4, {:id => 4, :sid => 2, :amount => 10000}
+  end
+end
+   
+Durable.ruleset :a5 do
+  when_all any(m.subject == "approve", m.subject == "jumbo"),
+           any(m.amount == 100, m.amount == 10000) do
+    puts "a5 action #{s.id}"
+  end
+  when_start do
+    post :a5, {:id => 1, :sid => 1, :subject => "approve"}
+    post :a5, {:id => 2, :sid => 1, :amount => 100}
+    post :a5, {:id => 3, :sid => 2, :subject => "jumbo"}
+    post :a5, {:id => 4, :sid => 2, :amount => 10000}
+  end
+end
+
+Durable.statechart :a6 do
+  state :start do
+    to :work
+  end
+  state :work do   
+    state :enter do
+      to :process, when_one(m.subject == "enter") do
+        puts "a6 continue process"
+      end
+    end
+    state :process do
+      to :process, when_one(m.subject == "continue") do
+        puts "a6 processing"
+      end
+    end
+    to :work, when_one(m.subject == "reset") do
+      puts "a6 resetting"
+    end
+    to :canceled, when_one(m.subject == "cancel") do
+      puts "a6 canceling"
+    end
+  end
+  state :canceled
+  when_start do
+    post :a6, {:id => 1, :sid => 1, :subject => "enter"}
+    post :a6, {:id => 2, :sid => 1, :subject => "continue"}
+    post :a6, {:id => 3, :sid => 1, :subject => "continue"}
   end
 end
 

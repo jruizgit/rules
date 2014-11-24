@@ -188,7 +188,7 @@ module Durable
       @rule_index = 0
       @expression_index = 0
       @start = nil
-      self.instance_eval &block
+      self.instance_exec &block
     end        
 
     def when_one(expression, paralel = nil, &block)
@@ -277,18 +277,16 @@ module Durable
       @rules[rule_name] = rule
       rule
     end
+
   end
 
 
-  class Statechart < Ruleset
-    attr_reader :states
+  class State < Ruleset
 
     def initialize(name, block)
-      @states = {}
-      @trigger_index = 0
       super name, block
     end
-
+  
     def to(state_name, rule = nil, paralel = nil, &block)
       rule = define_rule(nil, nil, paralel, &block) if !rule
       rule[:to] = state_name
@@ -303,9 +301,35 @@ module Durable
     end
 
     def state(state_name, &block)
-      self.instance_eval &block if block
-      @states[state_name] = self.rules
-      @rules = {}
+      @rules[:$chart] = {} if (!@rules.key? :$chart)
+      if block
+        @rules[:$chart][state_name] = State.new(state_name, block).rules
+      else
+        @rules[:$chart][state_name] = {}
+      end
+    end
+
+  end
+
+  class Statechart
+    attr_reader :states, :start
+
+    def initialize(name, block)
+      @states = {}
+      self.instance_exec &block
+    end
+
+    def state(state_name, &block)
+      if block
+        states[state_name] = State.new(state_name, block).rules 
+      else
+        states[state_name] = {}
+      end
+    end
+
+    def when_start(&block)
+      @start = block
+      self
     end
 
   end
