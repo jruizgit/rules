@@ -89,6 +89,28 @@ unsigned int readNextValue(char *start, char **first, char **last, unsigned char
     return ERR_PARSE_OBJECT;
 }
 
+unsigned int readNextString(char *start, char **first, char **last, unsigned int *hash) {
+    unsigned char state = ST_OBJECT_PROP_PARSE;
+    ++start;
+    while(start[0] != '\0') {
+        switch(state) {
+            case ST_OBJECT_PROP_PARSE:
+                if (start[0] == ':') {
+                    state = ST_OBJECT_PROP_VAL;
+                } else if (!IS_WHITESPACE(start[0])) {
+                    return ERR_PARSE_OBJECT;
+                }
+                break;
+            case ST_OBJECT_PROP_VAL:
+                return getStringAndHash(start, first, last, hash);
+        }
+                
+        ++start;
+    }
+
+    return ERR_PARSE_OBJECT;
+}
+
 unsigned int readNextArrayValue(char *start, char **first, char **last, unsigned char *type) {
     unsigned char state = ST_OBJECT_PROP_PARSE;
     if (start[0] == '[') {

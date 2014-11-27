@@ -335,7 +335,6 @@ class Statechart(Ruleset):
                         rule['when'] = {'$s': state_test}
 
                     if 'run' in trigger:
-                        print('looking at {0}, {1}'.format(trigger_name, trigger))    
                         if isinstance(trigger['run'], basestring):
                             rule['run'] = Promise(self._host.get_action(trigger['run']))
                         elif isinstance(trigger['run'], Promise):

@@ -75,40 +75,6 @@ with statechart('a2'):
         host.post('a2', {'id': 4, 'sid': 2, 'subject': 'denied'})
         host.post('a2', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000})
 
-with statechart('a6'):
-    with state('work'):
-        with state('enter'):
-            @to('process')
-            @when(m.subject == 'enter')
-            def continue_process(s):
-                print('a6 continue_process')
-    
-        with state('process'):
-            @to('process')
-            @when(m.subject == 'continue')
-            def continue_process(s):
-                print('a6 processing')
-
-        @to('work')
-        @when(m.subject == 'reset')
-        def reset(s):
-            print('a6 resetting')
-
-        @to('canceled')
-        @when(m.subject == 'cancel')
-        def cancel(s):
-            print('a6 canceling')
-
-    state('canceled')
-    @when_start
-    def start(host):
-        host.post('a6', {'id': 1, 'sid': 1, 'subject': 'enter'})
-        host.post('a6', {'id': 2, 'sid': 1, 'subject': 'continue'})
-        host.post('a6', {'id': 3, 'sid': 1, 'subject': 'continue'})
-        #host.post('a6', {'id': 4, 'sid': 1, 'subject': 'reset'})
-        #host.post('a6', {'id': 5, 'sid': 1, 'subject': 'enter'})
-        #host.post('a6', {'id': 6, 'sid': 1, 'subject': 'cancel'})
-        
 
 with flowchart('a3'):
     with stage('input'): 
@@ -175,7 +141,41 @@ with ruleset('a5'):
         host.post('a5', {'id': 4, 'sid': 2, 'amount': 10000})
 
 
+with statechart('a6'):
+    with state('work'):
+        with state('enter'):
+            @to('process')
+            @when(m.subject == 'enter')
+            def continue_process(s):
+                print('a6 continue_process')
+    
+        with state('process'):
+            @to('process')
+            @when(m.subject == 'continue')
+            def continue_process(s):
+                print('a6 processing')
 
+        @to('work')
+        @when(m.subject == 'reset')
+        def reset(s):
+            print('a6 resetting')
+
+        @to('canceled')
+        @when(m.subject == 'cancel')
+        def cancel(s):
+            print('a6 canceling')
+
+    state('canceled')
+    @when_start
+    def start(host):
+        host.post('a6', {'id': 1, 'sid': 1, 'subject': 'enter'})
+        host.post('a6', {'id': 2, 'sid': 1, 'subject': 'continue'})
+        host.post('a6', {'id': 3, 'sid': 1, 'subject': 'continue'})
+        #host.post('a6', {'id': 4, 'sid': 1, 'subject': 'reset'})
+        #host.post('a6', {'id': 5, 'sid': 1, 'subject': 'enter'})
+        #host.post('a6', {'id': 6, 'sid': 1, 'subject': 'cancel'})
+
+        
 with ruleset('p1'):
     with when(m.start == 'yes'): 
         with ruleset('one'):

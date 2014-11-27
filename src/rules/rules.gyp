@@ -12,7 +12,8 @@
             'json.c',
             'rete.c',
             'net.c',
-            'events.c'
+            'events.c',
+            'state.c'
         ],
         'conditions': [
             ['OS=="mac"', {

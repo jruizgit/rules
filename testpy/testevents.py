@@ -22,8 +22,7 @@ handle = rules.create_ruleset('books1',  json.dumps({
                     {'status': 'available'} 
                 ]
             }
-        },
-        'run': 'ship'
+        }
     }
 }))
 
@@ -71,8 +70,7 @@ handle = rules.create_ruleset('books2',  json.dumps({
                 {'currency': 'US'},
                 {'$lte': {'amount': 1000}},
             ]
-        },
-        'run': 'ship'
+        }
     },
     'order': {
         'when': {
@@ -82,8 +80,7 @@ handle = rules.create_ruleset('books2',  json.dumps({
                 {'currency': 'US'},
                 {'$lte': {'amount': 1000}},
             ]
-        },
-        'run': 'order'
+        }
     }
 }))
 
@@ -115,8 +112,7 @@ print('books3 ******')
 
 handle = rules.create_ruleset('books3',  json.dumps({
     'ship': {
-        'when': {'$nex': {'label': 1}},
-        'run': 'ship'
+        'when': {'$nex': {'label': 1}}
    }
 }))
 
@@ -146,8 +142,7 @@ handle = rules.create_ruleset('books4', json.dumps({
                 {'$lte': {'amount': 1000}},
                 {'subject': 'approve'}
             ]
-        },
-        'run': 'ship'
+        }
     }
 }))
 
@@ -182,8 +177,7 @@ handle = rules.create_ruleset('approval1',  json.dumps({
                 'e': {'$lt': {'total': 1000}},
                 'f': {'$lt': {'amount': 1000}}
             }
-        },
-        'run': 'unitTest'
+        }
     }
 }))
 
@@ -222,8 +216,7 @@ handle = rules.create_ruleset('approval2',  json.dumps({
                 'e': {'$lt': {'total': 1000}},
                 'f': {'$lt': {'amount': 1000}}
             }
-        },
-        'run': 'unitTest'
+        }
     }
 }))
 

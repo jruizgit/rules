@@ -21,8 +21,7 @@ handle = Rules.create_ruleset 'books1', JSON.generate({
             {:status => 'available'} 
         ]
       }
-    },
-    :run => 'ship'
+    }
   }
 })
 
@@ -70,8 +69,7 @@ handle = Rules.create_ruleset 'books2',  JSON.generate({
           {:currency => 'US'},
           {:$lte => {:amount => 1000}},
       ]
-    },
-    :run => 'ship'
+    }
   },
   :order => {
     :when => {
@@ -81,8 +79,7 @@ handle = Rules.create_ruleset 'books2',  JSON.generate({
           {:currency => 'US'},
           {:$lte => {:amount => 1000}},
       ]
-    },
-    :run => 'order'
+    }
   }
 })
 
@@ -114,8 +111,7 @@ puts 'books3 ******'
 
 handle = Rules.create_ruleset 'books3', JSON.generate({
   :ship => {
-    :when => {:$nex => {:label => 1}},
-    :run => 'ship'
+    :when => {:$nex => {:label => 1}}
  }
 })
 
@@ -145,8 +141,7 @@ handle = Rules.create_ruleset 'books4', JSON.generate({
           {:$lte => {:amount => 1000}},
           {:subject => 'approve'}
       ]
-    },
-    :run => 'ship'
+    }
   }
 })
 
@@ -181,8 +176,7 @@ handle = Rules.create_ruleset 'approval1', JSON.generate({
         :e => {:$lt => {:total => 1000}},
         :f => {:$lt => {:amount => 1000}}
       }
-    },
-    :run => 'unitTest'
+    }
   }
 })
 
@@ -221,8 +215,7 @@ handle = Rules.create_ruleset 'approval2', JSON.generate({
         :e => {:$lt => {:total => 1000}},
         :f => {:$lt => {:amount => 1000}}
       }
-    },
-    :run => 'unitTest'
+    }
   }
 })
 

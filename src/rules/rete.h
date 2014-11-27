@@ -1,3 +1,4 @@
+#include "state.h"
 
 #define OP_NOP 0
 #define OP_LT 0x01
@@ -20,6 +21,7 @@
 
 typedef struct jsonValue {
     unsigned char type;
+    unsigned int hash;
     union { 
         long i; 
         double d; 
@@ -34,6 +36,7 @@ typedef struct alpha {
     unsigned int betaListOffset;
     unsigned int nextListOffset;
     unsigned int nextOffset;
+    unsigned int maxLifetime;
     jsonValue right;
 } alpha;
 
@@ -68,5 +71,9 @@ typedef struct ruleset {
     unsigned int *queryPool;
     unsigned int queryOffset;  
     unsigned int actionCount;
-    void *bindingsMap;
+    void *bindingsList;
+    stateEntry stateMap[MAX_STATE_ENTRIES]; 
+    unsigned int stateMapLength;
 } ruleset;
+
+

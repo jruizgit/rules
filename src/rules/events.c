@@ -6,9 +6,7 @@
 #include "net.h"
 #include "json.h"
 
-#define ID_HASH 5863474
-#define SID_HASH 193505797
-#define MAX_PROPERTIES 256
+#define MAX_EVENT_PROPERTIES 256
 #define MAX_RESULT_NODES 32
 #define MAX_NODE_RESULTS 16
 #define MAX_STACK_SIZE 64
@@ -45,19 +43,6 @@ typedef struct actionContext {
     redisReply *reply;
 } actionContext;
 
-typedef struct jsonProperty {
-    unsigned int hash;
-    char *firstValue;
-    char *lastValue;
-    unsigned char type;
-    unsigned char isMaterial;
-    union { 
-        long i; 
-        double d; 
-        unsigned char b; 
-    } value;
-} jsonProperty;
-
 typedef struct jsonResult {
     unsigned int hash;
     char *firstName;
@@ -68,74 +53,10 @@ typedef struct jsonResult {
     unsigned char children[MAX_NODE_RESULTS];
 } jsonResult;
 
-static unsigned int constructObject(char *parentName, 
-                                    char *object, 
-                                    jsonProperty *properties, 
-                                    unsigned int *propertiesLength, 
-                                    unsigned int *midIndex, 
-                                    unsigned int *sidIndex, 
-                                    char **next) {
-    char *firstName;
-    char *lastName;
-    char *first;
-    char *last;
-    unsigned char type;
-    unsigned int hash;
-    int parentNameLength = (parentName ? strlen(parentName): 0);
-    unsigned int result = readNextName(object, &firstName, &lastName, &hash);
-    while (result == PARSE_OK) {
-        result = readNextValue(lastName, &first, &last, &type);
-        if (result != PARSE_OK) {
-            return result;
-        }
-        
-        if (!parentName) {
-            if (type == JSON_OBJECT) {
-                int nameLength = lastName - firstName;
-                char newParent[nameLength + 1];
-                strncpy(newParent, firstName, nameLength);
-                newParent[nameLength] = '\0';
-                return constructObject(newParent, first, properties, propertiesLength, midIndex, sidIndex, next);
-            }
-        } else {
-            int nameLength = lastName - firstName;
-            int fullNameLength = nameLength + parentNameLength + 1; 
-            char fullName[fullNameLength + 1];
-            strncpy(fullName, firstName, nameLength);
-            fullName[nameLength] = '.';
-            strncpy(&fullName[nameLength + 1], parentName, parentNameLength);
-            fullName[fullNameLength] = '\0';
-            hash = djbHash(fullName, fullNameLength);
-            if (type == JSON_OBJECT) {
-                return constructObject(fullName, first, properties, propertiesLength, midIndex, sidIndex, next);
-            }
-        }
-
-        jsonProperty *property = &properties[*propertiesLength];
-        if (hash == ID_HASH) {
-            *midIndex = *propertiesLength;
-        } else if (hash == SID_HASH) {
-            *sidIndex = *propertiesLength;
-        }
-
-        *propertiesLength = *propertiesLength + 1;
-        if (*propertiesLength == MAX_PROPERTIES) {
-            return ERR_EVENT_MAX_PROPERTIES;
-        }
-        
-        property->isMaterial = 0;
-        property->hash = hash;
-        property->firstValue = first;
-        property->lastValue = last;
-        property->type = type;
-        *next = last;
-        result = readNextName(last, &firstName, &lastName, &hash);
-    }
- 
-    return (result == PARSE_END ? RULES_OK: result);
-}
-
-static unsigned int readLastName(char *start, char *end, char **first, unsigned int *hash) {
+static unsigned int readLastName(char *start, 
+                                 char *end, 
+                                 char **first, 
+                                 unsigned int *hash) {
     if (end < start) {
         return ERR_PARSE_PATH;
     }
@@ -156,7 +77,9 @@ static unsigned int readLastName(char *start, char *end, char **first, unsigned 
     return RULES_OK;
 }
 
-static unsigned char compareBool(unsigned char left, unsigned char right, unsigned char op) {
+static unsigned char compareBool(unsigned char left, 
+                                 unsigned char right, 
+                                 unsigned char op) {
     switch(op) {
         case OP_LT:
             return (left < right);
@@ -175,7 +98,9 @@ static unsigned char compareBool(unsigned char left, unsigned char right, unsign
     return 0;
 }
 
-static unsigned char compareInt(long left, long right, unsigned char op) {
+static unsigned char compareInt(long left, 
+                                long right, 
+                                unsigned char op) {
     switch(op) {
         case OP_LT:
             return (left < right);
@@ -194,7 +119,9 @@ static unsigned char compareInt(long left, long right, unsigned char op) {
     return 0;
 }
 
-static unsigned char compareDouble(double left, double right, unsigned char op) {
+static unsigned char compareDouble(double left, 
+                                   double right, 
+                                   unsigned char op) {
     switch(op) {
         case OP_LT:
             return (left < right);
@@ -213,11 +140,62 @@ static unsigned char compareDouble(double left, double right, unsigned char op) 
     return 0;
 }
 
-static unsigned char compareString(char* leftFirst, char* leftLast, char* right, unsigned char op) {
+static unsigned char compareString(char* leftFirst, 
+                                   char* leftLast, 
+                                   char* right, 
+                                   unsigned char op) {
     char temp = leftLast[0];
     leftLast[0] = '\0';
     int result = strcmp(leftFirst, right);
     leftLast[0] = temp;
+    switch(op) {
+        case OP_LT:
+            return (result < 0);
+        case OP_LTE:
+            return (result <= 0);
+        case OP_GT:
+            return (result > 0);
+        case OP_GTE: 
+            return (result >= 0);
+        case OP_EQ:
+            return (result == 0);
+        case OP_NEQ:
+            return (result != 0);
+    }
+
+    return 0;
+
+}
+
+static unsigned char compareStringProperty(char* leftFirst, 
+                                           char* leftLast, 
+                                           char* rightFirst, 
+                                           char* rightLast,
+                                           unsigned char op) {
+    char leftTemp = '\0';
+    char rightTemp = '\0';
+
+    if (leftLast) {
+        leftTemp = leftLast[0];
+        leftLast[0] = '\0';
+    
+    }
+
+    if (rightLast) {
+        rightTemp = rightLast[0];
+        rightLast[0] = '\0';
+    }
+
+    int result = strcmp(leftFirst, rightFirst);
+    
+    if (leftLast) {
+        leftLast[0] = leftTemp;
+    }
+
+    if (rightLast) {
+        rightLast[0] = rightTemp;
+    }
+
     switch(op) {
         case OP_LT:
             return (result < 0);
@@ -243,9 +221,9 @@ static unsigned int handleAction(ruleset *tree,
                                  char *state, 
                                  char *prefix, 
                                  node *node, 
-                                 void **rulesBinding, 
                                  unsigned short actionType, 
-                                 unsigned short *commandCount) {
+                                 unsigned short *commandCount,
+                                 void **rulesBinding) {
     *commandCount = *commandCount + 1;
     unsigned int result;
     switch(actionType) {
@@ -292,9 +270,9 @@ static unsigned int handleBeta(ruleset *tree,
                                char *mid, 
                                char *state, 
                                node *betaNode, 
-                               void **rulesBinding, 
                                unsigned short actionType, 
-                               unsigned short *commandCount) {
+                               unsigned short *commandCount,
+                               void **rulesBinding) {
     int prefixLength = 0;
     node *currentNode = betaNode;
     while (currentNode != NULL) {
@@ -328,133 +306,173 @@ static unsigned int handleBeta(ruleset *tree,
             currentNode = &tree->nodePool[currentNode->value.b.nextOffset];
         }
     }
-    return handleAction(tree, sid, mid, state, prefix, actionNode, rulesBinding, actionType, commandCount);
+    return handleAction(tree, sid, mid, state, prefix, actionNode, actionType, commandCount, rulesBinding);
 }
 
-static unsigned char isMatch(ruleset *tree, jsonProperty *currentProperty, alpha *currentAlpha) {
+static unsigned int isMatch(ruleset *tree,
+                             char *sid,
+                             jsonProperty *currentProperty, 
+                             alpha *currentAlpha,
+                             unsigned short actionType,
+                             unsigned char ignoreStaleState, 
+                             unsigned char *propertyMatch) {
     char *propertyLast = currentProperty->lastValue;
     char *propertyFirst = currentProperty->firstValue;
     unsigned char alphaOp = currentAlpha->operator;
     unsigned char propertyType = currentProperty->type;
-    unsigned char propertyMatch = 0;
-    char temp;
+    unsigned int result = RULES_OK;
     
+    *propertyMatch = 0;
     if (alphaOp == OP_EX) {
-        return 1;
+        *propertyMatch = 1;
+        return RULES_OK;
     }
     
-    if (!currentProperty->isMaterial) {
-        switch(propertyType) {
-            case JSON_INT:
-                ++propertyLast;
-                temp = propertyLast[0];
-                propertyLast[0] = '\0';
-                currentProperty->value.i = atol(propertyFirst);
-                propertyLast[0] = temp;
-                break;
-            case JSON_DOUBLE:
-                ++propertyLast;
-                temp = propertyLast[0];
-                propertyLast[0] = '\0';
-                currentProperty->value.i = atof(propertyFirst);
-                propertyLast[0] = temp;
-                break;
-            case JSON_BOOL:
-                ++propertyLast;
-                unsigned int leftLength = propertyLast - propertyFirst;
-                unsigned char b = 1;
-                if (leftLength == 5 && strncmp("false", propertyFirst, 5)) {
-                    b = 0;
+    rehydrateProperty(currentProperty);
+    jsonProperty *rightProperty;
+    jsonProperty rightValue;
+    if (currentAlpha->right.type == JSON_PROPERTY) {
+        result = fetchProperty(tree, 
+                               sid, 
+                               currentAlpha->right.hash, 
+                               currentAlpha->maxLifetime, 
+                               ignoreStaleState,
+                               &rightProperty);
+
+        if ((result == ERR_STATE_NOT_LOADED || result == ERR_STALE_STATE) &&
+            !ignoreStaleState) {
+            if (actionType == ACTION_ASSERT_MESSAGE ||
+                actionType == ACTION_ASSERT_TIMER ||
+                actionType == ACTION_ASSERT_SESSION) {
+                result = rollbackCommands(tree);
+
+                if (result != RULES_OK) {
+                    return result;
                 }
-                currentProperty->value.b = b;
-                break;
+            }
+
+            result = refreshState(tree, sid);
+            if (result != RULES_OK) {
+                return result;
+            }
+
+            result = fetchProperty(tree, 
+                               sid, 
+                               currentAlpha->right.hash, 
+                               currentAlpha->maxLifetime, 
+                               ignoreStaleState,
+                               &rightProperty);
         }
 
-        currentProperty->isMaterial = 1;
+        if (result != RULES_OK) {
+            return result;
+        }
+    } else {
+        rightProperty = &rightValue;
+        rightValue.type = currentAlpha->right.type;
+        switch(rightValue.type) {
+            case JSON_BOOL:
+                rightValue.value.b = currentAlpha->right.value.b;
+                break;
+            case JSON_INT:
+                rightValue.value.i = currentAlpha->right.value.i;
+                break;
+            case JSON_DOUBLE:
+                rightValue.value.d = currentAlpha->right.value.d;
+                break;
+            case JSON_STRING:
+                rightValue.firstValue = &tree->stringPool[currentAlpha->right.value.stringOffset];
+                rightValue.lastValue = 0;
+                break;
+        }
     }
 
-    unsigned short type = propertyType << 8;
-    type = type + currentAlpha->right.type;
     int leftLength;
+    unsigned short type = propertyType << 8;
+    type = type + rightProperty->type;
     switch(type) {
         case COMP_BOOL_BOOL:
-            propertyMatch = compareBool(currentProperty->value.b, currentAlpha->right.value.b, alphaOp);
+            *propertyMatch = compareBool(currentProperty->value.b, rightProperty->value.b, alphaOp);
             break;
         case COMP_BOOL_INT: 
-            propertyMatch = compareInt(currentProperty->value.b, currentAlpha->right.value.i, alphaOp);
+            *propertyMatch = compareInt(currentProperty->value.b, rightProperty->value.i, alphaOp);
             break;
         case COMP_BOOL_DOUBLE: 
-            propertyMatch = compareDouble(currentProperty->value.b, currentAlpha->right.value.d, alphaOp);
+            *propertyMatch = compareDouble(currentProperty->value.b, rightProperty->value.d, alphaOp);
             break;
         case COMP_BOOL_STRING:
-            propertyMatch = compareString(propertyFirst, 
-                                          propertyLast, 
-                                          &tree->stringPool[currentAlpha->right.value.stringOffset], 
-                                          alphaOp);
+            *propertyMatch = compareStringProperty(propertyFirst, 
+                                                   propertyLast, 
+                                                   rightProperty->firstValue,
+                                                   rightProperty->lastValue, 
+                                                   alphaOp);
             break;
         case COMP_INT_BOOL:
-            propertyMatch = compareInt(currentProperty->value.i, currentAlpha->right.value.b, alphaOp);
+            *propertyMatch = compareInt(currentProperty->value.i, rightProperty->value.b, alphaOp);
             break;
         case COMP_INT_INT: 
-            propertyMatch = compareInt(currentProperty->value.i, currentAlpha->right.value.i, alphaOp);
+            *propertyMatch = compareInt(currentProperty->value.i, rightProperty->value.i, alphaOp);
             break;
         case COMP_INT_DOUBLE: 
-            propertyMatch = compareDouble(currentProperty->value.i, currentAlpha->right.value.d, alphaOp);
+            *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.d, alphaOp);
             break;
         case COMP_INT_STRING:
-            propertyMatch = compareString(propertyFirst, 
-                                          propertyLast, 
-                                          &tree->stringPool[currentAlpha->right.value.stringOffset], 
-                                          alphaOp);
+            *propertyMatch = compareStringProperty(propertyFirst, 
+                                                   propertyLast, 
+                                                   rightProperty->firstValue,
+                                                   rightProperty->lastValue, 
+                                                   alphaOp);
             break;
         case COMP_DOUBLE_BOOL:
-            propertyMatch = compareDouble(currentProperty->value.i, currentAlpha->right.value.b, alphaOp);
+            *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.b, alphaOp);
             break;
         case COMP_DOUBLE_INT: 
-            propertyMatch = compareDouble(currentProperty->value.i, currentAlpha->right.value.i, alphaOp);
+            *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.i, alphaOp);
             break;
         case COMP_DOUBLE_DOUBLE: 
-            propertyMatch = compareDouble(currentProperty->value.i, currentAlpha->right.value.d, alphaOp);
+            *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.d, alphaOp);
             break;
         case COMP_DOUBLE_STRING:
-            propertyMatch = compareString(propertyFirst, 
-                                          propertyLast, 
-                                          &tree->stringPool[currentAlpha->right.value.stringOffset], 
-                                          alphaOp);
+            *propertyMatch = compareStringProperty(propertyFirst, 
+                                                   propertyLast, 
+                                                   rightProperty->firstValue,
+                                                   rightProperty->lastValue, 
+                                                   alphaOp);
             break;
         case COMP_STRING_BOOL:
-            if (currentAlpha->right.value.b) {
-                propertyMatch = compareString(propertyFirst, propertyLast, "true", alphaOp);
+            if (rightProperty->value.b) {
+                *propertyMatch = compareString(propertyFirst, propertyLast, "true", alphaOp);
             }
             else {
-                propertyMatch = compareString(propertyFirst, propertyLast, "false", alphaOp);
+                *propertyMatch = compareString(propertyFirst, propertyLast, "false", alphaOp);
             }
             break;
         case COMP_STRING_INT: 
             {
                 leftLength = propertyLast - propertyFirst + 1;
                 char rightStringInt[leftLength];
-                snprintf(rightStringInt, leftLength, "%ld", currentAlpha->right.value.i);
-                propertyMatch = compareString(propertyFirst, propertyLast, rightStringInt, alphaOp);
+                snprintf(rightStringInt, leftLength, "%ld", rightProperty->value.i);
+                *propertyMatch = compareString(propertyFirst, propertyLast, rightStringInt, alphaOp);
             }
             break;
         case COMP_STRING_DOUBLE: 
             {
                 leftLength = propertyLast - propertyFirst + 1;
                 char rightStringDouble[leftLength];
-                snprintf(rightStringDouble, leftLength, "%f", currentAlpha->right.value.d);
-                propertyMatch = compareString(propertyFirst, propertyLast, rightStringDouble, alphaOp);
-                break;
+                snprintf(rightStringDouble, leftLength, "%f", rightProperty->value.d);
+                *propertyMatch = compareString(propertyFirst, propertyLast, rightStringDouble, alphaOp);
             }
+            break;
         case COMP_STRING_STRING:
-            propertyMatch = compareString(propertyFirst, 
-                                          propertyLast, 
-                                          &tree->stringPool[currentAlpha->right.value.stringOffset], 
-                                          alphaOp);
+            *propertyMatch = compareStringProperty(propertyFirst, 
+                                                   propertyLast, 
+                                                   rightProperty->firstValue,
+                                                   rightProperty->lastValue,
+                                                   alphaOp);
             break;
     }
-
-    return propertyMatch;
+    
+    return result;
 }
 
 static unsigned int handleAlpha(ruleset *tree, 
@@ -463,10 +481,11 @@ static unsigned int handleAlpha(ruleset *tree,
                                 char *state, 
                                 alpha *alphaNode, 
                                 jsonProperty *allProperties,
-                                unsigned int propertiesLength, 
-                                void **rulesBinding, 
-                                unsigned short actionType, 
-                                unsigned short *commandCount) {
+                                unsigned int propertiesLength,  
+                                unsigned short actionType,
+                                unsigned char ignoreStaleState, 
+                                unsigned short *commandCount,
+                                void **rulesBinding) {
     unsigned int result = ERR_EVENT_NOT_HANDLED;
     unsigned short top = 1;
     unsigned int entry;
@@ -504,12 +523,27 @@ static unsigned int handleAlpha(ruleset *tree,
                 jsonProperty *currentProperty = &allProperties[propertyIndex];
                 for (entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
                     node *hashNode = &tree->nodePool[nextHashset[entry]];
-                    if (currentProperty->hash == hashNode->value.a.hash && isMatch(tree, currentProperty, &hashNode->value.a)) {
-                        if (top == MAX_STACK_SIZE) {
-                            return ERR_MAX_STACK_SIZE;
+                    if (currentProperty->hash == hashNode->value.a.hash) {
+                        unsigned char match = 0;
+                        result = isMatch(tree, 
+                                         sid, 
+                                         currentProperty, 
+                                         &hashNode->value.a,
+                                         actionType,
+                                         ignoreStaleState,
+                                         &match);
+                        
+                        if (result != RULES_OK){
+                            return result;
                         }
-                        stack[top] = &hashNode->value.a; 
-                        ++top;
+
+                        if (match) {
+                            if (top == MAX_STACK_SIZE) {
+                                return ERR_MAX_STACK_SIZE;
+                            }
+                            stack[top] = &hashNode->value.a; 
+                            ++top;
+                        }
                     }
                 }
             }   
@@ -522,10 +556,10 @@ static unsigned int handleAlpha(ruleset *tree,
                                     sid, 
                                     mid, 
                                     state, 
-                                    &tree->nodePool[betaList[entry]], 
-                                    rulesBinding, 
+                                    &tree->nodePool[betaList[entry]],  
                                     actionType, 
-                                    commandCount);
+                                    commandCount,
+                                    rulesBinding);
                 if (result != RULES_OK) {
                     return result;
                 }
@@ -541,7 +575,7 @@ static unsigned int getId(jsonProperty *allProperties,
                           jsonProperty **idProperty, 
                           int *idLength) {
     jsonProperty *currentProperty;
-    if (idIndex == MAX_PROPERTIES) {
+    if (idIndex == UNDEFINED_INDEX) {
         return ERR_NO_ID_DEFINED;
     }
 
@@ -561,22 +595,31 @@ static unsigned int getId(jsonProperty *allProperties,
     return RULES_OK;
 }
 
-static unsigned int handleSession(ruleset *tree, 
-                                  char *state, 
-                                  void *rulesBinding, 
-                                  unsigned short actionType, 
-                                  unsigned short *commandCount, 
-                                  unsigned char store) {
+static unsigned int handleState(ruleset *tree, 
+                                char *state, 
+                                unsigned short actionType, 
+                                unsigned char store,
+                                unsigned char ignoreStaleState,
+                                void *rulesBinding,
+                                unsigned short *commandCount) {
     char *next;
     unsigned int propertiesLength = 0;
-    unsigned int dummyIndex = MAX_PROPERTIES;
-    unsigned int sidIndex = MAX_PROPERTIES;
-    jsonProperty properties[MAX_PROPERTIES];
-    int result = constructObject(NULL, state, properties, &propertiesLength, &sidIndex, &dummyIndex, &next);
+    unsigned int dummyIndex = UNDEFINED_INDEX;
+    unsigned int sidIndex = UNDEFINED_INDEX;
+    jsonProperty properties[MAX_STATE_PROPERTIES];
+    int result = constructObject(NULL, 
+                                 state, 
+                                 0, 
+                                 MAX_STATE_PROPERTIES, 
+                                 properties, 
+                                 &propertiesLength, 
+                                 &sidIndex, 
+                                 &dummyIndex, 
+                                 &next);
     if (result != RULES_OK) {
         return result;
     }
-
+    
     jsonProperty *sidProperty;
     int sidLength;
     result = getId(properties, sidIndex, &sidProperty, &sidLength);
@@ -593,13 +636,25 @@ static unsigned int handleSession(ruleset *tree,
                          state, 
                          &tree->nodePool[NODE_S_OFFSET].value.a, properties, 
                          propertiesLength, 
-                         &rulesBinding, 
                          actionType, 
-                         commandCount); 
-
+                         ignoreStaleState,
+                         commandCount,
+                         &rulesBinding); 
     if (result == ERR_EVENT_NOT_HANDLED && store) {
-        *commandCount = *commandCount + 1;
-        result = storeSession(rulesBinding, sid, state);
+        if (actionType == ACTION_ASSERT_SESSION_IMMEDIATE) {
+            if (!rulesBinding) {
+                result = resolveBinding(tree, sid, &rulesBinding);
+                if (result != RULES_OK) {
+                    return result;
+                }
+            }
+
+            result = storeSessionImmediate(rulesBinding, sid, state);
+        }
+        else {
+            *commandCount = *commandCount + 1;
+            result = storeSession(rulesBinding, sid, state);
+        }
     }
 
     return result;
@@ -611,9 +666,10 @@ static unsigned int handleEventCore(ruleset *tree,
                                     unsigned int propertiesLength, 
                                     unsigned int midIndex, 
                                     unsigned int sidIndex, 
-                                    void **rulesBinding, 
                                     unsigned short actionType, 
-                                    unsigned short *commandCount) {
+                                    unsigned char ignoreStaleState,
+                                    unsigned short *commandCount,
+                                    void **rulesBinding) {
     jsonProperty *idProperty;
     int idLength;
     int result = getId(properties, midIndex, &idProperty, &idLength);
@@ -646,10 +702,11 @@ static unsigned int handleEventCore(ruleset *tree,
                           message, 
                           &tree->nodePool[NODE_M_OFFSET].value.a, 
                           properties, 
-                          propertiesLength, 
-                          rulesBinding, 
+                          propertiesLength,  
                           actionType, 
-                          commandCount);
+                          ignoreStaleState,
+                          commandCount,
+                          rulesBinding);
 
     if (result == ERR_NEW_SESSION) {
         char session[11 + idLength];
@@ -657,7 +714,13 @@ static unsigned int handleEventCore(ruleset *tree,
         strncpy(session + 7, sid, idLength);
         strcpy(session + 7 + idLength, "\"}");
 
-        result = handleSession(tree, session, *rulesBinding, ACTION_ASSERT_SESSION_IMMEDIATE, commandCount, 0);
+        result = handleState(tree, 
+                             session,  
+                             ACTION_ASSERT_SESSION_IMMEDIATE,
+                             0,
+                             ignoreStaleState,
+                             *rulesBinding, 
+                             commandCount);
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
             return result;
         }
@@ -670,15 +733,24 @@ static unsigned int handleEventCore(ruleset *tree,
 
 static unsigned int handleEvent(ruleset *tree, 
                                 char *message, 
-                                void **rulesBinding, 
                                 unsigned short actionType, 
-                                unsigned short *commandCount) {
+                                unsigned char ignoreStaleState,
+                                unsigned short *commandCount,
+                                void **rulesBinding) {
     char *next;
     unsigned int propertiesLength = 0;
-    unsigned int midIndex = MAX_PROPERTIES;
-    unsigned int sidIndex = MAX_PROPERTIES;
-    jsonProperty properties[MAX_PROPERTIES];
-    int result = constructObject(NULL, message, properties, &propertiesLength, &midIndex, &sidIndex, &next);
+    unsigned int midIndex = UNDEFINED_INDEX;
+    unsigned int sidIndex = UNDEFINED_INDEX;
+    jsonProperty properties[MAX_EVENT_PROPERTIES];
+    int result = constructObject(NULL, 
+                                 message, 
+                                 0, 
+                                 MAX_EVENT_PROPERTIES,
+                                 properties, 
+                                 &propertiesLength, 
+                                 &midIndex, 
+                                 &sidIndex, 
+                                 &next);
     if (result != RULES_OK) {
         return result;
     }
@@ -688,19 +760,39 @@ static unsigned int handleEvent(ruleset *tree,
                            properties, 
                            propertiesLength, 
                            midIndex, 
-                           sidIndex, 
-                           rulesBinding, 
-                           actionType, 
-                           commandCount);
+                           sidIndex,  
+                           actionType,
+                           ignoreStaleState,
+                           commandCount,
+                           rulesBinding);
 }
 
 unsigned int assertEvent(void *handle, char *message) {
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
-    return handleEvent(handle, message, &rulesBinding, ACTION_ASSERT_MESSAGE_IMMEDIATE, &commandCount);
+    unsigned int result = handleEvent(handle, 
+                                      message, 
+                                      ACTION_ASSERT_MESSAGE_IMMEDIATE, 
+                                      0, 
+                                      &commandCount, 
+                                      &rulesBinding);
+    if (result == ERR_NEED_RETRY) {
+        return handleEvent(handle, 
+                           message, 
+                           ACTION_ASSERT_MESSAGE_IMMEDIATE, 
+                           1, 
+                           &commandCount, 
+                           &rulesBinding);
+    }
+
+    return result;
 }
 
-unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results) {
+static unsigned int handleEventsCore(void *handle, 
+                              char *messages, 
+                              unsigned char ignoreStaleState,
+                              unsigned int *resultsLength,  
+                              unsigned int **results) {
     unsigned int messagesLength = 64;
     unsigned int *resultsArray = malloc(sizeof(unsigned int) * messagesLength);
     if (!resultsArray) {
@@ -712,15 +804,15 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
     unsigned short actionType = ACTION_ASSERT_FIRST_MESSAGE;
     unsigned int result;
     void *rulesBinding = NULL;
-    jsonProperty properties0[MAX_PROPERTIES];
-    jsonProperty properties1[MAX_PROPERTIES];
+    jsonProperty properties0[MAX_EVENT_PROPERTIES];
+    jsonProperty properties1[MAX_EVENT_PROPERTIES];
     jsonProperty *currentProperties = NULL;
     unsigned int currentPropertiesLength = 0;
-    unsigned int currentPropertiesMidIndex = MAX_PROPERTIES;
-    unsigned int currentPropertiesSidIndex = MAX_PROPERTIES;
+    unsigned int currentPropertiesMidIndex = UNDEFINED_INDEX;
+    unsigned int currentPropertiesSidIndex = UNDEFINED_INDEX;
     unsigned int nextPropertiesLength = 0;
-    unsigned int nextPropertiesMidIndex = MAX_PROPERTIES;
-    unsigned int nextPropertiesSidIndex = MAX_PROPERTIES;
+    unsigned int nextPropertiesMidIndex = UNDEFINED_INDEX;
+    unsigned int nextPropertiesSidIndex = UNDEFINED_INDEX;
     
     jsonProperty *nextProperties = properties0;
     char *first = NULL;
@@ -735,6 +827,8 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
 
     while (constructObject(NULL, 
                            nextFirst, 
+                           0,
+                           MAX_EVENT_PROPERTIES,
                            nextProperties, 
                            &nextPropertiesLength, 
                            &nextPropertiesMidIndex,
@@ -747,10 +841,11 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
                                      currentProperties, 
                                      currentPropertiesLength,
                                      currentPropertiesMidIndex,
-                                     currentPropertiesSidIndex,
-                                     &rulesBinding, 
+                                     currentPropertiesSidIndex, 
                                      actionType, 
-                                     &commandCount);
+                                     ignoreStaleState,
+                                     &commandCount,
+                                     &rulesBinding);
             last[0] = lastTemp;
             if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
                 free(resultsArray);
@@ -792,8 +887,8 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
         }
 
         nextPropertiesLength = 0;
-        nextPropertiesMidIndex = MAX_PROPERTIES;
-        nextPropertiesSidIndex = MAX_PROPERTIES;
+        nextPropertiesMidIndex = UNDEFINED_INDEX;
+        nextPropertiesSidIndex = UNDEFINED_INDEX;
     }
 
     if (actionType == ACTION_ASSERT_FIRST_MESSAGE) {
@@ -807,10 +902,11 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
                              currentProperties, 
                              currentPropertiesLength,
                              currentPropertiesMidIndex,
-                             currentPropertiesSidIndex,
-                             &rulesBinding, 
+                             currentPropertiesSidIndex, 
                              actionType, 
-                             &commandCount);
+                             ignoreStaleState,
+                             &commandCount,
+                             &rulesBinding);
     last[0] = lastTemp;
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         free(resultsArray);
@@ -831,32 +927,70 @@ unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLen
     return RULES_OK;
 }
 
+unsigned int assertEvents(void *handle, 
+                          char *messages, 
+                          unsigned int *resultsLength, 
+                          unsigned int **results) {
+
+    unsigned int result = handleEventsCore(handle,
+                                           messages,
+                                           0,
+                                           resultsLength,
+                                           results);
+    if (result == ERR_NEED_RETRY) {
+        return handleEventsCore(handle,
+                                messages,
+                                1,
+                                resultsLength,
+                                results);
+    }
+
+    return result;
+}
+
 unsigned int assertState(void *handle, char *state) {
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
 
-    return handleSession(handle, state, rulesBinding, ACTION_ASSERT_SESSION_IMMEDIATE, &commandCount, 0);
+    unsigned int result = handleState(handle, 
+                                      state, 
+                                      ACTION_ASSERT_SESSION_IMMEDIATE, 
+                                      1, 
+                                      0,
+                                      rulesBinding, 
+                                      &commandCount);
+    if (result == ERR_NEED_RETRY) {
+        return handleState(handle, 
+                    state, 
+                    ACTION_ASSERT_SESSION_IMMEDIATE, 
+                    1, 
+                    1,
+                    rulesBinding, 
+                    &commandCount);
+    }
+
+    return result;
 }
 
-static unsigned int createSession(redisReply *reply, char *firstSid, char *lastSid, char **session) {
+static unsigned int createState(redisReply *reply, char *firstSid, char *lastSid, char **state) {
     if (reply->element[2]->type == REDIS_REPLY_NIL) {        
         int idLength = lastSid - firstSid + 1;
-        *session = malloc((11 + idLength) * sizeof(char));
-        if (!*session) {
+        *state = malloc((11 + idLength) * sizeof(char));
+        if (!*state) {
             return ERR_OUT_OF_MEMORY;
         }    
 
-        strcpy(*session, "{\"id\":\"");
-        strncpy(*session + 7, firstSid, idLength);
-        strcpy(*session + 7 + idLength, "\"}");
+        strcpy(*state, "{\"id\":\"");
+        strncpy(*state + 7, firstSid, idLength);
+        strcpy(*state + 7 + idLength, "\"}");
     }
     else {
-        *session = malloc((strlen(reply->element[2]->str) + 1) * sizeof(char));
-        if (!*session) {
+        *state = malloc((strlen(reply->element[2]->str) + 1) * sizeof(char));
+        if (!*state) {
             return ERR_OUT_OF_MEMORY;
         }  
 
-        strcpy(*session, reply->element[2]->str);  
+        strcpy(*state, reply->element[2]->str);  
     }
 
     return RULES_OK;
@@ -1028,7 +1162,7 @@ unsigned int startAction(void *handle, char **state, char **messages, void **act
         return result;
     }
 
-    result = createSession(reply, firstSid, lastSid, state);
+    result = createState(reply, firstSid, lastSid, state);
     if (result != RULES_OK) {
         return result;
     } 
@@ -1056,7 +1190,13 @@ unsigned int completeAction(void *handle, void *actionHandle, char *state) {
     }
 
     if (reply->element[2]->type != REDIS_REPLY_NIL) {
-        result = handleSession(handle, reply->element[2]->str, rulesBinding, ACTION_NEGATE_SESSION, &commandCount, 0);
+        result = handleState(handle, 
+                             reply->element[2]->str, 
+                             ACTION_NEGATE_SESSION, 
+                             0, 
+                             1, 
+                             rulesBinding, 
+                             &commandCount);
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
             return result;
         }
@@ -1064,14 +1204,25 @@ unsigned int completeAction(void *handle, void *actionHandle, char *state) {
    
     for (unsigned long i = 4; i < reply->elements; i = i + 2) {
         if (strcmp(reply->element[i]->str, "null") != 0) {
-            result = handleEvent(handle, reply->element[i]->str, &rulesBinding, ACTION_NEGATE_MESSAGE, &commandCount);
+            result = handleEvent(handle, 
+                                 reply->element[i]->str, 
+                                 ACTION_NEGATE_MESSAGE, 
+                                 1, 
+                                 &commandCount, 
+                                 &rulesBinding);
             if (result != RULES_OK) {
                 return result;
             }
         }
     }
 
-    result = handleSession(handle, state, rulesBinding, ACTION_ASSERT_SESSION, &commandCount, 1);
+    result = handleState(handle, 
+                         state, 
+                         ACTION_ASSERT_SESSION,  
+                         1, 
+                         1, 
+                         rulesBinding, 
+                         &commandCount);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         return result;
     }
@@ -1090,7 +1241,7 @@ unsigned int abandonAction(void *handle, void *actionHandle) {
     return RULES_OK;
 }
 
-unsigned int assertTimers(void *handle) {
+static unsigned int assertTimersCore(void *handle, unsigned char ignoreStaleState) {
     unsigned short commandCount = 2;
     redisReply *reply;
     void *rulesBinding;
@@ -1113,7 +1264,12 @@ unsigned int assertTimers(void *handle) {
         }
 
         ++commandCount;
-        result = handleEvent(handle, reply->element[i]->str, &rulesBinding, ACTION_ASSERT_TIMER, &commandCount);
+        result = handleEvent(handle, 
+                             reply->element[i]->str, 
+                             ACTION_ASSERT_TIMER, 
+                             ignoreStaleState,
+                             &commandCount, 
+                             &rulesBinding);
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
             freeReplyObject(reply);
             return result;
@@ -1122,6 +1278,15 @@ unsigned int assertTimers(void *handle) {
 
     result = executeCommands(rulesBinding, commandCount);
     freeReplyObject(reply);
+    return result;
+}
+
+unsigned int assertTimers(void *handle) {
+    unsigned int result = assertTimersCore(handle, 0);
+    if (result == ERR_NEED_RETRY) {
+        return assertTimersCore(handle, 1);
+    }
+
     return result;
 }
 

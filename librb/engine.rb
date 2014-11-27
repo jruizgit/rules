@@ -203,7 +203,7 @@ module Engine
           rule.delete "run"
         elsif rule.key? :run
           action = rule[:run]
-          rule.delete :rum
+          rule.delete :run
         end
 
         if !action

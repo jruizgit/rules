@@ -3,8 +3,7 @@ import json
 
 handle = rules.create_ruleset('rules',  json.dumps({ 
     'r1': {
-        'whenSome': {'$and': [{'amount': 10000}, {'subject': 'approve'}]}, 
-        'run': 'pending' 
+        'whenSome': {'$and': [{'amount': 10000}, {'subject': 'approve'}]}
    }
 }))
 
@@ -13,8 +12,7 @@ print('created rules1')
 
 handle = rules.create_ruleset('rules',  json.dumps({ 
     'r1': {
-        'when': {'$and': [{'amount': 10000}, {'subject': 'approve'}]}, 
-        'run': 'pending' 
+        'when': {'$and': [{'amount': 10000}, {'subject': 'approve'}]}
    }
 }))
 
@@ -23,8 +21,7 @@ print('created rules2')
 
 handle = rules.create_ruleset('rules',  json.dumps({ 
     'r1': {
-        'when': {'$or': [{'amount': 10000}, {'subject': 'ok'}]}, 
-        'run': 'pending' 
+        'when': {'$or': [{'amount': 10000}, {'subject': 'ok'}]}
    }
 }))
 
@@ -36,8 +33,7 @@ handle = rules.create_ruleset('rules',  json.dumps({
         'whenAll': {
             'a': {'$lte': {'amount': 10}}, 
             'b': {'subject': 'yes'} 
-       }, 
-        'run': 'pending' 
+       }
    }
 }))
 
@@ -46,8 +42,7 @@ print('created rules4')
 
 handle = rules.create_ruleset('rules',  json.dumps({ 
     'r1': {
-        'when': {'$lte': {'amount': 10000}},  
-        'run': 'pending' 
+        'when': {'$lte': {'amount': 10000}}
    }
 }))
 
@@ -56,12 +51,10 @@ print('created rules5')
 
 handle = rules.create_ruleset('rules',  json.dumps({ 
     'r1': {
-        'when': {'$lte': {'number': 10000}}, 
-        'run': 'pending' 
+        'when': {'$lte': {'number': 10000}} 
    }, 
     'r2': {
-        'when': {'$gte': {'amount': 1}}, 
-        'run': 'done' 
+        'when': {'$gte': {'amount': 1}}
    }
 }))
 
@@ -79,8 +72,7 @@ handle = rules.create_ruleset('rules',  json.dumps({
                 'e': {'$lt': {'total': 1000}},
                 'f': {'$lt': {'amount': 1000}}
            }
-       },
-        'run': 'unitTest'
+       }
    }
 }))
 
@@ -98,8 +90,7 @@ handle = rules.create_ruleset('rules',  json.dumps({
                 'e': {'$lt': {'total': 1000}},
                 'f': {'$lt': {'amount': 1000}}
            }
-       },
-        'run': 'unitTest'
+       }
    }
 }))
 
@@ -117,8 +108,7 @@ handle = rules.create_ruleset('rules',  json.dumps({
                 'e': {'$lt': {'total': 1000}},
                 'f': {'$lt': {'amount': 1000}}
            }
-       },
-        'run': 'unitTest'
+       }
    }
 }))
 
@@ -136,8 +126,7 @@ handle = rules.create_ruleset('rules',  json.dumps({
                 'e': {'$lt': {'total': 1000}},
                 'f': {'$lt': {'amount': 1000}}
            }
-       },
-        'run': 'unitTest'
+       }
    }
 }))
 
@@ -152,8 +141,7 @@ handle = rules.create_ruleset('rules',  json.dumps({
                 'e': {'$lt': {'total': 1000}},
                 'f': {'$lt': {'amount': 1000}}
            }
-       },
-        'run': 'unitTest'
+       }
    }
 }))
 
@@ -169,8 +157,7 @@ handle = rules.create_ruleset('rules',  json.dumps({
                 'f': {'$lt': {'amount': 1000}}
            },
             'b': {'subject': 'approve'}
-       },
-        'run': 'unitTest'
+       }
    }
 }))
 
@@ -185,8 +172,7 @@ handle = rules.create_ruleset('rules',  json.dumps({
                 'e': {'$lt': {'total': 1000}},
                 'f': {'$lt': {'amount': 1000}}
            }
-       },
-        'run': 'unitTest'
+       }
    }
 }))
 

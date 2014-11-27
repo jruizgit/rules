@@ -6,51 +6,6 @@
 #include "net.h"
 #include "rules.h"
 
-#define HASH_LENGTH 40
-#define SID_BUCKET_LENGTH 256
-#define SID_HASH_MASK 0xFF
-
-typedef char functionHash[HASH_LENGTH + 1];
-
-typedef struct mapEntry {
-    unsigned int sidHash;
-    unsigned int bindingIndex;
-} mapEntry;
-
-typedef struct binding {
-    redisContext *reContext;
-    functionHash dequeueActionHash;
-    functionHash partitionHash;
-    functionHash timersHash;
-    char *actionSortedset;
-    char *messageHashset;
-    char *resultsHashset;
-    char *sessionHashset;
-    char *timersSortedset;
-    char *partitionHashset;
-    functionHash *hashArray;
-    unsigned int hashArrayLength;
-} binding;
-
-typedef struct bindingsMap {
-    mapEntry entries[SID_BUCKET_LENGTH];
-    binding *bindings;
-    unsigned int bindingsLength;
-    unsigned int lastBinding;
-    unsigned int lastTimersBinding;
-} bindingsMap;
-
-unsigned int djbHash(char *str, unsigned int len) {
-   unsigned int hash = 5381;
-   unsigned int i = 0;
-
-   for(i = 0; i < len; str++, i++) {
-      hash = ((hash << 5) + hash) + (*str);
-   }
-
-   return hash;
-}
-
 static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     redisContext *reContext = rulesBinding->reContext;
     redisReply *reply;
@@ -314,22 +269,21 @@ unsigned int bindRuleset(void *handle,
                          unsigned int port, 
                          char *password) {
     ruleset *tree = (ruleset*)handle;
-    bindingsMap *map;
-    if (tree->bindingsMap) {
-        map = tree->bindingsMap;
+    bindingsList *list;
+    if (tree->bindingsList) {
+        list = tree->bindingsList;
     }
     else {
-        map = malloc(sizeof(bindingsMap));
-        if (!map) {
+        list = malloc(sizeof(bindingsList));
+        if (!list) {
             return ERR_OUT_OF_MEMORY;
         }
 
-        memset(map->entries, 0, sizeof(mapEntry) * SID_BUCKET_LENGTH);
-        map->bindings = NULL;
-        map->bindingsLength = 0;
-        map->lastBinding = 0;
-        map->lastTimersBinding = 0;
-        tree->bindingsMap = map;
+        list->bindings = NULL;
+        list->bindingsLength = 0;
+        list->lastBinding = 0;
+        list->lastTimersBinding = 0;
+        tree->bindingsList = list;
     }
 
     redisContext *reContext;
@@ -364,27 +318,27 @@ unsigned int bindRuleset(void *handle,
         freeReplyObject(reply);
     }
 
-    if (!map->bindings) {
-        map->bindings = malloc(sizeof(binding));
+    if (!list->bindings) {
+        list->bindings = malloc(sizeof(binding));
     }
     else {
-        map->bindings = realloc(map->bindings, sizeof(binding) * (map->bindingsLength + 1));
+        list->bindings = realloc(list->bindings, sizeof(binding) * (list->bindingsLength + 1));
     }
 
-    if (!map->bindings) {
+    if (!list->bindings) {
         redisFree(reContext);
         return ERR_OUT_OF_MEMORY;
     }
-    map->bindings[map->bindingsLength].reContext = reContext;
-    ++map->bindingsLength;
-    return loadCommands(tree, &map->bindings[map->bindingsLength -1]);
+    list->bindings[list->bindingsLength].reContext = reContext;
+    ++list->bindingsLength;
+    return loadCommands(tree, &list->bindings[list->bindingsLength -1]);
 }
 
-unsigned int deleteBindingsMap(ruleset *tree) {
-    bindingsMap *map = tree->bindingsMap;
-    if (tree->bindingsMap != NULL) {
-        for (unsigned int i = 0; i < map->bindingsLength; ++i) {
-            binding *currentBinding = &map->bindings[i];
+unsigned int deleteBindingsList(ruleset *tree) {
+    bindingsList *list = tree->bindingsList;
+    if (tree->bindingsList != NULL) {
+        for (unsigned int i = 0; i < list->bindingsLength; ++i) {
+            binding *currentBinding = &list->bindings[i];
             redisFree(currentBinding->reContext);
             free(currentBinding->actionSortedset);
             free(currentBinding->resultsHashset);
@@ -394,47 +348,41 @@ unsigned int deleteBindingsMap(ruleset *tree) {
             free(currentBinding->hashArray);
         }
 
-        free(map->bindings);
-        free(map);
+        free(list->bindings);
+        free(list);
     }
     return RULES_OK;
 }
 
-unsigned int resolveBinding(ruleset *tree, char *sid, void **rulesBinding) {
-    bindingsMap *map = tree->bindingsMap;
-    unsigned int sidHash = djbHash(sid, strlen(sid));
-    mapEntry *entry = &map->entries[sidHash & SID_HASH_MASK];
-    if (entry->sidHash != sidHash) {
-        binding *firstBinding = &map->bindings[0];
-        redisContext *reContext = firstBinding->reContext;
-        
-        int result = redisAppendCommand(reContext, 
-                                        "evalsha %s %d %s %d %d", 
-                                        firstBinding->partitionHash, 
-                                        1, 
-                                        firstBinding->partitionHashset, 
-                                        sidHash, 
-                                        map->bindingsLength);
-        if (result != REDIS_OK) {
-            return ERR_REDIS_ERROR;
-        }
+unsigned int getBindingIndex(ruleset *tree, unsigned int sidHash, unsigned int *bindingIndex) {
+    bindingsList *list = tree->bindingsList;
+    binding *firstBinding = &list->bindings[0];
+    redisContext *reContext = firstBinding->reContext;
 
-        redisReply *reply;
-        result = redisGetReply(reContext, (void**)&reply);
-        if (result != REDIS_OK) {
-            return ERR_REDIS_ERROR;
-        }
-        
-        if (reply->type == REDIS_REPLY_ERROR) {
-            freeReplyObject(reply);
-            return ERR_REDIS_ERROR;
-        } 
-
-        entry->sidHash = sidHash;
-        entry->bindingIndex = reply->integer;
+    int result = redisAppendCommand(reContext, 
+                                    "evalsha %s %d %s %d %d", 
+                                    firstBinding->partitionHash, 
+                                    1, 
+                                    firstBinding->partitionHashset, 
+                                    sidHash, 
+                                    list->bindingsLength);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
     }
 
-    *rulesBinding = &map->bindings[entry->bindingIndex];
+    redisReply *reply;
+    result = redisGetReply(reContext, (void**)&reply);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+    
+    if (reply->type == REDIS_REPLY_ERROR) {
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    } 
+
+    *bindingIndex = reply->integer;
+    freeReplyObject(reply);
     return RULES_OK;
 }
 
@@ -624,10 +572,10 @@ unsigned int assertTimer(void *rulesBinding,
 }
 
 unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply) {
-    bindingsMap *map = tree->bindingsMap;
-    for (unsigned int i = 0; i < map->bindingsLength; ++i) {
-        binding *currentBinding = &map->bindings[map->lastBinding % map->bindingsLength];
-        ++map->lastBinding;
+    bindingsList *list = tree->bindingsList;
+    for (unsigned int i = 0; i < list->bindingsLength; ++i) {
+        binding *currentBinding = &list->bindings[list->lastBinding % list->bindingsLength];
+        ++list->lastBinding;
         redisContext *reContext = currentBinding->reContext;
         time_t currentTime = time(NULL);
 
@@ -666,10 +614,10 @@ unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply
 }
 
 unsigned int peekTimers(ruleset *tree, void **bindingContext, redisReply **reply) {
-    bindingsMap *map = tree->bindingsMap;
-    for (unsigned int i = 0; i < map->bindingsLength; ++i) {
-        binding *currentBinding = &map->bindings[map->lastTimersBinding % map->bindingsLength];
-        ++map->lastTimersBinding;
+    bindingsList *list = tree->bindingsList;
+    for (unsigned int i = 0; i < list->bindingsLength; ++i) {
+        binding *currentBinding = &list->bindings[list->lastTimersBinding % list->bindingsLength];
+        ++list->lastTimersBinding;
         redisContext *reContext = currentBinding->reContext;
         time_t currentTime = time(NULL);
 
@@ -736,6 +684,34 @@ unsigned int storeSession(void *rulesBinding, char *sid, char *state) {
         return ERR_REDIS_ERROR;
     }
 
+    return RULES_OK;
+}
+
+unsigned int storeSessionImmediate(void *rulesBinding, char *sid, char *state) {
+    binding *currentBinding = (binding*)rulesBinding;
+    redisContext *reContext = currentBinding->reContext;
+
+    int result = redisAppendCommand(reContext, 
+                                    "hset %s %s %s", 
+                                    currentBinding->sessionHashset, 
+                                    sid, 
+                                    state);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    redisReply *reply;
+    result = redisGetReply(reContext, (void**)&reply);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    if (reply->type == REDIS_REPLY_ERROR) {
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    }
+    
+    freeReplyObject(reply);    
     return RULES_OK;
 }
 
@@ -900,6 +876,28 @@ unsigned int prepareCommands(void *rulesBinding) {
         return ERR_REDIS_ERROR;
     }
     
+    return RULES_OK;
+}
+
+unsigned int rollbackCommands(void *rulesBinding) {
+    redisContext *reContext = ((binding*)rulesBinding)->reContext;   
+    int result = redisAppendCommand(reContext, "discard");
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+    
+    redisReply *reply;
+    result = redisGetReply(reContext, (void**)&reply);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    if (reply->type == REDIS_REPLY_ERROR) {
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    }
+
+    freeReplyObject(reply);    
     return RULES_OK;
 }
 
