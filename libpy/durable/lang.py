@@ -57,17 +57,24 @@ class value(object):
         return value(self.type, name)
 
     def define(self):
+        if self.op == None:
+            return {self.type: self.left}
+
         new_definition = None
+        right_definition = self.right
+        if isinstance(self.right, value):
+            right_definition = right_definition.define();
+
         if self.op == '$or' or self.op == '$and':
             definitions = [ self.left.define() ]
-            definitions.append(self.right.define())
+            definitions.append(right_definition)
             new_definition = {self.op: definitions}
         elif self.op == '$nex' or self.op == '$ex':
             new_definition = {self.op: {self.left: 1}}
         elif self.op == '$eq':
-            new_definition = {self.left: self.right}
+            new_definition = {self.left: right_definition}
         else:
-            new_definition = {self.op: {self.left: self.right}}
+            new_definition = {self.op: {self.left: right_definition}}
         
         if self.type == '$s':
             return {'$s': new_definition}
@@ -473,6 +480,8 @@ def timeout(name):
 
 m = value('$m')
 s = value('$s')
+r = value('$r')
+
 _rule_stack = []
 _ruleset_stack = []
 _rulesets = []
@@ -482,7 +491,6 @@ def run_all(databases = ['/tmp/redis.sock']):
     ruleset_definitions = {}
     for rset in _rulesets:
         ruleset_name, ruleset_definition = rset.define()
-        print('{0} => {1}'.format(ruleset_name, ruleset_definition))
         ruleset_definitions[ruleset_name] = ruleset_definition
 
     main_host = engine.Host(ruleset_definitions, databases)

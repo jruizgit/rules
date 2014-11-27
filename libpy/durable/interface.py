@@ -14,7 +14,8 @@ class Application(object):
         self._host = host
         routing_rules.append(Rule('/<ruleset_name>', endpoint=self._ruleset_definition_request))
         routing_rules.append(Rule('/durableVisual.js', endpoint=self._visual_request))
-        routing_rules.append(Rule('/<ruleset_name>/<sid>', endpoint=self._ruleset_state_request))
+        routing_rules.append(Rule('/<ruleset_name>/$state', endpoint=self._ruleset_state_request))
+        routing_rules.append(Rule('/<ruleset_name>/<sid>', endpoint=self._state_request))
         routing_rules.append(Rule('/<ruleset_name>/<sid>/admin.html', endpoint=self._admin_request))
         self._url_map = Map(routing_rules)
 
@@ -34,7 +35,7 @@ class Application(object):
 
         return Response()(environ, start_response)
 
-    def _ruleset_state_request(self, environ, start_response, ruleset_name, sid):
+    def _state_request(self, environ, start_response, ruleset_name, sid):
         request = Request(environ)
         if request.method == 'GET':
             result = self._host.get_state(ruleset_name, sid)
@@ -47,6 +48,17 @@ class Application(object):
             document = json.loads(request.stream.read())
             document['id'] = sid
             self._host.patch_state(ruleset_name, document)
+        
+        return Response()(environ, start_response)
+
+    def _ruleset_state_request(self, environ, start_response, ruleset_name):
+        request = Request(environ)
+        if request.method == 'GET':
+            result = self._host.get_ruleset_state(ruleset_name)
+            return Response(json.dumps(result))(environ, start_response)
+        elif request.method == 'PATCH':
+            document = json.loads(request.stream.read())
+            self._host.patch_ruleset_state(ruleset_name, document)
         
         return Response()(environ, start_response)
 

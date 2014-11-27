@@ -54,6 +54,8 @@ unsigned int abandonAction(void *handle, void *actionHandle);
 unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *timer);
 unsigned int assertTimers(void *handle);
 unsigned int getState(void *handle, char *sid, char **state);
+unsigned int getRulesetState(void *handle, char **state);
+unsigned int setRulesetState(void *handle, char *state);
 
 #ifdef __cplusplus
 }

@@ -72,8 +72,9 @@ typedef struct ruleset {
     unsigned int queryOffset;  
     unsigned int actionCount;
     void *bindingsList;
-    stateEntry stateMap[MAX_STATE_ENTRIES]; 
-    unsigned int stateMapLength;
+    stateEntry globalState;
+    stateEntry state[MAX_STATE_ENTRIES]; 
+    unsigned int stateLength;
 } ruleset;
 
 

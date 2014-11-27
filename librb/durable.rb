@@ -53,19 +53,28 @@ module Durable
     end
     
     def definition
-      new_definition = nil
-      if @op == :$or || @op == :$and
-        new_definition = {@op => @definitions}
-      elsif @op == :$eq
-        new_definition = {@left => @right}
+      if not @op
+        {@type => @left}
       else
-        new_definition = {@op => {@left => @right}}
-      end
+        new_definition = nil
+        righ_definition = @right
+        if @right.kind_of? Expression
+          righ_definition = @right.definition
+        end
 
-      if @type == :$s
-        {:$s => new_definition}
-      else
-        new_definition
+        if @op == :$or || @op == :$and
+          new_definition = {@op => @definitions}
+        elsif @op == :$eq
+          new_definition = {@left => righ_definition}
+        else
+          new_definition = {@op => {@left => righ_definition}}
+        end
+
+        if @type == :$s
+          {:$s => new_definition}
+        else
+          new_definition
+        end
       end
     end
 
@@ -252,6 +261,10 @@ module Durable
       Expression.new(:$m)
     end
     
+    def r
+      Expression.new(:$r)
+    end
+
     def timeout(name)
       expression = Expression.new(:$m)
       expression.left = :$t

@@ -3,8 +3,7 @@ r = require('../build/release/rules.node');
 handle = r.createRuleset('rules',  
     JSON.stringify({  
         r1: { 
-            whenSome: { $and: [{ amount: 10000 }, { subject: 'approve'}] }, 
-            run: 'pending' 
+            whenSome: { $and: [{ amount: 10000 }, { subject: 'approve'}] }
         }
     })
 );
@@ -15,8 +14,7 @@ console.log('created rules1');
 handle = r.createRuleset('rules',  
     JSON.stringify({  
         r1: { 
-            when: { $and: [{ amount: 10000 }, { subject: 'approve'}] }, 
-            run: 'pending' 
+            when: { $and: [{ amount: 10000 }, { subject: 'approve'}] }
         }
     })
 );
@@ -27,8 +25,7 @@ console.log('created rules2');
 handle = r.createRuleset('rules',  
     JSON.stringify({ 
         r1: { 
-            when: { $or: [{ amount: 1000 }, { subject: 'ok' }] }, 
-            run: 'pending' 
+            when: { $or: [{ amount: 1000 }, { subject: 'ok' }] }
         }
     })
 );
@@ -42,8 +39,7 @@ handle = r.createRuleset('rules',
             whenAll: { 
                 a: { $lte: { amount: 10 } }, 
                 b: { subject: 'yes' } 
-            }, 
-            run: 'pending' 
+            } 
         }
     })
 );
@@ -54,8 +50,7 @@ console.log('created rules4');
 handle = r.createRuleset('rules',  
     JSON.stringify({
         r1: {
-            when: { $lte: { amount: 10000 } },
-            run: 'pending'
+            when: { $lte: { amount: 10000 } }
         }
     })
 );
@@ -66,12 +61,10 @@ console.log('created rules5');
 handle = r.createRuleset('rules', 
     JSON.stringify({ 
         r1: { 
-            when: { $lte: { number: 10000 } }, 
-            run: 'pending' 
+            when: { $lte: { number: 10000 } }
         }, 
         r2: { 
-            when: { $gte: { amount: 1 } }, 
-            run: 'done' 
+            when: { $gte: { amount: 1 } }
         }
     })
 );
@@ -90,8 +83,7 @@ handle = r.createRuleset('rules',
                     e: { $lt: { total: 1000 }},
                     f: { $lt: { amount: 1000 }}
                 }
-            },
-            run: 'unitTest'
+            }
         }
     })
 );
@@ -110,8 +102,7 @@ handle = r.createRuleset('rules',
                     e: { $lt: { total: 1000 }},
                     f: { $lt: { amount: 1000 }}
                 }
-            },
-            run: 'unitTest'
+            }
         }
     })
 );
@@ -130,8 +121,7 @@ handle = r.createRuleset('rules',
                     e: { $lt: { total: 1000 }},
                     f: { $lt: { amount: 1000 }}
                 }
-            },
-            run: 'unitTest'
+            }
         }
     })
 );
@@ -150,8 +140,7 @@ handle = r.createRuleset('rules',
                     e: { $lt: { total: 1000 }},
                     f: { $lt: { amount: 1000 }}
                 }
-            },
-            run: 'unitTest'
+            }
         }
     })
 );
@@ -167,8 +156,7 @@ handle = r.createRuleset('rules',
                     e: { $lt: { total: 1000 }},
                     f: { $lt: { amount: 1000 }}
                 }
-            },
-            run: 'unitTest'
+            }
         }
     })
 );
@@ -185,8 +173,7 @@ handle = r.createRuleset('rules',
                     f: { $lt: { amount: 1000 }}
                 },
                 b: { subject: 'approve' }
-            },
-            run: 'unitTest'
+            }
         }
     })
 );
@@ -202,11 +189,32 @@ handle = r.createRuleset('rules',
                     e: { $lt: { total: 1000 }},
                     f: { $lt: { amount: 1000 }}
                 }
-            },
-            run: 'unitTest'
+            }
         }
     })
 );
 r.deleteRuleset(handle);
 
 console.log('created rules13');
+
+handle = r.createRuleset('rules',  
+    JSON.stringify({  
+        r1: { 
+            when: {amount: {$s: 'expected_amount'}}
+        }
+    })
+);
+r.deleteRuleset(handle);
+
+console.log('created rules14');
+
+handle = r.createRuleset('rules',  
+    JSON.stringify({  
+        r1: { 
+            when: {$lte: {amount: {$s: 'max_amount'}}}
+        }
+    })
+);
+r.deleteRuleset(handle);
+
+console.log('created rules15');

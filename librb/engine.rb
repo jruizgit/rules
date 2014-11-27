@@ -244,10 +244,18 @@ module Engine
       Rules.assert_state @handle, JSON.generate(state)
     end
 
+    def set_ruleset_state(state)
+      Rules.set_ruleset_state @handle, JSON.generate(state)
+    end
+
     def get_state(sid)
       JSON.parse Rules.get_state(@handle, sid)
     end
     
+    def get_ruleset_state(sid)
+      JSON.parse Rules.get_ruleset_state(@handle)
+    end
+
     def Ruleset.create_rulesets(parent_name, host, ruleset_definitions)
       branches = {}
       for name, definition in ruleset_definitions do  
@@ -690,6 +698,10 @@ module Engine
       get_ruleset(ruleset_name).get_state sid
     end
 
+    def get_ruleset_state(ruleset_name)
+      get_ruleset(ruleset_name).get_ruleset_state
+    end
+
     def post_batch(ruleset_name, messages)
       get_ruleset(ruleset_name).assert_events messages
     end
@@ -700,6 +712,10 @@ module Engine
 
     def patch_state(ruleset_name, state)
       get_ruleset(ruleset_name).assert_state state
+    end
+
+    def patch_ruleset_state(ruleset_name, state)
+      get_ruleset(ruleset_name).set_ruleset_state state
     end
 
     def register_rulesets(parent_name, ruleset_definitions)

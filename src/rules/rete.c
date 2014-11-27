@@ -21,7 +21,8 @@
 #define HASH_NEX 2087890580 // $nex
 #define HASH_OR 193419978 // $or
 #define HASH_AND 2087876700 // $and
-#define HASH_S 5861212
+#define HASH_S 5861212 // $s
+#define HASH_R 5861211 // $r
 
 typedef struct path {
     unsigned char operator;
@@ -217,7 +218,8 @@ static void copyValue(ruleset *tree,
     unsigned int leftLength;
     char temp;
     switch(type) {
-        case JSON_PROPERTY:
+        case JSON_STATE_PROPERTY:
+        case JSON_GLOBAL_STATE_PROPERTY:
         case JSON_STRING:
             leftLength = last - first;
             storeString(tree, first, &right->value.stringOffset, leftLength);
@@ -263,7 +265,8 @@ static unsigned char compareValue(ruleset *tree,
     unsigned int leftLength;
     char temp;
     switch(type) {
-        case JSON_PROPERTY:
+        case JSON_STATE_PROPERTY:
+        case JSON_GLOBAL_STATE_PROPERTY:
         case JSON_STRING:
             leftLength = last - first;
             char *rightString = &tree->stringPool[right->value.stringOffset];
@@ -384,7 +387,7 @@ static unsigned int validateExpression(char *rule) {
             return result;
         }
         
-        if (hash != HASH_S) {
+        if (hash != HASH_S && hash != HASH_R) {
             return ERR_UNEXPECTED_VALUE;
         }
 
@@ -604,8 +607,14 @@ static unsigned int findAlpha(ruleset *tree,
     readNextValue(lastName, &first, &last, &type);
     if (type == JSON_OBJECT) {
         readNextName(first, &first, &last, &rhash);
+        if (rhash == HASH_S) {
+            type = JSON_STATE_PROPERTY;
+        } else {
+            type = JSON_GLOBAL_STATE_PROPERTY;
+        }
+
         readNextString(last, &first, &last, &rhash);
-        type = JSON_PROPERTY;
+        
     }
 
     node *parent = &tree->nodePool[parentOffset];
@@ -1236,9 +1245,10 @@ unsigned int createRuleset(void **handle, char *name, char *rules) {
     tree->queryOffset = 0;
     tree->actionCount = 0;
     tree->bindingsList = NULL;
-    tree->stateMapLength = 0;
+    tree->stateLength = 0;
 
-    memset(tree->stateMap, 0, MAX_STATE_ENTRIES * sizeof(stateEntry));
+    memset(tree->state, 0, MAX_STATE_ENTRIES * sizeof(stateEntry));
+    memset(&tree->globalState, 0, sizeof(stateEntry));
 
     result = storeString(tree, name, &tree->nameOffset, strlen(name));
     if (result != RULES_OK) {

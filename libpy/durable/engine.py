@@ -180,6 +180,12 @@ class Ruleset(object):
         
     def get_state(self, sid):
         return json.loads(rules.get_state(self._handle, sid))
+
+    def get_ruleset_state(self):
+        return json.loads(rules.get_ruleset_state(self._handle))
+
+    def set_ruleset_state(self, state):
+        rules.set_ruleset_state(self._handle, json.dumps(state))
         
     def get_definition(self):
         return self._definition
@@ -511,6 +517,9 @@ class Host(object):
 
     def get_state(self, ruleset_name, sid):
         return self.get_ruleset(ruleset_name).get_state(sid)
+
+    def get_ruleset_state(self, ruleset_name):
+        return self.get_ruleset(ruleset_name).get_ruleset_state()
         
     def post_batch(self, ruleset_name, messages):
         self.get_ruleset(ruleset_name).assert_events(messages)
@@ -520,6 +529,9 @@ class Host(object):
         
     def patch_state(self, ruleset_name, state):
         self.get_ruleset(ruleset_name).assert_state(state)
+
+    def patch_ruleset_state(self, ruleset_name, state):
+        self.get_ruleset(ruleset_name).set_ruleset_state(state)
 
     def register_rulesets(self, parent_name, ruleset_definitions):
         rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions)

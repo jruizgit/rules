@@ -6,7 +6,7 @@
 #include "net.h"
 #include "json.h"
 
-#define MAX_EVENT_PROPERTIES 256
+#define MAX_EVENT_PROPERTIES 128
 #define MAX_RESULT_NODES 32
 #define MAX_NODE_RESULTS 16
 #define MAX_STACK_SIZE 64
@@ -315,7 +315,8 @@ static unsigned int isMatch(ruleset *tree,
                              alpha *currentAlpha,
                              unsigned short actionType,
                              unsigned char ignoreStaleState, 
-                             unsigned char *propertyMatch) {
+                             unsigned char *propertyMatch,
+                             void **rulesBinding) {
     char *propertyLast = currentProperty->lastValue;
     char *propertyFirst = currentProperty->firstValue;
     unsigned char alphaOp = currentAlpha->operator;
@@ -331,42 +332,20 @@ static unsigned int isMatch(ruleset *tree,
     rehydrateProperty(currentProperty);
     jsonProperty *rightProperty;
     jsonProperty rightValue;
-    if (currentAlpha->right.type == JSON_PROPERTY) {
-        result = fetchProperty(tree, 
-                               sid, 
-                               currentAlpha->right.hash, 
-                               currentAlpha->maxLifetime, 
-                               ignoreStaleState,
-                               &rightProperty);
-
-        if ((result == ERR_STATE_NOT_LOADED || result == ERR_STALE_STATE) &&
-            !ignoreStaleState) {
-            if (actionType == ACTION_ASSERT_MESSAGE ||
-                actionType == ACTION_ASSERT_TIMER ||
-                actionType == ACTION_ASSERT_SESSION) {
-                result = rollbackCommands(tree);
-
-                if (result != RULES_OK) {
-                    return result;
-                }
-            }
-
-            result = refreshState(tree, sid);
-            if (result != RULES_OK) {
-                return result;
-            }
-
-            result = fetchProperty(tree, 
-                               sid, 
-                               currentAlpha->right.hash, 
-                               currentAlpha->maxLifetime, 
-                               ignoreStaleState,
-                               &rightProperty);
-        }
-
-        if (result != RULES_OK) {
-            return result;
-        }
+    if (currentAlpha->right.type == JSON_STATE_PROPERTY) {
+        result = fetchStateProperty(tree, 
+                                    sid, 
+                                    currentAlpha->right.hash, 
+                                    currentAlpha->maxLifetime, 
+                                    ignoreStaleState,
+                                    &rightProperty);
+    } 
+    else if (currentAlpha->right.type == JSON_GLOBAL_STATE_PROPERTY) {
+        result = fetchGlobalStateProperty(tree, 
+                                          currentAlpha->right.hash, 
+                                          currentAlpha->maxLifetime, 
+                                          ignoreStaleState,
+                                          &rightProperty);
     } else {
         rightProperty = &rightValue;
         rightValue.type = currentAlpha->right.type;
@@ -386,7 +365,50 @@ static unsigned int isMatch(ruleset *tree,
                 break;
         }
     }
+        
+    if ((result == ERR_STATE_NOT_LOADED || result == ERR_STALE_STATE) &&
+        !ignoreStaleState) {
+        if (actionType == ACTION_ASSERT_MESSAGE ||
+            actionType == ACTION_ASSERT_TIMER ||
+            actionType == ACTION_ASSERT_SESSION) {
+            result = rollbackCommands(tree);
 
+            if (result != RULES_OK) {
+                return result;
+            }
+        }
+
+        if (currentAlpha->right.type == JSON_STATE_PROPERTY) {
+            result = refreshState(tree, sid, rulesBinding);
+            if (result != RULES_OK) {
+                return result;
+            }
+               
+            result = fetchStateProperty(tree, 
+                                        sid, 
+                                        currentAlpha->right.hash, 
+                                        currentAlpha->maxLifetime, 
+                                        ignoreStaleState,
+                                        &rightProperty);
+        } 
+        else if (currentAlpha->right.type == JSON_GLOBAL_STATE_PROPERTY) {
+            result = refreshGlobalState(tree);
+            if (result != RULES_OK) {
+                return result;
+            }
+
+            result = fetchGlobalStateProperty(tree, 
+                                              currentAlpha->right.hash, 
+                                              currentAlpha->maxLifetime, 
+                                              ignoreStaleState,
+                                              &rightProperty);
+        }
+    }
+
+    if (result != RULES_OK) {
+        return result;
+    }
+    
     int leftLength;
     unsigned short type = propertyType << 8;
     type = type + rightProperty->type;
@@ -531,8 +553,8 @@ static unsigned int handleAlpha(ruleset *tree,
                                          &hashNode->value.a,
                                          actionType,
                                          ignoreStaleState,
-                                         &match);
-                        
+                                         &match,
+                                         rulesBinding);
                         if (result != RULES_OK){
                             return result;
                         }

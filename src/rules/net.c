@@ -261,6 +261,18 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     partitionHashset[nameLength + 1] = 'p';
     partitionHashset[nameLength + 2] = '\0';
     rulesBinding->partitionHashset = partitionHashset;
+
+    char *rulesetSessionKey = malloc((nameLength + 3) * sizeof(char));
+    if (!rulesetSessionKey) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    strncpy(rulesetSessionKey, name, nameLength);
+    rulesetSessionKey[nameLength] = '!';
+    rulesetSessionKey[nameLength + 1] = 'g';
+    rulesetSessionKey[nameLength + 2] = '\0';
+    rulesBinding->rulesetSessionKey = rulesetSessionKey;
+
     return RULES_OK;
 }
 
@@ -345,6 +357,7 @@ unsigned int deleteBindingsList(ruleset *tree) {
             free(currentBinding->messageHashset);
             free(currentBinding->sessionHashset);
             free(currentBinding->partitionHashset);
+            free(currentBinding->rulesetSessionKey);
             free(currentBinding->hashArray);
         }
 
@@ -671,50 +684,6 @@ unsigned int negateMessage(void *rulesBinding,
     return RULES_OK;
 }
 
-unsigned int storeSession(void *rulesBinding, char *sid, char *state) {
-    binding *currentBinding = (binding*)rulesBinding;
-    redisContext *reContext = currentBinding->reContext;
-
-    int result = redisAppendCommand(reContext, 
-                                    "hset %s %s %s", 
-                                    currentBinding->sessionHashset, 
-                                    sid, 
-                                    state);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    return RULES_OK;
-}
-
-unsigned int storeSessionImmediate(void *rulesBinding, char *sid, char *state) {
-    binding *currentBinding = (binding*)rulesBinding;
-    redisContext *reContext = currentBinding->reContext;
-
-    int result = redisAppendCommand(reContext, 
-                                    "hset %s %s %s", 
-                                    currentBinding->sessionHashset, 
-                                    sid, 
-                                    state);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    redisReply *reply;
-    result = redisGetReply(reContext, (void**)&reply);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    if (reply->type == REDIS_REPLY_ERROR) {
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-    
-    freeReplyObject(reply);    
-    return RULES_OK;
-}
-
 unsigned int assertSession(void *rulesBinding, 
                            char *key, 
                            char *sid, 
@@ -926,18 +895,12 @@ unsigned int executeCommands(void *rulesBinding, unsigned int commandCount) {
     return result;
 }
 
-unsigned int getState(void *handle, char *sid, char **state) {
-    binding *bindingContext;
-    unsigned int result = resolveBinding(handle, sid, (void**)&bindingContext);
-    if (result != REDIS_OK) {
-        return result;
-    }
-
-    redisContext *reContext = bindingContext->reContext; 
-
-    result = redisAppendCommand(reContext, 
+unsigned int getSession(void *rulesBinding, char *sid, char **state) {
+    binding *currentBinding = (binding*)rulesBinding;
+    redisContext *reContext = currentBinding->reContext; 
+    unsigned int result = redisAppendCommand(reContext, 
                                 "hget %s %s", 
-                                bindingContext->sessionHashset, 
+                                currentBinding->sessionHashset, 
                                 sid);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
@@ -968,3 +931,109 @@ unsigned int getState(void *handle, char *sid, char **state) {
     return REDIS_OK;
 }
 
+unsigned int storeSession(void *rulesBinding, char *sid, char *state) {
+    binding *currentBinding = (binding*)rulesBinding;
+    redisContext *reContext = currentBinding->reContext; 
+    int result = redisAppendCommand(reContext, 
+                                    "hset %s %s %s", 
+                                    currentBinding->sessionHashset, 
+                                    sid, 
+                                    state);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    return RULES_OK;
+}
+
+unsigned int storeSessionImmediate(void *rulesBinding, char *sid, char *state) {
+    binding *currentBinding = (binding*)rulesBinding;
+    redisContext *reContext = currentBinding->reContext;  
+    int result = redisAppendCommand(reContext, 
+                                    "hset %s %s %s", 
+                                    currentBinding->sessionHashset, 
+                                    sid, 
+                                    state);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    redisReply *reply;
+    result = redisGetReply(reContext, (void**)&reply);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    if (reply->type == REDIS_REPLY_ERROR) {
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    }
+    
+    freeReplyObject(reply);    
+    return RULES_OK;
+}
+
+unsigned int getRulesetSession(ruleset *tree, char **state) {
+    bindingsList *list = tree->bindingsList;
+    binding *firstBinding = &list->bindings[0];
+    redisContext *reContext = firstBinding->reContext;
+
+    unsigned int result = redisAppendCommand(reContext, 
+                                             "get %s", 
+                                             firstBinding->rulesetSessionKey);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    redisReply *reply;
+    result = redisGetReply(reContext, (void**)&reply);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    if (reply->type == REDIS_REPLY_ERROR) {
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    }
+
+    if (reply->type != REDIS_REPLY_STRING) {
+        freeReplyObject(reply);
+        return ERR_NEW_SESSION;
+    }
+
+    *state = malloc(strlen(reply->str) * sizeof(char));
+    if (!*state) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    strcpy(*state, reply->str);
+    freeReplyObject(reply); 
+    return REDIS_OK;
+}
+
+unsigned int storeRulesetSessionImmediate(ruleset *tree, char *state) {
+    bindingsList *list = tree->bindingsList;
+    binding *firstBinding = &list->bindings[0];
+    redisContext *reContext = firstBinding->reContext;
+    
+    int result = redisAppendCommand(reContext, 
+                                    "set %s %s", 
+                                    firstBinding->rulesetSessionKey, 
+                                    state);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    redisReply *reply;
+    result = redisGetReply(reContext, (void**)&reply);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    if (reply->type == REDIS_REPLY_ERROR) {
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    }
+    
+    freeReplyObject(reply);    
+    return RULES_OK;
+}

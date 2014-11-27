@@ -307,6 +307,53 @@ Handle<Value> jsGetState(const Arguments& args) {
             return ret;
         } else if (result != ERR_NEW_SESSION) {
             char * message;
+            asprintf(&message, "Could not get ruleset state, error code: %d", result);
+            ThrowException(Exception::TypeError(String::New(message)));
+            free(message);
+        }
+    }
+
+    return scope.Close(Undefined());
+}
+
+Handle<Value> jsSetRulesetState(const Arguments& args) {
+    HandleScope scope;
+
+    if (args.Length() < 2) {
+        ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+        ThrowException(Exception::TypeError(String::New("Wrong argument type")));
+    } else {
+        unsigned int result = setRulesetState((void *)args[0]->IntegerValue(),
+                                           *v8::String::Utf8Value(args[1]->ToString()));
+        
+        if (result != RULES_OK) {
+            char * message;
+            asprintf(&message, "Could not set ruleset state, error code: %d", result);
+            ThrowException(Exception::TypeError(String::New(message)));
+            free(message);
+        } 
+    }
+
+    return scope.Close(Undefined());
+}
+
+Handle<Value> jsGetRulesetState(const Arguments& args) {
+    HandleScope scope;
+
+    if (args.Length() < 1) {
+        ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
+    } else if (!args[0]->IsNumber()) {
+        ThrowException(Exception::TypeError(String::New("Wrong argument type")));
+    } else {
+        char *state;
+        unsigned int result = getRulesetState((void *)args[0]->IntegerValue(), &state); 
+        if (result == RULES_OK) {
+            Handle<Value> ret = scope.Close(String::New(state));
+            free(state);
+            return ret;
+        } else {
+            char * message;
             asprintf(&message, "Could not get state, error code: %d", result);
             ThrowException(Exception::TypeError(String::New(message)));
             free(message);
@@ -352,6 +399,12 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewSymbol("getState"),
         FunctionTemplate::New(jsGetState)->GetFunction());
+
+    exports->Set(String::NewSymbol("setRulesetState"),
+        FunctionTemplate::New(jsSetRulesetState)->GetFunction());
+
+    exports->Set(String::NewSymbol("getRulesetState"),
+        FunctionTemplate::New(jsGetRulesetState)->GetFunction());
 }
 
 NODE_MODULE(rules, init)

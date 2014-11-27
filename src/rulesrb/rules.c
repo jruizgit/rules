@@ -236,6 +236,40 @@ static VALUE rbGetState(VALUE self, VALUE handle, VALUE sid) {
     return output;
 }
 
+static VALUE rbGetRulesetState(VALUE self, VALUE handle) {
+    Check_Type(handle, T_FIXNUM);
+
+    char *state;
+    unsigned int result = getRulesetState((void *)FIX2LONG(handle), &state);
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not get ruleset state, error code: %d", result);
+        }
+    }
+
+    VALUE output = rb_str_new2(state);
+    free(state);
+    return output;
+}
+
+static VALUE rbSetRulesetState(VALUE self, VALUE handle, VALUE state) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(state, T_STRING);
+
+    unsigned int result = setRulesetState((void *)FIX2LONG(handle), RSTRING_PTR(state));
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not set ruleset state, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
 void Init_rules() {
     rulesModule = rb_define_module("Rules");
     rb_define_singleton_method(rulesModule, "create_ruleset", rbCreateRuleset, 2);
@@ -250,6 +284,8 @@ void Init_rules() {
     rb_define_singleton_method(rulesModule, "start_timer", rbStartTimer, 4);
     rb_define_singleton_method(rulesModule, "assert_timers", rbAssertTimers, 1);
     rb_define_singleton_method(rulesModule, "get_state", rbGetState, 2);
+    rb_define_singleton_method(rulesModule, "get_ruleset_state", rbGetRulesetState, 1);
+    rb_define_singleton_method(rulesModule, "set_ruleset_state", rbSetRulesetState, 2);
 }
 
 

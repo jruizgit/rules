@@ -24,7 +24,6 @@ handle = r.createRuleset('books',
                     ]
                 }
             },
-            run: 'ship'
         }
     })
 );
@@ -86,8 +85,7 @@ handle = r.createRuleset('books2',
                         { item: 'book' },
                     ]
                 }
-            },
-            run: 'ship'
+            }
         }
     })
 );
@@ -140,7 +138,6 @@ handle = r.createRuleset('books3',
                     { $lte: { amount: 1000 } },
                 ]
             },
-            run: 'ship'
         },
         order: {
             when: { 
@@ -151,7 +148,6 @@ handle = r.createRuleset('books3',
                     { $lte: { amount: 1000 } },
                 ]
             },
-            run: 'order'
         },
     })
 );
@@ -185,8 +181,7 @@ console.log('books4');
 handle = r.createRuleset('books4',  
     JSON.stringify({
         ship: {
-            when: { $nex: { label: 1 }},
-            run: 'ship'
+            when: { $nex: { label: 1 }}
         }
     })
 );
@@ -229,8 +224,7 @@ handle = r.createRuleset('approval1',
                     e: { $lt: { total: 1000 }},
                     f: { $lt: { amount: 1000 }}
                 }
-            },
-            run: 'unitTest'
+            }
         }
     })
 );
@@ -272,8 +266,7 @@ handle = r.createRuleset('approval2',
                     e: { $lt: { total: 1000 }},
                     f: { $lt: { amount: 1000 }}
                 }
-            },
-            run: 'unitTest'
+            }
         }
     })
 );
@@ -295,6 +288,102 @@ r.assertEvent(handle,
         subject: 'review'
     })
 );
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+
+r.deleteRuleset(handle);
+
+console.log('approval3');
+
+handle = r.createRuleset('approval3', 
+    JSON.stringify({
+        r1: { 
+            when: {$lte: {amount: {$s: 'maxAmount'}}}
+        }
+    })
+);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+r.assertState(handle,
+    JSON.stringify({
+        id: 'fourth',
+        maxAmount: 100
+    })
+);
+
+console.log(JSON.parse(r.getState(handle, 'fourth')));
+
+r.assertEvent(handle,
+    JSON.stringify({
+        id: 1,
+        sid: 'fourth',
+        amount: 1000
+    })
+);
+
+r.assertEvent(handle,
+    JSON.stringify({
+        id: 2,
+        sid: 'fourth',
+        amount: 10
+    })
+);
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+
+console.log('approval4');
+
+handle = r.createRuleset('approval4', 
+    JSON.stringify({
+        r1: { 
+            when: {$lte: {amount: {$r: 'maxAmount'}}}
+        }
+    })
+);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+r.setRulesetState(handle,
+    JSON.stringify({maxAmount: 100})
+);
+
+console.log(JSON.parse(r.getRulesetState(handle)));
+
+r.assertEvent(handle,
+    JSON.stringify({
+        id: 1,
+        sid: 'fifth',
+        amount: 5
+    })
+);
+
+r.assertEvent(handle,
+    JSON.stringify({
+        id: 2,
+        sid: 'sixth',
+        amount: 6
+    })
+);
+
+r.assertEvent(handle,
+    JSON.stringify({
+        id: 3,
+        sid: 'sixth',
+        amount: 100
+    })
+);
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
 
 result = r.startAction(handle);
 console.log(JSON.parse(result[1]));

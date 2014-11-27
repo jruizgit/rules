@@ -1,5 +1,6 @@
 require_relative '../librb/durable'
 
+
 Durable.ruleset :a1 do
   when_one (m.amount < 1000) | (m.amount > 10000) do
     puts "a1 approving " + m.amount.to_s
@@ -128,6 +129,29 @@ Durable.statechart :a6 do
     post :a6, {:id => 1, :sid => 1, :subject => "enter"}
     post :a6, {:id => 2, :sid => 1, :subject => "continue"}
     post :a6, {:id => 3, :sid => 1, :subject => "continue"}
+  end
+end
+
+Durable.ruleset :a7 do
+  when_one m.amount < s.max_amount do
+    puts "a7 approved"
+  end
+  when_start do
+    patch_state :a7, {:id => 1, :max_amount => 100}
+    post :a7, {:id => 1, :sid => 1, :amount => 10}
+    post :a7, {:id => 2, :sid => 1, :amount => 1000}
+  end
+end
+
+Durable.ruleset :a8 do
+  when_all m.amount < s.max_amount, m.amount > r.min_amount do
+    puts "a8 approved"
+  end
+  when_start do
+    patch_state :a8, {:id => 1, :max_amount => 100}
+    patch_ruleset_state :a8, {:min_amount => 1000}
+    post :a8, {:id => 1, :sid => 1, :amount => 10}
+    post :a8, {:id => 2, :sid => 1, :amount => 10000}
   end
 end
 

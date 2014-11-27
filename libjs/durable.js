@@ -244,9 +244,25 @@ exports = module.exports = durable = function () {
             }
         };
 
+        that.setRulesetState = function(state, complete) {
+            try {
+                complete(null, r.setRulesetState(handle, JSON.stringify(state)));
+            } catch(err) {
+                complete(err);
+            }
+        };
+
         that.getState = function(sid, complete) {
             try {
                 complete(null, JSON.parse(r.getState(handle, sid)));
+            } catch(err) {
+                complete(err);
+            }
+        }
+
+        that.getRulesetState = function(sid, complete) {
+            try {
+                complete(null, JSON.parse(r.getRulesetState(handle)));
             } catch(err) {
                 complete(err);
             }
@@ -768,6 +784,26 @@ exports = module.exports = durable = function () {
             });
         };
 
+        that.getRulesetState = function (rulesetName, complete) {
+            that.getRuleset(rulesetName, function(err, rules) {
+                if (err) {
+                    complete(err);
+                } else {
+                    rules.getRulesetState(complete);
+                }
+            });
+        };
+
+        that.patchRulesetState = function (rulesetName, state, complete) {
+            that.getRuleset(rulesetName, function(err, rules) {
+                if (err) {
+                    complete(err);
+                } else {
+                    rules.setRulesetState(state, complete);
+                }
+            });
+        };
+
         that.getRuleset = function (rulesetName, complete) {
             var rules = rulesDirectory[rulesetName];
             if (rules) {
@@ -900,6 +936,30 @@ exports = module.exports = durable = function () {
                 request.addListener('end',function () {
                     fileServer.serveFile('/admin.html', 200, {}, request, response);
                 }).resume();
+            });
+
+            that.get(basePath + '/:rulesetName/$state', function (request, response) {
+                response.contentType = 'application/json; charset=utf-8';
+                host.getRulesetState(request.params.rulesetName, request.params.sid, function (err, result) {
+                        if (err) {
+                            response.send({ error: err }, 404);
+                        }
+                        else {
+                            response.send(result);
+                        }
+                    });
+            });
+
+            that.patch(basePath + '/:rulesetName/$state', function (request, response) {
+                response.contentType = 'application/json; charset=utf-8';
+                var document = request.body;
+                host.patchRulesetState(request.params.rulesetName, document, function (err) {
+                    if (err) {
+                        response.send({ error: err }, 500);
+                    } else {
+                        response.send();
+                    }
+                });
             });
 
             that.get(basePath + '/:rulesetName/:sid', function (request, response) {

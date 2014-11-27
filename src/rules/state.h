@@ -3,7 +3,8 @@
 #define SID_HASH 193505797
 #define UNDEFINED_INDEX 0xFFFFFFFF
 #define MAX_STATE_ENTRIES 1024
-#define MAX_STATE_PROPERTIES 256
+#define MAX_CONFIG_PROPERTIES 256
+#define MAX_STATE_PROPERTIES 128
 
 typedef struct jsonProperty {
     unsigned int hash;
@@ -23,7 +24,7 @@ typedef struct stateEntry {
     unsigned int bindingIndex;
     unsigned int lastRefresh;
     unsigned int propertiesLength;
-    jsonProperty properties[MAX_STATE_ENTRIES];
+    jsonProperty properties[MAX_CONFIG_PROPERTIES];
     char *state;
 } stateEntry;
 
@@ -38,10 +39,16 @@ unsigned int constructObject(char *parentName,
                              char **next);
 void rehydrateProperty(jsonProperty *property);
 unsigned int resolveBinding(void *tree, char *sid, void **rulesBinding);
-unsigned int refreshState(void *tree, char *sid);
-unsigned int fetchProperty(void *tree, 
-						   char *sid, 
-						   unsigned int hash, 
-						   unsigned int maxTime, 
-						   unsigned char ignoreStaleState,
-						   jsonProperty **property);
+unsigned int refreshGlobalState(void *tree);
+unsigned int refreshState(void *tree, char *sid, void **rulesBinding);
+unsigned int fetchGlobalStateProperty(void *tree, 
+                                       unsigned int propertyHash,
+                                       unsigned int maxTime,
+                                       unsigned char ignoreStaleState,
+                                       jsonProperty **property);
+unsigned int fetchStateProperty(void *tree,
+                                      char *sid, 
+                                      unsigned int propertyHash, 
+                                      unsigned int maxTime, 
+                                      unsigned char ignoreStaleState,
+                                      jsonProperty **property);

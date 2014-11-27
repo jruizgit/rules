@@ -20,10 +20,10 @@ static unsigned int djbHash(char *str, unsigned int len) {
 static stateEntry *getEntry(ruleset *tree, char *sid, unsigned int *sidHash) {
     *sidHash = djbHash(sid, strlen(sid));
     unsigned int candidateIndex = *sidHash % MAX_STATE_ENTRIES;
-    stateEntry *candidate = &tree->stateMap[candidateIndex];
+    stateEntry *candidate = &tree->state[candidateIndex];
     if (candidate->sidHash && candidate->sidHash != *sidHash) {
         candidateIndex = (candidateIndex + 1) % MAX_STATE_ENTRIES;
-        candidate = &tree->stateMap[candidateIndex];
+        candidate = &tree->state[candidateIndex];
     }
 
     return candidate;
@@ -178,11 +178,11 @@ unsigned int resolveBinding(void *tree,
     ruleset *handle = (ruleset*)tree; 
     stateEntry *entry = getEntry(tree, sid, &sidHash);
     if (entry->sidHash == 0) {
-        if (handle->stateMapLength >= MAX_STATE_ENTRIES - 1) {
+        if (handle->stateLength >= MAX_STATE_ENTRIES - 1) {
             return ERR_STATE_CACHE_FULL;
         }
 
-        ++handle->stateMapLength;
+        ++handle->stateLength;
         unsigned int result = getBindingIndex(tree, sidHash, &entry->bindingIndex);
         if (result != RULES_OK) {
             return result;
@@ -196,20 +196,59 @@ unsigned int resolveBinding(void *tree,
     return RULES_OK;
 }
 
-unsigned int refreshState(void *tree, char *sid) {
-
-    unsigned int sidHash;   
-    stateEntry *entry = getEntry(tree, sid, &sidHash);
-    if (entry->sidHash == 0) {
-        return ERR_BINDING_NOT_MAPPED;
+unsigned int refreshGlobalState(void *tree) {
+    ruleset *handle = (ruleset*)tree;
+    if (handle->globalState.state != NULL) {
+        free(handle->globalState.state);
+        handle->globalState.state = NULL;
     }
 
-    unsigned int result = getState(tree, sid, &entry->state);
+    memset(&handle->globalState, 0, MAX_CONFIG_PROPERTIES * sizeof(jsonProperty));
+    unsigned int result = getRulesetSession(handle, &handle->globalState.state);
     if (result != RULES_OK) {
         return result;
     }
 
+    char *next;
+    unsigned int midIndex = UNDEFINED_INDEX;
+    unsigned int sidIndex = UNDEFINED_INDEX;
+    result =  constructObject(NULL, 
+                             handle->globalState.state, 
+                             1, 
+                             MAX_CONFIG_PROPERTIES, 
+                             handle->globalState.properties, 
+                             &handle->globalState.propertiesLength, 
+                             &midIndex, 
+                             &sidIndex, 
+                             &next);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    handle->globalState.lastRefresh = time(NULL);
+    return RULES_OK;
+}
+
+unsigned int refreshState(void *tree, char *sid, void **rulesBinding) {
+    unsigned int result;
+    if (*rulesBinding == NULL) {
+        result = resolveBinding(tree, sid, rulesBinding);
+        if (result != RULES_OK) {
+          return result;
+        }
+    }
+    
+    unsigned int sidHash;   
+    stateEntry *entry = getEntry(tree, sid, &sidHash);
+    if (entry->state != NULL) {
+        free(entry->state);
+        entry->state = NULL;
+    }
     memset(entry->properties, 0, MAX_STATE_PROPERTIES * sizeof(jsonProperty));
+    result = getSession(*rulesBinding, sid, &entry->state);
+    if (result != RULES_OK) {
+        return result;
+    }
 
     char *next;
     unsigned int midIndex = UNDEFINED_INDEX;
@@ -231,12 +270,42 @@ unsigned int refreshState(void *tree, char *sid) {
     return RULES_OK;
 }
 
-unsigned int fetchProperty(void *tree,
-                           char *sid, 
-                           unsigned int propertyHash, 
-                           unsigned int maxTime, 
-                           unsigned char ignoreStaleState,
-                           jsonProperty **property) {
+unsigned int fetchGlobalStateProperty(void *tree, 
+                                       unsigned int propertyHash,
+                                       unsigned int maxTime,
+                                       unsigned char ignoreStaleState,
+                                       jsonProperty **property) {
+    ruleset *handle = (ruleset*)tree;
+    if (handle->globalState.lastRefresh == 0) {
+        return ERR_STATE_NOT_LOADED;
+    }
+
+    if (!ignoreStaleState && (time(NULL) - handle->globalState.lastRefresh > maxTime)) {
+        return ERR_STALE_STATE;
+    }
+
+    unsigned int propertyIndex = propertyHash % MAX_CONFIG_PROPERTIES;
+    jsonProperty *result = &handle->globalState.properties[propertyIndex];
+    while (result->type != 0 && result->hash != propertyHash) {
+        propertyIndex = (propertyIndex + 1) % MAX_CONFIG_PROPERTIES;  
+        result = &handle->globalState.properties[propertyIndex];   
+    }
+
+    if (!result->type) {
+        return ERR_PROPERTY_NOT_FOUND;
+    }
+
+    rehydrateProperty(result);
+    *property = result;
+    return RULES_OK;    
+}
+
+unsigned int fetchStateProperty(void *tree,
+                                      char *sid, 
+                                      unsigned int propertyHash, 
+                                      unsigned int maxTime, 
+                                      unsigned char ignoreStaleState,
+                                      jsonProperty **property) {
 
     unsigned int sidHash;   
     stateEntry *entry = getEntry(tree, sid, &sidHash);
@@ -244,7 +313,7 @@ unsigned int fetchProperty(void *tree,
         return ERR_BINDING_NOT_MAPPED;
     }
     
-    if (entry->propertiesLength == 0) {
+    if (entry->lastRefresh == 0) {
         return ERR_STATE_NOT_LOADED;
     }
 
@@ -268,3 +337,20 @@ unsigned int fetchProperty(void *tree,
     return RULES_OK;    
 }
 
+unsigned int getState(void *handle, char *sid, char **state) {
+    void *rulesBinding = NULL;
+    unsigned int result = resolveBinding(handle, sid, &rulesBinding);
+    if (result != RULES_OK) {
+      return result;
+    }
+
+    return getSession(rulesBinding, sid, state);
+}
+
+unsigned int getRulesetState(void *handle, char **state) {
+    return getRulesetSession(handle, state);
+}
+
+unsigned int setRulesetState(void *handle, char *state) {
+    return storeRulesetSessionImmediate(handle, state);
+}
