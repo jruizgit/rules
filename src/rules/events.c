@@ -1059,11 +1059,12 @@ static unsigned int createMessages(redisReply *reply,  char **firstSid, char **l
                     current = &results[nodesCount];
                     current->childrenCount = 0;
                     current->firstName = firstName;
-                    if (*lastName != '+') {
+                    char* min = strchr(firstName, '+');
+                    if (!min) {
                         current->lastName = lastName;
                     }
                     else {
-                        current->lastName = lastName - 1;   
+                        current->lastName = min - 1;   
                     }
                     current->hash = hash;
                     current->messagesLength = 0;

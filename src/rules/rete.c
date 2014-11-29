@@ -23,6 +23,11 @@
 #define HASH_AND 2087876700 // $and
 #define HASH_S 5861212 // $s
 #define HASH_R 5861211 // $r
+#define HASH_MIN_SIZE 2087889613 // $min
+#define HASH_MAX_SIZE 2087889359 // $max
+
+#define MIN_WINDOW_SIZE "10"
+#define MAX_WINDOW_SIZE "64"
 
 typedef struct path {
     unsigned char operator;
@@ -41,6 +46,8 @@ typedef struct all {
     char **names;
     unsigned int namesLength;
 } all;
+
+static unsigned int validateAlgebra(char *rule);
 
 static unsigned int createBeta(ruleset *tree, 
                                char *rule, 
@@ -414,7 +421,8 @@ static unsigned int validateWrappedExpression(char *rule) {
         return result;
     }
 
-    if ((last - first) == 2) {
+    unsigned int nameLength = last - first; 
+    if (nameLength == 2) {
         if (!strncmp("$s", first, 2) || !strncmp("$m", first, 2)) {
             result = readNextValue(last, &first, &last, &type);
             if (result != PARSE_OK) {
@@ -426,11 +434,21 @@ static unsigned int validateWrappedExpression(char *rule) {
 
             return validateExpression(last);
         }
-    }
+    } else if (nameLength >= 4) { 
+        if (!strncmp("$all", last - 4, 4) || !strncmp("$any", last - 4, 4)) {
+            result = readNextValue(last, &first, &last, &type);
+            if (result != PARSE_OK) {
+                return result;
+            }
+            if (type != JSON_OBJECT) {
+                return ERR_UNEXPECTED_TYPE;
+            }
+            return validateAlgebra(first);
+        } 
+    } 
 
     return validateExpression(rule);
 }
-
 
 static unsigned int validateAlgebra(char *rule) {
     char *first;
@@ -668,6 +686,49 @@ static unsigned int findAlpha(ruleset *tree,
     return linkAlpha(tree, parentOffset, *resultOffset);
 }
 
+static unsigned char appendWindowSize(char *rule, char *name) {
+    char *first;
+    char *last;
+    char *min = NULL;
+    unsigned char minLength = 0;
+    char *max = NULL;
+    unsigned char maxLength = 0;
+    unsigned int hash;
+    unsigned char type;
+    unsigned int result = readNextName(rule, &first, &last, &hash);
+    while (result == PARSE_OK) {
+        readNextValue(last, &first, &last, &type);
+        switch (hash) {
+            case HASH_MIN_SIZE:
+                min = first;
+                minLength = last - first + 1;
+            break;
+            case HASH_MAX_SIZE:
+                max = first;
+                maxLength = last - first + 1;
+            break;
+        }
+
+        result = readNextName(last, &first, &last, &hash);
+    }
+
+    if (!min) {
+        min = MIN_WINDOW_SIZE;
+        minLength = strlen(MIN_WINDOW_SIZE);
+    }
+
+    if (!max) {
+        max = MAX_WINDOW_SIZE;
+        maxLength = strlen(MAX_WINDOW_SIZE);
+    }
+
+    name[0] = '+';
+    strncpy(name + 1, min, minLength);
+    name[minLength + 1] = '+';
+    strncpy(name + 2 + minLength, max, maxLength);
+    return minLength + maxLength + 2;
+}
+
 static unsigned int createAlpha(ruleset *tree, 
                                 unsigned int *newOffset, 
                                 char *rule, 
@@ -680,6 +741,13 @@ static unsigned int createAlpha(ruleset *tree,
     unsigned int result;
     unsigned int parentOffset = *newOffset;
     readNextName(rule, &first, &last, &hash);
+
+    // Fast forward $min and $max
+    while(hash == HASH_MAX_SIZE || hash == HASH_MIN_SIZE) {
+        readNextValue(last, &first, &rule, &type);
+        readNextName(rule, &first, &last, &hash);
+    }
+
     switch (hash) {
         case HASH_EQ:
             operator = OP_EQ;
@@ -756,6 +824,13 @@ static unsigned int createBetaConnector(ruleset *tree,
     unsigned int hash;
     unsigned char type;
     unsigned int result = readNextName(rule, &first, &last, &hash);
+
+    // Fast foward $min and $max
+    while(hash == HASH_MAX_SIZE || hash == HASH_MIN_SIZE) {
+        readNextValue(last, &first, &rule, &type);
+        readNextName(rule, &first, &last, &hash);
+    }
+    
     while (result == PARSE_OK) {
         unsigned int nameLength = last - first; 
         unsigned char operator = OP_NOP;
@@ -771,15 +846,18 @@ static unsigned int createBetaConnector(ruleset *tree,
         
         unsigned int stringOffset;
         if (nameLength >= 5 && !strncmp("$some", last - 5, 5)) {
-            nameLength = nameLength - 4;
-            char temp = first[nameLength - 1];
-            first[nameLength - 1] = '+';
-            result = storeString(tree, first, &stringOffset, nameLength);
+            nameLength = nameLength - 5;
+            char temp[nameLength + 8];
+            strncpy(temp, first, nameLength);
+            char *innerRuleFirst;
+            char *innerRuleLast;
+            unsigned char innerRuleType;
+            readNextValue(last, &innerRuleFirst, &innerRuleLast, &innerRuleType);
+            nameLength += appendWindowSize(innerRuleFirst, temp + nameLength);
+            result = storeString(tree, temp, &stringOffset, nameLength);
             if (result != RULES_OK) {
                 return result;
             }
-
-            first[nameLength - 1] = temp;
         } else {
             result = storeString(tree, first, &stringOffset, nameLength);
             if (result != RULES_OK) {
@@ -904,8 +982,15 @@ static unsigned int unwrapAndCreateAlpha(ruleset *tree,
     char *last;
     unsigned int hash;
     unsigned int resultOffset;
-
+    unsigned char type;
     readNextName(rule, &first, &last, &hash);
+
+    // Fast forward $min and $max
+    while(hash == HASH_MAX_SIZE || hash == HASH_MIN_SIZE) {
+        readNextValue(last, &first, &rule, &type);
+        readNextName(rule, &first, &last, &hash);
+    }
+
     resultOffset = NODE_M_OFFSET;
     *outPath = NULL;
     unsigned int nameLength = last - first; 
@@ -1173,9 +1258,8 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         // need to resolve namespace every time it is used.
         char *namespace = &tree->stringPool[tree->nameOffset];
         int namespaceLength = strlen(namespace); 
-        char actionName[namespaceLength + lastName - firstName + 2];
+        char actionName[namespaceLength + lastName - firstName + 9];
         strncpy(actionName, firstName, lastName - firstName);
-        
         readNextValue(lastName, &first, &lastRuleValue, &type);
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
@@ -1185,8 +1269,7 @@ static unsigned int createTree(ruleset *tree, char *rules) {
                     result = unwrapAndCreateAlpha(tree, first, actionOffset, &betaPath);
                     break;
                 case HASH_WHEN_SOME:
-                    actionName[lastName - firstName] = '+';
-                    ++lastName; 
+                    lastName += appendWindowSize(first, &actionName[lastName - firstName]); 
                     result = unwrapAndCreateAlpha(tree, first, actionOffset, &betaPath);
                     break;
                 case HASH_WHEN_ANY:

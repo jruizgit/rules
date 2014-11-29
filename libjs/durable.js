@@ -17,6 +17,10 @@ exports = module.exports = durable = function () {
             output = output.$m;
         }
 
+        that.getRulesetName = function() {
+            return rulesetName;
+        };
+
         that.getHandle = function () {
             return handle;
         };

@@ -3,7 +3,7 @@ var d = require('../libjs/durable');
 d.run({
     approval1: {
         r1: {
-            whenSome: { $and: [
+            whenSome: { $min: 5, $max: 10, $and: [
                 { subject: 'approve' },
                 { $lte: { amount: 1000 }}
             ]},
@@ -12,7 +12,9 @@ d.run({
     },
     approval2: {
         r1: {
-            whenSome: { 
+            whenSome: {
+                $min: 3,
+                $max: 3,
                 a$any: {
                     a: { $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
                     $s: { $nex: { done: 1 } }
@@ -24,7 +26,7 @@ d.run({
     approval3: {
         r1: {
             whenAll: { 
-                a$some: { $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
+                a$some: { $min: 5, $max: 5, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
                 $s: { $nex: { done: 1 } }            
             },
             run: requestApproval
@@ -33,7 +35,7 @@ d.run({
     approval4$state: {
         input: {
             request: {
-                whenSome: { $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
+                whenSome: { $min: 5, $max: 10, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
                 run: requestApproval,
                 to: 'pending'
             }
@@ -59,7 +61,7 @@ d.run({
     approval5$flow: {
         input: {
             to: {
-                request: { $some:{ $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]}},
+                request: { $some:{ $min: 5, $max: 5, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]}},
             }
         },
         request: {
@@ -68,8 +70,8 @@ d.run({
                 approve: { $s: { done: 1} },
                 request: {
                     $any: {
-                        a$some: { subject: 'approved' },
-                        b$some: { subject: 'ok'}
+                        a$some: { $min: 5, $max: 5, subject: 'approved' },
+                        b$some: { $min: 5, $max: 5, subject: 'ok'}
                     }
                 }
             }
@@ -167,7 +169,13 @@ d.run({
                                 { id: '6', sid: 4, subject: 'ok', amount: 100 },
                                 { id: '7', sid: 4, subject: 'ok', amount: 100 },
                                 { id: '8', sid: 4, subject: 'ok', amount: 100 },
-                                { id: '9', sid: 4, subject: 'ok', amount: 100 }], 
+                                { id: '9', sid: 4, subject: 'ok', amount: 100 },
+                                { id: '10', sid: 4, subject: 'ok', amount: 100 },
+                                { id: '11', sid: 4, subject: 'ok', amount: 100 },
+                                { id: '12', sid: 4, subject: 'ok', amount: 100 },
+                                { id: '13', sid: 4, subject: 'ok', amount: 100 },
+                                { id: '14', sid: 4, subject: 'ok', amount: 100 },
+                                { id: '15', sid: 4, subject: 'ok', amount: 100 }], 
     function (err) {
         if (err) {
             console.log(err);
@@ -204,7 +212,7 @@ d.run({
 });
 
 function requestApproval(s) {
-    console.log('requestApproval');
+    console.log(s.getRulesetName() + ' requestApproval');
     console.log(s.getOutput());
     if (!s.count) {
         s.count = 1;
@@ -218,6 +226,6 @@ function requestApproval(s) {
 }
 
 function approved(s) {
-    console.log('approved');
+    console.log(s.getRulesetName() + ' approved');
     console.log(s.getOutput());
 }
