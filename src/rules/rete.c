@@ -26,9 +26,6 @@
 #define HASH_MIN_SIZE 2087889613 // $min
 #define HASH_MAX_SIZE 2087889359 // $max
 
-#define MIN_WINDOW_SIZE "10"
-#define MAX_WINDOW_SIZE "64"
-
 typedef struct path {
     unsigned char operator;
     struct path **parents;
@@ -527,7 +524,6 @@ static unsigned int validateRuleset(char *rules) {
             
             switch (hash) {
                 case HASH_WHEN:
-                case HASH_WHEN_SOME:
                     result = validateWrappedExpression(first);
                     break;
                 case HASH_WHEN_ANY:
@@ -712,21 +708,26 @@ static unsigned char appendWindowSize(char *rule, char *name) {
         result = readNextName(last, &first, &last, &hash);
     }
 
+    if (!min && !max) {
+        return 0;
+    }
+
     if (!min) {
-        min = MIN_WINDOW_SIZE;
-        minLength = strlen(MIN_WINDOW_SIZE);
+        min = "1";
+        minLength = 1;
     }
 
     if (!max) {
-        max = MAX_WINDOW_SIZE;
-        maxLength = strlen(MAX_WINDOW_SIZE);
+        max = min;
+        maxLength = minLength;
     }
 
     name[0] = '+';
     strncpy(name + 1, min, minLength);
     name[minLength + 1] = '+';
     strncpy(name + 2 + minLength, max, maxLength);
-    return minLength + maxLength + 2;
+    name[minLength + 1 + maxLength + 1] = '+';
+    return minLength + maxLength + 3;
 }
 
 static unsigned int createAlpha(ruleset *tree, 
@@ -830,7 +831,7 @@ static unsigned int createBetaConnector(ruleset *tree,
         readNextValue(last, &first, &rule, &type);
         readNextName(rule, &first, &last, &hash);
     }
-    
+
     while (result == PARSE_OK) {
         unsigned int nameLength = last - first; 
         unsigned char operator = OP_NOP;
@@ -845,24 +846,22 @@ static unsigned int createBetaConnector(ruleset *tree,
         }        
         
         unsigned int stringOffset;
-        if (nameLength >= 5 && !strncmp("$some", last - 5, 5)) {
-            nameLength = nameLength - 5;
-            char temp[nameLength + 8];
-            strncpy(temp, first, nameLength);
-            char *innerRuleFirst;
-            char *innerRuleLast;
-            unsigned char innerRuleType;
-            readNextValue(last, &innerRuleFirst, &innerRuleLast, &innerRuleType);
-            nameLength += appendWindowSize(innerRuleFirst, temp + nameLength);
-            result = storeString(tree, temp, &stringOffset, nameLength);
-            if (result != RULES_OK) {
-                return result;
-            }
-        } else {
-            result = storeString(tree, first, &stringOffset, nameLength);
-            if (result != RULES_OK) {
-                return result;
-            }
+        result = storeString(tree, first, &stringOffset, nameLength);
+        if (result != RULES_OK) {
+            return result;
+        }
+
+        unsigned int queryOffset;
+        char temp[nameLength + 9];
+        strncpy(temp, first, nameLength);
+        char *rFirst;
+        char *rLast;
+        unsigned char rType;
+        readNextValue(last, &rFirst, &rLast, &rType);
+        nameLength += appendWindowSize(rFirst, temp + nameLength);
+        result = storeString(tree, temp, &queryOffset, nameLength);
+        if (result != RULES_OK) {
+            return result;
         }
 
         node *connector;
@@ -882,7 +881,7 @@ static unsigned int createBetaConnector(ruleset *tree,
                 return ERR_OUT_OF_MEMORY;
             }
 
-            betaPath->namesOffsets[0] = stringOffset;
+            betaPath->namesOffsets[0] = queryOffset;
         }
         else {
             betaPath->namesLength = betaPath->namesLength + 1;
@@ -891,7 +890,7 @@ static unsigned int createBetaConnector(ruleset *tree,
                 return ERR_OUT_OF_MEMORY;
             }
 
-            betaPath->namesOffsets[betaPath->namesLength - 1] = stringOffset;
+            betaPath->namesOffsets[betaPath->namesLength - 1] = queryOffset;
         }
 
         if (operator == OP_NOP) {
@@ -1183,9 +1182,8 @@ static unsigned int createQueries(ruleset *tree,
     return RULES_OK;
 }
 
-static unsigned int fixupQueries(ruleset *tree, unsigned int actionOffset, path *betaPath) {
+static unsigned int fixupQueries(ruleset *tree, unsigned int actionOffset, char* postfix, path *betaPath) {
     node *actionNode = &tree->nodePool[actionOffset];
-    char *postfix = &tree->stringPool[actionNode->nameOffset];
     char copyPostfix[strlen(postfix) + 1];
     strcpy(copyPostfix, postfix);
     
@@ -1258,18 +1256,26 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         // need to resolve namespace every time it is used.
         char *namespace = &tree->stringPool[tree->nameOffset];
         int namespaceLength = strlen(namespace); 
-        char actionName[namespaceLength + lastName - firstName + 9];
-        strncpy(actionName, firstName, lastName - firstName);
+        char runtimeActionName[namespaceLength + lastName - firstName + 1];
+        strncpy(runtimeActionName, firstName, lastName - firstName);
+        runtimeActionName[lastName - firstName] = '!';
+        strncpy(&runtimeActionName[lastName - firstName + 1], namespace, namespaceLength);
+        result = storeString(tree, runtimeActionName, &ruleAction->nameOffset, namespaceLength + lastName - firstName + 1);
+        if (result != RULES_OK) {
+            return result;
+        }
+
+        char queryActionName[namespaceLength + lastName - firstName + 11];
+        strncpy(queryActionName, firstName, lastName - firstName);
+
         readNextValue(lastName, &first, &lastRuleValue, &type);
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
             readNextValue(last, &first, &last, &type);
+            lastName += appendWindowSize(first, &queryActionName[lastName - firstName]); 
+            
             switch (hash) {
                 case HASH_WHEN:
-                    result = unwrapAndCreateAlpha(tree, first, actionOffset, &betaPath);
-                    break;
-                case HASH_WHEN_SOME:
-                    lastName += appendWindowSize(first, &actionName[lastName - firstName]); 
                     result = unwrapAndCreateAlpha(tree, first, actionOffset, &betaPath);
                     break;
                 case HASH_WHEN_ANY:
@@ -1282,18 +1288,13 @@ static unsigned int createTree(ruleset *tree, char *rules) {
             result = readNextName(last, &first, &last, &hash);
         }
 
+        queryActionName[lastName - firstName] = '!';
         // tree->stringPool can change after storing strings
         // need to resolve namespace every time it is used.
         namespace = &tree->stringPool[tree->nameOffset];
-        ruleAction = &tree->nodePool[actionOffset];
-        actionName[lastName - firstName] = '!'; 
-        strncpy(&actionName[lastName - firstName + 1], namespace, namespaceLength);
-        result = storeString(tree, actionName, &ruleAction->nameOffset, namespaceLength + lastName - firstName + 1);
-        if (result != RULES_OK) {
-            return result;
-        }
-        
-        result = fixupQueries(tree, actionOffset, betaPath);
+        strncpy(&queryActionName[lastName - firstName + 1], namespace, namespaceLength);
+        queryActionName[lastName - firstName + namespaceLength + 1] = '\0';
+        result = fixupQueries(tree, actionOffset, queryActionName, betaPath);
         if (result != RULES_OK) {
             return result;
         }

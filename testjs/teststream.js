@@ -1,20 +1,18 @@
 var d = require('../libjs/durable');
 
 d.run({
-    approval1: {
+    a1: {
         r1: {
-            whenSome: { $min: 5, $max: 10, $and: [
+            when: { $min: 5, $max: 10, $and: [
                 { subject: 'approve' },
                 { $lte: { amount: 1000 }}
             ]},
             run: requestApproval
         },
     },
-    approval2: {
+    a2: {
         r1: {
-            whenSome: {
-                $min: 3,
-                $max: 3,
+            when: { $min: 3, $max: 3,
                 a$any: {
                     a: { $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
                     $s: { $nex: { done: 1 } }
@@ -23,19 +21,19 @@ d.run({
             run: requestApproval
         },
     },
-    approval3: {
+    a3: {
         r1: {
             whenAll: { 
-                a$some: { $min: 5, $max: 5, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
+                a: { $min: 5, $max: 5, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
                 $s: { $nex: { done: 1 } }            
             },
             run: requestApproval
         },
     },
-    approval4$state: {
+    a4$state: {
         input: {
             request: {
-                whenSome: { $min: 5, $max: 10, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
+                when: { $min: 5, $max: 10, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
                 run: requestApproval,
                 to: 'pending'
             }
@@ -43,8 +41,8 @@ d.run({
         pending: {
             request: {
                 whenAny: {
-                    a$some: { subject: 'approved' },
-                    b$some: { subject: 'ok' }
+                    a: { $min: 5, subject: 'approved' },
+                    b: { $min: 5, subject: 'ok' }
                 },
                 run: requestApproval,
                 to: 'pending'
@@ -58,10 +56,10 @@ d.run({
         done: {
         }
     },
-    approval5$flow: {
+    a5$flow: {
         input: {
             to: {
-                request: { $some:{ $min: 5, $max: 5, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]}},
+                request: { $min: 5, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
             }
         },
         request: {
@@ -70,8 +68,8 @@ d.run({
                 approve: { $s: { done: 1} },
                 request: {
                     $any: {
-                        a$some: { $min: 5, $max: 5, subject: 'approved' },
-                        b$some: { $min: 5, $max: 5, subject: 'ok'}
+                        a: { $min: 5, subject: 'approved' },
+                        b: { $min: 5, subject: 'ok'}
                     }
                 }
             }
@@ -82,7 +80,7 @@ d.run({
     },
 
 }, '', null, function(host) {
-    host.postBatch('approval1', [{ id: '0', sid: 1, subject: 'approve', amount: 100 }, 
+    host.postBatch('a1', [{ id: '0', sid: 1, subject: 'approve', amount: 100 }, 
                                 { id: '1', sid: 1, subject: 'approve', amount: 100 },
                                 { id: '2', sid: 1, subject: 'approve', amount: 100 },
                                 { id: '3', sid: 1, subject: 'approve', amount: 100 },
@@ -100,7 +98,7 @@ d.run({
         }
     });
 
-    host.postBatch('approval2', [{ id: '0', sid: 2, subject: 'approve', amount: 100 }, 
+    host.postBatch('a2', [{ id: '0', sid: 2, subject: 'approve', amount: 100 }, 
                                 { id: '1', sid: 2, subject: 'approve', amount: 100 },
                                 { id: '2', sid: 2, subject: 'approve', amount: 100 },
                                 { id: '3', sid: 2, subject: 'approve', amount: 100 },
@@ -113,7 +111,7 @@ d.run({
         }
     });
 
-    host.postBatch('approval2', [{ id: '5', sid: 2, subject: 'approve', amount: 100 }, 
+    host.postBatch('a2', [{ id: '5', sid: 2, subject: 'approve', amount: 100 }, 
                                 { id: '6', sid: 2, subject: 'approve', amount: 100 },
                                 { id: '7', sid: 2, subject: 'approve', amount: 100 },
                                 { id: '8', sid: 2, subject: 'approve', amount: 100 },
@@ -126,7 +124,7 @@ d.run({
         }
     });
 
-    host.postBatch('approval3', [{ id: '0', sid: 3, subject: 'approve', amount: 100 }, 
+    host.postBatch('a3', [{ id: '0', sid: 3, subject: 'approve', amount: 100 }, 
                                 { id: '1', sid: 3, subject: 'approve', amount: 100 },
                                 { id: '2', sid: 3, subject: 'approve', amount: 100 },
                                 { id: '3', sid: 3, subject: 'approve', amount: 100 },
@@ -139,7 +137,7 @@ d.run({
         }
     });
 
-    host.postBatch('approval3', [{ id: '5', sid: 3, subject: 'approve', amount: 100 }, 
+    host.postBatch('a3', [{ id: '5', sid: 3, subject: 'approve', amount: 100 }, 
                                 { id: '6', sid: 3, subject: 'approve', amount: 100 },
                                 { id: '7', sid: 3, subject: 'approve', amount: 100 },
                                 { id: '8', sid: 3, subject: 'approve', amount: 100 },
@@ -152,7 +150,7 @@ d.run({
         }
     });
 
-    host.postBatch('approval4', [{ id: '0', sid: 4, subject: 'approve', amount: 100 }, 
+    host.postBatch('a4', [{ id: '0', sid: 4, subject: 'approve', amount: 100 }, 
                                 { id: '1', sid: 4, subject: 'approve', amount: 100 },
                                 { id: '2', sid: 4, subject: 'approve', amount: 100 },
                                 { id: '3', sid: 4, subject: 'approve', amount: 100 },
@@ -165,17 +163,11 @@ d.run({
         }
     });
 
-    host.postBatch('approval4', [{ id: '5', sid: 4, subject: 'ok', amount: 100 }, 
-                                { id: '6', sid: 4, subject: 'ok', amount: 100 },
-                                { id: '7', sid: 4, subject: 'ok', amount: 100 },
-                                { id: '8', sid: 4, subject: 'ok', amount: 100 },
-                                { id: '9', sid: 4, subject: 'ok', amount: 100 },
-                                { id: '10', sid: 4, subject: 'ok', amount: 100 },
-                                { id: '11', sid: 4, subject: 'ok', amount: 100 },
-                                { id: '12', sid: 4, subject: 'ok', amount: 100 },
-                                { id: '13', sid: 4, subject: 'ok', amount: 100 },
-                                { id: '14', sid: 4, subject: 'ok', amount: 100 },
-                                { id: '15', sid: 4, subject: 'ok', amount: 100 }], 
+    host.postBatch('a4', [{ id: '5', sid: 4, subject: 'ok' }, 
+                                { id: '6', sid: 4, subject: 'ok' },
+                                { id: '7', sid: 4, subject: 'ok' },
+                                { id: '8', sid: 4, subject: 'ok' },
+                                { id: '9', sid: 4, subject: 'ok' }], 
     function (err) {
         if (err) {
             console.log(err);
@@ -184,7 +176,7 @@ d.run({
         }
     });
 
-    host.postBatch('approval5', [{ id: '0', sid: 5, subject: 'approve', amount: 100 }, 
+    host.postBatch('a5', [{ id: '0', sid: 5, subject: 'approve', amount: 100 }, 
                                 { id: '1', sid: 5, subject: 'approve', amount: 100 },
                                 { id: '2', sid: 5, subject: 'approve', amount: 100 },
                                 { id: '3', sid: 5, subject: 'approve', amount: 100 },
@@ -197,7 +189,7 @@ d.run({
         }
     });
 
-    host.postBatch('approval5', [{ id: '5', sid: 5, subject: 'approved', amount: 100 }, 
+    host.postBatch('a5', [{ id: '5', sid: 5, subject: 'approved', amount: 100 }, 
                                 { id: '6', sid: 5, subject: 'approved', amount: 100 },
                                 { id: '7', sid: 5, subject: 'approved', amount: 100 },
                                 { id: '8', sid: 5, subject: 'approved', amount: 100 },
