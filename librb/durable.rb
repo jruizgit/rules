@@ -261,10 +261,6 @@ module Durable
       Expression.new(:$m)
     end
     
-    def r
-      Expression.new(:$r)
-    end
-
     def timeout(name)
       expression = Expression.new(:$m)
       expression.left = :$t

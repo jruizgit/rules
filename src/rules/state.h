@@ -1,10 +1,9 @@
 
-#define ID_HASH 5863474
-#define SID_HASH 193505797
+#define HASH_ID 5863474
+#define HASH_SID 193505797
 #define UNDEFINED_INDEX 0xFFFFFFFF
-#define MAX_STATE_ENTRIES 1024
-#define MAX_CONFIG_PROPERTIES 256
 #define MAX_STATE_PROPERTIES 128
+#define UNDEFINED_HASH_OFFSET 0xFFFFFFFF
 
 typedef struct jsonProperty {
     unsigned int hash;
@@ -20,14 +19,20 @@ typedef struct jsonProperty {
 } jsonProperty;
 
 typedef struct stateEntry {
+    unsigned int nextHashOffset;
+    unsigned int nextLruOffset;
+    unsigned int prevLruOffset;
     unsigned int sidHash;
     unsigned int bindingIndex;
     unsigned int lastRefresh;
     unsigned int propertiesLength;
-    jsonProperty properties[MAX_CONFIG_PROPERTIES];
+    jsonProperty properties[MAX_STATE_PROPERTIES];
     char *state;
+    char *sid;
 } stateEntry;
 
+void rehydrateProperty(jsonProperty *property);
+unsigned int refreshState(void *tree, char *sid);
 unsigned int constructObject(char *parentName, 
                              char *object,
                              char createHashtable,
@@ -37,15 +42,9 @@ unsigned int constructObject(char *parentName,
                              unsigned int *midIndex, 
                              unsigned int *sidIndex,
                              char **next);
-void rehydrateProperty(jsonProperty *property);
-unsigned int resolveBinding(void *tree, char *sid, void **rulesBinding);
-unsigned int refreshGlobalState(void *tree);
-unsigned int refreshState(void *tree, char *sid, void **rulesBinding);
-unsigned int fetchGlobalStateProperty(void *tree, 
-                                       unsigned int propertyHash,
-                                       unsigned int maxTime,
-                                       unsigned char ignoreStaleState,
-                                       jsonProperty **property);
+unsigned int resolveBinding(void *tree, 
+                            char *sid, 
+                            void **rulesBinding);
 unsigned int fetchStateProperty(void *tree,
                                       char *sid, 
                                       unsigned int propertyHash, 

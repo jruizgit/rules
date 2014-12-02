@@ -189,19 +189,6 @@ with ruleset('a7'):
         host.post('a7', {'id': 2, 'sid': 1, 'amount': 100})
 
 
-with ruleset('a8'):
-    @when_all(m.amount < s.max_amount, m.amount > r.min_amount)
-    def approved(s):
-        print ('a8 approved')
-
-    @when_start
-    def start(host):
-        host.patch_state('a8', {'id': 1, 'max_amount': 100})
-        host.patch_ruleset_state('a8', {'min_amount': 1000})
-        host.post('a8', {'id': 1, 'sid': 1, 'amount': 10})
-        host.post('a8', {'id': 2, 'sid': 1, 'amount': 10000})
-
-
 with ruleset('p1'):
     with when(m.start == 'yes'): 
         with ruleset('one'):

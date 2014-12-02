@@ -42,7 +42,7 @@
 extern "C" {
 #endif
 
-unsigned int createRuleset(void **handle, char *name, char *rules);
+unsigned int createRuleset(void **handle, char *name, char *rules, unsigned int stateCaheSize);
 unsigned int deleteRuleset(void *handle);
 unsigned int bindRuleset(void *handle, char *host, unsigned int port, char *password);
 unsigned int assertEvent(void *handle, char *message);
@@ -54,8 +54,6 @@ unsigned int abandonAction(void *handle, void *actionHandle);
 unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *timer);
 unsigned int assertTimers(void *handle);
 unsigned int getState(void *handle, char *sid, char **state);
-unsigned int getRulesetState(void *handle, char **state);
-unsigned int setRulesetState(void *handle, char *state);
 
 #ifdef __cplusplus
 }

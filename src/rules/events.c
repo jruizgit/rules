@@ -333,19 +333,16 @@ static unsigned int isMatch(ruleset *tree,
     jsonProperty *rightProperty;
     jsonProperty rightValue;
     if (currentAlpha->right.type == JSON_STATE_PROPERTY) {
+        if (currentAlpha->right.value.property.sidOffset) {
+            sid = &tree->stringPool[currentAlpha->right.value.property.sidOffset];
+        }
+
         result = fetchStateProperty(tree, 
                                     sid, 
-                                    currentAlpha->right.hash, 
-                                    currentAlpha->maxLifetime, 
+                                    currentAlpha->right.value.property.hash, 
+                                    currentAlpha->right.value.property.time, 
                                     ignoreStaleState,
                                     &rightProperty);
-    } 
-    else if (currentAlpha->right.type == JSON_GLOBAL_STATE_PROPERTY) {
-        result = fetchGlobalStateProperty(tree, 
-                                          currentAlpha->right.hash, 
-                                          currentAlpha->maxLifetime, 
-                                          ignoreStaleState,
-                                          &rightProperty);
     } else {
         rightProperty = &rightValue;
         rightValue.type = currentAlpha->right.type;
@@ -366,47 +363,25 @@ static unsigned int isMatch(ruleset *tree,
         }
     }
         
-    if ((result == ERR_STATE_NOT_LOADED || result == ERR_STALE_STATE) &&
-        !ignoreStaleState) {
+    if ((result == ERR_STATE_NOT_LOADED || result == ERR_STALE_STATE) && !ignoreStaleState) {
         if (actionType == ACTION_ASSERT_MESSAGE ||
             actionType == ACTION_ASSERT_TIMER ||
             actionType == ACTION_ASSERT_SESSION) {
             result = rollbackCommands(tree);
-
-            if (result != RULES_OK) {
-                return result;
-            }
-        }
-
-        if (currentAlpha->right.type == JSON_STATE_PROPERTY) {
-            result = refreshState(tree, sid, rulesBinding);
-            if (result != RULES_OK) {
-                return result;
-            }
-               
-            result = fetchStateProperty(tree, 
-                                        sid, 
-                                        currentAlpha->right.hash, 
-                                        currentAlpha->maxLifetime, 
-                                        ignoreStaleState,
-                                        &rightProperty);
-        } 
-        else if (currentAlpha->right.type == JSON_GLOBAL_STATE_PROPERTY) {
-            result = refreshGlobalState(tree);
             if (result != RULES_OK) {
                 return result;
             }
 
-            result = fetchGlobalStateProperty(tree, 
-                                              currentAlpha->right.hash, 
-                                              currentAlpha->maxLifetime, 
-                                              ignoreStaleState,
-                                              &rightProperty);
-        }
+            result = refreshState(tree,sid);
+        } else {
+            result = refreshState(tree, sid);
+        }   
+
+        return result != RULES_OK ? result : ERR_NEED_RETRY;
     }
 
     if (result != RULES_OK) {
-        return result;
+        return result != ERR_PROPERTY_NOT_FOUND ? result : RULES_OK;
     }
     
     int leftLength;
@@ -547,7 +522,7 @@ static unsigned int handleAlpha(ruleset *tree,
                     node *hashNode = &tree->nodePool[nextHashset[entry]];
                     if (currentProperty->hash == hashNode->value.a.hash) {
                         unsigned char match = 0;
-                        result = isMatch(tree, 
+                        unsigned int mresult = isMatch(tree, 
                                          sid, 
                                          currentProperty, 
                                          &hashNode->value.a,
@@ -555,14 +530,15 @@ static unsigned int handleAlpha(ruleset *tree,
                                          ignoreStaleState,
                                          &match,
                                          rulesBinding);
-                        if (result != RULES_OK){
-                            return result;
+                        if (mresult != RULES_OK){
+                            return mresult;
                         }
-
+                        
                         if (match) {
                             if (top == MAX_STACK_SIZE) {
                                 return ERR_MAX_STACK_SIZE;
                             }
+
                             stack[top] = &hashNode->value.a; 
                             ++top;
                         }
@@ -792,21 +768,16 @@ static unsigned int handleEvent(ruleset *tree,
 unsigned int assertEvent(void *handle, char *message) {
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
-    unsigned int result = handleEvent(handle, 
-                                      message, 
-                                      ACTION_ASSERT_MESSAGE_IMMEDIATE, 
-                                      0, 
-                                      &commandCount, 
-                                      &rulesBinding);
-    if (result == ERR_NEED_RETRY) {
-        return handleEvent(handle, 
-                           message, 
-                           ACTION_ASSERT_MESSAGE_IMMEDIATE, 
-                           1, 
-                           &commandCount, 
-                           &rulesBinding);
+    unsigned int result = ERR_NEED_RETRY;
+    while (result == ERR_NEED_RETRY) {
+        result = handleEvent(handle, 
+                             message, 
+                             ACTION_ASSERT_MESSAGE_IMMEDIATE, 
+                             0, 
+                             &commandCount, 
+                             &rulesBinding);
     }
-
+    
     return result;
 }
 
@@ -954,19 +925,15 @@ unsigned int assertEvents(void *handle,
                           unsigned int *resultsLength, 
                           unsigned int **results) {
 
-    unsigned int result = handleEventsCore(handle,
-                                           messages,
-                                           0,
-                                           resultsLength,
-                                           results);
-    if (result == ERR_NEED_RETRY) {
-        return handleEventsCore(handle,
-                                messages,
-                                1,
-                                resultsLength,
-                                results);
+    unsigned int result = ERR_NEED_RETRY;
+    while (result == ERR_NEED_RETRY) {
+        result = handleEventsCore(handle,
+                                  messages,
+                                  0,
+                                  resultsLength,
+                                  results);
     }
-
+    
     return result;
 }
 
@@ -974,23 +941,17 @@ unsigned int assertState(void *handle, char *state) {
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
 
-    unsigned int result = handleState(handle, 
-                                      state, 
-                                      ACTION_ASSERT_SESSION_IMMEDIATE, 
-                                      1, 
-                                      0,
-                                      rulesBinding, 
-                                      &commandCount);
-    if (result == ERR_NEED_RETRY) {
-        return handleState(handle, 
-                    state, 
-                    ACTION_ASSERT_SESSION_IMMEDIATE, 
-                    1, 
-                    1,
-                    rulesBinding, 
-                    &commandCount);
+    unsigned int result = ERR_NEED_RETRY;
+    while(result == ERR_NEED_RETRY) {
+        result = handleState(handle, 
+                             state, 
+                             ACTION_ASSERT_SESSION_IMMEDIATE, 
+                             1, 
+                             0,
+                             rulesBinding, 
+                             &commandCount);
     }
-
+    
     return result;
 }
 

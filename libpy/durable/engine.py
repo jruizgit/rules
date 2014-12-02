@@ -143,7 +143,7 @@ class To(Promise):
 
 class Ruleset(object):
 
-    def __init__(self, name, host, ruleset_definition):
+    def __init__(self, name, host, ruleset_definition, state_cache_size):
         self._actions = {}
         self._name = name
         self._host = host
@@ -159,7 +159,7 @@ class Ruleset(object):
             else:
                 self._actions[rule_name] = Fork(host.register_rulesets(name, action))
 
-        self._handle = rules.create_ruleset(name, json.dumps(ruleset_definition))
+        self._handle = rules.create_ruleset(state_cache_size, name, json.dumps(ruleset_definition))
         self._definition = ruleset_definition
         
     def bind(self, databases):
@@ -180,18 +180,12 @@ class Ruleset(object):
         
     def get_state(self, sid):
         return json.loads(rules.get_state(self._handle, sid))
-
-    def get_ruleset_state(self):
-        return json.loads(rules.get_ruleset_state(self._handle))
-
-    def set_ruleset_state(self, state):
-        rules.set_ruleset_state(self._handle, json.dumps(state))
-        
+    
     def get_definition(self):
         return self._definition
 
     @staticmethod
-    def create_rulesets(parent_name, host, ruleset_definitions):
+    def create_rulesets(parent_name, host, ruleset_definitions, state_cache_size):
         branches = {}
         for name, definition in ruleset_definitions.iteritems():  
             if name.rfind('$state') != -1:
@@ -199,18 +193,18 @@ class Ruleset(object):
                 if parent_name:
                     name = '{0}.{1}'.format(parent_name, name) 
 
-                branches[name] = Statechart(name, host, definition)
+                branches[name] = Statechart(name, host, definition, state_cache_size)
             elif name.rfind('$flow') != -1:
                 name = name[:name.rfind('$flow')]
                 if parent_name:
                     name = '{0}.{1}'.format(parent_name, name) 
 
-                branches[name] = Flowchart(name, host, definition)
+                branches[name] = Flowchart(name, host, definition, state_cache_size)
             else:
                 if parent_name:
                     name = '{0}.{1}'.format(parent_name, name)
 
-                branches[name] = Ruleset(name, host, definition)
+                branches[name] = Ruleset(name, host, definition, state_cache_size)
 
         return branches
 
@@ -272,12 +266,12 @@ class Ruleset(object):
 
 class Statechart(Ruleset):
 
-    def __init__(self, name, host, chart_definition):
+    def __init__(self, name, host, chart_definition, state_cache_size):
         self._name = name
         self._host = host
         ruleset_definition = {}
         self._transform(None, None, None, chart_definition, ruleset_definition)
-        super(Statechart, self).__init__(name, host, ruleset_definition)
+        super(Statechart, self).__init__(name, host, ruleset_definition, state_cache_size)
         self._definition = chart_definition
         self._definition['$type'] = 'stateChart'
 
@@ -383,12 +377,12 @@ class Statechart(Ruleset):
 
 class Flowchart(Ruleset):
 
-    def __init__(self, name, host, chart_definition):
+    def __init__(self, name, host, chart_definition, state_cache_size):
         self._name = name
         self._host = host
         ruleset_definition = {} 
         self._transform(chart_definition, ruleset_definition)
-        super(Flowchart, self).__init__(name, host, ruleset_definition)
+        super(Flowchart, self).__init__(name, host, ruleset_definition, state_cache_size)
         self._definition = chart_definition
         self._definition['$type'] = 'flowChart'
 
@@ -487,10 +481,11 @@ class Flowchart(Ruleset):
 
 class Host(object):
 
-    def __init__(self, ruleset_definitions = None, databases = ['/tmp/redis.sock']):
+    def __init__(self, ruleset_definitions = None, databases = ['/tmp/redis.sock'], state_cache_size = 1024):
         self._ruleset_directory = {}
         self._ruleset_list = []
         self._databases = databases
+        self._state_cache_size = state_cache_size
         if ruleset_definitions:
             self.register_rulesets(None, ruleset_definitions)
 
@@ -534,7 +529,7 @@ class Host(object):
         self.get_ruleset(ruleset_name).set_ruleset_state(state)
 
     def register_rulesets(self, parent_name, ruleset_definitions):
-        rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions)
+        rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions, self._state_cache_size)
         for ruleset_name, ruleset in rulesets.iteritems():
             if ruleset_name in self._ruleset_directory:
                 raise Exception('Ruleset with name {0} already registered'.format(ruleset_name))

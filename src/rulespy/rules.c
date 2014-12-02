@@ -6,13 +6,14 @@ static PyObject *RulesError;
 static PyObject *pyCreateRuleset(PyObject *self, PyObject *args) {
     char *name;
     char *rules;
-    if (!PyArg_ParseTuple(args, "ss", &name, &rules)) {
+    unsigned int stateCacheSize;
+    if (!PyArg_ParseTuple(args, "lss", &stateCacheSize, &name, &rules)) {
         PyErr_SetString(RulesError, "pyCreateRuleset Invalid argument");
         return NULL;
     }
 
     void *output = NULL;
-    unsigned int result = createRuleset(&output, name, rules);
+    unsigned int result = createRuleset(&output, name, rules, stateCacheSize);
     if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -315,55 +316,6 @@ static PyObject *pyGetState(PyObject *self, PyObject *args) {
     return returnValue;
 }
 
-static PyObject *pyGetRulesetState(PyObject *self, PyObject *args) {
-    void *handle;
-    if (!PyArg_ParseTuple(args, "l", &handle)) {
-        PyErr_SetString(RulesError, "pyGetRulesetState Invalid argument");
-        return NULL;
-    }
-
-    char *state;
-    unsigned int result = getRulesetState(handle, &state);
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            PyErr_NoMemory();
-        } else { 
-            char * message;
-            asprintf(&message, "Could not get ruleset state, error code: %d", result);
-            PyErr_SetString(RulesError, message);
-            free(message);
-        }
-        return NULL;
-    }
-    PyObject *returnValue = Py_BuildValue("s", state);
-    free(state);
-    return returnValue;
-}
-
-static PyObject *pySetRulesetState(PyObject *self, PyObject *args) {
-    void *handle;
-    char *state;
-    if (!PyArg_ParseTuple(args, "ls", &handle, &state)) {
-        PyErr_SetString(RulesError, "pyAssertState Invalid argument");
-        return NULL;
-    }
-
-    unsigned int result = setRulesetState(handle, state);
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            PyErr_NoMemory();
-        } else { 
-            char * message;
-            asprintf(&message, "Could not set ruleset state, error code: %d", result);
-            PyErr_SetString(RulesError, message);
-            free(message);
-        }
-        return NULL;
-    }
-
-    Py_RETURN_NONE;
-}
-
 static PyMethodDef myModule_methods[] = {
     {"create_ruleset", pyCreateRuleset, METH_VARARGS},
     {"delete_ruleset", pyDeleteRuleset, METH_VARARGS},
@@ -377,8 +329,6 @@ static PyMethodDef myModule_methods[] = {
     {"start_timer", pyStartTimer, METH_VARARGS},
     {"assert_timers", pyAssertTimers, METH_VARARGS},
     {"get_state", pyGetState, METH_VARARGS},
-    {"get_ruleset_state", pyGetRulesetState, METH_VARARGS},
-    {"set_ruleset_state", pySetRulesetState, METH_VARARGS},
     {NULL, NULL}
 };
 

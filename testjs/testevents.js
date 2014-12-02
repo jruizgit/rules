@@ -26,7 +26,7 @@ handle = r.createRuleset('books',
             },
         }
     })
-);
+, 100);
 
 r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
 
@@ -44,7 +44,7 @@ r.assertEvent(handle,
         reference: '75323',
         amount: 500
     })
-);
+, 100);
 
 r.assertEvent(handle,
     JSON.stringify({
@@ -55,7 +55,7 @@ r.assertEvent(handle,
         country: 'US',
         seller: 'bookstore'
     })
-);
+, 100);
 
 result = r.startAction(handle);
 console.log(JSON.parse(result[1]));
@@ -88,7 +88,7 @@ handle = r.createRuleset('books2',
             }
         }
     })
-);
+, 100);
 
 r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
 
@@ -150,7 +150,7 @@ handle = r.createRuleset('books3',
             },
         },
     })
-);
+, 100);
 
 r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
 
@@ -184,7 +184,7 @@ handle = r.createRuleset('books4',
             when: { $nex: { label: 1 }}
         }
     })
-);
+, 100);
 
 r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
 
@@ -227,7 +227,7 @@ handle = r.createRuleset('approval1',
             }
         }
     })
-);
+, 100);
 
 r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
 
@@ -269,7 +269,7 @@ handle = r.createRuleset('approval2',
             }
         }
     })
-);
+, 100);
 
 r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
 
@@ -304,86 +304,149 @@ handle = r.createRuleset('approval3',
             when: {$lte: {amount: {$s: 'maxAmount'}}}
         }
     })
-);
+, 4);
 
 r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
 
-r.assertState(handle,
-    JSON.stringify({
-        id: 'fourth',
-        maxAmount: 100
-    })
-);
-
-console.log(JSON.parse(r.getState(handle, 'fourth')));
-
-r.assertEvent(handle,
+console.log(r.assertState(handle,
     JSON.stringify({
         id: 1,
-        sid: 'fourth',
+        maxAmount: 100
+    })
+));
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 1,
+        sid: 1,
         amount: 1000
     })
-);
+));
 
-r.assertEvent(handle,
+console.log(r.assertEvent(handle,
     JSON.stringify({
         id: 2,
-        sid: 'fourth',
+        sid: 1,
         amount: 10
     })
-);
+));
 
 result = r.startAction(handle);
 console.log(JSON.parse(result[1]));
 console.log(JSON.parse(result[2]));
 r.completeAction(handle, result[0], result[1]);
+
+r.assertState(handle,
+    JSON.stringify({
+        id: 1,
+        maxAmount: 10000
+    })
+);
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 3,
+        sid: 1,
+        amount: 1000
+    })
+));
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 4,
+        sid: 2,
+        amount: 1000
+    })
+));
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 5,
+        sid: 3,
+        amount: 1000
+    })
+));
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 6,
+        sid: 4,
+        amount: 1000
+    })
+));
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 7,
+        sid: 5,
+        amount: 1000
+    })
+));
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 8,
+        sid: 1,
+        amount: 1000
+    })
+));
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+
+r.deleteRuleset(handle);
 
 console.log('approval4');
 
 handle = r.createRuleset('approval4', 
     JSON.stringify({
         r1: { 
-            when: {$lte: {amount: {$r: 'maxAmount'}}}
-        }
+            when: {$lte: {amount: {$s: { name: 'maxAmount', time: 60, sid: 1}}}}
+        },
+        r2: { 
+            when: {$gte: {amount: {$s: { name: 'minAmount', time: 60, sid: 2}}}}
+        },
     })
-);
+, 4);
 
 r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
 
-r.setRulesetState(handle,
-    JSON.stringify({maxAmount: 100})
-);
-
-console.log(JSON.parse(r.getRulesetState(handle)));
-
-r.assertEvent(handle,
+console.log(r.assertState(handle,
     JSON.stringify({
         id: 1,
-        sid: 'fifth',
-        amount: 5
+        maxAmount: 300
     })
-);
+));
 
-r.assertEvent(handle,
+console.log(r.assertState(handle,
     JSON.stringify({
         id: 2,
-        sid: 'sixth',
-        amount: 6
+        minAmount: 200
     })
-);
+));
 
-r.assertEvent(handle,
+console.log(r.assertEvent(handle,
     JSON.stringify({
-        id: 3,
-        sid: 'sixth',
-        amount: 100
+        id: 1,
+        sid: 3,
+        amount: 500 
     })
-);
+));
 
 result = r.startAction(handle);
 console.log(JSON.parse(result[1]));
 console.log(JSON.parse(result[2]));
 r.completeAction(handle, result[0], result[1]);
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 2,
+        sid: 3,
+        amount: 100
+    })
+));
 
 result = r.startAction(handle);
 console.log(JSON.parse(result[1]));

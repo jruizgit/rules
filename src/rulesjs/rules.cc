@@ -8,14 +8,16 @@ using namespace v8;
 Handle<Value> jsCreateRuleset(const Arguments& args) {
     HandleScope scope;
 
-    if (args.Length() < 2) {
+    if (args.Length() < 3) {
         ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
-    } else if (!args[0]->IsString() || !args[1]->IsString()) {
+    } else if (!args[0]->IsString() || !args[1]->IsString() || !args[2]->IsNumber()) {
         ThrowException(Exception::TypeError(String::New("Wrong argument type")));
     } else {
         void *output = NULL;
-        unsigned int result = createRuleset(&output, *v8::String::Utf8Value(args[0]->ToString()), 
-                                                     *v8::String::Utf8Value(args[1]->ToString()));
+        unsigned int result = createRuleset(&output, 
+                                            *v8::String::Utf8Value(args[0]->ToString()), 
+                                            *v8::String::Utf8Value(args[1]->ToString()),
+                                            args[2]->IntegerValue());
         if (result != RULES_OK) {
             char * message;
             asprintf(&message, "Could not create ruleset, error code: %d", result);
@@ -59,11 +61,15 @@ Handle<Value> jsBindRuleset(const Arguments& args) {
     } else {
         unsigned int result;
         if (args[3]->IsString()) {
-            result = bindRuleset((void *)args[0]->IntegerValue(), *v8::String::Utf8Value(args[1]->ToString()), 
-                                  args[2]->IntegerValue(), *v8::String::Utf8Value(args[3]->ToString()));
+            result = bindRuleset((void *)args[0]->IntegerValue(), 
+                                 *v8::String::Utf8Value(args[1]->ToString()), 
+                                 args[2]->IntegerValue(), 
+                                 *v8::String::Utf8Value(args[3]->ToString()));
         } else {
-            result = bindRuleset((void *)args[0]->IntegerValue(), *v8::String::Utf8Value(args[1]->ToString()), 
-                                  args[2]->IntegerValue(), NULL);
+            result = bindRuleset((void *)args[0]->IntegerValue(), 
+                                 *v8::String::Utf8Value(args[1]->ToString()), 
+                                args[2]->IntegerValue(), 
+                                NULL);
         }
 
         if (result != RULES_OK) {
@@ -115,7 +121,9 @@ Handle<Value> jsAssertEvents(const Arguments& args) {
         unsigned int *results;
         unsigned int resultsLength;
         unsigned int result = assertEvents((void *)args[0]->IntegerValue(), 
-                                           *v8::String::Utf8Value(args[1]->ToString()), &resultsLength, &results);
+                                           *v8::String::Utf8Value(args[1]->ToString()), 
+                                           &resultsLength, 
+                                           &results);
         
         if (result == RULES_OK) {
             Handle<Array> array = Array::New(resultsLength);
@@ -177,7 +185,10 @@ Handle<Value> jsStartAction(const Arguments& args) {
         char *session;
         char *messages;
         void *actionHandle;
-        unsigned int result = startAction((void *)args[0]->IntegerValue(), &session, &messages, &actionHandle); 
+        unsigned int result = startAction((void *)args[0]->IntegerValue(), 
+                                          &session, 
+                                          &messages, 
+                                          &actionHandle); 
         if (result == RULES_OK) {
             Handle<Array> array = Array::New(3);
             array->Set(0, Number::New((long)actionHandle));
@@ -300,7 +311,9 @@ Handle<Value> jsGetState(const Arguments& args) {
         ThrowException(Exception::TypeError(String::New("Wrong argument type")));
     } else {
         char *state;
-        unsigned int result = getState((void *)args[0]->IntegerValue(),  *v8::String::Utf8Value(args[1]->ToString()), &state); 
+        unsigned int result = getState((void *)args[0]->IntegerValue(), 
+                                       *v8::String::Utf8Value(args[1]->ToString()), 
+                                       &state); 
         if (result == RULES_OK) {
             Handle<Value> ret = scope.Close(String::New(state));
             free(state);
@@ -308,53 +321,6 @@ Handle<Value> jsGetState(const Arguments& args) {
         } else if (result != ERR_NEW_SESSION) {
             char * message;
             asprintf(&message, "Could not get ruleset state, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
-        }
-    }
-
-    return scope.Close(Undefined());
-}
-
-Handle<Value> jsSetRulesetState(const Arguments& args) {
-    HandleScope scope;
-
-    if (args.Length() < 2) {
-        ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
-        ThrowException(Exception::TypeError(String::New("Wrong argument type")));
-    } else {
-        unsigned int result = setRulesetState((void *)args[0]->IntegerValue(),
-                                           *v8::String::Utf8Value(args[1]->ToString()));
-        
-        if (result != RULES_OK) {
-            char * message;
-            asprintf(&message, "Could not set ruleset state, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
-        } 
-    }
-
-    return scope.Close(Undefined());
-}
-
-Handle<Value> jsGetRulesetState(const Arguments& args) {
-    HandleScope scope;
-
-    if (args.Length() < 1) {
-        ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
-    } else if (!args[0]->IsNumber()) {
-        ThrowException(Exception::TypeError(String::New("Wrong argument type")));
-    } else {
-        char *state;
-        unsigned int result = getRulesetState((void *)args[0]->IntegerValue(), &state); 
-        if (result == RULES_OK) {
-            Handle<Value> ret = scope.Close(String::New(state));
-            free(state);
-            return ret;
-        } else {
-            char * message;
-            asprintf(&message, "Could not get state, error code: %d", result);
             ThrowException(Exception::TypeError(String::New(message)));
             free(message);
         }
@@ -399,12 +365,6 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewSymbol("getState"),
         FunctionTemplate::New(jsGetState)->GetFunction());
-
-    exports->Set(String::NewSymbol("setRulesetState"),
-        FunctionTemplate::New(jsSetRulesetState)->GetFunction());
-
-    exports->Set(String::NewSymbol("getRulesetState"),
-        FunctionTemplate::New(jsGetRulesetState)->GetFunction());
 }
 
 NODE_MODULE(rules, init)

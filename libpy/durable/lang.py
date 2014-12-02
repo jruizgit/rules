@@ -480,7 +480,6 @@ def timeout(name):
 
 m = value('$m')
 s = value('$s')
-r = value('$r')
 
 _rule_stack = []
 _ruleset_stack = []

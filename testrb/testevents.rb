@@ -23,7 +23,7 @@ handle = Rules.create_ruleset 'books1', JSON.generate({
       }
     }
   }
-})
+}), 100
 
 Rules.bind_ruleset handle, '/tmp/redis.sock', 0 , nil
 
@@ -81,7 +81,7 @@ handle = Rules.create_ruleset 'books2',  JSON.generate({
       ]
     }
   }
-})
+}), 100
 
 Rules.bind_ruleset handle, '/tmp/redis.sock', 0, nil
 
@@ -113,7 +113,7 @@ handle = Rules.create_ruleset 'books3', JSON.generate({
   :ship => {
     :when => {:$nex => {:label => 1}}
  }
-})
+}), 100
 
 Rules.bind_ruleset handle, '/tmp/redis.sock', 0 , nil
 
@@ -136,14 +136,15 @@ puts 'books4 ******'
 
 handle = Rules.create_ruleset 'books4', JSON.generate({
   :ship => {
-    :whenSome => {
+    :when => {
+      :$atLeast => 5,
       :$and => [
           {:$lte => {:amount => 1000}},
           {:subject => 'approve'}
       ]
     }
   }
-})
+}), 100
 
 Rules.bind_ruleset handle, '/tmp/redis.sock', 0, nil
 
@@ -178,7 +179,7 @@ handle = Rules.create_ruleset 'approval1', JSON.generate({
       }
     }
   }
-})
+}), 100
 
 Rules.bind_ruleset handle, '/tmp/redis.sock', 0, nil
 
@@ -217,7 +218,7 @@ handle = Rules.create_ruleset 'approval2', JSON.generate({
       }
     }
   }
-})
+}), 100
 
 Rules.bind_ruleset handle, '/tmp/redis.sock', 0, nil
 

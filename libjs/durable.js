@@ -208,7 +208,7 @@ exports = module.exports = durable = function () {
         return that;
     };
 
-    var ruleset = function(name, host, rulesetDefinition) {
+    var ruleset = function(name, host, rulesetDefinition, stateCacheSize) {
         var that = {};
         var actions = {};
         var handle;
@@ -447,11 +447,11 @@ exports = module.exports = durable = function () {
             delete(rule.run);
         }
 
-        handle = r.createRuleset(name, JSON.stringify(rulesetDefinition));
+        handle = r.createRuleset(name, JSON.stringify(rulesetDefinition), stateCacheSize);
         return that;
     }
 
-    var stateChart = function (name, host, chartDefinition) {
+    var stateChart = function (name, host, chartDefinition, stateCacheSize) {
         
         var transform = function (parentName, parentTriggers, parentStartState, host, chart, rules) {
             var startState = {};
@@ -585,7 +585,7 @@ exports = module.exports = durable = function () {
 
         var rules = {};
         transform(null, null, null, host, chartDefinition, rules);
-        var that = ruleset(name, host, rules);
+        var that = ruleset(name, host, rules, stateCacheSize);
         that.toJSON = function() {
             chartDefinition.$type = 'stateChart';
             return JSON.stringify(chartDefinition);
@@ -594,7 +594,7 @@ exports = module.exports = durable = function () {
         return that;
     };
 
-    var flowChart = function (name, host, chartDefinition) {
+    var flowChart = function (name, host, chartDefinition, stateCacheSize) {
         
         var transform = function (host, chart, rules) {
             var visited = {};
@@ -705,7 +705,7 @@ exports = module.exports = durable = function () {
 
         var rules = {};
         transform(host, chartDefinition, rules);
-        var that = ruleset(name, host, rules);
+        var that = ruleset(name, host, rules, stateCacheSize);
         that.toJSON = function() {
             chartDefinition.$type = 'flowChart';
             return JSON.stringify(chartDefinition);
@@ -714,7 +714,7 @@ exports = module.exports = durable = function () {
         return that;
     };
 
-    var createRulesets = function (parentName, host, rulesetDefinitions) {
+    var createRulesets = function (parentName, host, rulesetDefinitions, stateCacheSize) {
         var branches = {};
         for (var name in rulesetDefinitions) {
             var currentDefinition = rulesetDefinitions[name];
@@ -726,7 +726,7 @@ exports = module.exports = durable = function () {
                     name = parentName + '.' + name;
                 }
 
-                branches[name] = stateChart(name, host, currentDefinition);
+                branches[name] = stateChart(name, host, currentDefinition, stateCacheSize);
             } else {
                 index = name.indexOf('$flow');
                 if (index !== -1) {
@@ -735,13 +735,13 @@ exports = module.exports = durable = function () {
                         name = parentName + '.' + name;
                     }
 
-                    branches[name] = flowChart(name, host, currentDefinition);
+                    branches[name] = flowChart(name, host, currentDefinition, stateCacheSize);
                 } else {
                     if (parentName) {
                         name = parentName + '.' + name;
                     }
 
-                    branches[name] = ruleset(name, host, currentDefinition);
+                    branches[name] = ruleset(name, host, currentDefinition, stateCacheSize);
                 }
             }
         }
@@ -749,12 +749,13 @@ exports = module.exports = durable = function () {
         return branches;
     };
 
-    var host = function (databases) {
+    var host = function (databases, stateCacheSize) {
         var that = {};
         var rulesDirectory = {};
         var instanceDirectory = {};
         var rulesList = [];
         databases = databases || ['/tmp/redis.sock'];
+        stateCacheSize = stateCacheSize || 1024;
         
         that.getAction = function (actionName) {
             throw 'Action ' + actionName + ' not found';
@@ -788,26 +789,6 @@ exports = module.exports = durable = function () {
             });
         };
 
-        that.getRulesetState = function (rulesetName, complete) {
-            that.getRuleset(rulesetName, function(err, rules) {
-                if (err) {
-                    complete(err);
-                } else {
-                    rules.getRulesetState(complete);
-                }
-            });
-        };
-
-        that.patchRulesetState = function (rulesetName, state, complete) {
-            that.getRuleset(rulesetName, function(err, rules) {
-                if (err) {
-                    complete(err);
-                } else {
-                    rules.setRulesetState(state, complete);
-                }
-            });
-        };
-
         that.getRuleset = function (rulesetName, complete) {
             var rules = rulesDirectory[rulesetName];
             if (rules) {
@@ -837,7 +818,7 @@ exports = module.exports = durable = function () {
         };
 
         that.registerRulesets = function (parentName, rulesetDefinitions) {
-            var rulesets = createRulesets(parentName, that, rulesetDefinitions);
+            var rulesets = createRulesets(parentName, that, rulesetDefinitions, stateCacheSize);
             var names = [];
             for (var rulesetName in rulesets) {
                 var rulesetDefinition = rulesets[rulesetName];
@@ -942,30 +923,6 @@ exports = module.exports = durable = function () {
                 }).resume();
             });
 
-            that.get(basePath + '/:rulesetName/$state', function (request, response) {
-                response.contentType = 'application/json; charset=utf-8';
-                host.getRulesetState(request.params.rulesetName, request.params.sid, function (err, result) {
-                        if (err) {
-                            response.send({ error: err }, 404);
-                        }
-                        else {
-                            response.send(result);
-                        }
-                    });
-            });
-
-            that.patch(basePath + '/:rulesetName/$state', function (request, response) {
-                response.contentType = 'application/json; charset=utf-8';
-                var document = request.body;
-                host.patchRulesetState(request.params.rulesetName, document, function (err) {
-                    if (err) {
-                        response.send({ error: err }, 500);
-                    } else {
-                        response.send();
-                    }
-                });
-            });
-
             that.get(basePath + '/:rulesetName/:sid', function (request, response) {
                 response.contentType = 'application/json; charset=utf-8';
                 host.getState(request.params.rulesetName, request.params.sid, function (err, result) {
@@ -1035,7 +992,7 @@ exports = module.exports = durable = function () {
         return that;
     };
 
-    var run = function(rulesetDefinitions, basePath, databases, start) {
+    var run = function(rulesetDefinitions, basePath, databases, start, stateCacheSize) {
         var rulesHost = host(databases);
         rulesHost.registerRulesets(null, rulesetDefinitions);
         

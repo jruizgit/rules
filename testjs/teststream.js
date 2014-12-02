@@ -3,7 +3,7 @@ var d = require('../libjs/durable');
 d.run({
     a1: {
         r1: {
-            when: { $min: 5, $max: 10, $and: [
+            when: { $atLeast: 5, $atMost: 10, $and: [
                 { subject: 'approve' },
                 { $lte: { amount: 1000 }}
             ]},
@@ -12,7 +12,7 @@ d.run({
     },
     a2: {
         r1: {
-            when: { $min: 3, $max: 3,
+            when: { $atLeast: 3, $atMost: 3,
                 a$any: {
                     a: { $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
                     $s: { $nex: { done: 1 } }
@@ -24,7 +24,7 @@ d.run({
     a3: {
         r1: {
             whenAll: { 
-                a: { $min: 5, $max: 5, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
+                a: { $atLeast: 5, $atMost: 5, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
                 $s: { $nex: { done: 1 } }            
             },
             run: requestApproval
@@ -33,7 +33,7 @@ d.run({
     a4$state: {
         input: {
             request: {
-                when: { $min: 5, $max: 10, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
+                when: { $atLeast: 5, $atMost: 10, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
                 run: requestApproval,
                 to: 'pending'
             }
@@ -41,8 +41,8 @@ d.run({
         pending: {
             request: {
                 whenAny: {
-                    a: { $min: 5, subject: 'approved' },
-                    b: { $min: 5, subject: 'ok' }
+                    a: { $atLeast: 5, subject: 'approved' },
+                    b: { $atLeast: 5, subject: 'ok' }
                 },
                 run: requestApproval,
                 to: 'pending'
@@ -59,7 +59,7 @@ d.run({
     a5$flow: {
         input: {
             to: {
-                request: { $min: 5, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
+                request: { $atLeast: 5, $and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]},
             }
         },
         request: {
@@ -68,8 +68,8 @@ d.run({
                 approve: { $s: { done: 1} },
                 request: {
                     $any: {
-                        a: { $min: 5, subject: 'approved' },
-                        b: { $min: 5, subject: 'ok'}
+                        a: { $atLeast: 5, subject: 'approved' },
+                        b: { $atLeast: 5, subject: 'ok'}
                     }
                 }
             }

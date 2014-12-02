@@ -19,26 +19,30 @@
 #define NODE_M_OFFSET 0
 #define NODE_S_OFFSET 1
 
+typedef struct reference {
+    unsigned int hash;
+    unsigned int nameOffset;
+    unsigned int sidOffset;
+    unsigned int time;
+} reference;
+
 typedef struct jsonValue {
     unsigned char type;
-    unsigned int hash;
     union { 
         long i; 
         double d; 
         unsigned char b; 
         unsigned int stringOffset;
+        reference property;
     } value;
 } jsonValue;
 
 typedef struct alpha {
     unsigned int hash;
     unsigned char operator;
-    unsigned char min;
-    unsigned char max;
     unsigned int betaListOffset;
     unsigned int nextListOffset;
     unsigned int nextOffset;
-    unsigned int maxLifetime;
     jsonValue right;
 } alpha;
 
@@ -74,9 +78,13 @@ typedef struct ruleset {
     unsigned int queryOffset;  
     unsigned int actionCount;
     void *bindingsList;
-    stateEntry globalState;
-    stateEntry state[MAX_STATE_ENTRIES]; 
+    unsigned int *stateBuckets;
+    unsigned int stateBucketsLength;
+    stateEntry *state; 
+    unsigned int maxStateLength;
     unsigned int stateLength;
+    unsigned int lruStateOffset;
+    unsigned int mruStateOffset;
 } ruleset;
 
 

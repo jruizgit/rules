@@ -143,18 +143,6 @@ Durable.ruleset :a7 do
   end
 end
 
-Durable.ruleset :a8 do
-  when_all m.amount < s.max_amount, m.amount > r.min_amount do
-    puts "a8 approved"
-  end
-  when_start do
-    patch_state :a8, {:id => 1, :max_amount => 100}
-    patch_ruleset_state :a8, {:min_amount => 1000}
-    post :a8, {:id => 1, :sid => 1, :amount => 10}
-    post :a8, {:id => 2, :sid => 1, :amount => 10000}
-  end
-end
-
 Durable.ruleset :p1 do
   when_one m.start == "yes", paralel do 
     ruleset :one do 

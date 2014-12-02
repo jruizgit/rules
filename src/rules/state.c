@@ -17,16 +17,136 @@ static unsigned int djbHash(char *str, unsigned int len) {
    return hash;
 }
 
-static stateEntry *getEntry(ruleset *tree, char *sid, unsigned int *sidHash) {
-    *sidHash = djbHash(sid, strlen(sid));
-    unsigned int candidateIndex = *sidHash % MAX_STATE_ENTRIES;
-    stateEntry *candidate = &tree->state[candidateIndex];
-    if (candidate->sidHash && candidate->sidHash != *sidHash) {
-        candidateIndex = (candidateIndex + 1) % MAX_STATE_ENTRIES;
-        candidate = &tree->state[candidateIndex];
+static unsigned int evictEntry(ruleset *tree) {
+    stateEntry *lruEntry = &tree->state[tree->lruStateOffset];
+    unsigned int lruBucket = lruEntry->sidHash % tree->stateBucketsLength;
+    unsigned int offset = tree->stateBuckets[lruBucket];
+    unsigned int lastOffset = UNDEFINED_HASH_OFFSET;
+    unsigned char found = 0;
+    while (!found) {
+        stateEntry *current = &tree->state[offset];
+        if (current->sidHash == lruEntry->sidHash) {
+            if (!strcmp(current->sid, lruEntry->sid)) {
+                if (lastOffset == UNDEFINED_HASH_OFFSET) {
+                    tree->stateBuckets[lruBucket] = current->nextHashOffset;
+                } else {
+                    tree->state[lastOffset].nextHashOffset = current->nextHashOffset;
+                }
+
+                if (current->state) {
+                    free(current->state);
+                    current->state = NULL;
+                }
+
+                free(current->sid);
+                current->sid = NULL;
+                found = 1;
+            }
+        }
+
+        lastOffset = offset;
+        offset = current->nextHashOffset;
     }
 
-    return candidate;
+    unsigned int result = tree->lruStateOffset;
+    tree->lruStateOffset = lruEntry->nextLruOffset;
+    tree->state[tree->lruStateOffset].prevLruOffset = UNDEFINED_HASH_OFFSET;
+    return result;
+}
+
+static unsigned int addEntry(ruleset *tree, char *sid, unsigned int sidHash) {
+    unsigned newOffset;
+    if (tree->stateLength == tree->maxStateLength) {
+        newOffset = evictEntry(tree);
+    } else {
+        newOffset = tree->stateLength;
+        ++tree->stateLength;
+    }
+
+    stateEntry *current = &tree->state[newOffset];
+    current->prevLruOffset = UNDEFINED_HASH_OFFSET;
+    current->nextLruOffset = UNDEFINED_HASH_OFFSET;
+    current->nextHashOffset = UNDEFINED_HASH_OFFSET;
+    current->sid = malloc(strlen(sid) + 1);
+    strcpy(current->sid, sid);
+    current->sidHash = sidHash;
+    unsigned int bucket = sidHash % tree->stateBucketsLength;
+    unsigned int offset = tree->stateBuckets[bucket];
+    if (offset == UNDEFINED_HASH_OFFSET) {
+        tree->stateBuckets[bucket] = newOffset;
+    }
+    else {
+        while (1) {
+            current = &tree->state[offset];
+            if (current->nextHashOffset == UNDEFINED_HASH_OFFSET) {
+                current->nextHashOffset = newOffset;
+                break;
+            }
+
+            offset = current->nextHashOffset;
+        }
+    }
+
+    return newOffset;
+}
+
+static unsigned char ensureEntry(ruleset *tree, char *sid, unsigned int sidHash, stateEntry **result) {
+    unsigned int bucket = sidHash % tree->stateBucketsLength;
+    unsigned int offset = tree->stateBuckets[bucket];
+    stateEntry *current = NULL;
+    unsigned char found = 0;
+    while (offset != UNDEFINED_HASH_OFFSET) {
+        current = &tree->state[offset];
+        if (current->sidHash == sidHash) {
+            if (!strcmp(current->sid, sid)) {
+                found = 1;
+                break;
+            }
+        }
+
+        offset = current->nextHashOffset;
+    }  
+    if (offset == UNDEFINED_HASH_OFFSET) {
+        offset = addEntry(tree, sid, sidHash);
+        current = &tree->state[offset];
+    }
+
+    if (current->prevLruOffset != UNDEFINED_HASH_OFFSET) {
+        tree->state[current->prevLruOffset].nextLruOffset = current->nextLruOffset;
+    }
+
+    if (current->nextLruOffset != UNDEFINED_HASH_OFFSET) {
+        tree->state[current->nextLruOffset].prevLruOffset = current->prevLruOffset;
+    }
+
+    current->prevLruOffset = tree->mruStateOffset;
+    current->nextLruOffset = UNDEFINED_HASH_OFFSET;
+    if (tree->mruStateOffset == UNDEFINED_HASH_OFFSET) {
+        tree->lruStateOffset = offset;
+    } else {
+        tree->state[tree->mruStateOffset].nextLruOffset = offset;
+    }
+
+    tree->mruStateOffset = offset;
+    *result = current;
+    return found;
+}
+
+static stateEntry *getEntry(ruleset *tree, char *sid, unsigned int sidHash) {
+    unsigned int bucket = sidHash % tree->stateBucketsLength;
+    unsigned int offset = tree->stateBuckets[bucket];
+    while (offset != UNDEFINED_HASH_OFFSET) {
+        stateEntry *current = &tree->state[offset];
+        if (current->sidHash == sidHash) {
+            if (!strcmp(current->sid, sid)) {
+                return current;
+            }
+        }
+
+        offset = current->nextHashOffset;
+    }  
+    
+    return NULL;
 }
 
 unsigned int constructObject(char *parentName, 
@@ -93,9 +213,9 @@ unsigned int constructObject(char *parentName,
         jsonProperty *property = NULL;
         if (!createHashtable) {
             property = &properties[*propertiesLength];
-            if (hash == ID_HASH) {
+            if (hash == HASH_ID) {
                 *midIndex = *propertiesLength;
-            } else if (hash == SID_HASH) {
+            } else if (hash == HASH_SID) {
                 *sidIndex = *propertiesLength;
             }
         } else {
@@ -104,9 +224,9 @@ unsigned int constructObject(char *parentName,
                 candidate = (candidate + 1) % maxProperties;
             }
 
-            if (hash == ID_HASH) {
+            if (hash == HASH_ID) {
                 *midIndex = candidate;
-            } else if (hash == SID_HASH) {
+            } else if (hash == HASH_SID) {
                 *sidIndex = candidate;
             }
 
@@ -169,84 +289,53 @@ void rehydrateProperty(jsonProperty *property) {
     }
 }
 
-unsigned int resolveBinding(void *tree, 
-                            char *sid, 
-                            void **rulesBinding) {
-
-    
-    unsigned int sidHash;
-    ruleset *handle = (ruleset*)tree; 
-    stateEntry *entry = getEntry(tree, sid, &sidHash);
-    if (entry->sidHash == 0) {
-        if (handle->stateLength >= MAX_STATE_ENTRIES - 1) {
-            return ERR_STATE_CACHE_FULL;
-        }
-
-        ++handle->stateLength;
-        unsigned int result = getBindingIndex(tree, sidHash, &entry->bindingIndex);
+static unsigned int resolveBindingAndEntry(ruleset *tree, 
+                                          char *sid, 
+                                          stateEntry **entry,
+                                          void **rulesBinding) {   
+    unsigned int sidHash = djbHash(sid, strlen(sid));
+    if (!ensureEntry(tree, sid, sidHash, entry)) {
+        unsigned int result = getBindingIndex(tree, sidHash, &(*entry)->bindingIndex);
         if (result != RULES_OK) {
             return result;
         }
-
-        entry->sidHash = sidHash;
     }
     
-    bindingsList *list = handle->bindingsList;
-    *rulesBinding = &list->bindings[entry->bindingIndex];
+    bindingsList *list = tree->bindingsList;
+    *rulesBinding = &list->bindings[(*entry)->bindingIndex];
     return RULES_OK;
 }
 
-unsigned int refreshGlobalState(void *tree) {
-    ruleset *handle = (ruleset*)tree;
-    if (handle->globalState.state != NULL) {
-        free(handle->globalState.state);
-        handle->globalState.state = NULL;
-    }
-
-    memset(&handle->globalState, 0, MAX_CONFIG_PROPERTIES * sizeof(jsonProperty));
-    unsigned int result = getRulesetSession(handle, &handle->globalState.state);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    char *next;
-    unsigned int midIndex = UNDEFINED_INDEX;
-    unsigned int sidIndex = UNDEFINED_INDEX;
-    result =  constructObject(NULL, 
-                             handle->globalState.state, 
-                             1, 
-                             MAX_CONFIG_PROPERTIES, 
-                             handle->globalState.properties, 
-                             &handle->globalState.propertiesLength, 
-                             &midIndex, 
-                             &sidIndex, 
-                             &next);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    handle->globalState.lastRefresh = time(NULL);
-    return RULES_OK;
+unsigned int resolveBinding(void *handle, 
+                            char *sid, 
+                            void **rulesBinding) {   
+    stateEntry *entry = NULL;
+    return resolveBindingAndEntry(handle, sid, &entry, rulesBinding);
 }
 
-unsigned int refreshState(void *tree, char *sid, void **rulesBinding) {
+unsigned int refreshState(void *handle, 
+                          char *sid) {
     unsigned int result;
-    if (*rulesBinding == NULL) {
-        result = resolveBinding(tree, sid, rulesBinding);
-        if (result != RULES_OK) {
-          return result;
-        }
+    stateEntry *entry = NULL;  
+    void *rulesBinding;
+    result = resolveBindingAndEntry(handle, sid, &entry, &rulesBinding);
+    if (result != RULES_OK) {
+        return result;
     }
-    
-    unsigned int sidHash;   
-    stateEntry *entry = getEntry(tree, sid, &sidHash);
-    if (entry->state != NULL) {
+
+    if (entry->state) {
         free(entry->state);
         entry->state = NULL;
     }
+
     memset(entry->properties, 0, MAX_STATE_PROPERTIES * sizeof(jsonProperty));
-    result = getSession(*rulesBinding, sid, &entry->state);
+    result = getSession(rulesBinding, sid, &entry->state);
     if (result != RULES_OK) {
+        if (result == ERR_NEW_SESSION) {
+            entry->lastRefresh = time(NULL);
+            return RULES_OK;
+        }
+
         return result;
     }
 
@@ -270,53 +359,18 @@ unsigned int refreshState(void *tree, char *sid, void **rulesBinding) {
     return RULES_OK;
 }
 
-unsigned int fetchGlobalStateProperty(void *tree, 
-                                       unsigned int propertyHash,
-                                       unsigned int maxTime,
-                                       unsigned char ignoreStaleState,
-                                       jsonProperty **property) {
-    ruleset *handle = (ruleset*)tree;
-    if (handle->globalState.lastRefresh == 0) {
-        return ERR_STATE_NOT_LOADED;
-    }
-
-    if (!ignoreStaleState && (time(NULL) - handle->globalState.lastRefresh > maxTime)) {
-        return ERR_STALE_STATE;
-    }
-
-    unsigned int propertyIndex = propertyHash % MAX_CONFIG_PROPERTIES;
-    jsonProperty *result = &handle->globalState.properties[propertyIndex];
-    while (result->type != 0 && result->hash != propertyHash) {
-        propertyIndex = (propertyIndex + 1) % MAX_CONFIG_PROPERTIES;  
-        result = &handle->globalState.properties[propertyIndex];   
-    }
-
-    if (!result->type) {
-        return ERR_PROPERTY_NOT_FOUND;
-    }
-
-    rehydrateProperty(result);
-    *property = result;
-    return RULES_OK;    
-}
-
 unsigned int fetchStateProperty(void *tree,
-                                      char *sid, 
-                                      unsigned int propertyHash, 
-                                      unsigned int maxTime, 
-                                      unsigned char ignoreStaleState,
-                                      jsonProperty **property) {
-
-    unsigned int sidHash;   
-    stateEntry *entry = getEntry(tree, sid, &sidHash);
-    if (entry->sidHash == 0) {
-        return ERR_BINDING_NOT_MAPPED;
+                                char *sid, 
+                                unsigned int propertyHash, 
+                                unsigned int maxTime, 
+                                unsigned char ignoreStaleState,
+                                jsonProperty **property) {
+    unsigned int sidHash = djbHash(sid, strlen(sid));
+    stateEntry *entry = getEntry(tree, sid, sidHash);
+    if (entry == NULL || entry->lastRefresh == 0) {
+        return ERR_STATE_NOT_LOADED;
     }
     
-    if (entry->lastRefresh == 0) {
-        return ERR_STATE_NOT_LOADED;
-    }
-
     if (!ignoreStaleState && (time(NULL) - entry->lastRefresh > maxTime)) {
         return ERR_STALE_STATE;
     }
@@ -345,12 +399,4 @@ unsigned int getState(void *handle, char *sid, char **state) {
     }
 
     return getSession(rulesBinding, sid, state);
-}
-
-unsigned int getRulesetState(void *handle, char **state) {
-    return getRulesetSession(handle, state);
-}
-
-unsigned int setRulesetState(void *handle, char *state) {
-    return storeRulesetSessionImmediate(handle, state);
 }

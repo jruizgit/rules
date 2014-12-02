@@ -22,9 +22,10 @@
 #define HASH_OR 193419978 // $or
 #define HASH_AND 2087876700 // $and
 #define HASH_S 5861212 // $s
-#define HASH_R 5861211 // $r
-#define HASH_MIN_SIZE 2087889613 // $min
-#define HASH_MAX_SIZE 2087889359 // $max
+#define HASH_NAME 2090536006 // name 
+#define HASH_TIME 2090760340 // time
+#define HASH_MIN_SIZE 4092918839 // $atLeast
+#define HASH_MAX_SIZE 3247687841 // $atMost
 
 typedef struct path {
     unsigned char operator;
@@ -214,16 +215,19 @@ static unsigned int ensureBetaList(ruleset *tree, node *newNode) {
 static void copyValue(ruleset *tree, 
                       jsonValue *right, 
                       char *first, 
-                      char* last,
-                      unsigned int hash,
+                      char *last,
+                      reference *ref,
                       unsigned char type) {
     right->type = type;
-    right->hash = hash;
     unsigned int leftLength;
     char temp;
     switch(type) {
         case JSON_STATE_PROPERTY:
-        case JSON_GLOBAL_STATE_PROPERTY:
+            right->value.property.time = ref->time;
+            right->value.property.hash = ref->hash;
+            right->value.property.nameOffset = ref->nameOffset;
+            right->value.property.sidOffset = ref->sidOffset;
+            break;
         case JSON_STRING:
             leftLength = last - first;
             storeString(tree, first, &right->value.stringOffset, leftLength);
@@ -255,14 +259,10 @@ static unsigned char compareValue(ruleset *tree,
                                   jsonValue *right, 
                                   char *first, 
                                   char *last,
-                                  unsigned int hash,
+                                  reference *ref,
                                   unsigned char type) {
     
     if (right->type != type) {
-        return 0;
-    }
-
-    if (right->hash != hash) {
         return 0;
     }
 
@@ -270,7 +270,13 @@ static unsigned char compareValue(ruleset *tree,
     char temp;
     switch(type) {
         case JSON_STATE_PROPERTY:
-        case JSON_GLOBAL_STATE_PROPERTY:
+            if (right->value.property.time == ref->time &&
+                right->value.property.hash == ref->hash &&
+                right->value.property.nameOffset == ref->nameOffset &&
+                right->value.property.sidOffset == ref->sidOffset)
+                return 1;
+
+            return 0;
         case JSON_STRING:
             leftLength = last - first;
             char *rightString = &tree->stringPool[right->value.stringOffset];
@@ -391,7 +397,7 @@ static unsigned int validateExpression(char *rule) {
             return result;
         }
         
-        if (hash != HASH_S && hash != HASH_R) {
+        if (hash != HASH_S) {
             return ERR_UNEXPECTED_VALUE;
         }
 
@@ -400,7 +406,7 @@ static unsigned int validateExpression(char *rule) {
             return result;
         }
 
-        if (type != JSON_STRING) {
+        if (type != JSON_STRING && type != JSON_OBJECT) {
             return ERR_UNEXPECTED_TYPE;
         }
     }
@@ -603,6 +609,55 @@ static unsigned int linkAlpha(ruleset *tree,
     return RULES_OK;
 }
 
+static void readReference(ruleset *tree, char *rule, reference *ref) {
+    char *first;
+    char *last;
+    unsigned char type;
+    unsigned int hash;
+    
+    readNextName(rule, &first, &last, &hash);
+    if (hash == HASH_S) {
+        ref->time = 120;
+        ref->hash = 0;
+        ref->nameOffset = 0;
+        ref->sidOffset = 0;
+
+        if (readNextString(last, &first, &last, &hash) == PARSE_OK) {
+            ref->hash = hash;
+            storeString(tree, first, &ref->nameOffset, last - first);
+        }
+        else {
+            readNextValue(last, &first, &last, &type);
+            unsigned int result = readNextName(first, &first, &last, &hash);
+            while (result == PARSE_OK) {
+                switch (hash) {
+                    case HASH_NAME:
+                        readNextString(last, &first, &last, &hash);
+                        ref->hash = hash;
+                        storeString(tree, first, &ref->nameOffset, last - first);
+                        break;
+                    case HASH_TIME:
+                        readNextValue(last, &first, &last, &type);
+                        char temp = last[1];
+                        last[1] = '\0';
+                        ref->time = atoi(first);
+                        last[1] = temp;
+                        break;
+                    case HASH_SID:
+                        readNextValue(last, &first, &last, &type);
+                        storeString(tree, first, &ref->sidOffset, last - first + 1);
+                        break;
+                    default:
+                        readNextValue(last, &first, &last, &type);
+                        break;
+                }
+
+                result = readNextName(last, &first, &last, &hash);
+            }
+        }
+    }
+}
+
 static unsigned int findAlpha(ruleset *tree, 
                               unsigned int parentOffset, 
                               unsigned char operator, 
@@ -615,20 +670,13 @@ static unsigned int findAlpha(ruleset *tree,
     unsigned char type;
     unsigned int entry;
     unsigned int hash;
-    unsigned int rhash = 0;
+    reference ref;
     
     readNextName(rule, &firstName, &lastName, &hash);
     readNextValue(lastName, &first, &last, &type);
     if (type == JSON_OBJECT) {
-        readNextName(first, &first, &last, &rhash);
-        if (rhash == HASH_S) {
-            type = JSON_STATE_PROPERTY;
-        } else {
-            type = JSON_GLOBAL_STATE_PROPERTY;
-        }
-
-        readNextString(last, &first, &last, &rhash);
-        
+        readReference(tree, first, &ref);
+        type = JSON_STATE_PROPERTY;
     }
 
     node *parent = &tree->nodePool[parentOffset];
@@ -639,7 +687,7 @@ static unsigned int findAlpha(ruleset *tree,
             node *currentNode = &tree->nodePool[parentNext[entry]];
             if (currentNode->value.a.hash == hash && 
                 currentNode->value.a.operator == operator) {
-                if (compareValue(tree, &currentNode->value.a.right, first, last, rhash, type)) {
+                if (compareValue(tree, &currentNode->value.a.right, first, last, &ref, type)) {
                     *resultOffset = parentNext[entry];
                     return RULES_OK;
                 }
@@ -653,7 +701,7 @@ static unsigned int findAlpha(ruleset *tree,
             node *currentNode = &tree->nodePool[parentNext[entry]];
             if (currentNode->value.a.hash == hash&& 
                 currentNode->value.a.operator == operator) {
-                if (compareValue(tree, &currentNode->value.a.right, first, last, rhash, type)) {
+                if (compareValue(tree, &currentNode->value.a.right, first, last, &ref, type)) {
                     *resultOffset = parentNext[entry];
                     return RULES_OK;
                 }
@@ -677,8 +725,7 @@ static unsigned int findAlpha(ruleset *tree,
     newAlpha->type = NODE_ALPHA;
     newAlpha->value.a.hash = hash;
     newAlpha->value.a.operator = operator;
-    newAlpha->value.a.maxLifetime = 120;
-    copyValue(tree, &newAlpha->value.a.right, first, last, rhash, type);
+    copyValue(tree, &newAlpha->value.a.right, first, last, &ref, type);
     return linkAlpha(tree, parentOffset, *resultOffset);
 }
 
@@ -1305,7 +1352,7 @@ static unsigned int createTree(ruleset *tree, char *rules) {
     return RULES_OK;
 }
 
-unsigned int createRuleset(void **handle, char *name, char *rules) {
+unsigned int createRuleset(void **handle, char *name, char *rules, unsigned int stateCaheSize) {
     node *newNode;
     unsigned int stringOffset;
     unsigned int nodeOffset;
@@ -1330,9 +1377,13 @@ unsigned int createRuleset(void **handle, char *name, char *rules) {
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     tree->stateLength = 0;
-
-    memset(tree->state, 0, MAX_STATE_ENTRIES * sizeof(stateEntry));
-    memset(&tree->globalState, 0, sizeof(stateEntry));
+    tree->state = calloc(stateCaheSize, sizeof(stateEntry));
+    tree->maxStateLength = stateCaheSize;
+    tree->stateBucketsLength = stateCaheSize / 4;
+    tree->stateBuckets = malloc(tree->stateBucketsLength * sizeof(unsigned int));
+    memset(tree->stateBuckets, 0xFF, tree->stateBucketsLength * sizeof(unsigned int));
+    tree->lruStateOffset = UNDEFINED_HASH_OFFSET;
+    tree->mruStateOffset = UNDEFINED_HASH_OFFSET;
 
     result = storeString(tree, name, &tree->nameOffset, strlen(name));
     if (result != RULES_OK) {
@@ -1378,6 +1429,18 @@ unsigned int deleteRuleset(void *handle) {
     free(tree->nextPool);
     free(tree->stringPool);
     free(tree->queryPool);
+    free(tree->stateBuckets);
+    for (unsigned int i = 0; i < tree->stateLength; ++i) {
+        stateEntry *entry = &tree->state[i];
+        if (entry->state) {
+            free(entry->state);
+        }
+
+        if (entry->sid) {
+            free(entry->sid);
+        }
+    }
+    free(tree->state);
     free(tree);
     return RULES_OK;
 }

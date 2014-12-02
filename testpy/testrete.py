@@ -3,7 +3,7 @@ import json
 
 handle = rules.create_ruleset('rules',  json.dumps({ 
     'r1': {
-        'whenSome': {'$and': [{'amount': 10000}, {'subject': 'approve'}]}
+        'when': {'$atLeast': 5, '$atMost': 10, '$and': [{'amount': 10000}, {'subject': 'approve'}]}
    }
 }))
 

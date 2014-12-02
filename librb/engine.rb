@@ -191,7 +191,7 @@ module Engine
   class Ruleset
     attr_reader :definition
 
-    def initialize(name, host, ruleset_definition)
+    def initialize(name, host, ruleset_definition, state_cache_size)
       @actions = {}
       @name = name
       @host = host
@@ -218,7 +218,7 @@ module Engine
           @actions[rule_name] = Fork.new host.register_rulesets(name, action)
         end      
       end
-      @handle = Rules.create_ruleset name, JSON.generate(ruleset_definition)  
+      @handle = Rules.create_ruleset name, JSON.generate(ruleset_definition), state_cache_size  
       @definition = ruleset_definition
     end    
 
@@ -244,33 +244,25 @@ module Engine
       Rules.assert_state @handle, JSON.generate(state)
     end
 
-    def set_ruleset_state(state)
-      Rules.set_ruleset_state @handle, JSON.generate(state)
-    end
-
     def get_state(sid)
       JSON.parse Rules.get_state(@handle, sid)
     end
-    
-    def get_ruleset_state(sid)
-      JSON.parse Rules.get_ruleset_state(@handle)
-    end
 
-    def Ruleset.create_rulesets(parent_name, host, ruleset_definitions)
+    def Ruleset.create_rulesets(parent_name, host, ruleset_definitions, state_cache_size)
       branches = {}
       for name, definition in ruleset_definitions do  
         name = name.to_s
         if name.end_with? "$state"
           name = name[0..-7]
           name = "#{parent_name}.#{name}" if parent_name
-          branches[name] = Statechart.new name, host, definition
+          branches[name] = Statechart.new name, host, definition, state_cache_size
         elsif name.end_with? "$flow"
           name = name[0..-6]
           name = "#{parent_name}.#{name}" if parent_name
-          branches[name] = Flowchart.new name, host, definition
+          branches[name] = Flowchart.new name, host, definition, state_cache_size
         else
           name = "#{parent_name}.#{name}" if parent_name
-          branches[name] = Ruleset.new name, host, definition
+          branches[name] = Ruleset.new name, host, definition, state_cache_size
         end
       end
 
@@ -350,12 +342,12 @@ module Engine
 
   class Statechart < Ruleset
 
-    def initialize(name, host, chart_definition)
+    def initialize(name, host, chart_definition, state_cache_size)
       @name = name
       @host = host
       ruleset_definition = {}
       transform nil, nil, nil, chart_definition, ruleset_definition
-      super name, host, ruleset_definition
+      super name, host, ruleset_definition, state_cache_size
       @definition = chart_definition
       @definition[:$type] = "stateChart"
     end
@@ -519,12 +511,12 @@ module Engine
 
   class Flowchart < Ruleset
 
-    def initialize(name, host, chart_definition)
+    def initialize(name, host, chart_definition, state_cache_size)
       @name = name
       @host = host
       ruleset_definition = {}
       transform chart_definition, ruleset_definition
-      super name, host, ruleset_definition
+      super name, host, ruleset_definition, state_cache_size
       @definition = chart_definition
       @definition["$type"] = "flowChart"
     end
@@ -661,10 +653,11 @@ module Engine
 
   class Host
 
-    def initialize(ruleset_definitions = nil, databases = ["/tmp/redis.sock"])
+    def initialize(ruleset_definitions = nil, databases = ["/tmp/redis.sock"], state_cache_size = 1024)
       @ruleset_directory = {}
       @ruleset_list = []
       @databases = databases
+      @state_cache_size = state_cache_size
       register_rulesets nil, ruleset_definitions if ruleset_definitions
     end
 
@@ -698,10 +691,6 @@ module Engine
       get_ruleset(ruleset_name).get_state sid
     end
 
-    def get_ruleset_state(ruleset_name)
-      get_ruleset(ruleset_name).get_ruleset_state
-    end
-
     def post_batch(ruleset_name, messages)
       get_ruleset(ruleset_name).assert_events messages
     end
@@ -714,12 +703,8 @@ module Engine
       get_ruleset(ruleset_name).assert_state state
     end
 
-    def patch_ruleset_state(ruleset_name, state)
-      get_ruleset(ruleset_name).set_ruleset_state state
-    end
-
     def register_rulesets(parent_name, ruleset_definitions)
-      rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions)
+      rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions, @state_cache_size)
       for ruleset_name, ruleset in rulesets do
         if @ruleset_directory.key? ruleset_name
           raise ArgumentError, "Ruleset with name #{ruleset_name} already registered" 
