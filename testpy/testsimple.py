@@ -1,6 +1,16 @@
 from durable.lang import *
 import datetime
 
+with ruleset('a0'):
+    @when((m.amount > 1000) | (m.subject == 'approve') | (m.subject == 'ok'))
+    def approved(s):
+        print ('a0 approved ->{0}'.format(s.event))
+
+    @when_start
+    def start(host):
+        host.post('a0', {'id': 1, 'sid': 1, 'subject': 'approve'})
+        host.post('a0', {'id': 2, 'sid': 2, 'amount': 2000})
+        host.post('a0', {'id': 3, 'sid': 3, 'subject': 'ok'})
 
 with ruleset('a1'):
     @when((m.subject == 'approve') & (m.amount > 1000))

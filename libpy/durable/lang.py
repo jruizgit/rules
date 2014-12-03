@@ -90,9 +90,14 @@ class value(object):
             right_definition = right_definition.define();
 
         if self._op == '$or' or self._op == '$and':
-            definitions = [ self._left.define() ]
-            definitions.append(right_definition)
-            new_definition = {self._op: definitions}
+            left_definition = self._left.define()
+            if not self._op in left_definition:
+                left_definition = [ left_definition, right_definition ]
+            else:
+                left_definition = left_definition[self._op]
+                left_definition.append(right_definition)
+            
+            new_definition = {self._op: left_definition}
         elif self._op == '$nex' or self._op == '$ex':
             new_definition = {self._op: {self._left: 1}}
         elif self._op == '$eq':

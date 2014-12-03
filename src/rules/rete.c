@@ -890,7 +890,8 @@ static unsigned int createAlpha(ruleset *tree,
             readNextValue(last, &first, &last, &type);
             result = readNextArrayValue(first, &first, &last, &type);
             while (result == PARSE_OK) {
-                createAlpha(tree, &parentOffset, first, nextOffset);
+                unsigned int single_offset = parentOffset;
+                createAlpha(tree, &single_offset, first, nextOffset);
                 result = readNextArrayValue(last, &first, &last, &type);   
             }
 
