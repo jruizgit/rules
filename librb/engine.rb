@@ -14,7 +14,11 @@ module Engine
       @timers = {}
       @messages = {}
       @branches = {}
-      @event = (event.key? "$m") ? event["$m"]: event
+      if (event.kind_of? Hash) && (event.key? "$m")
+        @event = event["$m"]
+      else
+        @event = event
+      end
     end
 
     def signal(message)
@@ -691,7 +695,7 @@ module Engine
       get_ruleset(ruleset_name).get_state sid
     end
 
-    def post_batch(ruleset_name, messages)
+    def post_batch(ruleset_name, *messages)
       get_ruleset(ruleset_name).assert_events messages
     end
 

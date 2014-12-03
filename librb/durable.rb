@@ -45,16 +45,28 @@ module Durable
     attr_reader :type, :op
     attr_accessor :left
 
-    def initialize(type)
+    def initialize(type, left = nil, sid = nil, time = nil)
       @type = type
-      @left = nil
+      @left = left
       @right = nil
       @definitions = nil
+      @sid = sid
+      @time = time
+      @at_least = nil
+      @at_most = nil
     end
     
     def definition
       if not @op
-        {@type => @left}
+        if @sid && @time
+          {@type => { :name => @left, :id => @sid, :time => @time}}
+        elsif @sid
+          {@type => { :name => @left, :id => @sid}}
+        elsif @time
+          {@type => { :name => @left, :time => @time}}
+        else
+          {@type => @left}
+        end
       else
         new_definition = nil
         righ_definition = @right
@@ -68,6 +80,14 @@ module Durable
           new_definition = {@left => righ_definition}
         else
           new_definition = {@op => {@left => righ_definition}}
+        end
+
+        if @at_least
+          new_definition["$atLeast"] = @at_least
+        end
+
+        if @at_most
+          new_definition["$atMost"] = @at_most
         end
 
         if @type == :$s
@@ -136,6 +156,24 @@ module Durable
       self
     end
 
+    def id(sid)
+      Expression.new @type, @left, sid, @time
+    end
+
+    def time(time)
+      Expression.new @type, @left, @sid, time
+    end
+
+    def at_least(limit)
+      @at_least = limit
+      self
+    end
+
+    def at_most(limit)
+      @at_most = limit
+      self
+    end
+
     private 
 
     def default(name, value=nil)
@@ -200,28 +238,20 @@ module Durable
       self.instance_exec &block
     end        
 
-    def when_one(expression, paralel = nil, &block)
-      define_rule :when, expression.definition, paralel, &block
-    end
-
-    def when_some(expression, paralel = nil, &block)
-      define_rule :whenSome, expression.definition, paralel, &block
+    def when_one(expression, opt0 = {}, opt1 = {}, opt2 = {}, &block)
+      define_rule :when, expression.definition, opt0.merge!(opt1).merge!(opt2), &block
     end
 
     def when_all(*args, &block)
-      if (args[-1].kind_of? Expression) || (args[-1].kind_of? Expressions) 
-        define_rule :whenAll, Expressions.new(:$all, args).definition, nil, &block
-      else
-        define_rule :whenAll, Expressions.new(:$all, args[0..-1]).definition, args[-1], &block
-      end
+      options = get_options(*args)
+      args_length = args.length - options.length - 1
+      define_rule :whenAll, Expressions.new(:$any, args[0..args_length]).definition, options, &block
     end
 
     def when_any(*args, &block)
-      if (args[-1].kind_of? Expression) || (args[-1].kind_of? Expressions)
-        define_rule :whenAny, Expressions.new(:$any, args).definition, nil, &block
-      else
-        define_rule :whenAny, Expressions.new(:$any, args[0..-1]).definition, args[-1], &block
-      end
+      options = get_options(*args)
+      args_length = args.length - options.length
+      define_rule :whenAny, Expressions.new(:$any, args[0..args_length]).definition, options, &block
     end
 
     def all(*args)
@@ -237,8 +267,16 @@ module Durable
       self
     end
 
+    def at_least(limit)
+      {:atLeast => limit}
+    end
+
+    def at_most(limit)
+      {:atMost => limit}
+    end
+
     def paralel
-      true
+      {:paralel => true}
     end
 
     def ruleset(name, &block)
@@ -269,12 +307,26 @@ module Durable
     
     protected
 
-    def define_rule(operator, expression_definition, paralel, &block)
+    def get_options(*args)
+      options = {}
+      if args[-1].kind_of? Hash
+        options = options.merge!(args[-1])
+      end
+      if args[-2].kind_of? Hash
+        options = options.merge!(args[-2])
+      end
+      if args[-3].kind_of? Hash
+        options = options.merge!(args[-3])
+      end
+      options
+    end
+
+    def define_rule(operator, expression_definition, options, &block)
       index = @rule_index.to_s
       @rule_index += 1
       rule_name = "r_#{index}"
       rule = nil
-      if paralel
+      if options.key? :paralel
         @paralel_rulesets = {}
         self.instance_exec &block
         rule = operator ? {operator => expression_definition, :run => @paralel_rulesets} : {:run => @paralel_rulesets}
@@ -283,6 +335,15 @@ module Durable
       else
         rule = operator ? {operator => expression_definition} : {}
       end
+
+      if options.key? :atLeast
+        rule["$atLeast"] = options[:atLeast]
+      end
+
+      if options.key? :atMost
+        rule["$atMost"] = options[:atMost]
+      end
+
       @rules[rule_name] = rule
       rule
     end
@@ -296,10 +357,10 @@ module Durable
       super name, block
     end
   
-    def to(state_name, rule = nil, paralel = nil, &block)
+    def to(state_name, rule = nil, paralel = {}, &block)
       rule = define_rule(nil, nil, paralel, &block) if !rule
       rule[:to] = state_name
-      if paralel
+      if paralel.key? :paralel
         @paralel_rulesets = {}
         self.instance_exec &block
         rule[:run] = @paralel_rulesets
@@ -359,8 +420,6 @@ module Durable
         stages[@current_stage][:to][stage_name] = rule[:when]
       elsif rule.key? :whenAll
         stages[@current_stage][:to][stage_name] = {:$all => rule[:whenAll]}
-      elsif rule.key? :whenSome
-        stages[@current_stage][:to][stage_name] = {:$some => rule[:whenSome]}
       else
         stages[@current_stage][:to][stage_name] = {:$any => rule[:whenAny]}
       end

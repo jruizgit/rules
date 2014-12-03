@@ -1,6 +1,17 @@
 require_relative '../librb/durable'
 
 
+Durable.ruleset :a0 do
+  when_one (m.amount < 100) | (m.subject == "approve") | (m.subject == "ok") do
+    puts "a0 approved"
+  end
+  when_start do
+    post :a0, {:id => 1, :sid => 1, :amount => 10}
+    post :a0, {:id => 2, :sid => 2, :subject => 'approve'}
+    post :a0, {:id => 3, :sid => 3, :subject => 'ok'}
+  end
+end
+
 Durable.ruleset :a1 do
   when_one (m.amount < 1000) | (m.amount > 10000) do
     puts "a1 approving " + m.amount.to_s
@@ -134,12 +145,64 @@ end
 
 Durable.ruleset :a7 do
   when_one m.amount < s.max_amount do
-    puts "a7 approved"
+    puts "a7 approved " + m.amount.to_s
   end
   when_start do
     patch_state :a7, {:id => 1, :max_amount => 100}
     post :a7, {:id => 1, :sid => 1, :amount => 10}
     post :a7, {:id => 2, :sid => 1, :amount => 1000}
+  end
+end
+
+Durable.ruleset :a8 do
+  when_one (m.amount < s.max_amount) & (m.amount > s.id(:global).min_amount) do
+    puts "a8 approved " + m.amount.to_s
+  end
+  when_start do
+    patch_state :a8, {:id => 1, :max_amount => 500}
+    patch_state :a8, {:id => :global, :min_amount => 100}
+    post :a8, {:id => 1, :sid => 1, :amount => 10}
+    post :a8, {:id => 2, :sid => 1, :amount => 200}
+  end
+end
+
+Durable.ruleset :a9 do
+  when_one (m.amount < 100), at_least(3), at_most(6) do
+    puts "a9 approved ->" + m.to_s
+  end
+  when_start do
+    post_batch :a9, {:id => 1, :sid => 1, :amount => 10},
+                    {:id => 2, :sid => 1, :amount => 10},
+                    {:id => 3, :sid => 1, :amount => 10},
+                    {:id => 4, :sid => 1, :amount => 10}
+    post_batch :a9, {:id => 5, :sid => 1, :amount => 10},
+                    {:id => 6, :sid => 1, :amount => 10}
+  end
+end
+
+Durable.ruleset :a10 do
+  when_all (m.amount < 100), (m.subject == "approve"), at_least(3), at_most(6) do
+    puts "a10 approved ->" + m.to_s
+  end
+  when_start do
+    post_batch :a10, {:id => 1, :sid => 1, :amount => 10},
+                     {:id => 2, :sid => 1, :amount => 10},
+                     {:id => 3, :sid => 1, :amount => 10},
+                     {:id => 4, :sid => 1, :subject => "approve"}
+    post_batch :a10, {:id => 5, :sid => 1, :subject => "approve"},
+                     {:id => 6, :sid => 1, :subject => "approve"}
+  end
+end
+
+Durable.ruleset :a11 do
+  when_all (m.amount < 100), (m.subject == "please").at_least(3).at_most(6) do
+    puts "a11 approved ->" + m.to_s
+  end
+  when_start do
+    post_batch :a11, {:id => 1, :sid => 1, :amount => 10},
+                     {:id => 2, :sid => 1, :subject => "please"},
+                     {:id => 3, :sid => 1, :subject => "please"},
+                     {:id => 4, :sid => 1, :subject => "please"}
   end
 end
 
