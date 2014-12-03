@@ -403,10 +403,10 @@ console.log('approval4');
 handle = r.createRuleset('approval4', 
     JSON.stringify({
         r1: { 
-            when: {$lte: {amount: {$s: { name: 'maxAmount', time: 60, sid: 1}}}}
+            when: {$lte: {amount: {$s: { name: 'maxAmount', time: 60, id: 1}}}}
         },
         r2: { 
-            when: {$gte: {amount: {$s: { name: 'minAmount', time: 60, sid: 2}}}}
+            when: {$gte: {amount: {$s: { name: 'minAmount', time: 60, id: 2}}}}
         },
     })
 , 4);

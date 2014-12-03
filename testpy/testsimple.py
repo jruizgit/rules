@@ -172,10 +172,7 @@ with statechart('a6'):
         host.post('a6', {'id': 1, 'sid': 1, 'subject': 'enter'})
         host.post('a6', {'id': 2, 'sid': 1, 'subject': 'continue'})
         host.post('a6', {'id': 3, 'sid': 1, 'subject': 'continue'})
-        #host.post('a6', {'id': 4, 'sid': 1, 'subject': 'reset'})
-        #host.post('a6', {'id': 5, 'sid': 1, 'subject': 'enter'})
-        #host.post('a6', {'id': 6, 'sid': 1, 'subject': 'cancel'})
-
+       
         
 with ruleset('a7'):
     @when(m.amount < s.max_amount)
@@ -188,6 +185,87 @@ with ruleset('a7'):
         host.post('a7', {'id': 1, 'sid': 1, 'amount': 10})
         host.post('a7', {'id': 2, 'sid': 1, 'amount': 100})
 
+
+with ruleset('a8'):
+    @when((m.amount < s.max_amount) & (m.amount > s.id('global').min_amount))
+    def approved(s):
+        print ('a8 approved')
+
+    @when_start
+    def start(host):
+        host.patch_state('a8', {'id': 1, 'max_amount': 500})
+        host.patch_state('a8', {'id': 'global', 'min_amount': 300})
+        host.post('a8', {'id': 1, 'sid': 1, 'amount': 400})
+        host.post('a8', {'id': 2, 'sid': 1, 'amount': 1600})
+
+
+with ruleset('a9'):
+    @when((m.subject == 'approve') & (m.amount == 100), atLeast = 5, atMost = 10)
+    def approved(s):
+        print ('a9 approved ->{0}'.format(s.event))
+
+    @when_start
+    def start(host):
+        host.post_batch('a9', [{'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100},
+                               {'id': 2, 'sid': 1, 'subject': 'approve', 'amount': 100},
+                               {'id': 3, 'sid': 1, 'subject': 'approve', 'amount': 100},
+                               {'id': 4, 'sid': 1, 'subject': 'approve', 'amount': 100},
+                               {'id': 5, 'sid': 1, 'subject': 'approve', 'amount': 100},
+                               {'id': 6, 'sid': 1, 'subject': 'approve', 'amount': 100}])
+
+
+with ruleset('a10'):
+    @when_all(m.subject == 'approve', m.subject == 'approved', atLeast = 2, atMost = 4)
+    def approved(s):
+        print ('a10 approved ->{0}'.format(s.event))
+
+    @when_start
+    def start(host):
+        host.post_batch('a10', [{'id': 1, 'sid': 1, 'subject': 'approve'},
+                                {'id': 2, 'sid': 1, 'subject': 'approve'},
+                                {'id': 3, 'sid': 1, 'subject': 'approve'}])
+        host.post_batch('a10', [{'id': 7, 'sid': 1, 'subject': 'approved'},
+                                {'id': 8, 'sid': 1, 'subject': 'approved'},
+                                {'id': 9, 'sid': 1, 'subject': 'approved'}])
+
+
+with ruleset('a11'):
+    @when_any(m.subject == 'approve', m.subject == 'approved', atLeast = 3)
+    def approved(s):
+        print ('a11 approved ->{0}'.format(s.event))
+
+    @when_start
+    def start(host):
+        host.post_batch('a11', [{'id': 1, 'sid': 1, 'subject': 'approve'},
+                                {'id': 2, 'sid': 1, 'subject': 'approve'},
+                                {'id': 3, 'sid': 1, 'subject': 'approve'},
+                                {'id': 4, 'sid': 1, 'subject': 'approve'}])
+
+
+with ruleset('a12'):
+    @when_any(m.subject == 'approve', exp(m.subject == 'please', atLeast = 3))
+    def approved(s):
+        print ('a12 approved ->{0}'.format(s.event))
+
+    @when_start
+    def start(host):
+        host.post('a12', {'id': 1, 'sid': 1, 'subject': 'approve'})
+        host.post_batch('a12', [{'id': 2, 'sid': 2, 'subject': 'please'},
+                                {'id': 3, 'sid': 2, 'subject': 'please'},
+                                {'id': 4, 'sid': 2, 'subject': 'please'}])
+
+
+with ruleset('a13'):
+    @when_all(exp(m.subject == 'approve', atLeast = 2), m.subject == 'please')
+    def approved(s):
+        print ('a13 approved ->{0}'.format(s.event))
+
+    @when_start
+    def start(host):
+        host.post('a13', {'id': 1, 'sid': 1, 'subject': 'please'})
+        host.post_batch('a13', [{'id': 2, 'sid': 1, 'subject': 'approve'},
+                                {'id': 3, 'sid': 1, 'subject': 'approve'}])
+                                
 
 with ruleset('p1'):
     with when(m.start == 'yes'): 

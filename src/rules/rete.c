@@ -307,6 +307,26 @@ static unsigned char compareValue(ruleset *tree,
     return 0;
 }
 
+static unsigned int validateWindowSize(char *rule) {
+    char *first;
+    char *last;
+    unsigned int hash;
+    unsigned char type;
+    unsigned int result = readNextName(rule, &first, &last, &hash);
+    while (result == PARSE_OK) {
+        if (hash == HASH_MIN_SIZE || hash == HASH_MAX_SIZE) {
+            result = readNextValue(last, &first, &last, &type);
+            if (type != JSON_INT) {
+                return ERR_UNEXPECTED_TYPE;
+            }
+        }
+
+        result = readNextName(last, &first, &last, &hash);
+    }
+
+    return PARSE_OK;
+}
+
 static unsigned int validateExpression(char *rule) {
     char *first;
     char *last;
@@ -316,6 +336,12 @@ static unsigned int validateExpression(char *rule) {
     unsigned int result = readNextName(rule, &first, &last, &hash);
     if (result != PARSE_OK) {
         return result;
+    }
+
+    // Fast forward $min and $max
+    while(hash == HASH_MAX_SIZE || hash == HASH_MIN_SIZE) {
+        readNextValue(last, &first, &last, &type);
+        readNextName(last, &first, &last, &hash);
     }
 
     switch (hash) {
@@ -424,6 +450,12 @@ static unsigned int validateWrappedExpression(char *rule) {
         return result;
     }
 
+    // Fast forward $min and $max
+    while(hash == HASH_MAX_SIZE || hash == HASH_MIN_SIZE) {
+        readNextValue(last, &first, &last, &type);
+        readNextName(last, &first, &last, &hash);
+    }
+
     unsigned int nameLength = last - first; 
     if (nameLength == 2) {
         if (!strncmp("$s", first, 2) || !strncmp("$m", first, 2)) {
@@ -461,6 +493,19 @@ static unsigned int validateAlgebra(char *rule) {
     unsigned char reenter = 0;
     unsigned int result = readNextName(rule, &first, &last, &hash);
     while (result == PARSE_OK) {
+        // Fast foward $min and $max
+        while (hash == HASH_MAX_SIZE || hash == HASH_MIN_SIZE) {
+            result = readNextValue(last, &first, &last, &type);
+            if (result != PARSE_OK) {
+                return result;
+            }
+
+            result = readNextName(last, &first, &last, &hash);
+            if (result != PARSE_OK) {
+                return (result == PARSE_END ? PARSE_OK: result);
+            }
+        }
+
         unsigned int nameLength = last - first; 
         if (nameLength >= 4) {
             if (!strncmp("$all", last - 4, 4)) {
@@ -476,8 +521,10 @@ static unsigned int validateAlgebra(char *rule) {
         if (result != PARSE_OK) {
             return result;
         }
-        if (type != JSON_OBJECT) {
-            return ERR_UNEXPECTED_TYPE;
+        
+        result = validateWindowSize(first);
+        if (result != PARSE_OK) {
+            return result;
         }
 
         if (!reenter) {
@@ -523,11 +570,12 @@ static unsigned int validateRuleset(char *rules) {
             if (result != PARSE_OK) {
                 return result;
             }
-
-            if (type != JSON_OBJECT) {
-                return ERR_UNEXPECTED_TYPE;
-            }
             
+            result = validateWindowSize(first);
+            if (result != PARSE_OK) {
+                return result;
+            }
+
             switch (hash) {
                 case HASH_WHEN:
                     result = validateWrappedExpression(first);
@@ -643,9 +691,14 @@ static void readReference(ruleset *tree, char *rule, reference *ref) {
                         ref->time = atoi(first);
                         last[1] = temp;
                         break;
-                    case HASH_SID:
+                    case HASH_ID:
                         readNextValue(last, &first, &last, &type);
-                        storeString(tree, first, &ref->sidOffset, last - first + 1);
+                        if (type == JSON_STRING) {
+                            storeString(tree, first, &ref->sidOffset, last - first);
+                        } else{
+                            storeString(tree, first, &ref->sidOffset, last - first + 1);
+                        }
+
                         break;
                     default:
                         readNextValue(last, &first, &last, &type);
@@ -872,14 +925,16 @@ static unsigned int createBetaConnector(ruleset *tree,
     unsigned int hash;
     unsigned char type;
     unsigned int result = readNextName(rule, &first, &last, &hash);
-
-    // Fast foward $min and $max
-    while(hash == HASH_MAX_SIZE || hash == HASH_MIN_SIZE) {
-        readNextValue(last, &first, &rule, &type);
-        readNextName(rule, &first, &last, &hash);
-    }
-
     while (result == PARSE_OK) {
+        // Fast foward $min and $max
+        while (hash == HASH_MAX_SIZE || hash == HASH_MIN_SIZE) {
+            readNextValue(last, &first, &last, &type);
+            result = readNextName(last, &first, &last, &hash);
+            if (result != PARSE_OK) {
+                return (result == PARSE_END ? RULES_OK: result);
+            }
+        }
+
         unsigned int nameLength = last - first; 
         unsigned char operator = OP_NOP;
         if (nameLength >= 4) { 

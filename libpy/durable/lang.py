@@ -4,79 +4,103 @@ import interface
 class value(object):
 
     def __init__(self, vtype, left = None, op = None, right = None):
-        self.type = vtype
-        self.left = left
-        self.op = op
-        self.right = right
+        self._type = vtype
+        self._left = left
+        self._op = op
+        self._right = right
+        self._id = None
+        self._time = None
 
     def __lt__(self, other):
-        self.op = '$lt'
-        self.right = other
+        self._op = '$lt'
+        self._right = other
         return self
 
     def __le__(self, other):
-        self.op = '$lte'
-        self.right = other
+        self._op = '$lte'
+        self._right = other
         return self
 
     def __gt__(self, other):
-        self.op = '$gt'
-        self.right = other
+        self._op = '$gt'
+        self._right = other
         return self
 
     def __ge__(self, other):
-        self.op = '$gte'
-        self.right = other
+        self._op = '$gte'
+        self._right = other
         return self
 
     def __eq__(self, other):
-        self.op = '$eq'
-        self.right = other
+        self._op = '$eq'
+        self._right = other
         return self
 
     def __ne__(self, other):
-        self.op = '$neq'
-        self.right = other
+        self._op = '$neq'
+        self._right = other
         return self
 
     def __neg__(self):
-        self.op = '$nex'
+        self._op = '$nex'
         return self
 
     def __pos__(self):
-        self.op = '$ex'
+        self._op = '$ex'
         return self
 
     def __and__(self, other):
-        return value(self.type, self, '$and', other)
+        return value(self._type, self, '$and', other)
     
     def __or__(self, other):
-        return value(self.type, self, '$or', other)
+        return value(self._type, self, '$or', other)
 
     def __getattr__(self, name):
-        return value(self.type, name)
+        new_value = value(self._type, name)
+        new_value._time = self._time
+        new_value._id = self._id
+        return new_value
+
+    def id(self, id):
+        new_value = value(self._type)
+        new_value._id = id
+        new_value._time = self._time    
+        return new_value
+
+    def time(self, time):
+        new_value = value(self._type)
+        new_value._time = time
+        new_value._id = self._id
+        return new_value
 
     def define(self):
-        if self.op == None:
-            return {self.type: self.left}
+        if self._op == None:
+            if self._time and self._id:
+                return {self._type: {'name': self._left, 'id': self._id, 'time': self._time}}
+            elif self._time:
+                return {self._type: {'name': self._left, 'time': self._time}}
+            elif self._id:
+                return {self._type: {'name': self._left, 'id': self._id}}
+            else:
+                return {self._type: self._left}
 
         new_definition = None
-        right_definition = self.right
-        if isinstance(self.right, value):
+        right_definition = self._right
+        if isinstance(self._right, value):
             right_definition = right_definition.define();
 
-        if self.op == '$or' or self.op == '$and':
-            definitions = [ self.left.define() ]
+        if self._op == '$or' or self._op == '$and':
+            definitions = [ self._left.define() ]
             definitions.append(right_definition)
-            new_definition = {self.op: definitions}
-        elif self.op == '$nex' or self.op == '$ex':
-            new_definition = {self.op: {self.left: 1}}
-        elif self.op == '$eq':
-            new_definition = {self.left: right_definition}
+            new_definition = {self._op: definitions}
+        elif self._op == '$nex' or self._op == '$ex':
+            new_definition = {self._op: {self._left: 1}}
+        elif self._op == '$eq':
+            new_definition = {self._left: right_definition}
         else:
-            new_definition = {self.op: {self.left: right_definition}}
+            new_definition = {self._op: {self._left: right_definition}}
         
-        if self.type == '$s':
+        if self._type == '$s':
             return {'$s': new_definition}
         else:
             return new_definition
@@ -95,7 +119,7 @@ class run(object):
 
 class rule(object):
 
-    def __init__(self, operator, multi, *args):
+    def __init__(self, operator, multi, *args, **kw):
         self.operator = operator
         self.multi = multi
         
@@ -110,6 +134,16 @@ class rule(object):
         else:
             self.func = args[-1:]
             args = args[:-1]
+
+        if 'atLeast' in kw:
+            self.atLeast = kw['atLeast']
+        else:
+            self.atLeast = 0
+
+        if 'atMost' in kw:
+            self.atMost = kw['atMost']
+        else:
+            self.atMost = 0        
 
         if not multi:
             self.expression = args[0]
@@ -140,15 +174,21 @@ class rule(object):
                     defined_expression['m_{0}$all'.format(index)] = current_expression.define()['whenAll']
                 elif isinstance(current_expression, any):
                     defined_expression['m_{0}$any'.format(index)] = current_expression.define()['whenAny']
-                elif isinstance(current_expression, some):
-                    defined_expression['m_{0}$some'.format(index)] = current_expression.define()['whenSome']
-                elif current_expression.type == '$s':
+                elif isinstance(current_expression, exp):
+                    defined_expression['m_{0}'.format(index)] = current_expression.define()
+                elif current_expression._type == '$s':
                     defined_expression['$s'] = current_expression.define()['$s']
                 else:    
                     defined_expression['m_{0}'.format(index)] = current_expression.define()
                 
                 index += 1
-              
+        
+        if self.atLeast:
+            defined_expression['$atLeast'] = self.atLeast
+
+        if self.atMost:
+            defined_expression['$atMost'] = self.atMost
+
         if len(self.func):
             if len(self.func) == 1 and not hasattr(self.func[0], 'define'):
                 return {self.operator: defined_expression, 'run': self.func[0]}
@@ -160,54 +200,50 @@ class rule(object):
 
                 return {self.operator: defined_expression, 'run': ruleset_definitions}   
         else:
-            return {self.operator: defined_expression}
+            if not self.operator:
+                return defined_expression
+            else:
+                return {self.operator: defined_expression}
 
 
 class when(rule):
 
-    def __init__(self, *args):
-        super(when, self).__init__('when', False, *args)
-
-
-class when_some(rule):
-
-    def __init__(self, *args):
-        super(when_some, self).__init__('whenSome', False, *args)
+    def __init__(self, *args, **kw):
+        super(when, self).__init__('when', False, *args, **kw)
 
 
 class when_all(rule):
 
-    def __init__(self, *args):
-        super(when_all, self).__init__('whenAll', True, *args)
+    def __init__(self, *args, **kw):
+        super(when_all, self).__init__('whenAll', True, *args, **kw)
 
 
 class when_any(rule):
 
-    def __init__(self, *args):
-        super(when_any, self).__init__('whenAny', True, *args)
+    def __init__(self, *args, **kw):
+        super(when_any, self).__init__('whenAny', True, *args, **kw)
 
 
 class all(rule):
 
-    def __init__(self, *args):
+    def __init__(self, *args, **kw):
         _ruleset_stack.append(self)
-        super(all, self).__init__('whenAll', True, *args)
+        super(all, self).__init__('whenAll', True, *args, **kw)
         _ruleset_stack.pop()
 
 
 class any(rule):
 
-    def __init__(self, *args):
+    def __init__(self, *args, **kw):
         _ruleset_stack.append(self)
-        super(any, self).__init__('whenAny', True, *args)
+        super(any, self).__init__('whenAny', True, *args, **kw)
         _ruleset_stack.pop()
 
+class exp(rule):
 
-class some(rule):
-
-    def __init__(self, *args):
+    def __init__(self, *args, **kw):
         _ruleset_stack.append(self)
-        super(some, self).__init__('whenSome', True, *args)
+        super(exp, self).__init__(None, False, *args, **kw)
         _ruleset_stack.pop()
 
 
@@ -432,8 +468,6 @@ class stage(object):
                     break
                 elif 'when' in switch_definition:
                     switch_definition = switch_definition['when']
-                elif 'whenSome' in switch_definition:
-                    switch_definition = {'$some': switch_definition['whenSome']}
                 elif 'whenAll' in switch_definition:
                     switch_definition = {'$all': switch_definition['whenAll']}
                 elif 'whenAny' in switch_definition:

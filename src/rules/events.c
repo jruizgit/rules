@@ -336,7 +336,7 @@ static unsigned int isMatch(ruleset *tree,
         if (currentAlpha->right.value.property.sidOffset) {
             sid = &tree->stringPool[currentAlpha->right.value.property.sidOffset];
         }
-
+        
         result = fetchStateProperty(tree, 
                                     sid, 
                                     currentAlpha->right.value.property.hash, 
@@ -508,6 +508,7 @@ static unsigned int handleAlpha(ruleset *tree,
                     if (top == MAX_STACK_SIZE) {
                         return ERR_MAX_STACK_SIZE;
                     }
+                    
                     stack[top] = &listNode->value.a; 
                     ++top;
                 }
