@@ -238,7 +238,7 @@ module Durable
       self.instance_exec &block
     end        
 
-    def when_one(expression, opt0 = {}, opt1 = {}, opt2 = {}, &block)
+    def when_(expression, opt0 = {}, opt1 = {}, opt2 = {}, &block)
       define_rule :when, expression.definition, opt0.merge!(opt1).merge!(opt2), &block
     end
 
