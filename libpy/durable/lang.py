@@ -10,6 +10,8 @@ class value(object):
         self._right = right
         self._id = None
         self._time = None
+        self._at_least = None
+        self._at_most = None
 
     def __lt__(self, other):
         self._op = '$lt'
@@ -73,6 +75,14 @@ class value(object):
         new_value._id = self._id
         return new_value
 
+    def at_least(self, at_least):
+        self._at_least = at_least
+        return self
+
+    def at_most(self, at_most):
+        self._at_most = at_most
+        return self
+
     def define(self):
         if self._op == None:
             if self._time and self._id:
@@ -105,6 +115,12 @@ class value(object):
         else:
             new_definition = {self._op: {self._left: right_definition}}
         
+        if self._at_least:
+            new_definition['$atLeast'] = self._at_least
+
+        if self._at_most:
+            new_definition['$atMost'] = self._at_most
+
         if self._type == '$s':
             return {'$s': new_definition}
         else:
@@ -140,15 +156,15 @@ class rule(object):
             self.func = args[-1:]
             args = args[:-1]
 
-        if 'atLeast' in kw:
-            self.atLeast = kw['atLeast']
+        if 'at_least' in kw:
+            self.at_least = kw['at_least']
         else:
-            self.atLeast = 0
+            self.at_least = 0
 
-        if 'atMost' in kw:
-            self.atMost = kw['atMost']
+        if 'at_most' in kw:
+            self.at_most = kw['at_most']
         else:
-            self.atMost = 0        
+            self.at_most = 0        
 
         if not multi:
             self.expression = args[0]
@@ -179,8 +195,6 @@ class rule(object):
                     defined_expression['m_{0}$all'.format(index)] = current_expression.define()['whenAll']
                 elif isinstance(current_expression, any):
                     defined_expression['m_{0}$any'.format(index)] = current_expression.define()['whenAny']
-                elif isinstance(current_expression, exp):
-                    defined_expression['m_{0}'.format(index)] = current_expression.define()
                 elif current_expression._type == '$s':
                     defined_expression['$s'] = current_expression.define()['$s']
                 else:    
@@ -188,11 +202,11 @@ class rule(object):
                 
                 index += 1
         
-        if self.atLeast:
-            defined_expression['$atLeast'] = self.atLeast
+        if self.at_least:
+            defined_expression['$atLeast'] = self.at_least
 
-        if self.atMost:
-            defined_expression['$atMost'] = self.atMost
+        if self.at_most:
+            defined_expression['$atMost'] = self.at_most
 
         if len(self.func):
             if len(self.func) == 1 and not hasattr(self.func[0], 'define'):
@@ -242,13 +256,6 @@ class any(rule):
     def __init__(self, *args, **kw):
         _ruleset_stack.append(self)
         super(any, self).__init__('whenAny', True, *args, **kw)
-        _ruleset_stack.pop()
-
-class exp(rule):
-
-    def __init__(self, *args, **kw):
-        _ruleset_stack.append(self)
-        super(exp, self).__init__(None, False, *args, **kw)
         _ruleset_stack.pop()
 
 
@@ -318,10 +325,6 @@ class to(object):
 
     def when(self, *args):
         self.rule = rule('when', False, *args)
-        return self.rule
-
-    def when_some(self, *args):
-        self.rule = rule('whenSome', False, *args)
         return self.rule
 
     def wehn_all(self, *args):

@@ -210,7 +210,7 @@ with ruleset('a8'):
 
 
 with ruleset('a9'):
-    @when((m.subject == 'approve') & (m.amount == 100), atLeast = 5, atMost = 10)
+    @when((m.subject == 'approve') & (m.amount == 100), at_least = 5, at_most = 10)
     def approved(s):
         print ('a9 approved ->{0}'.format(s.event))
 
@@ -225,7 +225,7 @@ with ruleset('a9'):
 
 
 with ruleset('a10'):
-    @when_all(m.subject == 'approve', m.subject == 'approved', atLeast = 2, atMost = 4)
+    @when_all(m.subject == 'approve', m.subject == 'approved', at_least = 2, at_most = 4)
     def approved(s):
         print ('a10 approved ->{0}'.format(s.event))
 
@@ -240,7 +240,7 @@ with ruleset('a10'):
 
 
 with ruleset('a11'):
-    @when_any(m.subject == 'approve', m.subject == 'approved', atLeast = 3)
+    @when_any(m.subject == 'approve', m.subject == 'approved', at_least = 3)
     def approved(s):
         print ('a11 approved ->{0}'.format(s.event))
 
@@ -253,7 +253,7 @@ with ruleset('a11'):
 
 
 with ruleset('a12'):
-    @when_any(m.subject == 'approve', exp(m.subject == 'please', atLeast = 3))
+    @when_any(m.subject == 'approve', (m.subject == 'please').at_least(3))
     def approved(s):
         print ('a12 approved ->{0}'.format(s.event))
 
@@ -266,7 +266,7 @@ with ruleset('a12'):
 
 
 with ruleset('a13'):
-    @when_all(exp(m.subject == 'approve', atLeast = 2), m.subject == 'please')
+    @when_all((m.subject == 'approve').at_least(2), m.subject == 'please')
     def approved(s):
         print ('a13 approved ->{0}'.format(s.event))
 
