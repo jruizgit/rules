@@ -1,6 +1,6 @@
 <html>
     <head>
-        <title>Promise Admin</title>        
+        <title>Ruleset Admin</title>        
     </head>
     <style>
 
@@ -115,16 +115,9 @@
 
         var url = window.location.pathname;
         var query = getQueryVariables(window.location.search);
-        var theHistory = promiseHistory(url);
-        promiseGraph(url, theHistory).createVisual(query.size ,function(err) { 
-            if (!query.disableScratchpad) {
-                var pad = scratchPad(url, theHistory)
-                if (err) { 
-                    pad.setStatus(err.error); 
-                } 
-            }
-        });
-
+        var state = rulesetState(url);
+        rulesetGraph(url, state).createVisual(query.size);
+        
         function getQueryVariables(query) {
             query = query.substring(1);
             var result = {};

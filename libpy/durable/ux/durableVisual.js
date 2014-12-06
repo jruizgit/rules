@@ -1,277 +1,54 @@
-
 var r = 500;
-var sessions = {};
 
-function scratchPad(url, history) {
+function baseVisual(parent) {
     var that = {};
-
-    var postMessage = function (d) {
-        try {
-            var messageText = document.getElementById("scratchPad").value;
-            var message = JSON.parse(messageText);
-            server.post(messageText, function (err) {
-                if (err) {
-                    status.text(err.responseText);
-                } else {
-                    status.text("OK");
-                }
-            });
-        } catch (ex) {
-            status.text(ex);
-        }
-    };
-
-    var patchSession = function (d) {
-        try {
-            var sessionText = document.getElementById("scratchPad").value;
-            var session = JSON.parse(sessionText);
-            server.send("PATCH", sessionText, function (err) {
-                if (err) {
-                    status.text(err.responseText);
-                } else {
-                    status.text("OK");
-                }
-            });
-        } catch (ex) {
-            status.text(ex);
-        }
-    };
-
-    var copyRecord = function (d) {
-        var record = history.getSelectedRecord();
-        pad.text(JSON.stringify(record));
-    };
-
-    that.setStatus = function (message) {
-        status.text(message);
-    };
-
-    var body = d3.select("body");
-
-    body.append("br");
-
-    body.append("input")
-        .attr("type", "button")
-        .attr("id", "post")
-        .attr("value", "Post Message")
-        .on("click", postMessage);
-
-    body.append("input")
-        .attr("type", "button")
-        .attr("id", "patch")
-        .attr("value", "Patch Session")
-        .on("click", patchSession);
-
-    body.append("input")
-        .attr("type", "button")
-        .attr("id", "copy")
-        .attr("value", "Copy Record")
-        .on("click", copyRecord);
-
-    body.append("br");
-
-    var pad = body.append("textarea")
-        .attr("rows", "5")
-        .attr("cols", "60")
-        .attr("id", "scratchPad")
-        .text("{ \"id\": 1, \"content\": \"hello\" }");
-
-    body.append("br");
-
-    var status = body.append("small")
-        .append("span")
-        .attr("id", "status");
-
-    url = url.substring(0, url.lastIndexOf("/"));
-
-    var server = d3.xhr(url)
-        .header("content-type", "application/json; charset=utf-8");
-
-    history.onError(that.setStatus);
-    return that;
-}
-
-function baseVisual(parent, history) {
-    var that = {};
-    var selectedTime;
-    var colorScale;
-    var timeOverlay;
-    var axisOverlay;
-    var startTime;
-    var endTime;
-    var updateEvents = [];
-
-    var timeFormat = d3.time.format("%Y-%m-%d %H:%M:%S.%L");
-    var timeLabel = parent.append("text")
-        .attr("class", "time label")
-        .attr("text-anchor", "start")
-        .attr("y", r + 60)
-        .attr("x", 30)
-        .on("mouseover", updateTimeSelection);
-
-    var axisSymbol = d3.svg.symbol()
-        .type("triangle-down")
-        .size(50);
-
-    var axis = parent.append("g")
-        .attr("class", "x axis")
-        .attr("transform", "translate(" + (r + 20) + ", 30)");
-
-    axis.append("svg:path")
-        .attr("tag", "marker");
-
-    var updateAxis = function (newStartTime, newEndTime) {
-        if (!selectedTime || newEndTime) {
-            selectedTime = newEndTime;
-            startTime = newStartTime;
-            endTime = newEndTime;
-        }
-
-        colorScale = d3.scale.linear()
-                        .domain([0xFF, 0x00])
-                        .range([startTime.getTime(), endTime.getTime()])
-                        .clamp(true);
-
-        var yScale = d3.time.scale().domain([startTime, endTime]).range([10, r - 10]);
-        var yAxis = d3.svg.axis().scale(yScale).orient("right").ticks(10).tickPadding(6).tickSize(10);
-        var currentColor = Math.ceil(colorScale.invert(selectedTime.getTime())) * 0x100 + 0xFF0000;
-
-        timeLabel.text(timeFormat(selectedTime));
-        axis.call(yAxis);
-        axis.selectAll("path[tag=\"marker\"]")
-            .attr("class", "timeMarker")
-            .style("fill", "#" + currentColor.toString(16))
-            .style("fill-opacity", ".7")
-            .attr("transform", function (d) { return "translate(-5, " + yScale(selectedTime) + ") , rotate(-90)"; })
-            .attr("d", axisSymbol);
-    };
-
-    var updateTimeSelection = function () {
-        var timeScale = d3.scale.linear()
-            .domain([startTime.getTime(), endTime.getTime()])
-            .range([20, r - 60])
-            .clamp(true);
-
-        timeOverlay.on("mouseover", mouseover)
-            .on("mouseout", mouseout)
-            .on("mousemove", mousemove)
-            .on("touchmove", mousemove);
-
-        function mouseover() {
-            timeLabel.classed("active", true);
-        }
-
-        function mouseout() {
-            timeLabel.classed("active", false);
-        }
-
-        function mousemove() {
-            selectedTime = new Date(timeScale.invert(d3.mouse(this)[0]));
-            selectedTime = history.setSelectedTime(selectedTime);
-            timeLabel.text(timeFormat(selectedTime));
-            updateAxis();
-
-            for (var i = 0; i < updateEvents.length; ++i) {
-                updateEvents[i]();
-            }
-        }
-    };
-
-    var updateAxisSelection = function () {
-        var timeScale = d3.scale.linear()
-            .domain([startTime.getTime(), endTime.getTime()])
-            .range([30, r + 10])
-            .clamp(true);
-
-        axisOverlay.on("mousemove", mousemove)
-            .on("touchmove", mousemove);
-
-        function mousemove() {
-            selectedTime = new Date(timeScale.invert(d3.mouse(this)[1]));
-            selectedTime = history.setSelectedTime(selectedTime);
-            timeLabel.text(timeFormat(selectedTime));
-            updateAxis();
-            for (var i = 0; i < updateEvents.length; ++i) {
-                updateEvents[i]();
-            }
-        }
-    };
-
-    that.onTimeSelected = function (updateFunc) {
-        updateEvents.push(updateFunc);
-        return that;
-    };
-
-    that.addOverlays = function () {
-        if (!timeOverlay) {
-            timeOverlay = parent.append("rect")
-                .attr("fill", "none")
-                .attr("pointer-events", "all")
-                .attr("cursor", "ew-resize")
-                .attr("x", 20)
-                .attr("y", r + 20)
-                .attr("width", r - 75)
-                .attr("height", 45)
-                .on("mouseover", updateTimeSelection);
-
-            axisOverlay = parent.append("rect")
-                .attr("fill", "none")
-                .attr("pointer-events", "all")
-                .attr("cursor", "ns-resize")
-                .attr("x", r)
-                .attr("y", 30)
-                .attr("width", 30)
-                .attr("height", r - 15)
-                .on("mouseover", updateAxisSelection);
-        }
-    };
-
+    
     that.getColor = function (node) {
-        if (node.history && node.history.length) {
-            var currentColor = 0xFFFFFF;
-
-            for (var i = 0; i < node.history.length; ++i) {
-                var currentEntry = node.history[i];
-                if (currentEntry.startTime <= selectedTime) {
-                    currentColor = Math.ceil(colorScale.invert(currentEntry.startTime.getTime())) * 0x100 + 0xFF0000;
-                } else {
-                    break;
-                }
-            }
-
-            return "#" + currentColor.toString(16);
+        if (node.currentState) {
+            return "#ff0000";
         }
 
         return "#fff";
     };
 
     that.getOpacity = function (node) {
-        if (node.history && node.history.length) {
-            if (node.history[0].startTime <= selectedTime) {
-                return ".7";
-            }
+        if (node.currentState) {
+            return ".7";
         }
 
         return "0";
     };
 
+    that.reLayout = function (n, size, yOffset, transpose) {
+        var counts = [];
+        n.forEach(function (d) {
+            if (!counts[d.depth]) {
+                counts[d.depth] = 1;
+            } else {
+                ++counts[d.depth];
+            }
+
+            d.order = counts[d.depth] - 1;
+        });
+
+        n.forEach(function (d) {
+            var xSize = size / counts[d.depth];
+            if (transpose) {
+                d.x = d.y + yOffset;
+                d.y = d.order * xSize + xSize / 2;
+            } else {
+                d.x = d.order * xSize + xSize / 2;
+                d.y = d.y + yOffset;
+            }
+        });   
+    };
+
     that.getTitle = function (node) {
-        if (node.history && node.history.length) {
-            var displayEntries = "";
-            for (var i = 0; i < node.history.length; ++i) {
-                var currentEntry = node.history[i];
-                if (currentEntry.startTime <= selectedTime) {
-                    displayEntries = displayEntries + currentEntry.startTime.toLocaleString() + "\n";
-                    for (var propertyName in currentEntry) {
-                        if (propertyName !== "_id" &&
-                            propertyName !== "id" &&
-                            propertyName !== "endTime" &&
-                            propertyName !== "startTime") {
-                            displayEntries = displayEntries + "\t" + propertyName + ":\t" + currentEntry[propertyName] + "\n";
-                        }
-                    }
-                } else {
-                    break;
+        var displayEntries = "";
+        if (node.currentState) {
+            for (var propertyName in node.currentState) {
+                if (propertyName !== "id") {
+                    displayEntries = displayEntries + "\t" + propertyName + ":\t" + node.currentState[propertyName] + "\n";
                 }
             }
 
@@ -281,12 +58,11 @@ function baseVisual(parent, history) {
         return "";
     };
 
-    history.onUpdate(updateAxis);
     return that;
 }
 
-function stateVisual(root, links, x, y, title, parent, history, base) {
-    var base = base || baseVisual(parent, history);
+function stateVisual(root, links, x, y, title, parent, state, base) {
+    var base = base || baseVisual(parent);
     var that = {};
     var selectedLink = null;
     var zoomedLink = null;
@@ -385,7 +161,7 @@ function stateVisual(root, links, x, y, title, parent, history, base) {
 
         popup.each(updateTransition);
 
-    }
+    };
 
     var updateSelection = function (d) {
         popup.style("opacity", function (d1) {
@@ -421,7 +197,7 @@ function stateVisual(root, links, x, y, title, parent, history, base) {
             .attr("width", function (d) { return ((d === selectedLink) ? pSize * k : 0) });
 
         d3.event.stopPropagation();
-    }
+    };
 
     var drawLink = function (d) {
         var sourceX, sourceY, targetX, targetY, refX, refY;
@@ -434,8 +210,7 @@ function stateVisual(root, links, x, y, title, parent, history, base) {
             refY = d.source.y - d.source.r * (1 + (d.order + 1) * 0.4);
             d.$refX = d.source.x + d.source.r * (1 + d.order * 0.2);
             d.$refY = d.source.y - d.source.r * (1 + d.order * 0.2);
-        }
-        else {
+        } else if (d.target) {
             var deltaX = Math.abs(d.target.x - d.source.x),
 			deltaY = Math.abs(d.target.y - d.source.y),
 			dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY),
@@ -458,12 +233,14 @@ function stateVisual(root, links, x, y, title, parent, history, base) {
             targetY = d.target.y + Math.sin(targetAngle) * targetR * (d.source.y === d.target.y ? (d.source.x > d.target.x ? -1 : 1) : d.source.y > d.target.y ? 1 : -1);
             d.$refX = refX;
             d.$refY = refY;
+        } else {
+            return "";
         }
 
         d.$startX = sourceX;
         d.$startY = sourceY;
         return "M" + x(sourceX) + "," + y(sourceY) + "Q" + x(refX) + "," + y(refY) + "," + x(targetX) + "," + y(targetY);
-    }
+    };
 
     var zoom = function (d) {
         if (zoomedLink !== d) {
@@ -485,7 +262,7 @@ function stateVisual(root, links, x, y, title, parent, history, base) {
             that.update(1000);
         }
         d3.event.stopPropagation();
-    }
+    };
 
     var drawTransition = function (d) {
         if (d.nodes) {
@@ -493,9 +270,9 @@ function stateVisual(root, links, x, y, title, parent, history, base) {
             var newY = d3.scale.linear().range([y(d.$refY), y(d.$refY + pSize)]);
             newX.domain([0, r]);
             newY.domain([0, r + 50]);
-            d.update = sequenceVisual(d.nodes[0], d.links, newX, newY, d.id, d3.select(this), history, base).update;
+            d.update = ruleVisual(d.nodes[0], d.links, newX, newY, d.id, d3.select(this), false, base).update;
         }
-    }
+    };
 
     var updateTransition = function (d) {
         if (d.nodes) {
@@ -505,7 +282,7 @@ function stateVisual(root, links, x, y, title, parent, history, base) {
             newY.domain([0, r + 50]);
             d.update(tTime, newX, newY);
         }
-    }
+    };
 
     path.enter()
         .append("svg:path")
@@ -560,10 +337,7 @@ function stateVisual(root, links, x, y, title, parent, history, base) {
 
     popup.each(drawTransition);
 
-    base.onTimeSelected(that.update);
-    base.addOverlays();
-
-    history.onUpdate(function () {
+    state.onStateChanged(function () {
         that.update(500)
     });
 
@@ -579,21 +353,22 @@ function stateVisual(root, links, x, y, title, parent, history, base) {
     return that;
 }
 
-function flowVisual(root, links, x, y, title, parent, history, base) {
-    var base = base || baseVisual(parent, history);
+
+function flowVisual(root, links, x, y, title, parent, state, base) {
+    var base = base || baseVisual(parent);
     var that = {};
-    var selectedStage = null;
-    var zoomedStage = null;
+    var selectedLink = null;
+    var zoomedLink = null;
     var pSize = 150;
     var tTime = 0;
     var k = x(r) - x(0);
     k = k / r;
 
     var n = d3.layout.tree()
-        .size([r, r - 100])
+        .size([r, r])
         .nodes(root);
 
-    n.forEach(function (d) { d.y = d.y + 90; });
+    base.reLayout(n, r, 45);
 
     parent.append("svg:defs").append("svg:marker")
         .attr("id", "end-arrow")
@@ -611,6 +386,10 @@ function flowVisual(root, links, x, y, title, parent, history, base) {
         .selectAll("path")
         .data(links);
 
+    var pathText = parent.append("svg:g")
+        .selectAll("text")
+        .data(links);
+
     var step = parent.append("svg:g")
         .selectAll("g")
         .data(n);
@@ -626,14 +405,55 @@ function flowVisual(root, links, x, y, title, parent, history, base) {
 
     var popup = parent.append("svg:g")
         .selectAll("g")
-        .data(n);
+        .data(links);
 
     var getSource = function (d) {
         var deltaX = Math.abs(d.target.x - d.source.x),
         deltaY = Math.abs(d.target.y - d.source.y),
         sourceR = d.source.r / 2 + 2,
-        sourceX = d.source.x + sourceR * ((!deltaX && d.source.y > d.target.y) ? 1 : (deltaY > deltaX ? 0 : (d.source.x > d.target.x ? -1 : 1))),
-        sourceY = d.source.y + sourceR * ((!deltaX && d.source.y > d.target.y) ? 0 : (deltaY < deltaX ? 0 : (d.source.y > d.target.y ? -1 : 1)));
+        sourceX = d.source.x,
+        sourceY = d.source.y;
+        // aligned vertically, 
+        if (!deltaX) {
+            // only if pointing upwards
+            if (d.source.y > d.target.y) {
+                // offset the origin
+                sourceX += sourceR;
+            }
+        } else {
+            //if source on the right
+            if (d.source.x > d.target.x) {
+                sourceX -= sourceR;
+            } else {
+                sourceX += sourceR;
+            }
+        }
+
+        // not a switch
+        if (!d.source.condition) {
+            // not aligned vertically or pointing downwards
+            if (deltaX || (d.source.y < d.target.y)) {
+                //if source below
+                if (d.source.y > d.target.y) {
+                    sourceY -= sourceR;
+                } else {
+                    sourceY += sourceR;
+                }
+            }
+        } else {
+            // aligned vertically and pointing downwards
+            if (!deltaX && (d.source.y < d.target.y)) {
+                //if source below
+                if (d.source.y > d.target.y) {
+                    sourceY -= sourceR;
+                } else {
+                    sourceY += sourceR;
+                }
+            }
+        }
+
+        d.$refX = d.source.x + (d.target.x - d.source.x)/2;
+        d.$refY = d.source.y + (d.target.y - d.source.y)/2;
         return { x: x(sourceX), y: y(sourceY) };
     }
 
@@ -641,8 +461,8 @@ function flowVisual(root, links, x, y, title, parent, history, base) {
         var deltaX = Math.abs(d.target.x - d.source.x),
         deltaY = Math.abs(d.target.y - d.source.y),
         targetR = d.target.r / 2 + 2,
-        targetX = d.target.x + targetR * ((!deltaX && d.source.y > d.target.y) ? 1 : (deltaY > deltaX ? 0 : (d.source.x > d.target.x ? 1 : -1))),
-        targetY = d.target.y + targetR * (deltaY < deltaX ? 0 : (d.source.y > d.target.y ? 1 : -1));
+        targetX = d.target.x + targetR * ((!deltaX && d.source.y > d.target.y) ? 1 : 0),
+        targetY = d.target.y + targetR * (d.source.y > d.target.y ? 1 : -1);
         return { x: x(targetX), y: y(targetY) };
     }
 
@@ -677,93 +497,130 @@ function flowVisual(root, links, x, y, title, parent, history, base) {
             .attr("y", function (d) { return y(d.y + 3); })
             .style("font-size", function (d) { return 12 * k + "px"; });
 
+        popup.selectAll("rect[tag=\"fcPopupBack\"]")
+            .transition()
+            .duration(tTime)
+            .attr("x", function (d) { return x(d.$refX) + 4; })
+            .attr("y", function (d) { return y(d.$refY) + 4; })
+            .attr("rx", 8 * k)
+            .attr("ry", 8 * k)
+            .attr("height", function (d) { return ((d === selectedLink) ? pSize * k : 0) })
+            .attr("width", function (d) { return ((d === selectedLink) ? pSize * k : 0) });
+
         popup.selectAll("rect[tag=\"fcPopup\"]")
             .transition()
             .duration(tTime)
-            .attr("x", function (d) { return x(d.x - d.r / 2); })
-            .attr("y", function (d) { return y(d.y - d.r / 2); })
-            .attr("height", function (d) { return ((d === selectedStage) ? d.r * k : 0) })
-            .attr("width", function (d) { return ((d === selectedStage) ? d.r * k : 0) });
+            .attr("x", function (d) { return x(d.$refX); })
+            .attr("y", function (d) { return y(d.$refY); })
+            .attr("rx", 8 * k)
+            .attr("ry", 8 * k)
+            .attr("height", function (d) { return ((d === selectedLink) ? pSize * k : 0) })
+            .attr("width", function (d) { return ((d === selectedLink) ? pSize * k : 0) });
 
-        popup.each(updateStage);
+        popup.each(updateTransition);
     }
 
     var updateSelection = function (d) {
         popup.style("opacity", function (d1) {
             if (d1 === d) {
-                if (selectedStage === d) {
-                    selectedStage = null;
+                if (selectedLink === d) {
+                    selectedLink = null;
                     return "0";
                 }
                 else {
-                    selectedStage = d;
+                    selectedLink = d;
                     return "1";
                 }
             }
             return "0";
         });
 
+        path.classed("selected", function (d) { return d === selectedLink; })
+
+        popup.selectAll("rect[tag=\"fcPopupBack\"]")
+            .attr("x", function (d) { return x(d.$refX) + 4; })
+            .attr("y", function (d) { return y(d.$refY) + 4; })
+            .attr("rx", 8 * k)
+            .attr("ry", 8 * k)
+            .attr("height", function (d) { return ((d === selectedLink) ? pSize * k : 0) })
+            .attr("width", function (d) { return ((d === selectedLink) ? pSize * k : 0) });
+
         popup.selectAll("rect[tag=\"fcPopup\"]")
-            .attr("x", function (d) { return x(d.x - d.r / 2); })
-            .attr("y", function (d) { return y(d.y - d.r / 2); })
-            .attr("height", function (d) { return ((d === selectedStage) ? d.r * k : 0) })
-            .attr("width", function (d) { return ((d === selectedStage) ? d.r * k : 0) });
+            .attr("x", function (d) { return x(d.$refX); })
+            .attr("y", function (d) { return y(d.$refY); })
+            .attr("rx", 8 * k)
+            .attr("ry", 8 * k)
+            .attr("height", function (d) { return ((d === selectedLink) ? pSize * k : 0) })
+            .attr("width", function (d) { return ((d === selectedLink) ? pSize * k : 0) });
 
         d3.event.stopPropagation();
-    }
+    };
 
-    var zoom = function (d) {
-        if (zoomedStage !== d) {
-            x = d3.scale.linear().range([25 * k, (r - 25) * k]);
-            y = d3.scale.linear().range([25 * k, (r - 25) * k]);
-            x.domain([d.x - d.r / 2, d.x + d.r / 2]);
-            y.domain([d.y - d.r / 2, d.y + d.r / 2]);
-            k = k * (r - 50) / d.r;
-            zoomedStage = d;
-            that.update(1000);
-        }
-        else {
-            k = (k * d.r) / (r - 50);
-            x = d3.scale.linear().range([0, r * k]);
-            y = d3.scale.linear().range([0, r * k]);
-            x.domain([0, r]);
-            y.domain([0, r]);
-            zoomedStage = null;
-            that.update(1000);
-        }
-        d3.event.stopPropagation();
-    }
-
-    var drawStage = function (d) {
+    var drawTransition = function (d) {
         if (d.nodes) {
-            var newX = d3.scale.linear().range([x(d.x - d.r / 2), x(d.x + d.r / 2)]);
-            var newY = d3.scale.linear().range([y(d.y - d.r / 2), y(d.y + d.r / 2)]);
+            var newX = d3.scale.linear().range([x(d.$refX), x(d.$refX + pSize)]);
+            var newY = d3.scale.linear().range([y(d.$refY), y(d.$refY + pSize)]);
             newX.domain([0, r]);
             newY.domain([0, r + 50]);
-            d.update = sequenceVisual(d.nodes[0], d.links, newX, newY, d.id, d3.select(this), history, base).update;
+            d.update = ruleVisual(d.nodes[0], d.links, newX, newY, d.id, d3.select(this), false, base).update;
         }
-    }
+    };
 
-    var updateStage = function (d) {
+    var updateTransition = function (d) {
         if (d.nodes) {
-            var newX = d3.scale.linear().range([x(d.x - d.r / 2), x(d.x + d.r / 2)]);
-            var newY = d3.scale.linear().range([y(d.y - d.r / 2), y(d.y + d.r / 2)]);
+            var newX = d3.scale.linear().range([x(d.$refX), x(d.$refX + pSize)]);
+            var newY = d3.scale.linear().range([y(d.$refY), y(d.$refY + pSize)]);
             newX.domain([0, r]);
             newY.domain([0, r + 50]);
             d.update(tTime, newX, newY);
         }
-    }
+    };
+
+    var zoom = function (d) {
+        if (zoomedLink !== d) {
+            x = d3.scale.linear().range([25 * k, (r - 25) * k]);
+            y = d3.scale.linear().range([25 * k, (r - 25) * k]);
+            x.domain([d.$refX, d.$refX + pSize]);
+            y.domain([d.$refY, d.$refY + pSize]);
+            k = k * (r - 50) / pSize;
+            zoomedLink = d;
+            that.update(1000);
+        }
+        else {
+            k = (k * pSize) / (r - 50);
+            x = d3.scale.linear().range([0, r * k]);
+            y = d3.scale.linear().range([0, r * k]);
+            x.domain([0, r]);
+            y.domain([0, r]);
+            zoomedLink = null;
+            that.update(1000);
+        }
+        d3.event.stopPropagation();
+    };
+
 
     path.enter()
         .append("svg:path")
         .attr("class", "link")
+        .attr("id", function (d) { return d.source.x + "-" + d.source.y + "-" + d.target.x + "-" + d.target.y;})
         .style("marker-end", function (d) { return "url(#end-arrow)"; })
+        .on("click", updateSelection)
         .attr("d", diagonal);
+
+    pathText.enter()
+        .append("svg:text")
+        .attr("class", "linkDisplay")
+        .attr("dy", -5)
+        .on("click", updateSelection)
+        .append("svg:textPath")
+        .attr("xlink:href", function (d) { return "#" + d.source.x + "-" + d.source.y + "-" + d.target.x + "-" + d.target.y;})
+        .attr("startOffset", "5%")
+        .text(function (d) { return d.id })
+        .style("font-size", function (d) { return 12 * k + "px"; });
 
     var g = step.enter().append("svg:g");
 
     g.append("svg:rect")
-        .on("click", updateSelection)
         .attr("class", "node")
         .attr("x", function (d) { return x(d.x - d.r / 2 / ((d.condition) ? Math.sqrt(2) : 1)); })
         .attr("y", function (d) { return y(d.y - d.r / 2 / ((d.condition) ? Math.sqrt(2) : 1)); })
@@ -786,41 +643,80 @@ function flowVisual(root, links, x, y, title, parent, history, base) {
         .style("opacity", "0");
 
     g.append("svg:rect")
-        .attr("class", "flowPopup")
+        .attr("class", "popupBack")
+        .attr("tag", "fcPopupBack");
+
+    g.append("svg:rect")
+        .attr("class", "popup")
         .attr("tag", "fcPopup")
         .on("click", zoom);
 
-    popup.each(drawStage);
+    popup.each(drawTransition);
 
-    base.addOverlays();
-    base.onTimeSelected(that.update);
-    history.onUpdate(function () {
+    state.onStateChanged(function () {
         that.update(500)
     });
 
     d3.select(window).on("click", function () {
-        if (zoomedStage !== null) {
-            zoom(zoomedStage);
+        if (zoomedLink !== null) {
+            zoom(zoomedLink);
         }
-        else if (selectedStage !== null) {
-            updateSelection(selectedStage);
+        else if (selectedLink !== null) {
+            updateSelection(selectedLink);
         }
     });
 
     return that;
 }
 
-function sequenceVisual(root, links, x, y, title, parent, history, base) {
-    var base = base || baseVisual(parent, history);
+function rulesetVisual(roots, links, x, y, title, parent, state, base) {
+    var base = base || baseVisual(parent);
+    var that = {};
+    var visuals = [];
+    var rulesLength = Object.keys(roots).length;
+
+    var currentY = 0;
+    var linkHash = links[0];
+    for (var ruleName in roots) {
+        var currentRoot = roots[ruleName];
+        var currentLinkArray = linkHash[ruleName];
+        var newX = d3.scale.linear().range([0, x(r / rulesLength)]);
+        var newY = d3.scale.linear().range([y(currentY), y(currentY + r / rulesLength)]);
+        newX.domain([0, r]);
+        newY.domain([0, r]);
+        visuals.push(ruleVisual(currentRoot, currentLinkArray, newX, newY, ruleName, parent, true, base).update);   
+        currentY += r / rulesLength;
+    }
+    
+    return that;
+}
+
+function ruleVisual(root, links, x, y, title, parent, transpose, base) {
+    var base = base || baseVisual(parent);
     var that = {};
     var selectedNode = null;
     var k = x(r) - x(0);
     k = k / r;
     var n = d3.layout.tree()
-        .size([r - 60, r - 60])
+        .size([r - 30, r - 30])
         .nodes(root);
 
-    n.forEach(function (d) { (d.top ? d.x = r / 2 : d.x = d.x + 30); d.y = d.y + 65; });
+    var offset = -300 + n.length * 75;
+    if (offset > 0) {
+        offset = 0;
+    }
+    base.reLayout(n, r - 30, offset, transpose);
+
+    parent.append("svg:defs").append("svg:marker")
+        .attr("id", "end-arrow")
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 6)
+        .attr("markerWidth", 6)
+        .attr("markerHeight", 6)
+        .attr("orient", "auto")
+    .append("svg:path")
+        .attr("d", "M0,-4L8,0L0,4")
+        .attr("fill", "#ccc");
 
     var path = parent.append("svg:g")
         .selectAll("path")
@@ -830,25 +726,9 @@ function sequenceVisual(root, links, x, y, title, parent, history, base) {
         .selectAll("g")
         .data(n);
 
-    var promiseSymbol = d3.svg.symbol()
-        .type("square")
-        .size(90);
-
-    var checkpointSymbol = d3.svg.symbol()
-        .type("diamond")
-        .size(90);
-
-    var inputSymbol = d3.svg.symbol()
-        .type("triangle-down")
-        .size(90);
-
-    var tagSymbol = d3.svg.symbol()
+    var opSymbol = d3.svg.symbol()
         .type("circle")
-        .size(90);
-
-    var popup = parent.append("svg:g")
-        .selectAll("g")
-        .data(n);
+        .size(400);
 
     if (title) {
         var titleText = parent.append("svg:text")
@@ -860,14 +740,35 @@ function sequenceVisual(root, links, x, y, title, parent, history, base) {
     }
 
     var getSource = function (d) {
-        sourceX = d.source.x,
-        sourceY = (d.source.y + d.source.r / 2);
+        if (transpose) {
+            sourceX = (d.source.x + d.source.r);
+            sourceY = d.source.y;
+        } else {
+            sourceX = d.source.x;
+            sourceY = (d.source.y + d.source.r);
+        } 
         return { x: x(sourceX), y: y(sourceY) };
     }
 
     var getTarget = function (d) {
-        targetX = d.target.x;
-        targetY = (d.target.y - d.target.r / 2);
+        if (transpose) {
+            if (d.source.y < d.target.y) {
+                // pointing down
+                targetY = d.target.y - d.target.r;  
+                targetX = d.target.x; 
+            } else if (d.source.y > d.target.y) {
+                // pointing up
+                targetY = d.target.y + d.target.r; 
+                targetX = d.target.x;
+            } else {
+                // aligned
+                targetY = d.target.y;
+                targetX = d.target.x - d.target.r - 5;
+            }            
+        } else {
+            targetX = d.target.x;
+            targetY = d.target.y - d.target.r;
+        }
         return { x: x(targetX), y: y(targetY) };
     }
 
@@ -876,20 +777,57 @@ function sequenceVisual(root, links, x, y, title, parent, history, base) {
         .target(getTarget);
 
     var drawSymbol = function (d) {
-        if (d.type === "tag") {
-            return tagSymbol(d);
+        if (d.type === "op") {
+            return opSymbol(d);
         }
 
-        if (d.type.indexOf('e(') === 0) {
-            return inputSymbol(d);
+        if (d.type === "input") {
+            var h = d.r * 2 / 3;
+            return "M " + (d.r * -1) + " 0 L " + (h * -1) + " " + (h * -1) + " L " + h + " " + (h * -1) + " L " + d.r 
+                        + " 0 L " + h + " " + h + " L " + (h * -1) + " " + h + " z";
         }
 
-        if (d.name) {
-            return checkpointSymbol(d);
+        if (d.type === "function") {
+            var h = d.r * 2 / 3;
+            return "M " + (d.r * -1) + " " + (h * -1) + " L " + d.r + " " + (h * -1) +  " L " + d.r + " " + h + " L " 
+                        + (d.r * -1) + " " + h + " z";
         }
 
-        return promiseSymbol(d);
-    }
+        return;
+    };
+
+    var getColor = function(d) {
+        if (d.type === "op") {
+            return d3.rgb(236,236,236); 
+        }
+
+        if (d.type === "input") {
+            return d3.rgb(252,99,93);  
+        }
+
+        if (d.type === "function") {
+            return d3.rgb(95,191,96);  
+        }
+    };
+
+    var getTextX = function(d) {
+        if (d.type === "op") {
+            return x(d.x - d.r - d.exp.length * 6);
+        }
+
+        if (d.exp) {
+           return x(d.x - d.exp.length / 2 * 6);
+        }
+        return x(d.x - d.r);
+    };
+
+    var getTextY = function(d) {
+        if (d.type === "op") {
+            return y(d.y + 12 * k / 2);
+        }
+
+        return y(d.y - d.r);
+    };
 
     that.update = function (transitionTime, newX, newY) {
         x = newX || x;
@@ -905,9 +843,7 @@ function sequenceVisual(root, links, x, y, title, parent, history, base) {
         step.selectAll("path")
             .transition()
             .duration(transitionTime)
-            .attr("transform", function (d) { return "translate(" + x(d.x) + "," + y(d.y) + "),scale(" + k + ")"; })
-            .style("fill", base.getColor)
-            .style("fill-opacity", base.getOpacity);
+            .attr("transform", function (d) { return "translate(" + x(d.x) + "," + y(d.y) + "),scale(" + k + ")"; });
 
         step.selectAll("title")
             .text(base.getTitle);
@@ -915,36 +851,9 @@ function sequenceVisual(root, links, x, y, title, parent, history, base) {
         step.selectAll("text")
             .transition()
             .duration(transitionTime)
-            .attr("x", function (d) { return x(d.x + 10); })
-            .attr("y", function (d) { return y(d.y + 3); })
+            .attr("x", getTextX)
+            .attr("y", getTextY)
             .style("font-size", function (d) { return 12 * k + "px"; });
-
-        popup.selectAll("rect[class=\"popupBack\"]")
-            .transition()
-            .duration(transitionTime)
-            .attr("x", function (d) { return x(d.x + 14); })
-            .attr("y", function (d) { return y(d.y); })
-            .attr("rx", 8 * k)
-            .attr("ry", 8 * k)
-            .attr("height", function (d) { return ((d === selectedNode) ? d.$height * k : 0) })
-            .attr("width", function (d) { return ((d === selectedNode) ? d.$width * k : 0) });
-
-        popup.selectAll("rect[class=\"popup\"]")
-            .transition()
-            .duration(transitionTime)
-            .attr("x", function (d) { return x(d.x + 10); })
-            .attr("y", function (d) { return y(d.y - 4); })
-            .attr("rx", 8 * k)
-            .attr("ry", 8 * k)
-            .attr("height", function (d) { return ((d === selectedNode) ? d.$height * k : 0) })
-            .attr("width", function (d) { return ((d === selectedNode) ? d.$width * k : 0) });
-
-        popup.selectAll("text")
-            .transition()
-            .duration(transitionTime)
-            .attr("x", function (d) { return x(d.x + 10); })
-            .attr("y", function (d) { return y(d.y + 9); })
-            .style("font-size", 12 * k + "px");
 
         if (titleText) {
             titleText.transition()
@@ -953,84 +862,12 @@ function sequenceVisual(root, links, x, y, title, parent, history, base) {
                 .attr("y", function (d) { return y(45); })
                 .style("font-size", 40 * k + "px");
         }
-
-    }
-
-    var updateSelection = function (d) {
-        popup.style("opacity", function (d1) {
-            if (d1 === d) {
-                if (selectedNode === d) {
-                    selectedNode = null;
-                    return "0";
-                }
-                else {
-                    selectedNode = d;
-                    return "1";
-                }
-            }
-            return "0";
-        });
-
-        popup.selectAll("rect[class=\"popupBack\"]")
-            .attr("x", function (d) { return x(d.x + 14); })
-            .attr("y", function (d) { return y(d.y); })
-            .attr("rx", 8 * k)
-            .attr("ry", 8 * k)
-            .attr("height", function (d) { return ((d === selectedNode) ? d.$height * k : 0) })
-            .attr("width", function (d) { return ((d === selectedNode) ? d.$width * k : 0) });
-
-        popup.selectAll("rect[class=\"popup\"]")
-            .attr("x", function (d) { return x(d.x + 10); })
-            .attr("y", function (d) { return y(d.y - 4); })
-            .attr("rx", 8 * k)
-            .attr("ry", 8 * k)
-            .attr("height", function (d) { return ((d === selectedNode) ? d.$height * k : 0) })
-            .attr("width", function (d) { return ((d === selectedNode) ? d.$width * k : 0) });
-
-        popup.selectAll("text")
-            .attr("x", function (d) { return x(d.x + 10); })
-            .attr("y", function (d) { return y(d.y + 9); })
-            .style("font-size", 12 * k + "px");
-
-        if (titleText) {
-            titleText.attr("x", function (d) { return x(30); })
-                .attr("y", function (d) { return y(45); })
-                .style("font-size", 40 * k + "px");
-        }
-
-        d3.event.stopPropagation();
-    }
-
-    var setDisplayProperties = function (d) {
-        var displayValues = [];
-        if (d.params) {
-            var maxValue = 0;
-            var i = 0;
-            for (var propertyName in d.params) {
-                var currentValue = JSON.stringify(d.params[propertyName]);
-                if (currentValue.length > 25) {
-                    currentValue = currentValue.substring(0, 25) + "...";
-                }
-
-                if (propertyName.length > 15) {
-                    propertyName = propertyName.substring(0, 15) + "...";
-                }
-
-                displayValues.push({ x: d.x + 10, y: d.y + (i * 15), value: propertyName + ":", property: true });
-                displayValues.push({ x: d.x + 80, y: d.y + (i * 15), value: currentValue });
-                ++i;
-            }
-
-        }
-
-        d.$height = displayValues.length ? displayValues.length / 2 * 15 + 4 : 0;
-        d.$width = displayValues.length ? 230 : 0;
-        d.$displayValues = displayValues;
-    }
+    };
 
     path.enter()
         .append("svg:path")
         .attr("class", "link")
+        .style("marker-end", function (d) { return "url(#end-arrow)"; })
         .attr("d", diagonal);
 
     var g = step.enter().append("svg:g");
@@ -1039,70 +876,33 @@ function sequenceVisual(root, links, x, y, title, parent, history, base) {
         .attr("class", "sequenceNode")
         .attr("transform", function (d) { return "translate(" + x(d.x) + "," + y(d.y) + "),scale(" + k + ")"; })
         .attr("d", drawSymbol)
-        .on("click", updateSelection);
+        .style("fill", getColor)
+        .style("fill-opacity", ".7");
 
     g.append("title");
 
     g.append("svg:text")
         .attr("class", "id")
         .attr("text-anchor", "right")
-        .attr("x", function (d) { return x(d.x + 10); })
-        .attr("y", function (d) { return y(d.y + 3); })
+        .attr("x", getTextX)
+        .attr("y", getTextY)
         .style("font-size", function (d) { return 12 * k + "px"; })
-        .text(function (d) { return (d.name ? d.name : d.type); });
-
-    g = popup.enter()
-        .append("svg:g")
-        .attr("type", "popup")
-        .style("opacity", "0");
-
-    popup.each(setDisplayProperties);
-
-    g.append("svg:rect")
-        .attr("class", "popupBack");
-
-    g.append("svg:rect")
-        .attr("class", "popup");
-
-    g.selectAll("text")
-        .data(function (d) { return d.$displayValues })
-        .enter()
-        .append("svg:text")
-        .attr("class", function (d) { return (d.property ? "popupProperty" : "popupValue"); })
-        .text(function (d) { return d.value; });
-
-    base.addOverlays();
-    base.onTimeSelected(that.update);
-    history.onUpdate(function () {
-        that.update(500)
-    });
-
-    d3.select(window).on("click", updateSelection);
+        .text(function (d) { return d.exp; });
 
     return that;
 }
 
-
-function promiseHistory(url) {
+function rulesetState(url) {
     var that = {};
-    var records = [];
-    var startTime;
-    var endTime;
-    var updateEvents = [];
-    var newRecordEvents = [];
+    var stateChangedEvents = [];
     var errorEvents = [];
-    var selectedRecord;
-    var sessionName = url.substring(0, url.lastIndexOf("/"));
-    var ruleSetUrl = sessionName.substring(0, sessionName.lastIndexOf("/"));
-    sessionName = sessionName.substring(sessionName.lastIndexOf("/") + 1);
+    var currentState;
+    var sid = url.substring(0, url.lastIndexOf("/"));
+    var rulesetUrl = sid.substring(0, sid.lastIndexOf("/"));
+    sid = sid.substring(sid.lastIndexOf("/") + 1);
 
-    that.onUpdate = function (updateFunc) {
-        updateEvents.push(updateFunc);
-        return that;
-    }
-
-    that.onNewRecord = function (newRecordFunc) {
-        newRecordEvents.push(newRecordFunc);
+    that.onStateChanged = function (stateChangedFunc) {
+        stateChangedEvents.push(stateChangedFunc);
         return that;
     }
 
@@ -1111,82 +911,25 @@ function promiseHistory(url) {
         return that;
     }
 
-    that.setSelectedTime = function (time) {
-        var top = records.length;
-        var bottom = 0;
-        for (; ;) {
-            var currentIndex = bottom + Math.floor((top - bottom) / 2);
-            selectedRecord = records[currentIndex];
-            if (time >= selectedRecord.endTime) {
-                bottom = currentIndex;
-            }
-            else if (time < selectedRecord.startTime) {
-                top = currentIndex;
-            }
-            else {
-                break;
-            }
-
-            if (currentIndex === records.length - 1) {
-                break;
-            }
-        }
-
-        return selectedRecord.startTime;
-    }
-
-    that.getSelectedRecord = function () {
-        var newRecord = {};
-        for (var propertyName in selectedRecord) {
-            newRecord[propertyName] = selectedRecord[propertyName];
-        }
-        delete (newRecord.id);
-        delete (newRecord.startTime);
-        delete (newRecord.endTime);
-
-        return newRecord;
-    }
-
-    var getTimeFromId = function (objectId) {
-        var hexTime = objectId.substring(0, 8);
-        hexTime = parseInt(hexTime, 16) * 1000;
-        return new Date(hexTime);
+    that.getCurrentState = function () {
+        return currentState;
     }
 
     var update = function () {
         var i;
-        var statusUrl = ruleSetUrl + "/" + sessionName;
+        var statusUrl = rulesetUrl + "/" + sid;
         d3.json(statusUrl, function (err, status) {
-            var startTime;
-            var endTime;
             if (err) {
                 for (i = 0; i < errorEvents.length; ++i) {
                     errorEvents[i](err.responseText);
                 }
             }
             else {
-                var currentEntry = status;
-                var previousEntry;
-                if (records.length) {
-                    previousEntry = records[records.length - 1];
-                    currentEntry.startTime = previousEntry.startTime;
-                }
+                if (JSON.stringify(currentState) !== JSON.stringify(status)) {
+                    currentState = status;
 
-                if (!previousEntry || JSON.stringify(currentEntry) !== JSON.stringify(previousEntry)) {
-                    currentEntry.startTime = new Date();
-                    if (previousEntry) {
-                        previousEntry.endTime = currentEntry.startTime;
-                    }
-                    records.push(currentEntry);
-
-                    startTime = records[0].startTime;
-                    endTime = currentEntry.startTime;
-                    for (i = 0; i < newRecordEvents.length; ++i) {
-                        newRecordEvents[i](currentEntry, sessionName);
-                    }
-
-                    for (var i = 0; i < updateEvents.length; ++i) {
-                        updateEvents[i](startTime, endTime);
+                    for (i = 0; i < stateChangedEvents.length; ++i) {
+                        stateChangedEvents[i](currentState, sid);
                     }
                 }
             }
@@ -1205,17 +948,17 @@ function promiseHistory(url) {
     return that;
 }
 
-function promiseGraph(url, history) {
+function rulesetGraph(url, state) {
     var that = {};
     var links = [];
     var nodes;
     var nodeDictionary = {};
-    var sessionName = url.substring(0, url.lastIndexOf("/"));
-    var ruleSetUrl = sessionName.substring(0, sessionName.lastIndexOf("/"));
-    sessionName = sessionName.substring(sessionName.lastIndexOf("/") + 1);
+    var sid = url.substring(0, url.lastIndexOf("/"));
+    var ruleSetUrl = sid.substring(0, sid.lastIndexOf("/"));
+    sid= sid.substring(sid.lastIndexOf("/") + 1);
 
-    if (sessionName.indexOf(".") !== -1) {
-        sessionName = sessionName.substring(0, sessionName.indexOf("."));
+    if (sid.indexOf(".") !== -1) {
+        sid = sid.substring(0, sid.indexOf("."));
     }
 
     var getExpression = function(expression, typeName) {
@@ -1225,6 +968,11 @@ function promiseGraph(url, history) {
         var result;
         var expressions;
         var i;
+
+        if (!typeName.indexOf('$')) {
+            typeName = typeName.substring(1, typeName.length);
+        }
+
         for (operator in expression) {
             break;
         }
@@ -1240,8 +988,6 @@ function promiseGraph(url, history) {
         }
 
         switch (operator) {
-            case '$fn':
-                return 'fn(' + typeName +')' + expression[operator];
             case '$ne':
                 return typeName + '.' + lop + ' <> ' + rop;
             case '$lte':
@@ -1261,7 +1007,7 @@ function promiseGraph(url, history) {
                 expressions = expression[operator];
                 for (i = 0; i < expressions.length; ++i) {
                     if (i !== 0) {
-                        result = result + ' and ';
+                        result = result + ' & ';
                     }
                     result = result + getExpression(expressions[i], typeName);
                 }
@@ -1271,7 +1017,7 @@ function promiseGraph(url, history) {
                 expressions = expression[operator];
                 for (i = 0; i < expressions.length; ++i) {
                     if (i !== 0) {
-                        result = result + ' or ';
+                        result = result + ' | ';
                     }
                     result = result + getExpression(expressions[i], typeName);
                 }
@@ -1282,13 +1028,13 @@ function promiseGraph(url, history) {
                 }
 
                 rop = expression[lop];
-                return typeName + '.' + lop + ' = ' + rop;
+                return typeName + '.' + lop + ' == ' + rop;
         }
     };
 
     var getStateNodes = function (chart, links, parentId) {
         var currentState;
-        var resultNode = { size: 20, id: "", history: [], children: [] };
+        var resultNode = { size: 20, id: "", currentState: null, children: [] };
         var stateNode;
         var stateId;
         var stateName;
@@ -1306,7 +1052,7 @@ function promiseGraph(url, history) {
                 stateNode = getStateNodes(currentState.$chart, links, stateId);
                 stateNode.id = stateId;
             } else {
-                stateNode = { id: stateId, history: [], size: 20 };
+                stateNode = { id: stateId, currentState: null, size: 20 };
             }
 
             nodeDictionary[stateId] = stateNode;
@@ -1323,59 +1069,22 @@ function promiseGraph(url, history) {
 
             for (var transitionName in currentState) {
                 var transition = currentState[transitionName];
-                var transitionNode = { r: 14, name: stateId, type: "tag", top: true, children: [] };
-                var transitionLinks = [];
-                var outputNode;
-                var transitionId;
-                var toTransitionId;
-
-                if (parentId) {
-                    transitionId = parentId + "." + transitionName;
-                } else {
-                    transitionId = transitionName;
-                }
-
                 if (transition.to) {
+                    var transitionNode = { r: 15, type: "start", top: true, children: [] };
+                    var transitionLinks = [];
+                    var outputNode;
+                    var transitionId;
+                    
                     if (parentId) {
-                        toTransitionId = parentId + "." + transition.to;
+                        transitionId = parentId + "." + transitionName;
                     } else {
-                        toTransitionId = transition.to;
-                    }
-                }
-
-                if (transition.whenAny) {
-                    outputNode = getEventNodes(transitionNode, transition.whenAny, false, transitionLinks);
-                } else if (transition.whenAll) {
-                    outputNode = getEventNodes(transitionNode, transition.whenAll, true, transitionLinks);
-                } else if (transition.when) {
-                    var typeName;
-                    outputNode = { r: 14, top: true, children: [] };
-                    for (typeName in transition.when) {
-                        break;
+                        transitionId = transitionName;
                     }
 
-                    if (typeName === '$m' || typeName === '$s') {
-                        outputNode.type = getExpression(transition.when[typeName], typeName);
-                    }
-                    else {
-                        outputNode.type = getExpression(transition.when, '$m');
-                    }
-
-
-                    transitionNode.children.push(outputNode);
-                    transitionLinks.push({ source: transitionNode, target: outputNode, left: false, right: true });
-                } else {
-                    outputNode = transitionNode;
-                }
-
-                if (transition.to) {
-                    var toNode = { r: 14, name: toTransitionId, type: "tag", top: true, children: [] };
-                    outputNode.children.push(toNode);
-                    transitionLinks.push({ source: outputNode, target: toNode, left: false, right: true });
-
+                    outputNode = getRuleNodes(transitionId, transition, transitionNode, transitionLinks);
                     var link = {
                         source: nodeDictionary[stateId],
-                        target: nodeDictionary[toTransitionId],
+                        target: nodeDictionary[transition.to],
                         nodes: [transitionNode, outputNode],
                         links: transitionLinks,
                         id: transitionId,
@@ -1383,24 +1092,22 @@ function promiseGraph(url, history) {
                         right: true
                     };
 
-                    if (toTransitionId === stateId) {
+                    if (transition.to === stateId) {
                         link.reflexive = true;
                     }
 
-                    var counter = linkCounter[stateId + toTransitionId];
+                    var counter = linkCounter[stateId + transition.to];
                     if (counter) {
                         counter.count = counter.count + 1;
                         link.order = counter.count;
                     }
                     else {
-                        linkCounter[stateId + toTransitionId] = { count: 0 };
+                        linkCounter[stateId + transition.to] = { count: 0 };
                         link.order = 0;
                     }
 
                     links.push(link);
                 }
-
-
             }
         }
 
@@ -1412,54 +1119,63 @@ function promiseGraph(url, history) {
     var getFlowNodes = function (chart, links) {
         var resultNode;
         var visitedNodes = {};
-        for (var stateName in chart) {
-            var currentState = chart[stateName];
-            var stateNode = { id: stateName, r: 50, history: [], children: [] };
-            // if (currentState.run) {
-            //     var startNode = { r: 14, name: "$start", type: "tag", top: true, children: [] };
-            //     var endNode = { r: 14, name: "$end", type: "tag", top: true, children: [] };
-            //     stateNode.links = [];
-            //     stateNode.nodes = getSequenceNodes(currentState.run, stateNode.links, null, null, startNode, endNode);
-            // }
-
-            nodeDictionary[stateName] = stateNode;
+        for (var stageName in chart) {
+            var currentStage = chart[stageName];
+            var stageNode = { id: stageName, r: 50, currentStage: null, children: [] };
+            nodeDictionary[stageName] = stageNode;
             if (!resultNode) {
-                resultNode = stateNode;
-                visitedNodes[stateName] = stateNode;
+                resultNode = stageNode;
+                visitedNodes[stageName] = stageNode;
             }
         }
 
         var targetNode;
         var sourceNode;
-        var currentState;
-        for (var stateName in chart) {
-            currentState = chart[stateName];
-            sourceNode = nodeDictionary[stateName];
-            if (currentState.to) {
-                if (typeof (currentState.to) === "string") {
-                    targetNode = nodeDictionary[currentState.to];
+        var currentStage;
+        for (var stageName in chart) {
+            currentStage = chart[stageName];
+            sourceNode = nodeDictionary[stageName];
+            if (currentStage.to) {
+                if (typeof (currentStage.to) === "string") {
+                    targetNode = nodeDictionary[currentStage.to];
                     if (targetNode) {
-                        if (!visitedNodes[currentState.to]) {
+                        if (!visitedNodes[currentStage.to]) {
                             sourceNode.children.push(targetNode);
-                            visitedNodes[currentState.to] = targetNode;
+                            visitedNodes[currentStage.to] = targetNode;
                         }
 
                         links.push({ source: sourceNode, target: targetNode, left: false, right: true });
                     }
                 }
-                else {
+                else if (Object.keys(currentStage.to).length) {
                     var conditionNode = { id: "switch", r: 50, children: [], condition: true };
                     sourceNode.children.push(conditionNode);
                     links.push({ source: sourceNode, target: conditionNode, left: false, right: true });
-                    for (var targetName in currentState.to) {
+                    for (var targetName in currentStage.to) {
                         targetNode = nodeDictionary[targetName];
                         if (targetNode) {
+                            var transition = currentStage.to[targetName];
+                            var transitionNode = { r: 15, type: "start", top: true, children: [] };
+                            var transitionLinks = [];
+                            var outputNode;
+                            outputNode = getRuleNodes(targetName, {when: transition}, transitionNode, transitionLinks);
+                            
+                            var link = {
+                                source: conditionNode,
+                                target: targetNode,
+                                nodes: [transitionNode, outputNode],
+                                links: transitionLinks,
+                                id: targetName,
+                                left: false,
+                                right: true
+                            };
+
                             if (!visitedNodes[targetName]) {
                                 conditionNode.children.push(targetNode);
                                 visitedNodes[targetName] = targetNode;
                             }
 
-                            links.push({ source: conditionNode, target: targetNode, left: false, right: true });
+                            links.push(link);
                         }
                     }
                 }
@@ -1470,24 +1186,81 @@ function promiseGraph(url, history) {
         return resultNode;
     };
 
-    var getEventNodes = function (rootNode, events, all, links) {
-        var endNode = { r: 14, name: (all ? "all" : "any"), type: "tag", children: [] };
+    var getRulesetNodes = function (ruleset, links) {
+        var topNode;
+        var rule;
+        var roots = {};
+        var linkHash = {};
+        var linkArray;
+        for (var ruleName in ruleset) {
+            linkArray = [];
+            rule = ruleset[ruleName];
+            rule.run = "#";
+            topNode = { r: 15, type: "start", top: true, children: [] };
+            getRuleNodes(ruleName, rule, topNode, linkArray);
+            roots[ruleName] = topNode;
+            linkHash[ruleName] = linkArray;
+        }
+
+        links.push(linkHash);
+        return roots;
+    }
+
+    var getRuleNodes = function (ruleName, rule, parentNode, links) {
+        var outputNode;
+        if (rule.whenAny) {
+            outputNode = getAlgebraNodes(parentNode, rule.whenAny, "any", links);
+        } else if (rule.whenAll) {
+            outputNode = getAlgebraNodes(parentNode, rule.whenAll, "all", links);
+        } else if (rule.when) {
+            var typeName;
+            outputNode = { r: 15, top: true, type: "input" ,children: [] };
+            for (typeName in rule.when) {
+                break;
+            }
+
+            if (typeName === '$m' || typeName === '$s') {
+                outputNode.exp = getExpression(rule.when[typeName], typeName);
+            }
+            else {
+                outputNode.exp = getExpression(rule.when, '$m');
+            }
+
+            parentNode.children.push(outputNode);
+        } else {
+            outputNode = parentNode;
+        }
+
+        if (rule.run) {
+            var runNode = { r: 15, exp: ruleName, type: "function", top: true, children: [] };
+            outputNode.children.push(runNode);
+            links.push({ source: outputNode, target: runNode, left: false, right: true });
+        }
+
+        return outputNode;
+    }
+
+    var getAlgebraNodes = function (rootNode, events, op, links) {
+        var endNode = { r: 15, exp: op, type: "op", children: [] };
         var endNodes = [];
         var currentNode;
         for (var eventName in events) {
             var currentExpression = events[eventName];
             if (eventName.indexOf("$all") !== -1) {
-                currentNode = getEventNodes(rootNode, currentExpression, true, links);
+                currentNode = getAlgebraNodes(rootNode, currentExpression, "all", links);
             }
             else if (eventName.indexOf("$any") !== -1) {
-                currentNode = getEventNodes(rootNode, currentExpression, false, links);
+                currentNode = getAlgebraNodes(rootNode, currentExpression, "any", links);
             }
             else {
-                currentNode = { r: 14, children: [] };
-                currentNode.type = getExpression(currentExpression, eventName);
+                currentNode = { r: 15, type: "input", children: [] };
+                if (eventName !== "$s") {
+                    currentNode.exp = getExpression(currentExpression, "m");
+                } else {
+                    currentNode.exp = getExpression(currentExpression, "s");
+                }
                 currentNode.depth = 0;
                 rootNode.children.push(currentNode);
-                links.push({ source: rootNode, target: currentNode, left: false, right: true });
             }
 
             endNodes.push(currentNode);
@@ -1512,51 +1285,22 @@ function promiseGraph(url, history) {
         return endNode;
     };
 
-    var getNodes = function (ruleSet, links, sessionName, rootNode, endNode) {
-        if (ruleSet.$type === "stateChart") {
-            delete(ruleSet.$type);
-            return getStateNodes(ruleSet, links);
+    var getNodes = function (ruleset, links) {
+        if (ruleset.$type === "stateChart") {
+            delete(ruleset.$type);
+            return getStateNodes(ruleset, links);
         }
-        else if (ruleSet.$type === "flowChart") {
-            delete(ruleSet.$type);
-            return getFlowNodes(ruleSet, links);
+        else if (ruleset.$type === "flowChart") {
+            delete(ruleset.$type);
+            return getFlowNodes(ruleset, links);
         } else {
-            if (sessionName) {
-                rootNode = { r: 14, name: "$start:" + sessionName, type: "tag", top: true, history: [], children: [] };
-                sessions[sessionName] = { _id: getIdFromTime(new Date(2013, 01, 01, 0, 0, 0)) };
-                endNode = { r: 14, name: "$end:" + sessionName, type: "tag", top: top, history: [], children: [] };
-            }
-
-            var previousNode = rootNode;
-            for (var i = ruleSet.length - 1; i >= 0; --i) {
-                var currentRule = ruleSet[i];
-                var currentNode = { r: 14, top: true, children: [] };
-                currentNode.name = ruleSet.params.name;
-                currentNode.type = ruleSet.type;
-                currentNode.params = ruleSet.params;
-                if (currentNode.name) {
-                    currentNode.history = [];
-                    nodeDictionary[currentNode.name] = currentNode;
-                }
-
-                previousNode.children.push(currentNode);
-                links.push({ source: previousNode, target: currentNode, left: false, right: true });
-                previousNode = currentNode;
-            }
-
-            if (sessionName) {
-                nodeDictionary[rootNode.name] = rootNode;
-                nodeDictionary[endNode.name] = endNode;
-            }
-            previousNode.children.push(endNode);
-            links.push({ source: previousNode, target: endNode, left: false, right: true });
-            return [rootNode, endNode];
+            return getRulesetNodes(ruleset, links);
         }
     };
 
-    var addHistoryRecord = function (entry) {
+    var setCurrentState = function (entry) {
         if (nodeDictionary[entry.label]) {
-            nodeDictionary[entry.label].history.push(entry);
+            nodeDictionary[entry.label].currentState = entry;
         }
     };
 
@@ -1581,7 +1325,7 @@ function promiseGraph(url, history) {
                 var x;
                 var y;
 
-                nodes = getNodes(ruleSet, links, sessionName);
+                nodes = getNodes(ruleSet, links);
                 if (frameSize) {
                     frameSize = parseInt(frameSize);
                     x = d3.scale.linear().range([0, frameSize]);
@@ -1596,15 +1340,16 @@ function promiseGraph(url, history) {
                     y.domain([0, r]);
                 }
 
-                var title = ruleSetUrl.substring(1) + "/" + sessionName;
+                var title = ruleSetUrl.substring(1) + "/" + sid;
                 if (nodes.type === "stateChart") {
-                    stateVisual(nodes, links, x, y, title, svg, history);
-                }
-                else if (nodes.type === "flowChart") {
-                    flowVisual(nodes, links, x, y, title, svg, history);
+                    stateVisual(nodes, links, x, y, title, svg, state);
+                } else if (nodes.type === "flowChart") {
+                    flowVisual(nodes, links, x, y, title, svg, state);
+                } else {
+                    rulesetVisual(nodes, links, x, y, title, svg, state);
                 }
 
-                history.start();
+                state.start();
                 if (callback) {
                     callback();
                 }
@@ -1612,7 +1357,6 @@ function promiseGraph(url, history) {
         });
     };
 
-    history.onNewRecord(addHistoryRecord);
+    state.onStateChanged(setCurrentState);
     return that;
 }
-
