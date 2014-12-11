@@ -5,6 +5,26 @@
 
 using namespace v8;
 
+class Proxy {
+public:
+
+    explicit Proxy(Handle<v8::Function> gvalue, Handle<v8::Function> svalue) { 
+        _gfunc = v8::Persistent<v8::Function>::New(gvalue); 
+        _sfunc = v8::Persistent<v8::Function>::New(svalue); 
+    }
+    Handle<Object> Wrap();
+
+private:
+
+    static Proxy* Unwrap(Handle<Object> obj);
+    static Handle<Value> Get(Local<String> name, const AccessorInfo& info);
+    static Handle<Value> Set(Local<String> name, Local<Value> value, const AccessorInfo& info);
+    
+    v8::Persistent<v8::Function> _gfunc;
+    v8::Persistent<v8::Function> _sfunc;
+};
+
+
 Handle<Value> jsCreateRuleset(const Arguments& args) {
     HandleScope scope;
 
@@ -329,6 +349,64 @@ Handle<Value> jsGetState(const Arguments& args) {
     return scope.Close(Undefined());
 }
 
+Handle<Value> jsCreateProxy(const Arguments& args) {
+    HandleScope scope;
+
+    if (args.Length() < 2) {
+        ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
+    } else if (!args[0]->IsFunction() || !args[1]->IsFunction()) {
+        ThrowException(Exception::TypeError(String::New("Wrong argument type")));
+    } else {
+        Proxy *p = new Proxy(Handle<v8::Function>::Cast(args[0]), Handle<v8::Function>::Cast(args[1]));
+        return scope.Close(p->Wrap());
+    }
+
+    return scope.Close(Undefined());
+}
+
+Handle<Value> Proxy::Get(Local<String> name, const AccessorInfo& info) {
+    HandleScope scope;
+    Proxy* p = Unwrap(info.Holder());
+
+    Local<Value> args[1];
+    args[0] = name;
+
+    Handle<Value> result = p->_gfunc->Call(Context::GetCurrent()->Global(), 1, args);
+
+    return scope.Close(result);
+}
+
+Handle<Value> Proxy::Set(Local<String> name, Local<Value> value, const AccessorInfo& info) {
+    HandleScope scope;
+    Proxy* p = Unwrap(info.Holder());
+
+    Local<Value> args[2];
+    args[0] = name;
+    args[1] = value;
+
+    Handle<Value> result = p->_sfunc->Call(Context::GetCurrent()->Global(), 2, args);
+
+    return scope.Close(result);
+}
+
+Handle<Object> Proxy::Wrap() { 
+    Local<ObjectTemplate> proxyTempl = ObjectTemplate::New();
+    proxyTempl->SetInternalFieldCount(1);
+    proxyTempl->SetNamedPropertyHandler(Get, Set);
+
+    Local<Object> result = proxyTempl->NewInstance();
+    result->SetInternalField(0, External::New(this));
+
+    return result;
+}
+
+Proxy* Proxy::Unwrap(Handle<Object> obj) {
+  Handle<External> field = Handle<External>::Cast(obj->GetInternalField(0));
+  void* ptr = field->Value();
+  return static_cast<Proxy*>(ptr);
+}
+
+
 void init(Handle<Object> exports) {
     exports->Set(String::NewSymbol("createRuleset"),
         FunctionTemplate::New(jsCreateRuleset)->GetFunction());
@@ -365,6 +443,9 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewSymbol("getState"),
         FunctionTemplate::New(jsGetState)->GetFunction());
+
+    exports->Set(String::NewSymbol("createProxy"),
+        FunctionTemplate::New(jsCreateProxy)->GetFunction());
 }
 
 NODE_MODULE(rules, init)
