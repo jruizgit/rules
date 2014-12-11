@@ -19,7 +19,7 @@ Durable.ruleset :approve do
   end
 end
 
-run_all
+Durable.run_all
 ```
 ####Python
 ```python
@@ -39,6 +39,7 @@ run_all()
 ####JavaScript
 ```javascript
 var d = require('durable');
+
 with (d.ruleset('approve')) {
     when(m.amount.lt(1000)), function (s) {
         s.status = 'pending';
