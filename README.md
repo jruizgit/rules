@@ -11,13 +11,15 @@ The Durable Rules core engine is implemented in C, which enables ultra fast rule
 require 'durable'
 
 Durable.ruleset :approve do
-  when_one m.amount < 1000 do
+  when_ m.amount < 1000 do
     s.status = 'pending'
   end
   when_all m.subject == 'approved', s.status == 'pending' do
     puts 'approved'
   end
 end
+
+run_all
 ```
 ####Python
 ```python
@@ -31,25 +33,22 @@ with ruleset('approve'):
     @when_all(m.subject == 'approved', s.status == 'pending')
     def approved(s):
         print('approved')
+
+run_all()
 ```
 ####JavaScript
 ```javascript
 var d = require('durable');
-d.run({
-    approve: {
-        r1: {
-            when: { $lt: { amount: 1000 } },
-            run: function(s) { s.status = 'pending' }
-        },
-        r2: {
-            whenAll: {
-                $m: { subject: 'approved' },
-                $s: { status: 'pending' }
-            },
-            run: function(s) { console.log('approved'); }
-        }
-    }
-});
+with (d.ruleset('approve')) {
+    when(m.amount.lt(1000)), function (s) {
+        s.status = 'pending';
+    });
+    whenAll(m.subject.eq('approved'), s.status.eq('pending'), function (s) {
+        console.log('approved');
+    });
+}
+
+d.runAll();
 ```
 
 
