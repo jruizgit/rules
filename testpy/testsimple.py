@@ -3,8 +3,8 @@ import datetime
 
 with ruleset('a0'):
     @when((m.amount > 1000) | (m.subject == 'approve') | (m.subject == 'ok'))
-    def approved(s):
-        print ('a0 approved ->{0}'.format(s.event))
+    def approved(s, m):
+        print ('a0 approved ->{0}'.format(m))
 
     @when_start
     def start(host):
@@ -211,8 +211,8 @@ with ruleset('a8'):
 
 with ruleset('a9'):
     @when((m.subject == 'approve') & (m.amount == 100), at_least = 5, at_most = 10)
-    def approved(s):
-        print ('a9 approved ->{0}'.format(s.event))
+    def approved(s, m):
+        print ('a9 approved ->{0}'.format(m))
 
     @when_start
     def start(host):
@@ -226,8 +226,8 @@ with ruleset('a9'):
 
 with ruleset('a10'):
     @when_all(m.subject == 'approve', m.subject == 'approved', at_least = 2, at_most = 4)
-    def approved(s):
-        print ('a10 approved ->{0}'.format(s.event))
+    def approved(s, m):
+        print ('a10 approved ->{0}'.format(m))
 
     @when_start
     def start(host):
@@ -241,8 +241,8 @@ with ruleset('a10'):
 
 with ruleset('a11'):
     @when_any(m.subject == 'approve', m.subject == 'approved', at_least = 3)
-    def approved(s):
-        print ('a11 approved ->{0}'.format(s.event))
+    def approved(s, m):
+        print ('a11 approved ->{0}'.format(m))
 
     @when_start
     def start(host):
@@ -254,8 +254,8 @@ with ruleset('a11'):
 
 with ruleset('a12'):
     @when_any(m.subject == 'approve', (m.subject == 'please').at_least(3))
-    def approved(s):
-        print ('a12 approved ->{0}'.format(s.event))
+    def approved(s, m):
+        print ('a12 approved ->{0}'.format(m))
 
     @when_start
     def start(host):
@@ -267,8 +267,8 @@ with ruleset('a12'):
 
 with ruleset('a13'):
     @when_all((m.subject == 'approve').at_least(2), m.subject == 'please')
-    def approved(s):
-        print ('a13 approved ->{0}'.format(s.event))
+    def approved(s, m):
+        print ('a13 approved ->{0}'.format(m))
 
     @when_start
     def start(host):
@@ -314,9 +314,9 @@ with statechart('p2'):
     with state('input'):
         @to('process')
         @when(m.subject == 'approve')
-        def get_input(s):
-            print('p2 input {0} from: {1}'.format(s.event['quantity'], s.id))
-            s.quantity = s.event['quantity']
+        def get_input(s, m):
+            print('p2 input {0} from: {1}'.format(m.quantity, s.id))
+            s.quantity = m.quantity
 
     with state('process'):
         with to('result').when(+s.quantity):
@@ -365,9 +365,9 @@ with flowchart('p3'):
     
     with stage('input'):
         @run
-        def get_input(s):
-            print('p3 input {0} from: {1}'.format(s.event['quantity'], s.id))
-            s.quantity = s.event['quantity']
+        def get_input(s, m):
+            print('p3 input {0} from: {1}'.format(m.quantity, s.id))
+            s.quantity = m.quantity
 
         to('process')
     
@@ -462,16 +462,16 @@ with statechart('t2'):
     with state('pending'):
         @to('approved')
         @when(m.subject == 'approved')
-        def report_approved(s):
+        def report_approved(s, m):
             print('t2 approved {0}'.format(s.id))
-            print('t2 started @%s' % s.event['start'])
+            print('t2 started @%s' % m.start)
             print('t2 ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
 
         @to('denied')
         @when(m.subject == 'denied')
         def report_denied(s):
             print('t2 denied {0}'.format(s.id))
-            print('t2 started @%s' % s.event['start'])
+            print('t2 started @%s' % m.start)
             print('t2 ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
 
     state('approved')

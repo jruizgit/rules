@@ -2,6 +2,7 @@ import json
 import copy
 import rules
 import threading
+import inspect
 
 
 class Session(object):
@@ -14,9 +15,9 @@ class Session(object):
         self._message_directory = {}
         self._branch_directory = {}
         if '$m' in event:
-            self.event = event['$m']
+            self.event = Event(event['$m'])
         else:
-            self.event = event
+            self.event = Event(event)
 
     def get_timers(self):
         return self._timer_directory
@@ -68,6 +69,29 @@ class Session(object):
         else:
             self.state[name] = value
 
+class Event(object):
+
+    def __init__(self, state):
+        self.state = state
+
+    def __getitem__(self, key):
+        if key in self.state:
+            return self.state[key]
+        else:
+            return None
+
+    def __getattr__(self, name):   
+        if name in self.state:
+            return self.state[name]
+        else:
+            return None
+
+    def __repr__(self):
+        return repr(self.state);
+
+    def __str__(self):
+        return str(self.state);
+
 
 class Promise(object):
 
@@ -76,6 +100,19 @@ class Promise(object):
         self._next = None
         self._sync = True
         self.root = self
+
+        arg_count = func.__code__.co_argcount
+        if inspect.ismethod(func):
+            arg_count -= 1
+
+        if arg_count == 1:
+            self._pass_event = False
+        elif arg_count == 2:
+            self._pass_event = True
+        elif arg_count == 3:
+            self._sync = False
+        else:
+            raise Exception('Invalid function signature')
 
     def continue_with(self, next):
         if (isinstance(next, Promise)):
@@ -91,7 +128,11 @@ class Promise(object):
     def run(self, s, complete):
         if self._sync:
             try:
-                self._func(s)
+                if self._pass_event:
+                    self._func(s, s.event)    
+                else:
+                    self._func(s)
+
             except Exception as error:
                 complete(error)
                 return
@@ -110,7 +151,7 @@ class Promise(object):
                     else: 
                         complete(None)
 
-                self._func(s, callback)
+                self._func(s, s.event, callback)
             except Exception as error:
                 complete(error)
 

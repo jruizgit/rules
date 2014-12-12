@@ -436,9 +436,8 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
-        that.toJSON = function () {
-            rulesetDefinition.$type = 'ruleset';
-            return JSON.stringify(rulesetDefinition);
+        that.getDefinition = function () {
+            return rulesetDefinition;
         };
 
         for (var actionName in rulesetDefinition) {
@@ -595,9 +594,9 @@ exports = module.exports = durableEngine = function () {
         var rules = {};
         transform(null, null, null, host, chartDefinition, rules);
         var that = ruleset(name, host, rules, stateCacheSize);
-        that.toJSON = function () {
+        that.getDefinition = function () {
             chartDefinition.$type = 'stateChart';
-            return JSON.stringify(chartDefinition);
+            return chartDefinition;
         };
 
         return that;
@@ -719,9 +718,10 @@ exports = module.exports = durableEngine = function () {
         var rules = {};
         transform(host, chartDefinition, rules);
         var that = ruleset(name, host, rules, stateCacheSize);
-        that.toJSON = function () {
+
+        that.getDefinition = function () {
             chartDefinition.$type = 'flowChart';
-            return JSON.stringify(chartDefinition);
+            return chartDefinition;
         };
 
         return that;
@@ -999,7 +999,7 @@ exports = module.exports = durableEngine = function () {
                         response.send({ error: err }, 404);
                     }
                     else {
-                        response.send(result);
+                        response.send(result.getDefinition());
                     }
                 });
             });
