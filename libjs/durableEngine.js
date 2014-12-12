@@ -662,6 +662,10 @@ exports = module.exports = durableEngine = function () {
                             }
 
                             nextStage = chart[transitionName];
+                            if (!nextStage) {
+                                throw 'stage ' + transitionName + ' not found'
+                            }
+
                             if (!nextStage.run) {
                                 rule.run = to(transitionName);
                             } else {

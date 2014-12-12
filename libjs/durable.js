@@ -226,6 +226,7 @@ exports = module.exports = durableEngine = function () {
 
         that.flowchart = function(name) {
             var newRuleset = flowchart(name);
+            rulesets.pop();
             rulesetArray.push(newRuleset);
             return newRuleset;
         }
@@ -365,6 +366,10 @@ exports = module.exports = durableEngine = function () {
             }
             return that;
         };
+
+        obj.timeout = function(name) {
+            return m.$t.eq(name);
+        }
     };
 
     var ruleset = function (name) {
@@ -451,7 +456,10 @@ exports = module.exports = durableEngine = function () {
             if (!condition) {
                 if (!flow) {
                     return {to: stateName};
-                } else {
+                } else if (typeof(flow) === 'function') {
+                    return {to: stateName, run: flow};
+                }
+                else {
                     return stateName;
                 }
             } 
@@ -475,8 +483,8 @@ exports = module.exports = durableEngine = function () {
             return name;
         };
 
-        that.to = function (stateName) {
-            var trigger = to(stateName);
+        that.to = function (stateName, func) {
+            var trigger = to(stateName, func);
             triggers.push(trigger);
             return trigger;
         };
@@ -550,6 +558,7 @@ exports = module.exports = durableEngine = function () {
         var that = {};
         var switches = [];
         var runFunc;
+        var rulesetArray = [];
 
         that.getName = function() {
             return name;
@@ -558,6 +567,27 @@ exports = module.exports = durableEngine = function () {
         that.run = function (func) {
             runFunc = func;
         };
+
+        that.ruleset = function(name) {
+            var newRuleset = ruleset(name);
+            rulesets.pop();
+            rulesetArray.push(newRuleset);
+            return newRuleset;
+        }
+
+        that.statechart = function(name) {
+            var newRuleset = statechart(name);
+            rulesets.pop();
+            rulesetArray.push(newRuleset);
+            return newRuleset;
+        }
+
+        that.flowchart = function(name) {
+            var newRuleset = flowchart(name);
+            rulesets.pop();
+            rulesetArray.push(newRuleset);
+            return newRuleset;
+        }
 
         that.to = function (stageName) {
             var sw = to(stageName, true);
@@ -569,14 +599,27 @@ exports = module.exports = durableEngine = function () {
             var newDefinition = {};
             if (runFunc) {
                 newDefinition['run'] = runFunc;
+            } else if (rulesetArray.length) {
+                var rulesetDefinitions = {};
+                for (var i = 0; i < rulesetArray.length; ++i) {
+                    rulesetDefinitions[rulesetArray[i].getName()] = rulesetArray[i].define();
+                }
+
+                newDefinition['run'] =  rulesetDefinitions;   
             }
 
-            var switchDefinition = {};
+            var switchesDefinition = {};
             for (var i = 0; i < switches.length; ++i) {
-                switchDefinition[switches[i].getName()] = switches[i].define('');
+                var switchDefinition = switches[i].define('');
+                if (typeof(switchDefinition) === 'string') {
+                    switchesDefinition = switchDefinition;
+                    break;
+                }
+
+                switchesDefinition[switches[i].getName()] = switches[i].define('');
             }
 
-            newDefinition['to'] = switchDefinition;
+            newDefinition['to'] = switchesDefinition;
             return newDefinition;
         }
 
@@ -626,9 +669,7 @@ exports = module.exports = durableEngine = function () {
     var runAll = function(databases, basePath, stateCacheSize) {
         var definitions = {};
         for (var i = 0; i < rulesets.length; ++ i) {
-            definitions[rulesets[i].getName()] = rulesets[i].define();
-            console.log(rulesets[i].getName());
-            console.log(JSON.stringify(rulesets[i].define()));   
+            definitions[rulesets[i].getName()] = rulesets[i].define();  
         }
 
         var rulesHost = d.host(databases, stateCacheSize);
