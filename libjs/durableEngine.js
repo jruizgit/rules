@@ -102,10 +102,10 @@ exports = module.exports = durableEngine = function () {
         var root = that;
         var next;
         var sync;
-        if (func.length <= 1) {
+        if (func.length <= 2) {
             sync = true;
         }
-        else if (func.length === 2) {
+        else if (func.length === 3) {
             sync = false;
         }
         else {
@@ -137,7 +137,7 @@ exports = module.exports = durableEngine = function () {
             // complete should never throw
             if (sync) {
                 try {
-                    func(s);
+                    func(s, s.getOutput());
                 } catch (reason) {
                     complete(reason, s);
                     return;
@@ -150,7 +150,7 @@ exports = module.exports = durableEngine = function () {
                 }
             } else {
                 try {
-                    func(s, function (err) {
+                    func(s, s.getOutput(), function (err) {
                         if (err) {
                             complete(err, s);
                         } else if (next) {
@@ -169,11 +169,16 @@ exports = module.exports = durableEngine = function () {
     };
 
     var to = function (state) {
+
         var execute = function (s) {
             s.label = state;
         };
 
         var that = promise(execute);
+        that.getState = function() {
+            return state;
+        }
+
         return that;
     };
 
@@ -432,8 +437,8 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.toJSON = function () {
-            rules.$type = 'ruleset';
-            return JSON.stringify(rules);
+            rulesetDefinition.$type = 'ruleset';
+            return JSON.stringify(rulesetDefinition);
         };
 
         for (var actionName in rulesetDefinition) {
@@ -839,7 +844,26 @@ exports = module.exports = durableEngine = function () {
             return names;
         };
 
-        that.postBatch = function (rulesetName, messages, complete) {
+        that.postBatch = function () {
+            var rulesetName = arguments[0];
+            var messages = [];
+            var complete;
+            if (Array.isArray(arguments[1])) {
+                messages = arguments[1];
+                if (arguments.length === 3) {
+                    complete = arguments[2];
+                }
+            }
+            else {
+                for (var i = 1; i < arguments.length; ++ i) {
+                    if (typeof(arguments[i]) === 'function') {
+                        complete = arguments[i];
+                    } else {
+                        messages.push(arguments[i]);
+                    }
+                }
+            }
+
             that.getRuleset(rulesetName, function (err, rules) {
                 if (err) {
                     complete(err);

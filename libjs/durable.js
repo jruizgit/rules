@@ -2,24 +2,6 @@ exports = module.exports = durableEngine = function () {
     var d = require('./durableEngine');
     var r = require('../build/release/rules.node');
 
-    var m = r.createProxy(
-        function(name) {
-            return term('$m', name);
-        },
-        function(name, value) {
-            return;
-        }
-    );
-
-    var s = r.createProxy(
-        function(name) {
-            return term('$s', name);
-        },
-        function(name, value) {
-            return;
-        }
-    );
-
     var argsToArray = function(args, array) {
         array = array || [];
         for (var i = 0; i < args.length; ++i) {
@@ -35,18 +17,24 @@ exports = module.exports = durableEngine = function () {
         that.and = function () {
             if (op === '$and') {
                 argsToArray(arguments, terms);
+                return that;
             } else {
-                terms.push(and.apply(this, arguments));
+                var andExp = and.apply(this, arguments);
+                terms.push(andExp);
+                return andExp;
             }
-        }
+        };
 
         that.or = function()  {
             if (op === '$or') {
                 argsToArray(arguments, terms);
+                return that;
             } else {
-                terms.push(or.apply(this, arguments));
+                var orExp = or.apply(this, arguments); 
+                terms.push(orExp);
+                return orExp;
             }
-        }
+        };
 
         that.define = function() {
             var definitions = [];
@@ -57,18 +45,8 @@ exports = module.exports = durableEngine = function () {
             var newDefinition = {};
             newDefinition[op] = definitions;
             return newDefinition;
-        }
+        };
 
-        return that;
-    };
-
-    var and = function () {
-        that = exp('$and', argsToArray(arguments));
-        return that;
-    };
-
-    var or = function () {
-        that = exp('$or', argsToArray(arguments));
         return that;
     };
 
@@ -119,22 +97,48 @@ exports = module.exports = durableEngine = function () {
 
         that.ex = function () {
             op = '$ex';
+            right  = 1;
             return that;
         };
 
         that.nex = function () {
             op = '$nex';
+            right  = 1;
             return that;
         };
 
         that.id = function (refid) {
             sid = refid;
-            return that;
-        };
+            return r.createProxy(
+                function(name) {
+                    if (name === 'time') {
+                        return that.time; 
+                    }
+
+                    left = name;
+                    return that;
+                },
+                function(name, value) {
+                    return;
+                }
+            );
+        };  
 
         that.time = function (reftime) {
             time = reftime;
-            return that;
+            return r.createProxy(
+                function(name) {
+                    if (name === 'id') {
+                        return that.id; 
+                    }
+
+                    left = name;
+                    return that;
+                },
+                function(name, value) {
+                    return;
+                }
+            );
         };
 
         that.atLeast = function (count) {
@@ -174,7 +178,7 @@ exports = module.exports = durableEngine = function () {
                 return newDefinition;
             } else {
                 var rightDefinition = right;
-                if (typeof(right) === 'function') {
+                if (typeof(right) === 'object') {
                     rightDefinition = right.define();
                 }
 
@@ -182,16 +186,16 @@ exports = module.exports = durableEngine = function () {
                     newDefinition[left] = rightDefinition;
                 } else {
                     var innerDefinition = {};
-                    innerDefinition[left] = right;
+                    innerDefinition[left] = rightDefinition;
                     newDefinition[op] = innerDefinition;
                 }
 
                 if (atLeast) {
-                    newDefinition['atLeast'] = atLeast;
+                    newDefinition['$atLeast'] = atLeast;
                 }
 
                 if (atMost) {
-                    newDefinition['atMost'] = atMost;
+                    newDefinition['$atMost'] = atMost;
                 }
 
                 return type === '$s' ? {$s: newDefinition}: newDefinition;
@@ -203,12 +207,43 @@ exports = module.exports = durableEngine = function () {
 
     var rule = function(op, exp) {
         var that = {};
+        var func;
+        var rulesetArray = [];
+
+        that.ruleset = function(name) {
+            var newRuleset = ruleset(name);
+            rulesets.pop();
+            rulesetArray.push(newRuleset);
+            return newRuleset;
+        }
+
+        that.statechart = function(name) {
+            var newRuleset = statechart(name);
+            rulesets.pop();
+            rulesetArray.push(newRuleset);
+            return newRuleset;
+        }
+
+        that.flowchart = function(name) {
+            var newRuleset = flowchart(name);
+            rulesetArray.push(newRuleset);
+            return newRuleset;
+        }
 
         that.define = function(name) {
             var newDefinition = {};
+            var expDefinition;
             var func;
+
             if (typeof(exp[exp.length - 1]) === 'function') {
-                func = exp.pop();
+                func =  exp.pop();
+            } else if (rulesetArray.length) {
+                var rulesetDefinitions = {};
+                for (var i = 0; i < rulesetArray.length; ++i) {
+                    rulesetDefinitions[rulesetArray[i].getName()] = rulesetArray[i].define();
+                }
+
+                func =  rulesetDefinitions;
             }
 
             if (!op) {
@@ -217,15 +252,31 @@ exports = module.exports = durableEngine = function () {
                 } else {
                     newDefinition = exp[0].define('m_1');
                 }
+                for (var i = 1; i < exp.length; ++i) {
+                    expDefinition = exp[i].define();
+                    if (expDefinition['$least']) {
+                        newDefinition['$atLeast'] = expDefinition['$least'];
+                    } else if (expDefinition['$most']) {
+                        newDefinition['$atMost'] = expDefinition['$most'];
+                    }
+                }
             }
             else {
                 var innerDefinition = {};
                 for (var i = 0; i < exp.length; ++i) {
-                    var expDefinition = exp[i].define('m_' + i);
+                    expDefinition = exp[i].define('m_' + i);
                     if (expDefinition['$s']) {
                         innerDefinition['$s'] = expDefinition['$s'];
+                    } else if (expDefinition['m_' + i + '$all']) {
+                        innerDefinition['m_' + i + '$all'] = expDefinition['m_' + i + '$all'];
+                    } else if (expDefinition['m_' + i + '$any']) {
+                        innerDefinition['m_' + i + '$any'] = expDefinition['m_' + i + '$any'];
+                    } else if (expDefinition['$least']) {
+                        innerDefinition['$atLeast'] = expDefinition['$least'];
+                    } else if (expDefinition['$most']) {
+                        innerDefinition['$atMost'] = expDefinition['$most'];
                     } else {
-                        innerDefinition['m_' + i] = exp[i].define('m_' + i);
+                        innerDefinition['m_' + i] = expDefinition;
                     }
                 }
                 
@@ -244,7 +295,77 @@ exports = module.exports = durableEngine = function () {
         };
 
         return that;
-    }
+    };
+
+    and = function () {
+        var that = exp('$and', argsToArray(arguments));
+        return that;
+    };
+
+    or = function () {
+        var that = exp('$or', argsToArray(arguments));
+        return that;
+    };
+
+    m = r.createProxy(
+            function(name) {
+                return term('$m', name);
+            },
+            function(name, value) {
+                return;
+            }
+        );
+
+    s = r.createProxy(
+        function(name) {
+            if (name === 'id') {
+                return term('$s').id;    
+            }
+
+            if (name === 'time') {
+                return term('$s').time; 
+            }
+
+            return term('$s', name);
+        },
+        function(name, value) {
+            return;
+        }
+    );
+
+
+    var extend = function (obj) {        
+        obj.and = and;
+        obj.or = or;
+        obj.m = m;
+        obj.s = s;
+
+        obj.all = function() {
+            var that = rule('$all', argsToArray(arguments));
+            return that;
+        };
+
+        obj.any = function() {
+            var that = rule('$any', argsToArray(arguments));
+            return that;
+        };
+        
+        obj.atLeast = function (count) {
+            var that = {};
+            that.define = function () {
+                return {$least: count};
+            }
+            return that;
+        };
+
+        obj.atMost = function (count) {
+            var that = {};
+            that.define = function () {
+                return {$most: count};
+            }
+            return that;
+        };
+    };
 
     var ruleset = function (name) {
         var that = {};
@@ -260,15 +381,21 @@ exports = module.exports = durableEngine = function () {
         }  
 
         that.when = function () {
-            rules.push(rule(null, argsToArray(arguments)));
+            var newRule = rule(null, argsToArray(arguments));
+            rules.push(newRule);
+            return newRule;
         };
 
         that.whenAll = function () {
-            rules.push(rule('whenAll', argsToArray(arguments)));
+            var newRule = rule('whenAll', argsToArray(arguments));
+            rules.push(newRule);
+            return newRule;
         };
 
         that.whenAny = function () {
-            rules.push(rule('whenAny', argsToArray(arguments)));
+            var newRule = rule('whenAny', argsToArray(arguments));
+            rules.push(newRule);
+            return newRule;
         };
 
         that.whenStart = function (func) {
@@ -284,8 +411,7 @@ exports = module.exports = durableEngine = function () {
             return newDefinition;
         }
 
-        that.m = m;
-        that.s = s;
+        extend(that);
         rulesets.push(that);
         return that;
     };
@@ -296,10 +422,11 @@ exports = module.exports = durableEngine = function () {
 
         that.getName = function() {
             return stateName;
-        }
+        };
 
         that.when = function () {
             condition = rule(null, argsToArray(arguments));
+            return condition;
         };
 
         that.whenAll = function () {
@@ -308,6 +435,7 @@ exports = module.exports = durableEngine = function () {
             } else {
                 condition = rule('whenAll', argsToArray(arguments));
             }
+            return condition;
         };
 
         that.whenAny = function () {
@@ -316,15 +444,24 @@ exports = module.exports = durableEngine = function () {
             } else {
                 condition = rule('whenAny', argsToArray(arguments));
             }
+            return condition;
         };
 
         that.define = function(name)  {
+            if (!condition) {
+                if (!flow) {
+                    return {to: stateName};
+                } else {
+                    return stateName;
+                }
+            } 
+
             var newDefinition = condition.define(name);
             if (!flow) {
                 newDefinition['to'] = stateName;
             }
             return newDefinition;
-        }
+        };
 
         return that;
     };
@@ -332,15 +469,22 @@ exports = module.exports = durableEngine = function () {
     var state = function (name) {
         var that = {};
         var triggers = [];
+        var states = [];
 
         that.getName = function() {
             return name;
-        }
+        };
 
         that.to = function (stateName) {
             var trigger = to(stateName);
             triggers.push(trigger);
             return trigger;
+        };
+
+        that.state = function(stateName) {
+            var newState = state(stateName);
+            states.push(newState);
+            return newState;
         };
 
         that.define = function() {
@@ -349,11 +493,19 @@ exports = module.exports = durableEngine = function () {
                 newDefinition['t_' + i] = triggers[i].define();
             }
 
-            return newDefinition;
-        }
+            if (states.length) {
+                var chart = {};
+                for (var i = 0; i < states.length; ++i) {
+                    chart[states[i].getName()] = states[i].define();
+                }
 
-        that.m = m;
-        that.s = s;
+                newDefinition['$chart'] = chart;
+            }
+
+            return newDefinition;
+        };
+
+        extend(that);
         return that;
     };
 
@@ -383,15 +535,13 @@ exports = module.exports = durableEngine = function () {
         that.define = function() {
             var newDefinition = {};
             for (var i = 0; i < states.length; ++i) {
-                var current = states[i];
                 newDefinition[states[i].getName()] = states[i].define();
             }
 
             return newDefinition;
         }
 
-        that.m = m;
-        that.s = s;
+        extend(that);
         rulesets.push(that);
         return that;
     };
@@ -430,8 +580,7 @@ exports = module.exports = durableEngine = function () {
             return newDefinition;
         }
 
-        that.m = m;
-        that.s = s;
+        extend(that);
         return that;
     };
 
@@ -467,8 +616,7 @@ exports = module.exports = durableEngine = function () {
             return newDefinition;
         }
 
-        that.m = m;
-        that.s = s;
+        extend(that);
         rulesets.push(that);
         return that;
     };
@@ -479,6 +627,8 @@ exports = module.exports = durableEngine = function () {
         var definitions = {};
         for (var i = 0; i < rulesets.length; ++ i) {
             definitions[rulesets[i].getName()] = rulesets[i].define();
+            console.log(rulesets[i].getName());
+            console.log(JSON.stringify(rulesets[i].define()));   
         }
 
         var rulesHost = d.host(databases, stateCacheSize);
@@ -506,10 +656,6 @@ exports = module.exports = durableEngine = function () {
     }
 
     return {
-        m: m,
-        s: s,
-        and: and,
-        or: or,
         state: state,
         statechart: statechart,
         stage: stage,
