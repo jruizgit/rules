@@ -2,16 +2,16 @@
 #define HASH_ID 5863474
 #define HASH_SID 193505797
 #define UNDEFINED_INDEX 0xFFFFFFFF
-#define MAX_STATE_PROPERTIES 128
+#define MAX_STATE_PROPERTIES 64
 #define UNDEFINED_HASH_OFFSET 0xFFFFFFFF
 
 typedef struct jsonProperty {
     unsigned int hash;
     unsigned char type;
-    char *firstValue;
-    char *lastValue;
     unsigned char isMaterial;
-    union { 
+    unsigned short length;
+    union {
+        char *s;
         long i; 
         double d; 
         unsigned char b; 

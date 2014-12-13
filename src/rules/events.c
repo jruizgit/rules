@@ -6,7 +6,7 @@
 #include "net.h"
 #include "json.h"
 
-#define MAX_EVENT_PROPERTIES 128
+#define MAX_EVENT_PROPERTIES 64
 #define MAX_RESULT_NODES 32
 #define MAX_NODE_RESULTS 16
 #define MAX_STACK_SIZE 64
@@ -141,13 +141,13 @@ static unsigned char compareDouble(double left,
 }
 
 static unsigned char compareString(char* leftFirst, 
-                                   char* leftLast, 
+                                   unsigned short leftLength, 
                                    char* right, 
                                    unsigned char op) {
-    char temp = leftLast[0];
-    leftLast[0] = '\0';
+    char temp = leftFirst[leftLength];
+    leftFirst[leftLength] = '\0';
     int result = strcmp(leftFirst, right);
-    leftLast[0] = temp;
+    leftFirst[leftLength] = temp;
     switch(op) {
         case OP_LT:
             return (result < 0);
@@ -164,38 +164,48 @@ static unsigned char compareString(char* leftFirst,
     }
 
     return 0;
-
 }
 
-static unsigned char compareStringProperty(char* leftFirst, 
-                                           char* leftLast, 
+static unsigned char compareStringProperty(char* left, 
                                            char* rightFirst, 
-                                           char* rightLast,
+                                           unsigned short rightLength, 
                                            unsigned char op) {
-    char leftTemp = '\0';
-    char rightTemp = '\0';
+    char temp = rightFirst[rightLength];
+    rightFirst[rightLength] = '\0';
+    int result = strcmp(left, rightFirst);
+    rightFirst[rightLength] = temp;
+    switch(op) {
+        case OP_LT:
+            return (result < 0);
+        case OP_LTE:
+            return (result <= 0);
+        case OP_GT:
+            return (result > 0);
+        case OP_GTE: 
+            return (result >= 0);
+        case OP_EQ:
+            return (result == 0);
+        case OP_NEQ:
+            return (result != 0);
+    }
 
-    if (leftLast) {
-        leftTemp = leftLast[0];
-        leftLast[0] = '\0';
+    return 0;
+}
+
+static unsigned char compareStringAndStringProperty(char* leftFirst, 
+                                                    unsigned short leftLength, 
+                                                    char* rightFirst, 
+                                                    unsigned short rightLength,
+                                                    unsigned char op) {
     
-    }
-
-    if (rightLast) {
-        rightTemp = rightLast[0];
-        rightLast[0] = '\0';
-    }
-
+    char rightTemp = rightFirst[rightLength];
+    rightFirst[rightLength] = '\0';        
+    char leftTemp = leftFirst[leftLength];
+    leftFirst[leftLength] = '\0';
     int result = strcmp(leftFirst, rightFirst);
+    rightFirst[rightLength] = rightTemp;
+    leftFirst[leftLength] = leftTemp;
     
-    if (leftLast) {
-        leftLast[0] = leftTemp;
-    }
-
-    if (rightLast) {
-        rightLast[0] = rightTemp;
-    }
-
     switch(op) {
         case OP_LT:
             return (result < 0);
@@ -310,15 +320,13 @@ static unsigned int handleBeta(ruleset *tree,
 }
 
 static unsigned int isMatch(ruleset *tree,
-                             char *sid,
-                             jsonProperty *currentProperty, 
-                             alpha *currentAlpha,
-                             unsigned short actionType,
-                             unsigned char ignoreStaleState, 
-                             unsigned char *propertyMatch,
-                             void **rulesBinding) {
-    char *propertyLast = currentProperty->lastValue;
-    char *propertyFirst = currentProperty->firstValue;
+                            char *sid,
+                            jsonProperty *currentProperty, 
+                            alpha *currentAlpha,
+                            unsigned short actionType,
+                            unsigned char ignoreStaleState, 
+                            unsigned char *propertyMatch,
+                            void **rulesBinding) {
     unsigned char alphaOp = currentAlpha->operator;
     unsigned char propertyType = currentProperty->type;
     unsigned int result = RULES_OK;
@@ -357,8 +365,8 @@ static unsigned int isMatch(ruleset *tree,
                 rightValue.value.d = currentAlpha->right.value.d;
                 break;
             case JSON_STRING:
-                rightValue.firstValue = &tree->stringPool[currentAlpha->right.value.stringOffset];
-                rightValue.lastValue = 0;
+                rightValue.value.s = &tree->stringPool[currentAlpha->right.value.stringOffset];
+                rightValue.length = strlen(rightValue.value.s);
                 break;
         }
     }
@@ -385,6 +393,7 @@ static unsigned int isMatch(ruleset *tree,
     }
     
     int leftLength;
+    int rightLength;
     unsigned short type = propertyType << 8;
     type = type + rightProperty->type;
     switch(type) {
@@ -398,11 +407,19 @@ static unsigned int isMatch(ruleset *tree,
             *propertyMatch = compareDouble(currentProperty->value.b, rightProperty->value.d, alphaOp);
             break;
         case COMP_BOOL_STRING:
-            *propertyMatch = compareStringProperty(propertyFirst, 
-                                                   propertyLast, 
-                                                   rightProperty->firstValue,
-                                                   rightProperty->lastValue, 
-                                                   alphaOp);
+            if (currentProperty->value.b) {
+                *propertyMatch = compareStringProperty("true",
+                                                       rightProperty->value.s, 
+                                                       rightProperty->length,
+                                                       alphaOp);
+            }
+            else {
+                *propertyMatch = compareStringProperty("false",
+                                                       rightProperty->value.s, 
+                                                       rightProperty->length,
+                                                       alphaOp);
+            }
+            
             break;
         case COMP_INT_BOOL:
             *propertyMatch = compareInt(currentProperty->value.i, rightProperty->value.b, alphaOp);
@@ -414,11 +431,15 @@ static unsigned int isMatch(ruleset *tree,
             *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.d, alphaOp);
             break;
         case COMP_INT_STRING:
-            *propertyMatch = compareStringProperty(propertyFirst, 
-                                                   propertyLast, 
-                                                   rightProperty->firstValue,
-                                                   rightProperty->lastValue, 
-                                                   alphaOp);
+            {
+                rightLength = rightProperty->length + 1;
+                char leftStringInt[rightLength];
+                snprintf(leftStringInt, rightLength, "%ld", currentProperty->value.i);
+                *propertyMatch = compareStringProperty(leftStringInt, 
+                                                       rightProperty->value.s,
+                                                       rightProperty->length, 
+                                                       alphaOp);
+            }
             break;
         case COMP_DOUBLE_BOOL:
             *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.b, alphaOp);
@@ -430,42 +451,58 @@ static unsigned int isMatch(ruleset *tree,
             *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.d, alphaOp);
             break;
         case COMP_DOUBLE_STRING:
-            *propertyMatch = compareStringProperty(propertyFirst, 
-                                                   propertyLast, 
-                                                   rightProperty->firstValue,
-                                                   rightProperty->lastValue, 
-                                                   alphaOp);
+            {
+                rightLength = rightProperty->length + 1;
+                char leftStringDouble[rightLength];
+                snprintf(leftStringDouble, rightLength, "%f", currentProperty->value.d);
+                *propertyMatch = compareStringProperty(leftStringDouble,
+                                                       rightProperty->value.s,
+                                                       rightProperty->length, 
+                                                       alphaOp);
+            }
             break;
         case COMP_STRING_BOOL:
             if (rightProperty->value.b) {
-                *propertyMatch = compareString(propertyFirst, propertyLast, "true", alphaOp);
+                *propertyMatch = compareString(currentProperty->value.s, 
+                                               currentProperty->length, 
+                                               "true", 
+                                               alphaOp);
             }
             else {
-                *propertyMatch = compareString(propertyFirst, propertyLast, "false", alphaOp);
+                *propertyMatch = compareString(currentProperty->value.s, 
+                                               currentProperty->length, 
+                                               "false", 
+                                               alphaOp);
             }
             break;
         case COMP_STRING_INT: 
             {
-                leftLength = propertyLast - propertyFirst + 1;
+                leftLength = currentProperty->length + 1;
                 char rightStringInt[leftLength];
                 snprintf(rightStringInt, leftLength, "%ld", rightProperty->value.i);
-                *propertyMatch = compareString(propertyFirst, propertyLast, rightStringInt, alphaOp);
+                *propertyMatch = compareString(currentProperty->value.s, 
+                                               currentProperty->length, 
+                                               rightStringInt, 
+                                               alphaOp);
             }
             break;
         case COMP_STRING_DOUBLE: 
             {
-                leftLength = propertyLast - propertyFirst + 1;
+                leftLength = currentProperty->length + 1;
                 char rightStringDouble[leftLength];
                 snprintf(rightStringDouble, leftLength, "%f", rightProperty->value.d);
-                *propertyMatch = compareString(propertyFirst, propertyLast, rightStringDouble, alphaOp);
+                *propertyMatch = compareString(currentProperty->value.s, 
+                                               currentProperty->length, 
+                                               rightStringDouble, 
+                                               alphaOp);
             }
             break;
         case COMP_STRING_STRING:
-            *propertyMatch = compareStringProperty(propertyFirst, 
-                                                   propertyLast, 
-                                                   rightProperty->firstValue,
-                                                   rightProperty->lastValue,
-                                                   alphaOp);
+            *propertyMatch = compareStringAndStringProperty(currentProperty->value.s, 
+                                                            currentProperty->length, 
+                                                            rightProperty->value.s,
+                                                            rightProperty->length,
+                                                            alphaOp);
             break;
     }
     
@@ -579,7 +616,7 @@ static unsigned int getId(jsonProperty *allProperties,
     }
 
     currentProperty = &allProperties[idIndex];
-    *idLength = currentProperty->lastValue - currentProperty->firstValue;
+    *idLength = currentProperty->length;
     switch(currentProperty->type) {
         case JSON_INT:
         case JSON_DOUBLE:
@@ -627,7 +664,7 @@ static unsigned int handleState(ruleset *tree,
     }
 
     char sid[sidLength + 1];
-    strncpy(sid, sidProperty->firstValue, sidLength);
+    strncpy(sid, sidProperty->value.s, sidLength);
     sid[sidLength] = '\0';
     result = handleAlpha(tree, 
                          sid, 
@@ -676,7 +713,7 @@ static unsigned int handleEventCore(ruleset *tree,
         return result;
     }
     char mid[idLength + 1];
-    strncpy(mid, idProperty->firstValue, idLength);
+    strncpy(mid, idProperty->value.s, idLength);
     mid[idLength] = '\0';
     
     result = getId(properties, sidIndex, &idProperty, &idLength);
@@ -684,7 +721,7 @@ static unsigned int handleEventCore(ruleset *tree,
         return result;
     }
     char sid[idLength + 1];
-    strncpy(sid, idProperty->firstValue, idLength);
+    strncpy(sid, idProperty->value.s, idLength);
     sid[idLength] = '\0';
     if (actionType == ACTION_NEGATE_MESSAGE) {
         result = removeMessage(*rulesBinding, mid);

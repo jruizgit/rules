@@ -242,8 +242,8 @@ unsigned int constructObject(char *parentName,
         
         property->isMaterial = 0;
         property->hash = hash;
-        property->firstValue = first;
-        property->lastValue = last;
+        property->value.s = first;
+        property->length = last - first;
         property->type = type;
         *next = last;
         result = readNextName(last, &firstName, &lastName, &hash);
@@ -253,32 +253,30 @@ unsigned int constructObject(char *parentName,
 }
 
 void rehydrateProperty(jsonProperty *property) {
-    char *propertyLast = property->lastValue;
-    char *propertyFirst = property->firstValue;
-    unsigned char propertyType = property->type;
-    char temp;
+    // ID and SID are treated as strings regardless of type
+    // to avoid unnecessary conversions
+    if (!property->isMaterial && property->hash != HASH_ID && property->hash != HASH_SID) {
+        unsigned short propertyLength = property->length + 1;
+        char *propertyFirst = property->value.s;
+        unsigned char propertyType = property->type;
+        unsigned char b = 1;
+        char temp;
 
-    if (!property->isMaterial) {
         switch(propertyType) {
             case JSON_INT:
-                ++propertyLast;
-                temp = propertyLast[0];
-                propertyLast[0] = '\0';
+                temp = propertyFirst[propertyLength];
+                propertyFirst[propertyLength] = '\0';
                 property->value.i = atol(propertyFirst);
-                propertyLast[0] = temp;
+                propertyFirst[propertyLength] = temp;
                 break;
             case JSON_DOUBLE:
-                ++propertyLast;
-                temp = propertyLast[0];
-                propertyLast[0] = '\0';
+                temp = propertyFirst[propertyLength];
+                propertyFirst[propertyLength] = '\0';
                 property->value.i = atof(propertyFirst);
-                propertyLast[0] = temp;
+                propertyFirst[propertyLength] = temp;
                 break;
             case JSON_BOOL:
-                ++propertyLast;
-                unsigned int leftLength = propertyLast - propertyFirst;
-                unsigned char b = 1;
-                if (leftLength == 5 && strncmp("false", propertyFirst, 5)) {
+                if (propertyLength == 5 && strncmp("false", propertyFirst, 5)) {
                     b = 0;
                 }
                 property->value.b = b;
