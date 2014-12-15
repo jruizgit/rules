@@ -1,6 +1,31 @@
 require_relative '../librb/durable'
 
 
+Durable.statechart :fraud2 do
+  state :start do
+    to :standby
+  end
+  state :standby do
+    to :metering, when_(m.amount > 100) do
+      start_timer :velocity, 30
+    end
+  end
+  state :metering do
+    to :fraud, when_(m.amount > 100, at_least(3)) do
+      puts "fraud 2 detected"
+    end
+    to :standby, when_(timeout :velocity) do
+      puts "fraud 2 cleared"
+    end
+  end
+  state :fraud
+  when_start do
+    post :fraud2, {:id => 1, :sid => 1, :amount => 200}
+    post :fraud2, {:id => 2, :sid => 1, :amount => 200}
+    post :fraud2, {:id => 3, :sid => 1, :amount => 200}
+  end
+end
+
 Durable.ruleset :a0 do
   when_ (m.amount < 100) | (m.subject == "approve") | (m.subject == "ok") do
     puts "a0 approved"

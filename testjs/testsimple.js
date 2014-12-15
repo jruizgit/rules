@@ -1,5 +1,31 @@
 var d = require('../libjs/durable');
 
+
+with (d.statechart('fraud2')) {
+    with (state('start')) {
+        to('standby');
+    }
+    with (state('standby')) {
+        to('metering').when(m.amount.gt(100), function (s) {
+            s.startTimer('velocity', 30);
+        });
+    }
+    with (state('metering')) {
+        to('fraud').when(m.amount.gt(100).atLeast(2), function (s) {
+            console.log('fraud2 detected');
+        });
+        to('standby').when(timeout('velocity'), function (s) {
+            console.log('fraud2 cleared');  
+        });
+    }
+    state('fraud');
+    whenStart(function (host) {
+        host.post('fraud2', {id: 1, sid: 1, amount: 200});
+        host.post('fraud2', {id: 2, sid: 1, amount: 200});
+        host.post('fraud2', {id: 3, sid: 1, amount: 200});
+    });
+}
+
 with (d.ruleset('a0')) {
     when(m.amount.lt(100).or(m.subject.eq('approve')).or(m.subject.eq('ok')), function (s) {
         console.log('a0 approved from ' + s.id);

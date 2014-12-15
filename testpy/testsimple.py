@@ -1,6 +1,37 @@
 from durable.lang import *
 import datetime
 
+
+with statechart('fraud2'):
+    with state('start'):
+        to('standby')
+
+    with state('standby'):
+        @to('metering')
+        @when(m.amount > 100)
+        def start_metering(s):
+            s.start_timer('velocity', 30)
+
+    with state('metering'):
+        @to('fraud')
+        @when((m.amount > 100).at_least(2))
+        def report_fraud(s):
+            print('fraud2 detected')
+
+        @to('standby')
+        @when(timeout('velocity'))
+        def clear_fraud(s):
+            print('fraud2 cleared')
+
+    state('fraud')
+
+    @when_start
+    def start(host):
+        host.post('fraud2', {'id': 1, 'sid': 1, 'amount': 200})
+        host.post('fraud2', {'id': 2, 'sid': 1, 'amount': 200})
+        host.post('fraud2', {'id': 3, 'sid': 1, 'amount': 200})
+
+
 with ruleset('a0'):
     @when((m.amount > 1000) | (m.subject == 'approve') | (m.subject == 'ok'))
     def approved(s, m):
