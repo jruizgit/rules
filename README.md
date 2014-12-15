@@ -4,19 +4,36 @@ Durable Rules is a polyglot micro-framework for real-time, consistent and scalab
 
 A forward chaining algorithm (A.K.A. Rete) is used to evaluate massive streams of data. A simple, yet powerful meta-liguistic abstraction lets you define simple and complex rulesets, such as flowcharts, statecharts, nested statecharts, paralel and time driven flows. 
 
-The Durable Rules core engine is implemented in C, which enables ultra fast rule evaluation and inference as well as muti-language support. Below is an example on how easy it is to define a couple of rules that act on incoming web messages.
+The Durable Rules core engine is implemented in C, which enables ultra fast rule evaluation and inference as well as muti-language support. Durable Rules relies on state of the art technologies:
+
+* [Node.js](http://www.nodejs.org), [Werkzeug](http://werkzeug.pocoo.org/), [Sinatra](http://www.sinatrarb.com/) are used to host rulesets written in JavaScript, Python and Ruby respectively.
+* Inference state is cached using [Redis](http://www.redis.io), which lets scaling out without giving up performance.
+* A web client based on [D3.js](http://www.d3js.org) provides powerful data visualization and test tools.
+
+Below is an example on how easy it is to define a real-time fraud detection rule (three purchases over $100 in a span of 30 seconds).
 
 ####Ruby
 ```ruby
 require 'durable'
 
-Durable.ruleset :approve do
-  when_ m.amount < 1000 do
-    s.status = 'pending'
+Durable.statechart :fraud do
+  state :start do
+    to :standby
   end
-  when_all m.subject == 'approved', s.status == 'pending' do
-    puts 'approved'
+  state :standby do
+    to :metering, when_(m.amount > 100) do
+      start_timer :velocity, 30
+    end
   end
+  state :metering do
+    to :fraud, when_(m.amount > 100, at_least(2)) do
+      puts "fraud detected"
+    end
+    to :standby, when_(timeout :velocity) do
+      puts "fraud cleared"
+    end
+  end
+  state :fraud
 end
 
 Durable.run_all
@@ -25,14 +42,28 @@ Durable.run_all
 ```python
 from durable.lang import *
 
-with ruleset('approve'):
-    @when(m.amount < 1000)
-    def pending(s):
-        s.status = 'pending'
+with statechart('fraud'):
+    with state('start'):
+        to('standby')
 
-    @when_all(m.subject == 'approved', s.status == 'pending')
-    def approved(s):
-        print('approved')
+    with state('standby'):
+        @to('metering')
+        @when(m.amount > 100)
+        def start_metering(s):
+            s.start_timer('velocity', 30)
+
+    with state('metering'):
+        @to('fraud')
+        @when((m.amount > 100).at_least(2))
+        def report_fraud(s):
+            print('fraud detected')
+
+        @to('standby')
+        @when(timeout('velocity'))
+        def clear_fraud(s):
+            print('fraud cleared')
+
+    state('fraud')
 
 run_all()
 ```
@@ -40,24 +71,28 @@ run_all()
 ```javascript
 var d = require('durable');
 
-with (d.ruleset('approve')) {
-    when(m.amount.lt(1000)), function (s) {
-        s.status = 'pending';
-    });
-    whenAll(m.subject.eq('approved'), s.status.eq('pending'), function (s) {
-        console.log('approved');
-    });
+with (d.statechart('fraud')) {
+    with (state('start')) {
+        to('standby');
+    }
+    with (state('standby')) {
+        to('metering').when(m.amount.gt(100), function (s) {
+            s.startTimer('velocity', 30);
+        });
+    }
+    with (state('metering')) {
+        to('fraud').when(m.amount.gt(100).atLeast(2), function (s) {
+            console.log('fraud detected');
+        });
+        to('standby').when(timeout('velocity'), function (s) {
+            console.log('fraud cleared');  
+        });
+    }
+    state('fraud');
 }
 
 d.runAll();
 ```
-
-
-Durable Rules relies on state of the art technologies:
-
-* [Node.js](http://www.nodejs.org), [Werkzeug](http://werkzeug.pocoo.org/), [Sinatra](http://www.sinatrarb.com/) are used to host rulesets written in JavaScript, Python and Ruby respectively.
-* Inference state is cached using [Redis](http://www.redis.io), which lets scaling out without giving up performance.
-* A web client based on [D3.js](http://www.d3js.org) provides powerful data visualization and test tools.
 
 #### Resources
 To learn more:
