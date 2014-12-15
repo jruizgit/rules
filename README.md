@@ -94,7 +94,7 @@ with (d.statechart('fraud')) {
 d.runAll();
 ```
 ####Visual
-![Fraud Statechart](https://raw.github.com/jruizgit/rules/master/statechart.png =300x300)
+![Fraud Statechart](https://raw.github.com/jruizgit/rules/master/statechart.png =300x)
 
 #### Resources
 To learn more:
