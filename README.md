@@ -10,7 +10,7 @@ The Durable Rules core engine is implemented in C, which enables ultra fast rule
 * Inference state is cached using [Redis](http://www.redis.io), which lets scaling out without giving up performance.
 * A web client based on [D3.js](http://www.d3js.org) provides powerful data visualization and test tools.
 
-Below is an example on how easy it is to define a real-time fraud detection rule (three purchases over $100 in a span of 30 seconds).
+Below is an example on how easy it is to define a real-time fraud detection rule (three purchases over $100 within a 30 second interval).
 
 ####Ruby
 ```ruby
