@@ -17,68 +17,42 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
         char *oldLua;
         node *currentNode = &tree->nodePool[i];
         if (currentNode->type == NODE_ACTION) {
-            unsigned int queryLength = currentNode->value.c.queryLength;
             char *actionName = &tree->stringPool[currentNode->nameOffset];
-            for (unsigned int ii = 0; ii < queryLength; ++ii) {
-                unsigned int lineOffset = tree->queryPool[currentNode->value.c.queryOffset + ii];
-                char *currentLine = &tree->stringPool[lineOffset];
-                char *last = currentLine;
-                unsigned int clauseCount = 0;
-                while (last[0] != '\0') {
-                    if (last[0] == ' ') {
-                        last[0] = '\0';
-                        unsigned char min = 1;
-                        unsigned char max = 1;
-                        char * newCurrent = NULL;
-                        char *minStr = strchr(currentLine, '+'); 
-                        if (minStr) {
-                            minStr[0] = '\0';
-                            char * maxStr = strchr(minStr + 1, '+');
-                            maxStr[0] = '\0';
-                            min = atoi(minStr + 1);
-                            char *endStr = strchr(maxStr + 1, '+');
-                            endStr[0] = '\0';
-                            max = atoi(maxStr + 1);
-                            asprintf(&newCurrent, "%s%s", currentLine, endStr + 1);
-                            currentLine = newCurrent;
-                        }
-                        
-                        if (lua) {
-                            oldLua = lua;
-                            asprintf(&lua, "%skey = \"%s!\" .. ARGV[2]\n"
-                                           "res = redis.call(\"zcard\", key)\n"
-                                           "if res >= %d then\n"
-                                           "  res = redis.call(\"zrange\", key, 0, %d)\n"
-                                           "  if (res[1]) then\n"
-                                           "    i = 1\n"
-                                           "    while(res[i]) do\n"
-                                           "      signature = signature .. \",\" .. key .. \",\" .. res[i]\n"
-                                           "      i = i + 1\n"
-                                           "    end\n", 
-                                    lua, currentLine, min, max - 1);
-                            free(oldLua);
-                        } else {
-                            asprintf(&lua, "key = \"%s!\" .. ARGV[2]\n"
-                                           "res = redis.call(\"zcard\", key)\n"
-                                           "if res >= %d then\n"
-                                           "  res = redis.call(\"zrange\", key, 0, %d)\n"
-                                           "  if (res[1]) then\n"
-                                           "    i = 1\n"
-                                           "    while (res[i]) do\n"
-                                           "      signature = signature .. \",\" .. key .. \",\" .. res[i]\n"
-                                           "      i = i + 1\n"
-                                           "    end\n", 
-                                    currentLine, min, max - 1);
-                        }
-
-                        if (newCurrent) {
-                            free(newCurrent);
-                        }
-                        last[0] = ' ';
-                        currentLine = last + 1;
-                        ++clauseCount;
-                    }
-                    ++last;
+            for (unsigned int ii = 0; ii < currentNode->value.c.joinsLength; ++ii) {
+                unsigned int currentJoinOffset = tree->nextPool[currentNode->value.c.joinsOffset + ii];
+                join *currentJoin = &tree->joinPool[currentJoinOffset];
+                
+                for (unsigned int iii = 0; iii < currentJoin->expressionsLength; ++iii) {
+                    unsigned int expressionOffset = tree->nextPool[currentJoin->expressionsOffset + iii];
+                    expression *expr = &tree->expressionPool[expressionOffset];
+                    char *currentName = &tree->stringPool[expr->nameOffset];
+                    if (lua) {
+                        oldLua = lua;
+                        asprintf(&lua, "%skey = \"%s!\" .. ARGV[2]\n"
+                                       "res = redis.call(\"zcard\", key)\n"
+                                       "if res >= %d then\n"
+                                       "  res = redis.call(\"zrange\", key, 0, %d)\n"
+                                       "  if (res[1]) then\n"
+                                       "    i = 1\n"
+                                       "    while(res[i]) do\n"
+                                       "      signature = signature .. \",\" .. key .. \",\" .. res[i]\n"
+                                       "      i = i + 1\n"
+                                       "    end\n", 
+                                lua, currentName, expr->atLeast, expr->atMost - 1);
+                        free(oldLua);
+                    } else {
+                        asprintf(&lua, "key = \"%s!\" .. ARGV[2]\n"
+                                       "res = redis.call(\"zcard\", key)\n"
+                                       "if res >= %d then\n"
+                                       "  res = redis.call(\"zrange\", key, 0, %d)\n"
+                                       "  if (res[1]) then\n"
+                                       "    i = 1\n"
+                                       "    while (res[i]) do\n"
+                                       "      signature = signature .. \",\" .. key .. \",\" .. res[i]\n"
+                                       "      i = i + 1\n"
+                                       "    end\n", 
+                                currentName, expr->atLeast, expr->atMost - 1);
+                    }      
                 } 
 
                 oldLua = lua;
@@ -88,7 +62,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
               
                 free(oldLua);
 
-                for (unsigned int iii = 0; iii < clauseCount; ++iii) {
+                for (unsigned int iii = 0; iii < currentJoin->expressionsLength; ++iii) {
                     oldLua = lua;
                     asprintf(&lua, "%s  end\n"
                                    "end\n", lua);

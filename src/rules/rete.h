@@ -22,7 +22,7 @@
 typedef struct reference {
     unsigned int hash;
     unsigned int nameOffset;
-    unsigned int sidOffset;
+    unsigned int idOffset;
     unsigned int time;
 } reference;
 
@@ -36,6 +36,22 @@ typedef struct jsonValue {
         reference property;
     } value;
 } jsonValue;
+
+typedef struct expression {
+    unsigned int nameOffset;
+    unsigned short atLeast;
+    unsigned short atMost;
+    unsigned short termsLength;
+    union {
+        unsigned int termsOffset; 
+        unsigned int *termsPointer;
+    } t;
+} expression;
+
+typedef struct join {
+    unsigned int expressionsOffset;
+    unsigned short expressionsLength;
+} join;
 
 typedef struct alpha {
     unsigned int hash;
@@ -52,8 +68,8 @@ typedef struct betaConnector {
 
 typedef struct action {
     unsigned int index;
-    unsigned int queryLength;
-    unsigned int queryOffset;
+    unsigned int joinsOffset;
+    unsigned short joinsLength;
 } action;
 
 typedef struct node {
@@ -73,9 +89,11 @@ typedef struct ruleset {
     unsigned int *nextPool;
     unsigned int nextOffset;
     char *stringPool;
-    unsigned int stringPoolLength;  
-    unsigned int *queryPool;
-    unsigned int queryOffset;  
+    unsigned int stringPoolLength; 
+    expression *expressionPool;
+    unsigned int expressionOffset;
+    join *joinPool;
+    unsigned int joinOffset;
     unsigned int actionCount;
     void *bindingsList;
     unsigned int *stateBuckets;

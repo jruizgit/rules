@@ -24,15 +24,17 @@
 #define HASH_S 5861212 // $s
 #define HASH_NAME 2090536006 // name 
 #define HASH_TIME 2090760340 // time
-#define HASH_MIN_SIZE 4092918839 // $atLeast
-#define HASH_MAX_SIZE 3247687841 // $atMost
+#define HASH_AT_LEAST 4092918839 // $atLeast
+#define HASH_AT_MOST 3247687841 // $atMost
+#define MAX_STATE_PROPERTY_TIME 120
+
 
 typedef struct path {
     unsigned char operator;
     struct path **parents;
     unsigned int parentsLength;
-    unsigned int namesLength;
-    unsigned int *namesOffsets;
+    expression *expressions; 
+    unsigned int expressionsLength;
 } path;
 
 typedef struct any {
@@ -41,8 +43,8 @@ typedef struct any {
 } any;
 
 typedef struct all {
-    char **names;
-    unsigned int namesLength;
+    unsigned int *expressions;
+    unsigned short expressionsLength;
 } all;
 
 static unsigned int validateAlgebra(char *rule);
@@ -52,6 +54,8 @@ static unsigned int createBeta(ruleset *tree,
                                unsigned char operator, 
                                unsigned int nextOffset, 
                                path *nextPath, 
+                               unsigned short atLeast,
+                               unsigned short atMost,
                                path **outPath);
 
 static unsigned int storeString(ruleset *tree, 
@@ -83,36 +87,55 @@ static unsigned int storeString(ruleset *tree,
     return RULES_OK;
 }
 
-static unsigned int storeQuery(ruleset *tree, 
-                               char **query, 
-                               unsigned int *queryOffset, 
-                               unsigned int lineCount) {
+static unsigned int storeExpression(ruleset *tree, 
+                                    expression **newExpression, 
+                                    unsigned int *expressionOffset) {
 
-    if (!tree->queryPool) {
-        tree->queryPool = malloc(lineCount * sizeof(unsigned int));
-        if (!tree->queryPool) {
+    if (!tree->expressionPool) {
+        tree->expressionPool = malloc(sizeof(expression));
+        if (!tree->expressionPool) {
             return ERR_OUT_OF_MEMORY;
         }
 
-        *queryOffset = 0;
-        tree->queryOffset = lineCount;
+        *expressionOffset = 0;
+        *newExpression = &tree->expressionPool[0];
+        tree->expressionOffset = 1;
     } else {
-        tree->queryPool = realloc(tree->queryPool, (tree->queryOffset + lineCount) * sizeof(unsigned int));
-        if (!tree->queryPool) {
+        tree->expressionPool = realloc(tree->expressionPool, (tree->expressionOffset + 1) * sizeof(expression));
+        if (!tree->expressionPool) {
             return ERR_OUT_OF_MEMORY;
         }
 
-        *queryOffset = tree->queryOffset;
-        tree->queryOffset = tree->queryOffset + lineCount;
+        *expressionOffset = tree->expressionOffset;
+        *newExpression = &tree->expressionPool[tree->expressionOffset];
+        tree->expressionOffset = tree->expressionOffset + 1;        
     }
 
-    for (unsigned int i = 0; i < lineCount; ++i) {
-        unsigned int stringOffset;
-        unsigned int result = storeString(tree, query[i], &stringOffset, strlen(query[i]));
-        if (result != RULES_OK) {
-            return result;
+    return RULES_OK;
+}
+
+static unsigned int storeJoin(ruleset *tree, 
+                              join **newJoin, 
+                              unsigned int *joinOffset) {
+
+    if (!tree->joinPool) {
+        tree->joinPool = malloc(sizeof(join));
+        if (!tree->joinPool) {
+            return ERR_OUT_OF_MEMORY;
         }
-        tree->queryPool[*queryOffset + i] = stringOffset;
+
+        *joinOffset = 0;
+        *newJoin = &tree->joinPool[0];
+        tree->joinOffset = 1;
+    } else {
+        tree->joinPool = realloc(tree->joinPool, (tree->joinOffset + 1) * sizeof(join));
+        if (!tree->joinPool) {
+            return ERR_OUT_OF_MEMORY;
+        }
+
+        *joinOffset = tree->joinOffset;
+        *newJoin = &tree->joinPool[tree->joinOffset];
+        tree->joinOffset = tree->joinOffset + 1;        
     }
 
     return RULES_OK;
@@ -222,11 +245,12 @@ static void copyValue(ruleset *tree,
     unsigned int leftLength;
     char temp;
     switch(type) {
+        case JSON_EVENT_PROPERTY:
         case JSON_STATE_PROPERTY:
             right->value.property.time = ref->time;
             right->value.property.hash = ref->hash;
             right->value.property.nameOffset = ref->nameOffset;
-            right->value.property.sidOffset = ref->sidOffset;
+            right->value.property.idOffset = ref->idOffset;
             break;
         case JSON_STRING:
             leftLength = last - first;
@@ -269,11 +293,12 @@ static unsigned char compareValue(ruleset *tree,
     unsigned int leftLength;
     char temp;
     switch(type) {
+        case JSON_EVENT_PROPERTY:
         case JSON_STATE_PROPERTY:
             if (right->value.property.time == ref->time &&
                 right->value.property.hash == ref->hash &&
                 right->value.property.nameOffset == ref->nameOffset &&
-                right->value.property.sidOffset == ref->sidOffset)
+                right->value.property.idOffset == ref->idOffset)
                 return 1;
 
             return 0;
@@ -314,7 +339,7 @@ static unsigned int validateWindowSize(char *rule) {
     unsigned char type;
     unsigned int result = readNextName(rule, &first, &last, &hash);
     while (result == PARSE_OK) {
-        if (hash == HASH_MIN_SIZE || hash == HASH_MAX_SIZE) {
+        if (hash == HASH_AT_LEAST || hash == HASH_AT_MOST) {
             result = readNextValue(last, &first, &last, &type);
             if (type != JSON_INT) {
                 return ERR_UNEXPECTED_TYPE;
@@ -338,8 +363,8 @@ static unsigned int validateExpression(char *rule) {
         return result;
     }
 
-    // Fast forward $min and $max
-    while(hash == HASH_MAX_SIZE || hash == HASH_MIN_SIZE) {
+    // Fast forward $atLeast and $atMost
+    while(hash == HASH_AT_LEAST || hash == HASH_AT_MOST) {
         readNextValue(last, &first, &last, &type);
         readNextName(last, &first, &last, &hash);
     }
@@ -450,8 +475,8 @@ static unsigned int validateWrappedExpression(char *rule) {
         return result;
     }
 
-    // Fast forward $min and $max
-    while(hash == HASH_MAX_SIZE || hash == HASH_MIN_SIZE) {
+    // Fast forward $atLeast and $atMost
+    while(hash == HASH_AT_LEAST || hash == HASH_AT_MOST) {
         readNextValue(last, &first, &last, &type);
         readNextName(last, &first, &last, &hash);
     }
@@ -493,8 +518,8 @@ static unsigned int validateAlgebra(char *rule) {
     unsigned char reenter = 0;
     unsigned int result = readNextName(rule, &first, &last, &hash);
     while (result == PARSE_OK) {
-        // Fast foward $min and $max
-        while (hash == HASH_MAX_SIZE || hash == HASH_MIN_SIZE) {
+        // Fast foward $atLeast and $atMost
+        while (hash == HASH_AT_LEAST || hash == HASH_AT_MOST) {
             result = readNextValue(last, &first, &last, &type);
             if (result != PARSE_OK) {
                 return result;
@@ -657,19 +682,23 @@ static unsigned int linkAlpha(ruleset *tree,
     return RULES_OK;
 }
 
-static void readReference(ruleset *tree, char *rule, reference *ref) {
+static unsigned char readReference(ruleset *tree, char *rule, reference *ref) {
     char *first;
     char *last;
     unsigned char type;
     unsigned int hash;
+    unsigned char returnType = JSON_EVENT_PROPERTY;
     
+    ref->time = MAX_STATE_PROPERTY_TIME;
+    ref->idOffset = 0;
     readNextName(rule, &first, &last, &hash);
-    if (hash == HASH_S) {
-        ref->time = 120;
-        ref->hash = 0;
-        ref->nameOffset = 0;
-        ref->sidOffset = 0;
-
+    if (hash != HASH_S) {
+        storeString(tree, first, &ref->idOffset, last - first);   
+        readNextString(last, &first, &last, &hash);
+        ref->hash = hash;
+        storeString(tree, first, &ref->nameOffset, last - first);
+    } else {
+        returnType = JSON_STATE_PROPERTY;
         if (readNextString(last, &first, &last, &hash) == PARSE_OK) {
             ref->hash = hash;
             storeString(tree, first, &ref->nameOffset, last - first);
@@ -694,9 +723,9 @@ static void readReference(ruleset *tree, char *rule, reference *ref) {
                     case HASH_ID:
                         readNextValue(last, &first, &last, &type);
                         if (type == JSON_STRING) {
-                            storeString(tree, first, &ref->sidOffset, last - first);
+                            storeString(tree, first, &ref->idOffset, last - first);
                         } else{
-                            storeString(tree, first, &ref->sidOffset, last - first + 1);
+                            storeString(tree, first, &ref->idOffset, last - first + 1);
                         }
 
                         break;
@@ -709,12 +738,15 @@ static void readReference(ruleset *tree, char *rule, reference *ref) {
             }
         }
     }
+
+    return returnType;
 }
 
 static unsigned int findAlpha(ruleset *tree, 
                               unsigned int parentOffset, 
                               unsigned char operator, 
-                              char *rule, 
+                              char *rule,
+                              expression *expr, 
                               unsigned int *resultOffset) {
     char *first;
     char *last;
@@ -728,8 +760,7 @@ static unsigned int findAlpha(ruleset *tree,
     readNextName(rule, &firstName, &lastName, &hash);
     readNextValue(lastName, &first, &last, &type);
     if (type == JSON_OBJECT) {
-        readReference(tree, first, &ref);
-        type = JSON_STATE_PROPERTY;
+        type = readReference(tree, first, &ref);
     }
 
     node *parent = &tree->nodePool[parentOffset];
@@ -779,61 +810,63 @@ static unsigned int findAlpha(ruleset *tree,
     newAlpha->value.a.hash = hash;
     newAlpha->value.a.operator = operator;
     copyValue(tree, &newAlpha->value.a.right, first, last, &ref, type);
+    if (expr && type == JSON_EVENT_PROPERTY) {
+        if (expr->termsLength == 0) {
+            expr->termsLength = 1;
+            expr->t.termsPointer = malloc(sizeof(unsigned int));
+            if (!expr->t.termsPointer) {
+                return ERR_OUT_OF_MEMORY;
+            }
+
+            expr->t.termsPointer[0] = *resultOffset;
+        }
+        else {
+            expr->termsLength = expr->termsLength + 1;
+            expr->t.termsPointer = realloc(expr->t.termsPointer, expr->termsLength * sizeof(unsigned int));
+            if (!expr->t.termsPointer) {
+                return ERR_OUT_OF_MEMORY;
+            }
+
+            expr->t.termsPointer[expr->termsLength - 1] = *resultOffset;
+        }
+    }
+    
     return linkAlpha(tree, parentOffset, *resultOffset);
 }
 
-static unsigned char appendWindowSize(char *rule, char *name) {
+static void getWindowSize(char *rule, unsigned short *atLeast, unsigned short *atMost) {
     char *first;
     char *last;
-    char *min = NULL;
-    unsigned char minLength = 0;
-    char *max = NULL;
-    unsigned char maxLength = 0;
+    char temp;
     unsigned int hash;
     unsigned char type;
     unsigned int result = readNextName(rule, &first, &last, &hash);
     while (result == PARSE_OK) {
         readNextValue(last, &first, &last, &type);
         switch (hash) {
-            case HASH_MIN_SIZE:
-                min = first;
-                minLength = last - first + 1;
-            break;
-            case HASH_MAX_SIZE:
-                max = first;
-                maxLength = last - first + 1;
-            break;
+            case HASH_AT_LEAST:
+                temp = first[last - first + 1];
+                first[last - first + 1] = '\0';
+                *atLeast = atoi(first);
+                first[last - first + 1] = temp;
+                break;
+            case HASH_AT_MOST:
+                temp = first[last - first + 1];
+                first[last - first + 1] = '\0';
+                *atMost = atoi(first);
+                first[last - first + 1] = temp;
+                break;
         }
 
         result = readNextName(last, &first, &last, &hash);
     }
-
-    if (!min && !max) {
-        return 0;
-    }
-
-    if (!min) {
-        min = "1";
-        minLength = 1;
-    }
-
-    if (!max) {
-        max = min;
-        maxLength = minLength;
-    }
-
-    name[0] = '+';
-    strncpy(name + 1, min, minLength);
-    name[minLength + 1] = '+';
-    strncpy(name + 2 + minLength, max, maxLength);
-    name[minLength + 1 + maxLength + 1] = '+';
-    return minLength + maxLength + 3;
 }
 
 static unsigned int createAlpha(ruleset *tree, 
-                                unsigned int *newOffset, 
                                 char *rule, 
-                                unsigned int nextOffset) {
+                                expression *expr,
+                                unsigned int nextOffset,
+                                unsigned int *newOffset) {
     char *first;
     char *last;
     unsigned char type;
@@ -843,8 +876,8 @@ static unsigned int createAlpha(ruleset *tree,
     unsigned int parentOffset = *newOffset;
     readNextName(rule, &first, &last, &hash);
 
-    // Fast forward $min and $max
-    while(hash == HASH_MAX_SIZE || hash == HASH_MIN_SIZE) {
+    // Fast forward $atLeast and $atMost
+    while(hash == HASH_AT_LEAST || hash == HASH_AT_MOST) {
         readNextValue(last, &first, &rule, &type);
         readNextName(rule, &first, &last, &hash);
     }
@@ -880,7 +913,7 @@ static unsigned int createAlpha(ruleset *tree,
             unsigned int resultOffset = parentOffset;
             result = readNextArrayValue(first, &first, &last, &type);
             while (result == PARSE_OK) {
-                createAlpha(tree, &resultOffset, first, 0);
+                createAlpha(tree, first, expr, 0, &resultOffset);
                 previousOffset = resultOffset;
                 result = readNextArrayValue(last, &first, &last, &type);   
             }
@@ -891,7 +924,7 @@ static unsigned int createAlpha(ruleset *tree,
             result = readNextArrayValue(first, &first, &last, &type);
             while (result == PARSE_OK) {
                 unsigned int single_offset = parentOffset;
-                createAlpha(tree, &single_offset, first, nextOffset);
+                createAlpha(tree, first, expr, nextOffset, &single_offset);
                 result = readNextArrayValue(last, &first, &last, &type);   
             }
 
@@ -906,9 +939,9 @@ static unsigned int createAlpha(ruleset *tree,
     }
     
     if (nextOffset == 0) {
-        return findAlpha(tree, parentOffset, operator, first, newOffset);
+        return findAlpha(tree, parentOffset, operator, first, expr, newOffset);
     } else {
-        unsigned int result = findAlpha(tree, parentOffset, operator, first, newOffset);
+        unsigned int result = findAlpha(tree, parentOffset, operator, first, expr, newOffset);
         if (result != RULES_OK) {
             return result;
         }
@@ -919,7 +952,9 @@ static unsigned int createAlpha(ruleset *tree,
 
 static unsigned int createBetaConnector(ruleset *tree, 
                                         char *rule, 
-                                        path *betaPath, 
+                                        path *betaPath,
+                                        unsigned short atLeast,
+                                        unsigned short atMost, 
                                         unsigned int nextOffset) {
     char *first;
     char *last;
@@ -927,8 +962,8 @@ static unsigned int createBetaConnector(ruleset *tree,
     unsigned char type;
     unsigned int result = readNextName(rule, &first, &last, &hash);
     while (result == PARSE_OK) {
-        // Fast foward $min and $max
-        while (hash == HASH_MAX_SIZE || hash == HASH_MIN_SIZE) {
+        // Fast foward $atLeast and $atMost
+        while (hash == HASH_AT_LEAST || hash == HASH_AT_MOST) {
             readNextValue(last, &first, &last, &type);
             result = readNextName(last, &first, &last, &hash);
             if (result != PARSE_OK) {
@@ -954,19 +989,6 @@ static unsigned int createBetaConnector(ruleset *tree,
             return result;
         }
 
-        unsigned int queryOffset;
-        char temp[nameLength + 9];
-        strncpy(temp, first, nameLength);
-        char *rFirst;
-        char *rLast;
-        unsigned char rType;
-        readNextValue(last, &rFirst, &rLast, &rType);
-        nameLength += appendWindowSize(rFirst, temp + nameLength);
-        result = storeString(tree, temp, &queryOffset, nameLength);
-        if (result != RULES_OK) {
-            return result;
-        }
-
         node *connector;
         unsigned int connectorOffset;
         result = storeNode(tree, &connector, &connectorOffset);
@@ -974,33 +996,45 @@ static unsigned int createBetaConnector(ruleset *tree,
             return result;
         }
 
+        expression *expr;
         connector->nameOffset = stringOffset;
         connector->type = NODE_BETA_CONNECTOR;
         connector->value.b.nextOffset = nextOffset;
-        if (betaPath->namesLength == 0) {
-            betaPath->namesLength = 1;
-            betaPath->namesOffsets = malloc(sizeof(unsigned int));
-            if (!betaPath->namesOffsets) {
+        if (betaPath->expressionsLength == 0) {
+            betaPath->expressionsLength = 1;
+            betaPath->expressions = malloc(sizeof(expression));
+            if (!betaPath->expressions) {
                 return ERR_OUT_OF_MEMORY;
             }
 
-            betaPath->namesOffsets[0] = queryOffset;
+            expr = betaPath->expressions;
         }
         else {
-            betaPath->namesLength = betaPath->namesLength + 1;
-            betaPath->namesOffsets = realloc(betaPath->namesOffsets, betaPath->namesLength * sizeof(unsigned int));
-            if (!betaPath->namesOffsets) {
+            betaPath->expressionsLength = betaPath->expressionsLength + 1;
+            betaPath->expressions = realloc(betaPath->expressions, betaPath->expressionsLength * sizeof(expression));
+            if (!betaPath->expressions) {
                 return ERR_OUT_OF_MEMORY;
             }
 
-            betaPath->namesOffsets[betaPath->namesLength - 1] = queryOffset;
+            expr = &betaPath->expressions[betaPath->expressionsLength - 1];
         }
 
+        expr->nameOffset = stringOffset;
+        expr->termsLength = 0;
+        expr->t.termsPointer = NULL;
+        char *rFirst;
+        char *rLast;
+        unsigned char rType;
+        readNextValue(last, &rFirst, &rLast, &rType);
+        expr->atLeast = atLeast;
+        expr->atMost = atMost;
+        getWindowSize(rFirst, &expr->atLeast, &expr->atMost);
+        
         if (operator == OP_NOP) {
             unsigned int  resultOffset = NODE_M_OFFSET;
             if (((last - first) != 2)  || (strncmp("$s", first, 2) && strncmp("$m", first, 2))) {
                 readNextValue(last, &first, &last, &type);
-                result = createAlpha(tree, &resultOffset, first, connectorOffset);
+                result = createAlpha(tree, first, expr, connectorOffset, &resultOffset);
             } 
             else {
                 if (!strncmp("$s", first, 2)) {
@@ -1008,12 +1042,12 @@ static unsigned int createBetaConnector(ruleset *tree,
                 }
 
                 readNextValue(last, &first, &last, &type);
-                result = createAlpha(tree, &resultOffset, first, connectorOffset);
+                result = createAlpha(tree, first, expr, connectorOffset, &resultOffset);
             }
         }
         else {
             readNextValue(last, &first, &last, &type);
-            result = createBeta(tree, first, operator, connectorOffset, betaPath, NULL);
+            result = createBeta(tree, first, operator, connectorOffset, betaPath, atLeast, atMost, NULL);
         }
 
         if (result != RULES_OK) {
@@ -1031,6 +1065,8 @@ static unsigned int createBeta(ruleset *tree,
                                unsigned char operator, 
                                unsigned int nextOffset, 
                                path *nextPath, 
+                               unsigned short atLeast,
+                               unsigned short atMost,
                                path **outPath) {
 
     path *betaPath = malloc(sizeof(path));
@@ -1039,23 +1075,23 @@ static unsigned int createBeta(ruleset *tree,
     }
 
     betaPath->operator = operator;
-    betaPath->namesLength = 0;
-    betaPath->namesOffsets = NULL;
+    betaPath->expressionsLength = 0;
+    betaPath->expressions = NULL;
     betaPath->parents = NULL;
     betaPath->parentsLength = 0;
 
     if (nextPath) {
         if (nextPath->parentsLength == 0) {
-            nextPath->parentsLength = nextPath->namesLength;
-            nextPath->parents = calloc(nextPath->namesLength, sizeof(path*));
+            nextPath->parentsLength = nextPath->expressionsLength;
+            nextPath->parents = calloc(nextPath->expressionsLength, sizeof(path*));
             if (!nextPath->parents) {
                 return ERR_OUT_OF_MEMORY;
             }
 
-            nextPath->parents[nextPath->namesLength - 1] = betaPath;
+            nextPath->parents[nextPath->expressionsLength - 1] = betaPath;
         } else {
-            int lengthDiff = nextPath->namesLength - nextPath->parentsLength;
-            nextPath->parents = realloc(nextPath->parents, sizeof(path*) * nextPath->namesLength);
+            int lengthDiff = nextPath->expressionsLength - nextPath->parentsLength;
+            nextPath->parents = realloc(nextPath->parents, sizeof(path*) * nextPath->expressionsLength);
             if (!nextPath->parents) {
                 return ERR_OUT_OF_MEMORY;
             }
@@ -1064,7 +1100,7 @@ static unsigned int createBeta(ruleset *tree,
                 nextPath->parents[nextPath->parentsLength + i] = NULL;
             }
 
-            nextPath->parentsLength = nextPath->namesLength;
+            nextPath->parentsLength = nextPath->expressionsLength;
             nextPath->parents[nextPath->parentsLength - 1] = betaPath;
         }
     }
@@ -1073,12 +1109,14 @@ static unsigned int createBeta(ruleset *tree,
         *outPath = betaPath;
     }
 
-    return createBetaConnector(tree, rule, betaPath, nextOffset);    
+    return createBetaConnector(tree, rule, betaPath, atLeast, atMost, nextOffset);    
 }
 
 static unsigned int unwrapAndCreateAlpha(ruleset *tree, 
                                          char *rule, 
                                          unsigned int nextOffset, 
+                                         unsigned short atLeast,
+                                         unsigned short atMost,
                                          path **outPath) {
     char *first;
     char *last;
@@ -1087,8 +1125,8 @@ static unsigned int unwrapAndCreateAlpha(ruleset *tree,
     unsigned char type;
     readNextName(rule, &first, &last, &hash);
 
-    // Fast forward $min and $max
-    while(hash == HASH_MAX_SIZE || hash == HASH_MIN_SIZE) {
+    // Fast forward $atLeast and $atMost
+    while(hash == HASH_AT_LEAST || hash == HASH_AT_MOST) {
         readNextValue(last, &first, &rule, &type);
         readNextName(rule, &first, &last, &hash);
     }
@@ -1102,17 +1140,39 @@ static unsigned int unwrapAndCreateAlpha(ruleset *tree,
                 resultOffset = NODE_S_OFFSET;
             }
 
-            return createBeta(tree, rule, OP_ANY, nextOffset, NULL, outPath);
+            return createBeta(tree, rule, OP_ANY, nextOffset, NULL, atLeast, atMost, outPath);
         }
     } else if (nameLength >= 4) { 
         if (!strncmp("$all", last - 4, 4)) {
-            return createBeta(tree, rule, OP_ALL, nextOffset, NULL, outPath);
+            return createBeta(tree, rule, OP_ALL, nextOffset, NULL, atLeast, atMost, outPath);
         } else if (!strncmp("$any", last - 4, 4)) {
-            return createBeta(tree, rule, OP_ANY, nextOffset, NULL, outPath);
+            return createBeta(tree, rule, OP_ANY, nextOffset, NULL, atLeast, atMost, outPath);
         } 
     } 
 
-    return createAlpha(tree, &resultOffset, rule, nextOffset);
+
+    path *betaPath = malloc(sizeof(path));
+    if (!betaPath) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    betaPath->operator = OP_NOP;
+    betaPath->parents = NULL;
+    betaPath->parentsLength = 0;
+    betaPath->expressionsLength = 1;
+    betaPath->expressions = malloc(sizeof(expression));
+    if (!betaPath->expressions) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    betaPath->expressions->nameOffset = 0;
+    betaPath->expressions->atLeast = atLeast;
+    betaPath->expressions->atMost = atMost;
+    betaPath->expressions->termsLength = 0;
+    betaPath->expressions->t.termsPointer = NULL;
+
+    *outPath = betaPath;
+    return createAlpha(tree, rule, NULL, nextOffset, &resultOffset);
 }
 
 static unsigned int add(any *right, any *left, any **result) {
@@ -1144,47 +1204,30 @@ static unsigned int multiply(any *right, any *left, any **result) {
                 return ERR_OUT_OF_MEMORY;
             }
 
-            newAll->names = malloc((rightAll->namesLength + leftAll->namesLength) * sizeof(char*));
-            if (!newAll->names) {
+            newAll->expressions = malloc((rightAll->expressionsLength + leftAll->expressionsLength) * sizeof(unsigned int));
+            if (!newAll->expressions) {
                 return ERR_OUT_OF_MEMORY;
             }
 
-            for (unsigned int iii = 0; iii < rightAll->namesLength; ++iii) {
-                newAll->names[iii] = malloc(sizeof(char) * (strlen(rightAll->names[iii]) + 1));
-                if (!newAll->names[iii]) {
-                    return ERR_OUT_OF_MEMORY;
-                }
-
-                strcpy(newAll->names[iii], rightAll->names[iii]);
+            for (unsigned int iii = 0; iii < rightAll->expressionsLength; ++iii) {
+                newAll->expressions[iii] =  rightAll->expressions[iii];
             }
 
-            for (unsigned int iii = 0; iii < leftAll->namesLength; ++iii) {
-                newAll->names[rightAll->namesLength + iii] = malloc(sizeof(char) * (strlen(leftAll->names[iii]) + 1));
-                if (!newAll->names[rightAll->namesLength + iii]) {
-                    return ERR_OUT_OF_MEMORY;
-                }
-                
-                strcpy(newAll->names[rightAll->namesLength + iii], leftAll->names[iii]);
+            for (unsigned int iii = 0; iii < leftAll->expressionsLength; ++iii) {
+                newAll->expressions[rightAll->expressionsLength + iii] = leftAll->expressions[iii];
             }
 
-            newAll->namesLength = rightAll->namesLength + leftAll->namesLength;
+            newAll->expressionsLength = rightAll->expressionsLength + leftAll->expressionsLength;
             product->nodes[i + ii * left->nodesLength] = newAll;
         }
 
-        for (unsigned int ii = 0; ii < leftAll->namesLength; ++ii) {
-            free(leftAll->names[ii]);
-        }
-        free(leftAll->names);
+        free(leftAll->expressions);
         free(leftAll);
     }
 
     for (unsigned int i = 0; i < right->nodesLength; ++i) {
         all *rightAll = right->nodes[i];
-        for (unsigned int ii = 0; ii < rightAll->namesLength; ++ii) {
-            free(rightAll->names[ii]);
-        }
-
-        free(rightAll->names);
+        free(rightAll->expressions);
         free(rightAll);
     }
 
@@ -1196,7 +1239,7 @@ static unsigned int multiply(any *right, any *left, any **result) {
     return RULES_OK;
 }
 
-static unsigned int createSingleQuery(char *name, any **result) {
+static unsigned int createSingleQuery(ruleset *tree, char *name, expression *expr, any **resultAny) {
     any *newAny = malloc(sizeof(any));
     if (!newAny) {
         return ERR_OUT_OF_MEMORY;
@@ -1213,34 +1256,63 @@ static unsigned int createSingleQuery(char *name, any **result) {
         return ERR_OUT_OF_MEMORY;
     }
 
-    newAny->nodes[0]->namesLength = 1;
-    newAny->nodes[0]->names = malloc(sizeof(char*));
-    if (!newAny->nodes[0]->names) {
+    newAny->nodes[0]->expressionsLength = 1;
+    newAny->nodes[0]->expressions = malloc(sizeof(unsigned int));
+    if (!newAny->nodes[0]->expressions) {
         return ERR_OUT_OF_MEMORY;
     }
 
-    newAny->nodes[0]->names[0] = malloc(sizeof(char) * strlen(name) + 1);
-    if (!newAny->nodes[0]->names[0]) {
-        return ERR_OUT_OF_MEMORY;
+    expression *newExpression;
+    unsigned int result = storeExpression(tree, &newExpression, newAny->nodes[0]->expressions);
+    if (result != RULES_OK) {
+        return result;
     }
 
-    strcpy(newAny->nodes[0]->names[0], name);
-    *result = newAny;
+    result = storeString(tree, name, &newExpression->nameOffset, strlen(name));
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    newExpression->atLeast = expr->atLeast;
+    newExpression->atMost = expr->atMost;
+
+    if (expr->termsLength) {
+        result = allocateNext(tree, expr->termsLength, &newExpression->t.termsOffset);
+        if (result != RULES_OK) {
+            return result;
+        }
+
+        for (unsigned short i = 0; i < expr->termsLength; ++i) {
+            tree->nextPool[newExpression->t.termsOffset + i] = expr->t.termsPointer[i];
+        }
+
+        free(expr->t.termsPointer);
+    }
+
+    *resultAny = newAny;
     return RULES_OK;
 }
 
 static unsigned int createQueries(ruleset *tree, 
                                   char *postfix, 
                                   path *betaPath, 
-                                  any **result) {
-    if (!betaPath) {
-        return createSingleQuery(postfix, result);
-    }
-
+                                  any **anyResult) {
     any *currentAny = NULL;
-    for (unsigned int i = 0; i < betaPath->namesLength; ++ i) {
+    for (unsigned short i = 0; i < betaPath->expressionsLength; ++ i) {
         unsigned int result;
-        char *name = &tree->stringPool[betaPath->namesOffsets[i]];
+        expression *expr = &betaPath->expressions[i];
+        if (betaPath->operator == OP_NOP) {
+            result = createSingleQuery(tree, postfix, expr, anyResult);
+            if (result != RULES_OK) {
+                return result;
+            }
+
+            free(betaPath->expressions);
+            free(betaPath);
+            return RULES_OK;
+        }
+
+        char *name = &tree->stringPool[expr->nameOffset];
         int nameLength = strlen(name);
         char nextPostfix[strlen(postfix) + nameLength + 2];
         strcpy(nextPostfix, name);
@@ -1249,7 +1321,7 @@ static unsigned int createQueries(ruleset *tree,
         
         any *newAny = NULL;    
         if (i >= betaPath->parentsLength || !betaPath->parents[i]) {
-            result = createSingleQuery(nextPostfix, &newAny);
+            result = createSingleQuery(tree, nextPostfix, expr, &newAny);
             if (result != RULES_OK) {
                 return result;
             }
@@ -1278,10 +1350,10 @@ static unsigned int createQueries(ruleset *tree,
         }
     }
 
-    free(betaPath->namesOffsets);
+    free(betaPath->expressions);
     free(betaPath->parents);
     free(betaPath);
-    *result = currentAny;
+    *anyResult = currentAny;
     return RULES_OK;
 }
 
@@ -1296,38 +1368,35 @@ static unsigned int fixupQueries(ruleset *tree, unsigned int actionOffset, char*
         return result;
     }
 
-    char *queryStrings[query->nodesLength];
-    for (unsigned int i = 0; i < query->nodesLength; ++i) {
-        all *currentAll = query->nodes[i];
-        unsigned int queryLength = 1;
-        for (unsigned int ii = 0; ii < currentAll->namesLength; ++ii) {
-            queryLength = queryLength + strlen(currentAll->names[ii]) + 1;
-        }
-
-        queryStrings[i] = malloc(sizeof(char) * queryLength);
-        char *current = queryStrings[i];
-        for (unsigned int ii = 0; ii < currentAll->namesLength; ++ii) {
-            int nameLength = strlen(currentAll->names[ii]);
-            strncpy(current, currentAll->names[ii], nameLength);
-            current[nameLength] = ' ';
-            current = &current[nameLength + 1];
-            free(currentAll->names[ii]);
-        }        
-
-        current[0] = '\0';
-        free(currentAll->names);
-        free(currentAll);
-    }
-    
-    result = storeQuery(tree, queryStrings, &actionNode->value.c.queryOffset, query->nodesLength);
+    actionNode->value.c.joinsLength = query->nodesLength;
+    result = allocateNext(tree, query->nodesLength, &actionNode->value.c.joinsOffset);
     if (result != RULES_OK) {
         return result;
     }
-    
+
     for (unsigned int i = 0; i < query->nodesLength; ++i) {
-        free(queryStrings[i]);
+        all *currentAll = query->nodes[i];
+
+        join *newJoin;
+        result = storeJoin(tree, &newJoin, &tree->nextPool[actionNode->value.c.joinsOffset + i]);
+        if (result != RULES_OK) {
+            return result;
+        }
+        
+        newJoin->expressionsLength = currentAll->expressionsLength;
+        result = allocateNext(tree, currentAll->expressionsLength, &newJoin->expressionsOffset);
+        if (result != RULES_OK) {
+            return result;
+        }
+
+        for (unsigned int ii = 0; ii < currentAll->expressionsLength; ++ii) {
+            tree->nextPool[newJoin->expressionsOffset + ii] = currentAll->expressions[ii];
+        }
+
+        free(currentAll->expressions);
+        free(currentAll);
     }
-    actionNode->value.c.queryLength = query->nodesLength;
+    
     free(query->nodes);
     free(query);
     return RULES_OK;
@@ -1359,45 +1428,38 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         // need to resolve namespace every time it is used.
         char *namespace = &tree->stringPool[tree->nameOffset];
         int namespaceLength = strlen(namespace); 
-        char runtimeActionName[namespaceLength + lastName - firstName + 1];
+        char runtimeActionName[namespaceLength + lastName - firstName + 2];
         strncpy(runtimeActionName, firstName, lastName - firstName);
         runtimeActionName[lastName - firstName] = '!';
         strncpy(&runtimeActionName[lastName - firstName + 1], namespace, namespaceLength);
+        runtimeActionName[namespaceLength + lastName - firstName + 1] = '\0';
         result = storeString(tree, runtimeActionName, &ruleAction->nameOffset, namespaceLength + lastName - firstName + 1);
         if (result != RULES_OK) {
             return result;
         }
 
-        char queryActionName[namespaceLength + lastName - firstName + 11];
-        strncpy(queryActionName, firstName, lastName - firstName);
-
         readNextValue(lastName, &first, &lastRuleValue, &type);
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
+            unsigned short atLeast = 1;
+            unsigned short atMost = 1;
             readNextValue(last, &first, &last, &type);
-            lastName += appendWindowSize(first, &queryActionName[lastName - firstName]); 
-            
+            getWindowSize(first, &atLeast, &atMost);
             switch (hash) {
                 case HASH_WHEN:
-                    result = unwrapAndCreateAlpha(tree, first, actionOffset, &betaPath);
+                    result = unwrapAndCreateAlpha(tree, first, actionOffset, atLeast, atMost, &betaPath);
                     break;
                 case HASH_WHEN_ANY:
-                    result = createBeta(tree, first, OP_ANY, actionOffset, NULL, &betaPath);
+                    result = createBeta(tree, first, OP_ANY, actionOffset, NULL, atLeast, atMost, &betaPath);
                     break;
                 case HASH_WHEN_ALL:
-                    result = createBeta(tree, first, OP_ALL, actionOffset, NULL, &betaPath);
+                    result = createBeta(tree, first, OP_ALL, actionOffset, NULL, atLeast, atMost, &betaPath);
                     break;
             }
             result = readNextName(last, &first, &last, &hash);
         }
 
-        queryActionName[lastName - firstName] = '!';
-        // tree->stringPool can change after storing strings
-        // need to resolve namespace every time it is used.
-        namespace = &tree->stringPool[tree->nameOffset];
-        strncpy(&queryActionName[lastName - firstName + 1], namespace, namespaceLength);
-        queryActionName[lastName - firstName + namespaceLength + 1] = '\0';
-        result = fixupQueries(tree, actionOffset, queryActionName, betaPath);
+        result = fixupQueries(tree, actionOffset, runtimeActionName, betaPath);
         if (result != RULES_OK) {
             return result;
         }
@@ -1428,8 +1490,10 @@ unsigned int createRuleset(void **handle, char *name, char *rules, unsigned int 
     tree->nodeOffset = 0;
     tree->nextPool = NULL;
     tree->nextOffset = 0;
-    tree->queryPool = NULL;
-    tree->queryOffset = 0;
+    tree->expressionPool = NULL;
+    tree->expressionOffset = 0;
+    tree->joinPool = NULL;
+    tree->joinOffset = 0;
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     tree->stateLength = 0;
@@ -1484,7 +1548,8 @@ unsigned int deleteRuleset(void *handle) {
     free(tree->nodePool);
     free(tree->nextPool);
     free(tree->stringPool);
-    free(tree->queryPool);
+    free(tree->expressionPool);
+    free(tree->joinPool);
     free(tree->stateBuckets);
     for (unsigned int i = 0; i < tree->stateLength; ++i) {
         stateEntry *entry = &tree->state[i];

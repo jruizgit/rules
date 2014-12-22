@@ -1,7 +1,7 @@
 var d = require('../libjs/durable');
 
 
-with (d.statechart('fraud2')) {
+with (d.statechart('fraud')) {
     with (state('start')) {
         to('standby');
     }
@@ -20,9 +20,9 @@ with (d.statechart('fraud2')) {
     }
     state('fraud');
     whenStart(function (host) {
-        host.post('fraud2', {id: 1, sid: 1, amount: 200});
-        host.post('fraud2', {id: 2, sid: 1, amount: 200});
-        host.post('fraud2', {id: 3, sid: 1, amount: 200});
+        host.post('fraud', {id: 1, sid: 1, amount: 200});
+        host.post('fraud', {id: 2, sid: 1, amount: 200});
+        host.post('fraud', {id: 3, sid: 1, amount: 200});
     });
 }
 

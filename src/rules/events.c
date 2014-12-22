@@ -205,7 +205,7 @@ static unsigned char compareStringAndStringProperty(char* leftFirst,
     int result = strcmp(leftFirst, rightFirst);
     rightFirst[rightLength] = rightTemp;
     leftFirst[leftLength] = leftTemp;
-    
+
     switch(op) {
         case OP_LT:
             return (result < 0);
@@ -341,8 +341,8 @@ static unsigned int isMatch(ruleset *tree,
     jsonProperty *rightProperty;
     jsonProperty rightValue;
     if (currentAlpha->right.type == JSON_STATE_PROPERTY) {
-        if (currentAlpha->right.value.property.sidOffset) {
-            sid = &tree->stringPool[currentAlpha->right.value.property.sidOffset];
+        if (currentAlpha->right.value.property.idOffset) {
+            sid = &tree->stringPool[currentAlpha->right.value.property.idOffset];
         }
         
         result = fetchStateProperty(tree, 
