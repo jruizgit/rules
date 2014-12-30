@@ -395,27 +395,43 @@ unsigned int getBindingIndex(ruleset *tree, unsigned int sidHash, unsigned int *
 unsigned int assertMessageImmediate(void *rulesBinding, 
                                     char *key, 
                                     char *sid, 
-                                    char *mid, 
                                     char *message, 
+                                    jsonProperty *allProperties,
+                                    unsigned int propertiesLength,
                                     unsigned int actionIndex) {
 
     binding *bindingContext = (binding*)rulesBinding;
     redisContext *reContext = bindingContext->reContext;
-    time_t currentTime = time(NULL);
     functionHash *currentAssertHash = &bindingContext->hashArray[actionIndex];
+    time_t currentTime = time(NULL);
+    char score[10];
+    snprintf(score, 10, "%ld", currentTime);
+    char *argv[6 + propertiesLength * 2];
+    size_t argvl[6 + propertiesLength * 2];
 
-    int result = redisAppendCommand(reContext, 
-                                    "evalsha %s %d %s %s %s %s %s %s %s %ld 0", 
-                                    *currentAssertHash, 
-                                    3, 
-                                    bindingContext->messageHashset, 
-                                    bindingContext->actionSortedset, 
-                                    bindingContext->sessionHashset, 
-                                    key, 
-                                    sid, 
-                                    mid, 
-                                    message, 
-                                    currentTime); 
+    argv[0] = "evalsha";
+    argvl[0] = 7;
+    argv[1] = *currentAssertHash;
+    argvl[1] = 40;
+    argv[2] = "0";
+    argvl[2] = 1;
+    argv[3] = key;
+    argvl[3] = strlen(key);
+    argv[4] = sid;
+    argvl[4] = strlen(sid);
+    argv[5] = score;
+    argvl[5] = 8;
+
+    for (unsigned int i = 0; i < propertiesLength; ++i) {
+        char propertyHash[10];
+        snprintf(propertyHash, 10, "%d", allProperties[i].hash);
+        argv[6 + i * 2] = propertyHash;
+        argvl[6 + i * 2] = 10;
+        argv[6 + i * 2 + 1] = message + allProperties[i].valueOffset;
+        argvl[6 + i * 2 + 1] = allProperties[i].valueLength;
+    }
+
+    int result = redisAppendCommandArgv(reContext, 6 + propertiesLength * 2, (const char**)argv, argvl); 
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -443,8 +459,9 @@ unsigned int assertMessageImmediate(void *rulesBinding,
 unsigned int assertFirstMessage(void *rulesBinding, 
                                 char *key, 
                                 char *sid, 
-                                char *mid, 
-                                char *message) {
+                                char *message,
+                                jsonProperty *allProperties,
+                                unsigned int propertiesLength) {
 
     redisContext *reContext = ((binding*)rulesBinding)->reContext;
     int result = redisAppendCommand(reContext, "multi");
@@ -452,66 +469,89 @@ unsigned int assertFirstMessage(void *rulesBinding,
         return ERR_REDIS_ERROR;
     }
 
-    return assertMessage(rulesBinding, key, sid, mid, message);
+    return assertMessage(rulesBinding, 
+                         key, 
+                         sid, 
+                         message, 
+                         allProperties, 
+                         propertiesLength);
 }
 
 unsigned int assertMessage(void *rulesBinding, 
                            char *key, 
                            char *sid, 
-                           char *mid, 
-                           char *message) {
+                           char *message,
+                           jsonProperty *allProperties,
+                           unsigned int propertiesLength) {
 
-    redisContext *reContext = ((binding*)rulesBinding)->reContext;
-
-    int result = redisAppendCommand(reContext, 
-                                    "hsetnx %s %s %s", 
-                                    ((binding*)rulesBinding)->messageHashset, 
-                                    mid, 
-                                    message);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
+    binding *bindingContext = (binding*)rulesBinding;
+    redisContext *reContext = bindingContext->reContext;
     time_t currentTime = time(NULL);
+    char score[10];
+    snprintf(score, 10, "%ld", currentTime);
+    char *argv[6 + propertiesLength * 2];
+    size_t argvl[6 + propertiesLength * 2];
 
-    result = redisAppendCommand(reContext, 
-                                "zadd %s!%s %ld %s", 
-                                key, 
-                                sid, 
-                                currentTime, 
-                                mid);
+    argv[0] = "evalsha";
+    argvl[0] = 7;
+    argv[1] = bindingContext->assertMessageHash;
+    argvl[1] = 40;
+    argv[2] = "0";
+    argvl[2] = 1;
+    argv[3] = key;
+    argvl[3] = strlen(key);
+    argv[4] = sid;
+    argvl[4] = strlen(sid);
+    argv[5] = score;
+    argvl[5] = 8;
+
+    for (unsigned int i = 0; i < propertiesLength; ++i) {
+        char propertyHash[10];
+        snprintf(propertyHash, 10, "%d", allProperties[i].hash);
+        argv[6 + i * 2] = propertyHash;
+        argvl[6 + i * 2] = 10;
+        argv[6 + i * 2 + 1] = message + allProperties[i].valueOffset;
+        argvl[6 + i * 2 + 1] = allProperties[i].valueLength;
+    }
+
+    int result = redisAppendCommandArgv(reContext, 6 + propertiesLength * 2, (const char**)argv, argvl); 
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
-    
+
     return RULES_OK;
 }
 
 unsigned int assertLastMessage(void *rulesBinding, 
-                               char *key, 
+                               char *key,
                                char *sid, 
-                               char *mid, 
-                               char *message, 
+                               char *message,
+                               jsonProperty *allProperties,
+                               unsigned int propertiesLength,
                                int actionIndex, 
                                unsigned int messageCount) {
+
+
+    unsigned int result = assertMessage(rulesBinding, 
+                                        key, 
+                                        sid, 
+                                        message, 
+                                        allProperties, 
+                                        propertiesLength); 
+    if (result != RULES_OK) {
+        return result;
+    }
 
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;
     time_t currentTime = time(NULL);
     functionHash *currentAssertHash = &currentBinding->hashArray[actionIndex];
 
-    unsigned int result = redisAppendCommand(reContext, 
-                                             "evalsha %s %d %s %s %s %s %s %s %s %ld 0", 
-                                             *currentAssertHash, 
-                                             3, 
-                                             currentBinding->messageHashset, 
-                                             currentBinding->actionSortedset, 
-                                             currentBinding->sessionHashset, 
-                                             key, 
-                                             sid, 
-                                             mid, 
-                                             message, 
-                                             currentTime); 
+    result = redisAppendCommand(reContext, 
+                                "evalsha %s 0 \"\" %s %s %ld", 
+                                *currentAssertHash, 
+                                sid, 
+                                currentTime); 
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -523,7 +563,7 @@ unsigned int assertLastMessage(void *rulesBinding,
 
     redisReply *reply;
     result = RULES_OK;
-    for (unsigned short i = 0; i < (messageCount * 2) + 1; ++i) {
+    for (unsigned short i = 0; i < messageCount + 3; ++i) {
         result = redisGetReply(reContext, (void**)&reply);
         if (result != REDIS_OK) {
             result = ERR_REDIS_ERROR;

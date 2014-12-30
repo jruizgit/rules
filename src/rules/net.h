@@ -9,6 +9,7 @@ typedef char functionHash[HASH_LENGTH + 1];
 
 typedef struct binding {
     redisContext *reContext;
+    functionHash assertMessageHash;
     functionHash dequeueActionHash;
     functionHash partitionHash;
     functionHash timersHash;
@@ -30,11 +31,41 @@ typedef struct bindingsList {
     unsigned int lastTimersBinding;
 } bindingsList;
 
-unsigned int getBindingIndex(ruleset *tree, unsigned int sidHash, unsigned int *bindingIndex);
-unsigned int assertMessageImmediate(void *rulesBinding, char *key, char *sid, char *mid, char *message, unsigned int actionIndex);
-unsigned int assertFirstMessage(void *rulesBinding, char *key, char *sid, char *mid, char *message);
-unsigned int assertMessage(void *rulesBinding, char *key, char *sid, char *mid, char *message);
-unsigned int assertLastMessage(void *rulesBinding, char *key, char *sid, char *mid, char *message, int actionIndex, unsigned int messageCount);
+unsigned int getBindingIndex(ruleset *tree, 
+                             unsigned int sidHash, 
+                             unsigned int *bindingIndex);
+
+unsigned int assertMessageImmediate(void *rulesBinding, 
+                                    char *key, 
+                                    char *sid, 
+                                    char *message, 
+                                    jsonProperty *allProperties,
+                                    unsigned int propertiesLength,
+                                    unsigned int actionIndex);
+
+unsigned int assertFirstMessage(void *rulesBinding, 
+                                char *key, 
+                                char *sid, 
+                                char *message, 
+                                jsonProperty *allProperties,
+                                unsigned int propertiesLength);
+
+unsigned int assertMessage(void *rulesBinding, 
+                           char *key, 
+                           char *sid, 
+                           char *message, 
+                           jsonProperty *allProperties,
+                           unsigned int propertiesLength);
+
+unsigned int assertLastMessage(void *rulesBinding, 
+                              char *key, 
+                              char *sid, 
+                              char *message, 
+                              jsonProperty *allProperties,
+                              unsigned int propertiesLength,
+                              int actionIndex,
+                              unsigned int messageCount);
+
 unsigned int assertTimer(void *rulesBinding, char *key, char *sid, char *mid, char *timer, unsigned int actionIndex);
 unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply);
 unsigned int peekTimers(ruleset *tree, void **bindingContext, redisReply **reply);
@@ -53,6 +84,5 @@ unsigned int deleteBindingsList(ruleset *tree);
 unsigned int getSession(void *rulesBinding, char *sid, char **state);
 unsigned int storeSession(void *rulesBinding, char *sid, char *state);
 unsigned int storeSessionImmediate(void *rulesBinding, char *sid, char *state);
-unsigned int getRulesetSession(ruleset *tree, char **state);
-unsigned int storeRulesetSessionImmediate(ruleset *tree, char *state);
+
 

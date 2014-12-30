@@ -242,8 +242,8 @@ unsigned int constructObject(char *parentName,
         
         property->isMaterial = 0;
         property->hash = hash;
-        property->value.s = first;
-        property->length = last - first;
+        property->valueOffset = first - object;
+        property->valueLength = last - first;
         property->type = type;
         *next = last;
         result = readNextName(last, &firstName, &lastName, &hash);
@@ -252,12 +252,12 @@ unsigned int constructObject(char *parentName,
     return (result == PARSE_END ? RULES_OK: result);
 }
 
-void rehydrateProperty(jsonProperty *property) {
+void rehydrateProperty(jsonProperty *property, char *state) {
     // ID and SID are treated as strings regardless of type
     // to avoid unnecessary conversions
     if (!property->isMaterial && property->hash != HASH_ID && property->hash != HASH_SID) {
-        unsigned short propertyLength = property->length + 1;
-        char *propertyFirst = property->value.s;
+        unsigned short propertyLength = property->valueLength + 1;
+        char *propertyFirst = state + property->valueOffset;
         unsigned char propertyType = property->type;
         unsigned char b = 1;
         char temp;
@@ -362,6 +362,7 @@ unsigned int fetchStateProperty(void *tree,
                                 unsigned int propertyHash, 
                                 unsigned int maxTime, 
                                 unsigned char ignoreStaleState,
+                                char **state,
                                 jsonProperty **property) {
     unsigned int sidHash = djbHash(sid, strlen(sid));
     stateEntry *entry = getEntry(tree, sid, sidHash);
@@ -384,7 +385,8 @@ unsigned int fetchStateProperty(void *tree,
         return ERR_PROPERTY_NOT_FOUND;
     }
 
-    rehydrateProperty(result);
+    *state = entry->state;
+    rehydrateProperty(result, *state);
     *property = result;
     return RULES_OK;    
 }

@@ -9,9 +9,9 @@ typedef struct jsonProperty {
     unsigned int hash;
     unsigned char type;
     unsigned char isMaterial;
-    unsigned short length;
+    unsigned short valueOffset;
+    unsigned short valueLength;
     union {
-        char *s;
         long i; 
         double d; 
         unsigned char b; 
@@ -31,7 +31,7 @@ typedef struct stateEntry {
     char *sid;
 } stateEntry;
 
-void rehydrateProperty(jsonProperty *property);
+void rehydrateProperty(jsonProperty *property, char *state);
 unsigned int refreshState(void *tree, char *sid);
 unsigned int constructObject(char *parentName, 
                              char *object,
@@ -46,8 +46,9 @@ unsigned int resolveBinding(void *tree,
                             char *sid, 
                             void **rulesBinding);
 unsigned int fetchStateProperty(void *tree,
-                                      char *sid, 
-                                      unsigned int propertyHash, 
-                                      unsigned int maxTime, 
-                                      unsigned char ignoreStaleState,
-                                      jsonProperty **property);
+                                char *sid, 
+                                unsigned int propertyHash, 
+                                unsigned int maxTime, 
+                                unsigned char ignoreStaleState,
+                                char **state,
+                                jsonProperty **property);

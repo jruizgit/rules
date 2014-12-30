@@ -448,10 +448,6 @@ static unsigned int validateExpression(char *rule) {
             return result;
         }
         
-        if (hash != HASH_S) {
-            return ERR_UNEXPECTED_VALUE;
-        }
-
         result = readNextValue(last, &first, &last, &type);
         if (result != PARSE_OK) {
             return result;
