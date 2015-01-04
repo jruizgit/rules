@@ -5,6 +5,97 @@
 #include <time.h>
 #include "net.h"
 #include "rules.h"
+#include "json.h"
+
+static char *createTest(ruleset *tree, expression *expr) {
+    char *test = NULL;
+    char *comp = NULL;
+    char *compStack[32];
+    unsigned char compTop = 0;
+    unsigned char first = 1;
+    asprintf(&test, "");
+
+    for (unsigned short i = 0; i < expr->termsLength; ++i) {
+        unsigned int currentNodeOffset = tree->nextPool[expr->t.termsOffset + i];
+        node *currentNode = &tree->nodePool[currentNodeOffset];
+        if (currentNode->value.a.operator == OP_AND) {
+            char *oldTest = test;
+            if (first) {
+                asprintf(&test, "%s(", test);
+            } else {
+                asprintf(&test, "%s %s (", test, comp);
+            }
+            free(oldTest);
+            
+            compStack[compTop] = comp;
+            ++compTop;
+            comp = "and";
+            first = 1;
+        } else if (currentNode->value.a.operator == OP_OR) {
+            char *oldTest = test;
+            if (first) {
+                asprintf(&test, "%s(", test);
+            } else {
+                asprintf(&test, "%s %s (", test, comp);
+            }
+            free(oldTest); 
+            
+            compStack[compTop] = comp;
+            ++compTop;
+            comp = "or";
+            first = 1;           
+        } else if (currentNode->value.a.operator == OP_END) {
+            --compTop;
+            comp = compStack[compTop];
+            
+            char *oldTest = test;
+            asprintf(&test, "%s)", test);
+            free(oldTest);            
+        } else {
+            char *leftProperty = &tree->stringPool[currentNode->nameOffset];
+            char *rightProperty = &tree->stringPool[currentNode->value.a.right.value.property.nameOffset];
+            char *rightAlias = &tree->stringPool[currentNode->value.a.right.value.property.idOffset];
+            char *op;
+            switch (currentNode->value.a.operator) {
+                case OP_LT:
+                    op = "<";
+                    break;
+                case OP_LTE:
+                    op = "<=";
+                    break;
+                case OP_GT:
+                    op = ">";
+                    break;
+                case OP_GTE:
+                    op = ">=";
+                    break;
+                case OP_EQ:
+                    op = "==";
+                    break;
+                case OP_NEQ:
+                    op = "~=";
+                    break;
+            }
+
+            char *oldTest = test;
+            if (first) {
+                asprintf(&test, "%smessage[\"%s\"] %s frame[\"%s\"][\"%s\"]", test, leftProperty, op, rightAlias, rightProperty);
+                first = 0;
+            } else {
+                asprintf(&test, "%s %s message[\"%s\"] %s frame[\"%s\"][\"%s\"]", test, comp, leftProperty, op, rightAlias, rightProperty);
+            }
+
+            free(oldTest);
+        }
+    }
+
+    if (first) {
+        free(test);
+        asprintf(&test, "1");
+    }
+
+    return test;
+}
 
 static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     redisContext *reContext = rulesBinding->reContext;
@@ -12,12 +103,20 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     rulesBinding->hashArray = malloc(tree->actionCount * sizeof(functionHash));
     char *name = &tree->stringPool[tree->nameOffset];
     int nameLength = strlen(name);
+    char actionKey[nameLength + 3];
+    snprintf(actionKey, nameLength + 3, "%s!a", name);
+    char *lua = NULL;
     for (unsigned int i = 0; i < tree->nodeOffset; ++i) {
-        char *lua = NULL;
         char *oldLua;
         node *currentNode = &tree->nodePool[i];
+        asprintf(&lua, "");
         if (currentNode->type == NODE_ACTION) {
             char *actionName = &tree->stringPool[currentNode->nameOffset];
+            char *actionLastName = strchr(actionName, '!');
+            char actionAlias[actionLastName - actionName + 1];
+            strncpy(actionAlias, actionName, actionLastName - actionName);
+            actionAlias[actionLastName - actionName] = '\0';
+
             for (unsigned int ii = 0; ii < currentNode->value.c.joinsLength; ++ii) {
                 unsigned int currentJoinOffset = tree->nextPool[currentNode->value.c.joinsOffset + ii];
                 join *currentJoin = &tree->joinPool[currentJoinOffset];
@@ -25,74 +124,181 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                 for (unsigned int iii = 0; iii < currentJoin->expressionsLength; ++iii) {
                     unsigned int expressionOffset = tree->nextPool[currentJoin->expressionsOffset + iii];
                     expression *expr = &tree->expressionPool[expressionOffset];
-                    char *currentName = &tree->stringPool[expr->nameOffset];
-                    if (lua) {
-                        oldLua = lua;
-                        asprintf(&lua, "%skey = \"%s!\" .. ARGV[2]\n"
-                                       "res = redis.call(\"zcard\", key)\n"
-                                       "if res >= %d then\n"
-                                       "  res = redis.call(\"zrange\", key, 0, %d)\n"
-                                       "  if (res[1]) then\n"
-                                       "    i = 1\n"
-                                       "    while(res[i]) do\n"
-                                       "      signature = signature .. \",\" .. key .. \",\" .. res[i]\n"
-                                       "      i = i + 1\n"
-                                       "    end\n", 
-                                lua, currentName, expr->atLeast, expr->atMost - 1);
-                        free(oldLua);
-                    } else {
-                        asprintf(&lua, "key = \"%s!\" .. ARGV[2]\n"
-                                       "res = redis.call(\"zcard\", key)\n"
-                                       "if res >= %d then\n"
-                                       "  res = redis.call(\"zrange\", key, 0, %d)\n"
-                                       "  if (res[1]) then\n"
-                                       "    i = 1\n"
-                                       "    while (res[i]) do\n"
-                                       "      signature = signature .. \",\" .. key .. \",\" .. res[i]\n"
-                                       "      i = i + 1\n"
-                                       "    end\n", 
-                                currentName, expr->atLeast, expr->atMost - 1);
-                    }      
-                } 
-
-                oldLua = lua;
-                asprintf(&lua, "%s    redis.call(\"zadd\", KEYS[2], ARGV[5], signatureKey)\n"
-                               "    redis.call(\"hset\", \"%s!r\", signatureKey, signature)\n"
-                               "    return result\n", lua, name);
-              
-                free(oldLua);
-
-                for (unsigned int iii = 0; iii < currentJoin->expressionsLength; ++iii) {
+                    char *currentKey = &tree->stringPool[expr->nameOffset];
+                    char *currentAlias = &tree->stringPool[expr->aliasOffset];
                     oldLua = lua;
-                    asprintf(&lua, "%s  end\n"
-                                   "end\n", lua);
+                    if (iii == 0) {
+                        asprintf(&lua, 
+"%skeys = {}\n"
+"directory = {[\"0\"] = 1}\n"
+"reviewers = {}\n"
+"results_key = \"%s!%d!r!\" .. sid\n"                   
+"keys[1] = \"%s\"\n"
+"directory[\"%s\"] = 1\n"
+"reviewers[1] = function(message, frame)\n"
+"    frame[\"%s\"] = message\n"
+"    return true\n"
+"end\n",
+                                lua,
+                                actionName,
+                                ii,
+                                currentKey, 
+                                currentKey,
+                                currentAlias);
+                    } else {
+                        char *test = createTest(tree, expr);
+                        asprintf(&lua,
+"%skeys[%d] = \"%s\"\n"
+"directory[\"%s\"] = %d\n"
+"reviewers[%d] = function(message, frame)\n"
+"    if %s then\n"
+"        frame[\"%s\"] = message\n"
+"        return true\n"
+"    end\n"
+"    return false\n"
+"end\n",
+                                lua,
+                                iii + 1, 
+                                currentKey,
+                                currentKey,
+                                iii + 1,
+                                iii + 1,
+                                test,
+                                currentAlias);
+                        free(test);
+                    }
+
                     free(oldLua);
                 }
+
+                oldLua = lua;
+                asprintf(&lua,
+"%sprocess_key(%d)\n",
+                        lua,
+                        currentJoin->count);
+                free(oldLua);
+                    
             }
 
             oldLua = lua;
-            asprintf(&lua, "local signature = \"$s\" .. \",\" .. ARGV[2]\n"
-                           "local signatureKey = \"%s\" .. \"!\" .. ARGV[2]\n"
-                           "local key = ARGV[1] .. \"!\" .. ARGV[2]\n"
-                           "local result = 0\n"
-                           "local i\n"
-                           "if (ARGV[6] == \"1\") then\n"
-                           "  redis.call(\"hset\", KEYS[1], ARGV[2], ARGV[4])\n"
-                           "  redis.call(\"zadd\", key, ARGV[5], ARGV[2])\n"
-                           "else\n"
-                           "  result = redis.call(\"hsetnx\", KEYS[3], ARGV[2], \"{ \\\"id\\\":\\\"\" .. ARGV[2] .. \"\\\" }\")\n"
-                           "  redis.call(\"hsetnx\", KEYS[1], ARGV[3], ARGV[4])\n"
-                           "  redis.call(\"zadd\", key, ARGV[5], ARGV[3])\n"
-                           "end\n"
-                           "local res = redis.call(\"hexists\", \"%s!r\", signatureKey)\n" 
-                           "if (res ~= 0) then\n"
-                           "  return result\n"
-                           "end\n%s"
-                           "return result\n", actionName, name, lua);  
+            asprintf(&lua,
+"local key = ARGV[1]\n" 
+"local sid = ARGV[2]\n"
+"local score = tonumber(ARGV[3])\n"
+"local messages_key = \"%s!m!\" .. sid\n"
+"local actions_key = \"%s!a\"\n"
+"local keys\n"
+"local directory\n"
+"local reviewers\n"
+"local results_key\n"
+"local load_frame = function(packed_frame)\n"
+"    local frame = cmsgpack.unpack(packed_frame)\n"
+"    for name, mid in pairs(frame) do\n"
+"        local packed_message = redis.call(\"hget\", messages_key, mid)\n"
+"        if packed_message then\n"
+"            frame[name] = cmsgpack.unpack(packed_message)\n"
+"        else\n"
+"            frame = nil\n"
+"            break\n"
+"        end\n"
+"    end\n"
+"    return frame\n"
+"end\n"
+"local save_frame = function(frames_key, frame)\n"
+"    local frame_to_pack = {}\n"
+"    for name, message in pairs(frame) do\n"
+"        frame_to_pack[name] = message[\"id\"]\n"
+"    end\n"
+"    redis.call(\"rpush\", frames_key, cmsgpack.pack(frame_to_pack))\n"
+"end\n"
+"local save_result = function(frame)\n"
+"    for name, message in pairs(frame) do\n"
+"        redis.call(\"hdel\", messages_key, message[\"id\"])\n"
+"    end\n"
+"    redis.call(\"rpush\", results_key, cmsgpack.pack(frame))\n"
+"end\n"
+"local process_frame\n"
+"process_frame = function(frame, index)\n"
+"    local events_key = keys[index] .. \"!e!\" .. sid\n"
+"    local packed_message_list_len = redis.call(\"llen\", events_key)\n"
+"    for i = 0, packed_message_list_len - 1, 1  do\n"
+"        local mid = redis.call(\"lpop\", events_key)\n"
+"        local packed_message = redis.call(\"hget\", messages_key, mid)\n"
+"        if packed_message then\n"
+"            local message = cmsgpack.unpack(packed_message)\n"
+"            if reviewers[index](message, frame) then\n"
+"                if (index == #reviewers) then\n"
+"                    save_result(frame)\n"
+"                    return true\n"
+"                elseif process_frame(frame, index + 1) then\n"
+"                    return true\n"
+"                else\n"
+"                    save_frame(keys[index + 1] .. \"!f!\" .. sid, frame)\n"
+"                end\n"
+"            end\n"
+"            redis.call(\"rpush\", events_key, mid)\n"
+"        end\n"
+"    end\n"
+"    return false\n"
+"end\n"
+"local process_key = function(window)\n"
+"    local start_index = directory[key]\n"
+"    if start_index then\n"
+"        local count = 0\n"
+"        if start_index == 1 then\n"
+"            while process_frame({}, 1) do\n"
+"                count = count + 1\n"
+"            end\n"
+"        else\n"
+"            local frames_key = keys[start_index] .. \"!f!\" .. sid\n"
+"            local packed_frame_list_len = redis.call(\"llen\", frames_key)\n"
+"            for i = 0, packed_frame_list_len - 1, 1  do\n"
+"                local packed_frame = redis.call(\"lpop\", frames_key)\n"
+"                local frame = load_frame(packed_frame)\n"
+"                if frame then\n"
+"                    if process_frame(frame, start_index) then\n"
+"                        count = 1\n"
+"                        break\n"
+"                    else\n"
+"                        redis.call(\"rpush\", frames_key, packed_frame)\n"
+"                    end\n"
+"                end\n"
+"            end\n"
+"        end\n"
+"        if count > 0 then\n"
+"            local length = redis.call(\"llen\", results_key)\n"
+"            local prev_count, prev_remain = math.modf((length - count) / window)\n"
+"            local new_count, prev_remain = math.modf(length / window)\n"
+"            local diff = new_count - prev_count\n"
+"            if diff > 0 then\n"
+"                for i = 0, diff - 1, 1 do\n"
+"                    redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
+"                    redis.call(\"rpush\", actions_key .. \"!\" .. sid, window)\n"
+"                end\n"
+"                redis.call(\"zadd\", actions_key , score, sid)\n"
+"            end\n"
+"        end\n"
+"    end\n"
+"end\n"
+"if #ARGV > 3 then\n"
+"    local message = {}\n"
+"    for index = 4, #ARGV, 2 do\n"
+"        message[ARGV[index]] = ARGV[index + 1]\n"
+"    end\n"
+"    redis.call(\"hsetnx\", messages_key, message[\"id\"], cmsgpack.pack(message))\n"
+"    redis.call(\"rpush\", key .. \"!e!\" .. sid, message[\"id\"])\n"
+"end\n%s"
+"return tonumber(redis.call(\"hsetnx\", \"%s!s\", sid, \"{ \\\"sid\\\":\\\"\" .. sid .. \"\\\"}\"))\n",
+                name,
+                name,
+                lua,
+                name);
+            
             free(oldLua);
             redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
             redisGetReply(reContext, (void**)&reply);
             if (reply->type == REDIS_REPLY_ERROR) {
+                printf("%s\n", reply->str);
                 freeReplyObject(reply);
                 free(lua);
                 return ERR_REDIS_ERROR;
@@ -106,56 +312,121 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
         }
     }
 
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", 
-                    "local action = redis.call(\"zrange\", KEYS[3], 0, 0, \"withscores\")\n"
-                    "local timestamp = tonumber(ARGV[1])\n"
-                    "if (action[2] ~= nil and (tonumber(action[2]) < (timestamp + 100))) then\n"
-                    "  redis.call(\"zincrby\", KEYS[3], 60, action[1])\n"
-                    "  local signature = redis.call(\"hget\", KEYS[4], action[1])\n"
-                    "  local res = { action[1] }\n"
-                    "  local i = 0\n"
-                    "  local skip = 0\n"
-                    "  for token in string.gmatch(signature, \"([%w%.%-%$%+_!:]+)\") do\n"
-                    "    if (i > 1 and string.match(token, \"%$s!\")) then\n"
-                    "      table.insert(res, token)\n"
-                    "      skip = 1\n"
-                    "    elseif (skip == 1) then\n"
-                    "      table.insert(res, \"null\")\n"
-                    "      skip = 0\n"
-                    "    elseif (i % 2 == 0) then\n"
-                    "      table.insert(res, token)\n"
-                    "    else\n"
-                    "      if (i == 1) then\n"
-                    "        table.insert(res, redis.call(\"hget\", KEYS[1], token))\n"
-                    "      else\n"
-                    "        table.insert(res, redis.call(\"hget\", KEYS[2], token))\n"
-                    "      end\n"
-                    "    end\n"
-                    "    i = i + 1\n"
-                    "  end\n"
-                    "  return res\n"
-                    "end\n"
-                    "return false\n");
-
+    asprintf(&lua, 
+"local load_next_frame = function(key, sid)\n"
+"    local rule_action_key = redis.call(\"lindex\", key, 0)\n"
+"    local count = tonumber(redis.call(\"lindex\", key, 1))\n"
+"    local frames = {}\n"
+"    for i = 0, count - 1, 1 do\n"
+"        local packed_frame = redis.call(\"lindex\", rule_action_key, i)\n"
+"        frames[i + 1] = cmsgpack.unpack(packed_frame)\n"
+"    end\n"
+"    local last_name = string.find(rule_action_key, \"!\") - 1\n"
+"    if #frames == 1 then\n"
+"        return string.sub(rule_action_key, 1, last_name), frames[1]\n"
+"    else\n"
+"        return string.sub(rule_action_key, 1, last_name), frames\n"
+"    end\n"
+"end\n"
+"local step = tonumber(ARGV[1])\n"
+"local max_score = tonumber(ARGV[2])\n"
+"local ruleset_name = \"%s\"\n"
+"local action_key = ruleset_name .. \"!a\"\n"
+"local current_action = redis.call(\"zrange\", action_key, 0, 0, \"withscores\")\n"
+"if #current_action > 0 then\n"
+"    if (tonumber(current_action[2]) > (max_score + 5)) then\n"
+"        return nil\n"
+"    end\n"
+"    local sid = current_action[1]\n"
+"    local action_name, frame = load_next_frame(action_key .. \"!\" .. sid, sid)\n"
+"    redis.call(\"zincrby\", action_key, step, sid)\n"
+"    local state = redis.call(\"hget\", ruleset_name .. \"!s\", sid)\n"
+"    return {sid, state, cjson.encode({[action_name] = frame})}\n"
+"end\n"
+"return nil\n", name);
+    
+    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
     redisGetReply(reContext, (void**)&reply);
     if (reply->type == REDIS_REPLY_ERROR) {
         freeReplyObject(reply);
+        free(lua);
         return ERR_REDIS_ERROR;
     }
 
-    strncpy(rulesBinding->dequeueActionHash, reply->str, 40);
-    rulesBinding->dequeueActionHash[40] = '\0';
+    strncpy(rulesBinding->peekActionHash, reply->str, 40);
+    rulesBinding->peekActionHash[40] = '\0';
     freeReplyObject(reply);
+    free(lua);
 
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", 
-                    "local res = redis.call(\"hget\", KEYS[1], ARGV[1])\n"
-                    "if (not res) then\n"
-                    "   res = redis.call(\"hincrby\", KEYS[1], \"index\", 1)\n"
-                    "   res = res % tonumber(ARGV[2])\n"
-                    "   redis.call(\"hset\", KEYS[1], ARGV[1], res)\n"
-                    "end\n"
-                    "return tonumber(res)\n");
+    asprintf(&lua, 
+"local delete_frame = function(key, sid)\n"
+"    local rule_action_key = redis.call(\"lpop\", key)\n"
+"    local count = tonumber(redis.call(\"lpop\", key))\n"
+"    for i = 0, count - 1, 1 do\n"
+"        redis.call(\"lpop\", rule_action_key .. \"!r!\" .. sid)\n"
+"    end\n"
+"    return (redis.call(\"llen\", key) > 0)\n"
+"end\n"
+"local sid = ARGV[1]\n"
+"local max_score = tonumber(ARGV[2])\n"
+"local ruleset_name = \"%s\"\n"
+"local action_key = ruleset_name .. \"!a\"\n"
+"if delete_frame(action_key .. \"!\" .. sid, sid) then\n"
+"    redis.call(\"zadd\", action_key, max_score, sid)\n"
+"else\n"
+"    redis.call(\"zrem\", action_key, sid)\n"
+"end\n", 
+              name);
 
+    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    redisGetReply(reContext, (void**)&reply);
+    if (reply->type == REDIS_REPLY_ERROR) {
+        freeReplyObject(reply);
+        free(lua);
+        return ERR_REDIS_ERROR;
+    }
+
+    strncpy(rulesBinding->removeActionHash, reply->str, 40);
+    rulesBinding->removeActionHash[40] = '\0';
+    freeReplyObject(reply);
+    free(lua);
+    
+    asprintf(&lua, 
+"local message = {}\n"
+"local key = ARGV[1]\n"
+"local sid = ARGV[2]\n"
+"for index = 3, #ARGV, 2 do\n"
+"    message[ARGV[index]] = ARGV[index + 1]\n"
+"end\n"
+"redis.call(\"hset\", \"%s!m!\" .. sid, message[\"id\"], cmsgpack.pack(message))\n"
+"redis.call(\"rpush\", key .. \"!e!\" .. sid, message[\"id\"])\n", 
+              name);
+    
+    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    redisGetReply(reContext, (void**)&reply);
+    if (reply->type == REDIS_REPLY_ERROR) {
+        freeReplyObject(reply);
+        free(lua);
+        return ERR_REDIS_ERROR;
+    }
+
+    strncpy(rulesBinding->assertMessageHash, reply->str, 40);
+    rulesBinding->removeActionHash[40] = '\0';
+    freeReplyObject(reply);
+    free(lua);
+
+    asprintf(&lua, 
+"local partition_key = \"%s!p\"\n"
+"local res = redis.call(\"hget\", partition_key, ARGV[1])\n"
+"if (not res) then\n"
+"   res = redis.call(\"hincrby\", partition_key, \"index\", 1)\n"
+"   res = res %% tonumber(ARGV[2])\n"
+"   redis.call(\"hset\", partition_key, ARGV[1], res)\n"
+"end\n"
+"return tonumber(res)\n", 
+              name);
+
+    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua); 
     redisGetReply(reContext, (void**)&reply);
     if (reply->type == REDIS_REPLY_ERROR) {
         freeReplyObject(reply);
@@ -165,20 +436,24 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     strncpy(rulesBinding->partitionHash, reply->str, 40);
     rulesBinding->partitionHash[40] = '\0';
     freeReplyObject(reply);
+    free(lua);
 
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", 
-                    "local timestamp = tonumber(ARGV[1])\n"
-                    "local res = redis.call(\"zrangebyscore\", KEYS[1], 0, timestamp)\n"
-                    "if (res[1]) then\n"
-                    "  local i = 1\n"
-                    "  while (res[i]) do\n"
-                    "    redis.call(\"zincrby\", KEYS[1], 10, res[i])\n"
-                    "    i = i + 1\n"
-                    "  end\n"
-                    "  return res\n"
-                    "end\n"
-                    "return 0\n");
+    asprintf(&lua,
+"local timer_key = \"%s!t\"\n"
+"local timestamp = tonumber(ARGV[1])\n"
+"local res = redis.call(\"zrangebyscore\", KEYS[1], 0, timestamp)\n"
+"if (res[1]) then\n"
+"  local i = 1\n"
+"  while (res[i]) do\n"
+"    redis.call(\"zincrby\", KEYS[1], 10, res[i])\n"
+"    i = i + 1\n"
+"  end\n"
+"  return res\n"
+"end\n"
+"return 0\n",
+              name);
 
+    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
     redisGetReply(reContext, (void**)&reply);
     if (reply->type == REDIS_REPLY_ERROR) {
         freeReplyObject(reply);
@@ -188,6 +463,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     strncpy(rulesBinding->timersHash, reply->str, 40);
     rulesBinding->timersHash[40] = '\0';
     freeReplyObject(reply);
+    free(lua);
 
     char *sessionHashset = malloc((nameLength + 3) * sizeof(char));
     if (!sessionHashset) {
@@ -200,28 +476,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     sessionHashset[nameLength + 2] = '\0';
     rulesBinding->sessionHashset = sessionHashset;
 
-    char *messageHashset = malloc((nameLength + 3) * sizeof(char));
-    if (!messageHashset) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    strncpy(messageHashset, name, nameLength);
-    messageHashset[nameLength] = '!';
-    messageHashset[nameLength + 1] = 'm';
-    messageHashset[nameLength + 2] = '\0';
-    rulesBinding->messageHashset = messageHashset;
-
-    char *actionSortedset = malloc((nameLength + 3) * sizeof(char));
-    if (!actionSortedset) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    strncpy(actionSortedset, name, nameLength);
-    actionSortedset[nameLength] = '!';
-    actionSortedset[nameLength + 1] = 'a';
-    actionSortedset[nameLength + 2] = '\0';
-    rulesBinding->actionSortedset = actionSortedset;
-
     char *timersSortedset = malloc((nameLength + 3) * sizeof(char));
     if (!timersSortedset) {
         return ERR_OUT_OF_MEMORY;
@@ -232,39 +486,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     timersSortedset[nameLength + 1] = 't';
     timersSortedset[nameLength + 2] = '\0';
     rulesBinding->timersSortedset = timersSortedset;
-
-    char *resultsHashset = malloc((nameLength + 3) * sizeof(char));
-    if (!resultsHashset) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    strncpy(resultsHashset, name, nameLength);
-    resultsHashset[nameLength] = '!';
-    resultsHashset[nameLength + 1] = 'r';
-    resultsHashset[nameLength + 2] = '\0';
-    rulesBinding->resultsHashset = resultsHashset;
-
-    char *partitionHashset = malloc((nameLength + 3) * sizeof(char));
-    if (!partitionHashset) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    strncpy(partitionHashset, name, nameLength);
-    partitionHashset[nameLength] = '!';
-    partitionHashset[nameLength + 1] = 'p';
-    partitionHashset[nameLength + 2] = '\0';
-    rulesBinding->partitionHashset = partitionHashset;
-
-    char *rulesetSessionKey = malloc((nameLength + 3) * sizeof(char));
-    if (!rulesetSessionKey) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    strncpy(rulesetSessionKey, name, nameLength);
-    rulesetSessionKey[nameLength] = '!';
-    rulesetSessionKey[nameLength + 1] = 'g';
-    rulesetSessionKey[nameLength + 2] = '\0';
-    rulesBinding->rulesetSessionKey = rulesetSessionKey;
 
     return RULES_OK;
 }
@@ -345,12 +566,8 @@ unsigned int deleteBindingsList(ruleset *tree) {
         for (unsigned int i = 0; i < list->bindingsLength; ++i) {
             binding *currentBinding = &list->bindings[i];
             redisFree(currentBinding->reContext);
-            free(currentBinding->actionSortedset);
-            free(currentBinding->resultsHashset);
-            free(currentBinding->messageHashset);
+            free(currentBinding->timersSortedset);
             free(currentBinding->sessionHashset);
-            free(currentBinding->partitionHashset);
-            free(currentBinding->rulesetSessionKey);
             free(currentBinding->hashArray);
         }
 
@@ -366,10 +583,8 @@ unsigned int getBindingIndex(ruleset *tree, unsigned int sidHash, unsigned int *
     redisContext *reContext = firstBinding->reContext;
 
     int result = redisAppendCommand(reContext, 
-                                    "evalsha %s %d %s %d %d", 
+                                    "evalsha %s 0 %d %d", 
                                     firstBinding->partitionHash, 
-                                    1, 
-                                    firstBinding->partitionHashset, 
                                     sidHash, 
                                     list->bindingsLength);
     if (result != REDIS_OK) {
@@ -404,8 +619,8 @@ unsigned int assertMessageImmediate(void *rulesBinding,
     redisContext *reContext = bindingContext->reContext;
     functionHash *currentAssertHash = &bindingContext->hashArray[actionIndex];
     time_t currentTime = time(NULL);
-    char score[10];
-    snprintf(score, 10, "%ld", currentTime);
+    char score[11];
+    snprintf(score, 11, "%ld", currentTime);
     char *argv[6 + propertiesLength * 2];
     size_t argvl[6 + propertiesLength * 2];
 
@@ -420,15 +635,17 @@ unsigned int assertMessageImmediate(void *rulesBinding,
     argv[4] = sid;
     argvl[4] = strlen(sid);
     argv[5] = score;
-    argvl[5] = 8;
+    argvl[5] = 10;
 
     for (unsigned int i = 0; i < propertiesLength; ++i) {
-        char propertyHash[10];
-        snprintf(propertyHash, 10, "%d", allProperties[i].hash);
-        argv[6 + i * 2] = propertyHash;
-        argvl[6 + i * 2] = 10;
+        argv[6 + i * 2] = message + allProperties[i].nameOffset;
+        argvl[6 + i * 2] = allProperties[i].nameLength;
         argv[6 + i * 2 + 1] = message + allProperties[i].valueOffset;
-        argvl[6 + i * 2 + 1] = allProperties[i].valueLength;
+        if (allProperties[i].type == JSON_STRING) {
+            argvl[6 + i * 2 + 1] = allProperties[i].valueLength;
+        } else {
+            argvl[6 + i * 2 + 1] = allProperties[i].valueLength + 1;
+        }
     }
 
     int result = redisAppendCommandArgv(reContext, 6 + propertiesLength * 2, (const char**)argv, argvl); 
@@ -443,6 +660,7 @@ unsigned int assertMessageImmediate(void *rulesBinding,
     }
 
     if (reply->type == REDIS_REPLY_ERROR) {
+        printf("%s\n", reply->str);
         freeReplyObject(reply);
         return ERR_REDIS_ERROR;
     }
@@ -487,10 +705,10 @@ unsigned int assertMessage(void *rulesBinding,
     binding *bindingContext = (binding*)rulesBinding;
     redisContext *reContext = bindingContext->reContext;
     time_t currentTime = time(NULL);
-    char score[10];
-    snprintf(score, 10, "%ld", currentTime);
-    char *argv[6 + propertiesLength * 2];
-    size_t argvl[6 + propertiesLength * 2];
+    char score[11];
+    snprintf(score, 11, "%ld", currentTime);
+    char *argv[5 + propertiesLength * 2];
+    size_t argvl[5 + propertiesLength * 2];
 
     argv[0] = "evalsha";
     argvl[0] = 7;
@@ -502,19 +720,21 @@ unsigned int assertMessage(void *rulesBinding,
     argvl[3] = strlen(key);
     argv[4] = sid;
     argvl[4] = strlen(sid);
-    argv[5] = score;
-    argvl[5] = 8;
-
+    
     for (unsigned int i = 0; i < propertiesLength; ++i) {
         char propertyHash[10];
         snprintf(propertyHash, 10, "%d", allProperties[i].hash);
-        argv[6 + i * 2] = propertyHash;
-        argvl[6 + i * 2] = 10;
-        argv[6 + i * 2 + 1] = message + allProperties[i].valueOffset;
-        argvl[6 + i * 2 + 1] = allProperties[i].valueLength;
+        argv[5 + i * 2] = message + allProperties[i].nameOffset;
+        argvl[5 + i * 2] = allProperties[i].nameLength;
+        argv[5 + i * 2 + 1] = message + allProperties[i].valueOffset;
+        if (allProperties[i].type == JSON_STRING) {
+            argvl[5 + i * 2 + 1] = allProperties[i].valueLength;
+        } else {
+            argvl[5 + i * 2 + 1] = allProperties[i].valueLength + 1;
+        }
     }
 
-    int result = redisAppendCommandArgv(reContext, 6 + propertiesLength * 2, (const char**)argv, argvl); 
+    int result = redisAppendCommandArgv(reContext, 5 + propertiesLength * 2, (const char**)argv, argvl); 
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
@@ -530,7 +750,6 @@ unsigned int assertLastMessage(void *rulesBinding,
                                unsigned int propertiesLength,
                                int actionIndex, 
                                unsigned int messageCount) {
-
 
     unsigned int result = assertMessage(rulesBinding, 
                                         key, 
@@ -548,7 +767,7 @@ unsigned int assertLastMessage(void *rulesBinding,
     functionHash *currentAssertHash = &currentBinding->hashArray[actionIndex];
 
     result = redisAppendCommand(reContext, 
-                                "evalsha %s 0 \"\" %s %s %ld", 
+                                "evalsha %s 0 0 %s %ld", 
                                 *currentAssertHash, 
                                 sid, 
                                 currentTime); 
@@ -586,37 +805,6 @@ unsigned int assertLastMessage(void *rulesBinding,
     return result;
 }
 
-unsigned int assertTimer(void *rulesBinding, 
-                         char *key, 
-                         char *sid, 
-                         char *mid, 
-                         char *timer, 
-                         unsigned int actionIndex) {
-
-    binding *bindingContext = (binding*)rulesBinding;
-    redisContext *reContext = bindingContext->reContext;
-    time_t currentTime = time(NULL);
-    functionHash *currentAssertHash = &bindingContext->hashArray[actionIndex];
-
-    int result = redisAppendCommand(reContext, 
-                                    "evalsha %s %d %s %s %s %s %s %s %s %ld 0", 
-                                    *currentAssertHash, 
-                                    3, 
-                                    bindingContext->messageHashset, 
-                                    bindingContext->actionSortedset, 
-                                    bindingContext->sessionHashset, 
-                                    key, 
-                                    sid, 
-                                    mid, 
-                                    timer, 
-                                    currentTime); 
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    return RULES_OK;
-}
-
 unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply) {
     bindingsList *list = tree->bindingsList;
     for (unsigned int i = 0; i < list->bindingsLength; ++i) {
@@ -626,13 +814,9 @@ unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply
         time_t currentTime = time(NULL);
 
         int result = redisAppendCommand(reContext, 
-                                        "evalsha %s %d %s %s %s %s %ld", 
-                                        currentBinding->dequeueActionHash, 
-                                        4, 
-                                        currentBinding->sessionHashset, 
-                                        currentBinding->messageHashset, 
-                                        currentBinding->actionSortedset, 
-                                        currentBinding->resultsHashset, 
+                                        "evalsha %s 0 %d %ld", 
+                                        currentBinding->peekActionHash, 
+                                        60,
                                         currentTime); 
         if (result != REDIS_OK) {
             continue;
@@ -644,7 +828,8 @@ unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply
         }
 
         if ((*reply)->type == REDIS_REPLY_ERROR) {
-            freeReplyObject(reply);
+            printf("error %s\n", (*reply)->str);
+            freeReplyObject(*reply);
             return ERR_REDIS_ERROR;
         }
         
@@ -659,6 +844,72 @@ unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply
     return ERR_NO_ACTION_AVAILABLE;
 }
 
+unsigned int removeAction(void *rulesBinding, char *sid) {
+    binding *bindingContext = (binding*)rulesBinding;
+    redisContext *reContext = bindingContext->reContext; 
+    time_t currentTime = time(NULL);
+
+    int result = redisAppendCommand(reContext, 
+                                    "evalsha %s 0 %s %ld", 
+                                    bindingContext->removeActionHash, 
+                                    sid, 
+                                    currentTime); 
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    return RULES_OK;
+}
+
+unsigned int assertTimer(void *rulesBinding, 
+                         char *key, 
+                         char *sid, 
+                         char *timer, 
+                         jsonProperty *allProperties,
+                         unsigned int propertiesLength,
+                         unsigned int actionIndex) {
+
+    binding *bindingContext = (binding*)rulesBinding;
+    redisContext *reContext = bindingContext->reContext;
+    functionHash *currentAssertHash = &bindingContext->hashArray[actionIndex];
+    time_t currentTime = time(NULL);
+    char score[11];
+    snprintf(score, 11, "%ld", currentTime);
+    char *argv[6 + propertiesLength * 2];
+    size_t argvl[6 + propertiesLength * 2];
+
+    argv[0] = "evalsha";
+    argvl[0] = 7;
+    argv[1] = *currentAssertHash;
+    argvl[1] = 40;
+    argv[2] = "0";
+    argvl[2] = 1;
+    argv[3] = key;
+    argvl[3] = strlen(key);
+    argv[4] = sid;
+    argvl[4] = strlen(sid);
+    argv[5] = score;
+    argvl[5] = 10;
+
+    for (unsigned int i = 0; i < propertiesLength; ++i) {
+        argv[6 + i * 2] = timer + allProperties[i].nameOffset;
+        argvl[6 + i * 2] = allProperties[i].nameLength;
+        argv[6 + i * 2 + 1] = timer + allProperties[i].valueOffset;
+        if (allProperties[i].type == JSON_STRING) {
+            argvl[6 + i * 2 + 1] = allProperties[i].valueLength;
+        } else {
+            argvl[6 + i * 2 + 1] = allProperties[i].valueLength + 1;
+        }
+    }
+
+    int result = redisAppendCommandArgv(reContext, 6 + propertiesLength * 2, (const char**)argv, argvl); 
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    return RULES_OK;
+}
+
 unsigned int peekTimers(ruleset *tree, void **bindingContext, redisReply **reply) {
     bindingsList *list = tree->bindingsList;
     for (unsigned int i = 0; i < list->bindingsLength; ++i) {
@@ -668,10 +919,8 @@ unsigned int peekTimers(ruleset *tree, void **bindingContext, redisReply **reply
         time_t currentTime = time(NULL);
 
         int result = redisAppendCommand(reContext, 
-                                        "evalsha %s %d %s %ld", 
-                                        currentBinding->timersHash, 
-                                        1, 
-                                        currentBinding->timersSortedset, 
+                                        "evalsha %s 0 %ld", 
+                                        currentBinding->timersHash,
                                         currentTime); 
         if (result != REDIS_OK) {
             continue;
@@ -696,135 +945,6 @@ unsigned int peekTimers(ruleset *tree, void **bindingContext, redisReply **reply
     }
 
     return ERR_NO_TIMERS_AVAILABLE;
-}
-
-unsigned int negateMessage(void *rulesBinding, 
-                           char *key, 
-                           char *sid, 
-                           char *mid) {
-
-    redisContext *reContext = ((binding*)rulesBinding)->reContext;
-
-    int result = redisAppendCommand(reContext, 
-                                    "zrem %s!%s %s", 
-                                    key, 
-                                    sid, 
-                                    mid);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    return RULES_OK;
-}
-
-unsigned int assertSession(void *rulesBinding, 
-                           char *key, 
-                           char *sid, 
-                           char *state, 
-                           unsigned int actionIndex) {
-
-    binding *currentBinding = (binding*)rulesBinding;
-    redisContext *reContext = currentBinding->reContext;
-    time_t currentTime = time(NULL);
-    functionHash *currentAssertHash = &currentBinding->hashArray[actionIndex];
-
-    int result = redisAppendCommand(reContext, 
-                                    "evalsha %s %d %s %s %s %s %s %s %ld 1", 
-                                    *currentAssertHash, 
-                                    2, 
-                                    currentBinding->sessionHashset, 
-                                    currentBinding->actionSortedset, 
-                                    key, 
-                                    sid, 
-                                    sid, 
-                                    state, 
-                                    currentTime); 
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    return RULES_OK;
-}
-
-unsigned int assertSessionImmediate(void *rulesBinding, 
-                                    char *key, 
-                                    char *sid, 
-                                    char *state, 
-                                    unsigned int actionIndex) {
-
-    int result = assertSession(rulesBinding, key, sid, state, actionIndex);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    binding *currentBinding = (binding*)rulesBinding;
-    redisContext *reContext = currentBinding->reContext;
-    redisReply *reply;
-    result = redisGetReply(reContext, (void**)&reply);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    if (reply->type == REDIS_REPLY_ERROR) {
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-
-    freeReplyObject(reply);    
-    return RULES_OK;
-}
-
-unsigned int negateSession(void *rulesBinding, char *key, char *sid) {
-    redisContext *reContext = ((binding*)rulesBinding)->reContext;
-
-    int result = redisAppendCommand(reContext, 
-                                    "zrem %s!%s %s", 
-                                    key, 
-                                    sid, 
-                                    sid);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-    
-    return RULES_OK;
-}
-
-unsigned int removeAction(void *rulesBinding, char *action) {
-    binding *currentBinding = (binding*)rulesBinding;
-    redisContext *reContext = currentBinding->reContext;   
-
-    int result = redisAppendCommand(reContext, 
-                                    "zrem %s %s", 
-                                    currentBinding->actionSortedset, 
-                                    action);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-    
-    result = redisAppendCommand(reContext, 
-                                "hdel %s %s", 
-                                currentBinding->resultsHashset, 
-                                action);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    return RULES_OK;
-}
-
-unsigned int removeMessage(void *rulesBinding, char *mid) {
-    binding *currentBinding = (binding*)rulesBinding;
-    redisContext *reContext = currentBinding->reContext;  
-
-    int result = redisAppendCommand(reContext, 
-                                    "hdel %s %s", 
-                                    currentBinding->messageHashset, 
-                                    mid);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-    
-    return RULES_OK;
 }
 
 unsigned int removeTimer(void *rulesBinding, char *timer) {

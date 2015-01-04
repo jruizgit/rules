@@ -6,11 +6,8 @@
 #include "net.h"
 #include "json.h"
 
-#define HASH_WHEN 2090866807 // when
-#define HASH_WHEN_ALL 3322641392 // whenAll 
-#define HASH_WHEN_ANY 3322641471 // whenAny
-#define HASH_WHEN_SOME 2273633803 // whenSome
-#define HASH_TO 5863848 // to
+#define HASH_ALL 193486302 // all
+#define HASH_ANY 193486381 // any
 #define HASH_LT 193419881 // $lt
 #define HASH_LTE 2087888878 // $lte
 #define HASH_GT 193419716 // $gt
@@ -24,8 +21,7 @@
 #define HASH_S 5861212 // $s
 #define HASH_NAME 2090536006 // name 
 #define HASH_TIME 2090760340 // time
-#define HASH_AT_LEAST 4092918839 // $atLeast
-#define HASH_AT_MOST 3247687841 // $atMost
+#define HASH_COUNT 1662456754 // $count
 #define MAX_STATE_PROPERTY_TIME 120
 
 
@@ -33,6 +29,7 @@ typedef struct path {
     unsigned char operator;
     struct path **parents;
     unsigned int parentsLength;
+    unsigned short count;
     expression *expressions; 
     unsigned int expressionsLength;
 } path;
@@ -43,6 +40,7 @@ typedef struct any {
 } any;
 
 typedef struct all {
+    unsigned short count;
     unsigned int *expressions;
     unsigned short expressionsLength;
 } all;
@@ -54,8 +52,7 @@ static unsigned int createBeta(ruleset *tree,
                                unsigned char operator, 
                                unsigned int nextOffset, 
                                path *nextPath, 
-                               unsigned short atLeast,
-                               unsigned short atMost,
+                               unsigned short count,
                                path **outPath);
 
 static unsigned int storeString(ruleset *tree, 
@@ -112,6 +109,29 @@ static unsigned int storeExpression(ruleset *tree,
     }
 
     return RULES_OK;
+}
+
+static unsigned int appendTerm(expression *expr, unsigned int nodeOffset) {
+    if (expr->termsLength == 0) {
+        expr->termsLength = 1;
+        expr->t.termsPointer = malloc(sizeof(unsigned int));
+        if (!expr->t.termsPointer) {
+            return ERR_OUT_OF_MEMORY;
+        }
+
+        expr->t.termsPointer[0] = nodeOffset;
+    }
+    else {
+        expr->termsLength = expr->termsLength + 1;
+        expr->t.termsPointer = realloc(expr->t.termsPointer, expr->termsLength * sizeof(unsigned int));
+        if (!expr->t.termsPointer) {
+            return ERR_OUT_OF_MEMORY;
+        }
+
+        expr->t.termsPointer[expr->termsLength - 1] = nodeOffset;
+    }
+
+    return RULES_OK;   
 }
 
 static unsigned int storeJoin(ruleset *tree, 
@@ -339,11 +359,13 @@ static unsigned int validateWindowSize(char *rule) {
     unsigned char type;
     unsigned int result = readNextName(rule, &first, &last, &hash);
     while (result == PARSE_OK) {
-        if (hash == HASH_AT_LEAST || hash == HASH_AT_MOST) {
+        if (hash == HASH_COUNT) {
             result = readNextValue(last, &first, &last, &type);
             if (type != JSON_INT) {
                 return ERR_UNEXPECTED_TYPE;
             }
+
+            return PARSE_OK;
         }
 
         result = readNextName(last, &first, &last, &hash);
@@ -361,12 +383,6 @@ static unsigned int validateExpression(char *rule) {
     unsigned int result = readNextName(rule, &first, &last, &hash);
     if (result != PARSE_OK) {
         return result;
-    }
-
-    // Fast forward $atLeast and $atMost
-    while(hash == HASH_AT_LEAST || hash == HASH_AT_MOST) {
-        readNextValue(last, &first, &last, &type);
-        readNextName(last, &first, &last, &hash);
     }
 
     switch (hash) {
@@ -461,69 +477,27 @@ static unsigned int validateExpression(char *rule) {
     return PARSE_OK;
 }
 
-static unsigned int validateWrappedExpression(char *rule) {
-    char *first;
-    char *last;
-    unsigned char type;
-    unsigned int hash;
-    unsigned int result = readNextName(rule, &first, &last, &hash);
-    if (result != PARSE_OK) {
-        return result;
-    }
-
-    // Fast forward $atLeast and $atMost
-    while(hash == HASH_AT_LEAST || hash == HASH_AT_MOST) {
-        readNextValue(last, &first, &last, &type);
-        readNextName(last, &first, &last, &hash);
-    }
-
-    unsigned int nameLength = last - first; 
-    if (nameLength == 2) {
-        if (!strncmp("$s", first, 2) || !strncmp("$m", first, 2)) {
-            result = readNextValue(last, &first, &last, &type);
-            if (result != PARSE_OK) {
-                return result;
-            }
-            if (type != JSON_OBJECT) {
-                return ERR_UNEXPECTED_TYPE;
-            }
-
-            return validateExpression(last);
-        }
-    } else if (nameLength >= 4) { 
-        if (!strncmp("$all", last - 4, 4) || !strncmp("$any", last - 4, 4)) {
-            result = readNextValue(last, &first, &last, &type);
-            if (result != PARSE_OK) {
-                return result;
-            }
-            if (type != JSON_OBJECT) {
-                return ERR_UNEXPECTED_TYPE;
-            }
-            return validateAlgebra(first);
-        } 
-    } 
-
-    return validateExpression(rule);
-}
-
 static unsigned int validateAlgebra(char *rule) {
     char *first;
     char *last;
+    char *lastArrayValue;
     unsigned int hash;
     unsigned char type;
     unsigned char reenter = 0;
-    unsigned int result = readNextName(rule, &first, &last, &hash);
+    unsigned int result = readNextArrayValue(rule, &first, &lastArrayValue, &type);
     while (result == PARSE_OK) {
-        // Fast foward $atLeast and $atMost
-        while (hash == HASH_AT_LEAST || hash == HASH_AT_MOST) {
-            result = readNextValue(last, &first, &last, &type);
-            if (result != PARSE_OK) {
-                return result;
-            }
+        result = validateWindowSize(first);
+        if (result != PARSE_OK) {
+            return result;
+        }
 
+        result = readNextName(first, &first, &last, &hash);
+        // Fast foward $count
+        if (hash == HASH_COUNT) {
+            readNextValue(last, &first, &last, &type);
             result = readNextName(last, &first, &last, &hash);
             if (result != PARSE_OK) {
-                return (result == PARSE_END ? PARSE_OK: result);
+                return (result == PARSE_END ? RULES_OK: result);
             }
         }
 
@@ -543,13 +517,8 @@ static unsigned int validateAlgebra(char *rule) {
             return result;
         }
         
-        result = validateWindowSize(first);
-        if (result != PARSE_OK) {
-            return result;
-        }
-
         if (!reenter) {
-            result = validateWrappedExpression(first);
+            result = validateExpression(first);
         }
         else {
             result = validateAlgebra(first);
@@ -560,7 +529,7 @@ static unsigned int validateAlgebra(char *rule) {
             return result;
         }
 
-        result = readNextName(last, &first, &last, &hash);
+        result = readNextArrayValue(lastArrayValue, &first, &lastArrayValue, &type);
     }
 
     return (result == PARSE_END ? PARSE_OK: result);
@@ -585,6 +554,11 @@ static unsigned int validateRuleset(char *rules) {
             return ERR_UNEXPECTED_TYPE;
         }
 
+        result = validateWindowSize(first);
+        if (result != PARSE_OK) {
+            return result;
+        }
+
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
             result = readNextValue(last, &first, &last, &type);
@@ -592,23 +566,13 @@ static unsigned int validateRuleset(char *rules) {
                 return result;
             }
             
-            result = validateWindowSize(first);
-            if (result != PARSE_OK) {
-                return result;
-            }
-
-            switch (hash) {
-                case HASH_WHEN:
-                    result = validateWrappedExpression(first);
-                    break;
-                case HASH_WHEN_ANY:
-                case HASH_WHEN_ALL:
-                    result = validateAlgebra(first);
-                    break;
-            }
-
-            if (result != RULES_OK && result != PARSE_END) {
-                return result;
+            if (hash == HASH_ALL || hash == HASH_ANY) {
+                result = validateAlgebra(first);
+                if (result != RULES_OK && result != PARSE_END) {
+                    return result;
+                }
+            } else if (hash != HASH_COUNT) {
+                return ERR_UNEXPECTED_NAME;
             }
 
             result = readNextName(last, &first, &last, &hash);
@@ -806,31 +770,17 @@ static unsigned int findAlpha(ruleset *tree,
     newAlpha->value.a.hash = hash;
     newAlpha->value.a.operator = operator;
     copyValue(tree, &newAlpha->value.a.right, first, last, &ref, type);
-    if (expr && type == JSON_EVENT_PROPERTY) {
-        if (expr->termsLength == 0) {
-            expr->termsLength = 1;
-            expr->t.termsPointer = malloc(sizeof(unsigned int));
-            if (!expr->t.termsPointer) {
-                return ERR_OUT_OF_MEMORY;
-            }
-
-            expr->t.termsPointer[0] = *resultOffset;
-        }
-        else {
-            expr->termsLength = expr->termsLength + 1;
-            expr->t.termsPointer = realloc(expr->t.termsPointer, expr->termsLength * sizeof(unsigned int));
-            if (!expr->t.termsPointer) {
-                return ERR_OUT_OF_MEMORY;
-            }
-
-            expr->t.termsPointer[expr->termsLength - 1] = *resultOffset;
+    if (type == JSON_EVENT_PROPERTY) {
+        result = appendTerm(expr, *resultOffset);
+        if (result != RULES_OK) {
+            return result;
         }
     }
-    
+
     return linkAlpha(tree, parentOffset, *resultOffset);
 }
 
-static void getWindowSize(char *rule, unsigned short *atLeast, unsigned short *atMost) {
+static void getWindowSize(char *rule, unsigned short *count) {
     char *first;
     char *last;
     char temp;
@@ -839,21 +789,13 @@ static void getWindowSize(char *rule, unsigned short *atLeast, unsigned short *a
     unsigned int result = readNextName(rule, &first, &last, &hash);
     while (result == PARSE_OK) {
         readNextValue(last, &first, &last, &type);
-        switch (hash) {
-            case HASH_AT_LEAST:
-                temp = first[last - first + 1];
-                first[last - first + 1] = '\0';
-                *atLeast = atoi(first);
-                first[last - first + 1] = temp;
-                break;
-            case HASH_AT_MOST:
-                temp = first[last - first + 1];
-                first[last - first + 1] = '\0';
-                *atMost = atoi(first);
-                first[last - first + 1] = temp;
-                break;
+        if (hash == HASH_COUNT) {
+            temp = first[last - first + 1];
+            first[last - first + 1] = '\0';
+            *count = atoi(first);
+            first[last - first + 1] = temp;
+            break;   
         }
-
         result = readNextName(last, &first, &last, &hash);
     }
 }
@@ -871,13 +813,6 @@ static unsigned int createAlpha(ruleset *tree,
     unsigned int result;
     unsigned int parentOffset = *newOffset;
     readNextName(rule, &first, &last, &hash);
-
-    // Fast forward $atLeast and $atMost
-    while(hash == HASH_AT_LEAST || hash == HASH_AT_MOST) {
-        readNextValue(last, &first, &rule, &type);
-        readNextName(rule, &first, &last, &hash);
-    }
-
     switch (hash) {
         case HASH_EQ:
             operator = OP_EQ;
@@ -904,6 +839,11 @@ static unsigned int createAlpha(ruleset *tree,
             operator = OP_LTE;
             break;
         case HASH_AND:
+            result = appendTerm(expr, tree->andNodeOffset);
+            if (result != RULES_OK) {
+                return result;
+            }
+
             readNextValue(last, &first, &last, &type);
             unsigned int previousOffset = 0;
             unsigned int resultOffset = parentOffset;
@@ -914,8 +854,17 @@ static unsigned int createAlpha(ruleset *tree,
                 result = readNextArrayValue(last, &first, &last, &type);   
             }
 
+            result = appendTerm(expr, tree->endNodeOffset);
+            if (result != RULES_OK) {
+                return result;
+            }
             return linkAlpha(tree, previousOffset, nextOffset);
         case HASH_OR:
+            result = appendTerm(expr, tree->orNodeOffset);
+            if (result != RULES_OK) {
+                return result;
+            }
+
             readNextValue(last, &first, &last, &type);
             result = readNextArrayValue(first, &first, &last, &type);
             while (result == PARSE_OK) {
@@ -924,6 +873,10 @@ static unsigned int createAlpha(ruleset *tree,
                 result = readNextArrayValue(last, &first, &last, &type);   
             }
 
+            result = appendTerm(expr, tree->endNodeOffset);
+            if (result != RULES_OK) {
+                return result;
+            }
             return RULES_OK;
     }
 
@@ -949,17 +902,20 @@ static unsigned int createAlpha(ruleset *tree,
 static unsigned int createBetaConnector(ruleset *tree, 
                                         char *rule, 
                                         path *betaPath,
-                                        unsigned short atLeast,
-                                        unsigned short atMost, 
                                         unsigned int nextOffset) {
     char *first;
     char *last;
+    char *lastArrayValue;
     unsigned int hash;
-    unsigned char type;
-    unsigned int result = readNextName(rule, &first, &last, &hash);
+    unsigned char type; 
+    unsigned int result = readNextArrayValue(rule, &first, &lastArrayValue, &type);
     while (result == PARSE_OK) {
-        // Fast foward $atLeast and $atMost
-        while (hash == HASH_AT_LEAST || hash == HASH_AT_MOST) {
+        unsigned short count = 1;
+        getWindowSize(first, &count);
+        readNextName(first, &first, &last, &hash);
+        
+        // Fast foward $count
+        if (hash == HASH_COUNT) {
             readNextValue(last, &first, &last, &type);
             result = readNextName(last, &first, &last, &hash);
             if (result != PARSE_OK) {
@@ -1016,41 +972,24 @@ static unsigned int createBetaConnector(ruleset *tree,
         }
 
         expr->nameOffset = stringOffset;
+        expr->aliasOffset = stringOffset;
         expr->termsLength = 0;
         expr->t.termsPointer = NULL;
-        char *rFirst;
-        char *rLast;
-        unsigned char rType;
-        readNextValue(last, &rFirst, &rLast, &rType);
-        expr->atLeast = atLeast;
-        expr->atMost = atMost;
-        getWindowSize(rFirst, &expr->atLeast, &expr->atMost);
-        
         if (operator == OP_NOP) {
-            unsigned int  resultOffset = NODE_M_OFFSET;
-            if (((last - first) != 2)  || (strncmp("$s", first, 2) && strncmp("$m", first, 2))) {
-                readNextValue(last, &first, &last, &type);
-                result = createAlpha(tree, first, expr, connectorOffset, &resultOffset);
-            } 
-            else {
-                if (!strncmp("$s", first, 2)) {
-                    resultOffset = NODE_S_OFFSET;
-                }
-
-                readNextValue(last, &first, &last, &type);
-                result = createAlpha(tree, first, expr, connectorOffset, &resultOffset);
-            }
+            unsigned int resultOffset = NODE_M_OFFSET;
+            readNextValue(last, &first, &last, &type);
+            result = createAlpha(tree, first, expr, connectorOffset, &resultOffset);
         }
         else {
             readNextValue(last, &first, &last, &type);
-            result = createBeta(tree, first, operator, connectorOffset, betaPath, atLeast, atMost, NULL);
+            result = createBeta(tree, first, operator, connectorOffset, betaPath, count, NULL);
         }
 
         if (result != RULES_OK) {
             return result;
         }
 
-        result = readNextName(last, &first, &last, &hash);
+        result = readNextArrayValue(lastArrayValue, &first, &lastArrayValue, &type);
     }
 
     return (result == PARSE_END ? RULES_OK: result);
@@ -1061,8 +1000,7 @@ static unsigned int createBeta(ruleset *tree,
                                unsigned char operator, 
                                unsigned int nextOffset, 
                                path *nextPath, 
-                               unsigned short atLeast,
-                               unsigned short atMost,
+                               unsigned short count,
                                path **outPath) {
 
     path *betaPath = malloc(sizeof(path));
@@ -1075,6 +1013,7 @@ static unsigned int createBeta(ruleset *tree,
     betaPath->expressions = NULL;
     betaPath->parents = NULL;
     betaPath->parentsLength = 0;
+    betaPath->count = count;
 
     if (nextPath) {
         if (nextPath->parentsLength == 0) {
@@ -1105,70 +1044,7 @@ static unsigned int createBeta(ruleset *tree,
         *outPath = betaPath;
     }
 
-    return createBetaConnector(tree, rule, betaPath, atLeast, atMost, nextOffset);    
-}
-
-static unsigned int unwrapAndCreateAlpha(ruleset *tree, 
-                                         char *rule, 
-                                         unsigned int nextOffset, 
-                                         unsigned short atLeast,
-                                         unsigned short atMost,
-                                         path **outPath) {
-    char *first;
-    char *last;
-    unsigned int hash;
-    unsigned int resultOffset;
-    unsigned char type;
-    readNextName(rule, &first, &last, &hash);
-
-    // Fast forward $atLeast and $atMost
-    while(hash == HASH_AT_LEAST || hash == HASH_AT_MOST) {
-        readNextValue(last, &first, &rule, &type);
-        readNextName(rule, &first, &last, &hash);
-    }
-
-    resultOffset = NODE_M_OFFSET;
-    *outPath = NULL;
-    unsigned int nameLength = last - first; 
-    if (nameLength == 2) {
-        if (!strncmp("$s", first, 2) || !strncmp("$m", first, 2)) {
-            if (!strncmp("$s", first, 2)) {
-                resultOffset = NODE_S_OFFSET;
-            }
-
-            return createBeta(tree, rule, OP_ANY, nextOffset, NULL, atLeast, atMost, outPath);
-        }
-    } else if (nameLength >= 4) { 
-        if (!strncmp("$all", last - 4, 4)) {
-            return createBeta(tree, rule, OP_ALL, nextOffset, NULL, atLeast, atMost, outPath);
-        } else if (!strncmp("$any", last - 4, 4)) {
-            return createBeta(tree, rule, OP_ANY, nextOffset, NULL, atLeast, atMost, outPath);
-        } 
-    } 
-
-
-    path *betaPath = malloc(sizeof(path));
-    if (!betaPath) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    betaPath->operator = OP_NOP;
-    betaPath->parents = NULL;
-    betaPath->parentsLength = 0;
-    betaPath->expressionsLength = 1;
-    betaPath->expressions = malloc(sizeof(expression));
-    if (!betaPath->expressions) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    betaPath->expressions->nameOffset = 0;
-    betaPath->expressions->atLeast = atLeast;
-    betaPath->expressions->atMost = atMost;
-    betaPath->expressions->termsLength = 0;
-    betaPath->expressions->t.termsPointer = NULL;
-
-    *outPath = betaPath;
-    return createAlpha(tree, rule, NULL, nextOffset, &resultOffset);
+    return createBetaConnector(tree, rule, betaPath, nextOffset);    
 }
 
 static unsigned int add(any *right, any *left, any **result) {
@@ -1186,7 +1062,7 @@ static unsigned int add(any *right, any *left, any **result) {
     return RULES_OK;
 }
 
-static unsigned int multiply(any *right, any *left, any **result) {
+static unsigned int multiply(ruleset *tree, any *right, any *left, any **result) {
     any *product = malloc(sizeof(any));
     product->nodesLength = right->nodesLength * left->nodesLength;
     product->nodes = malloc(sizeof(all*) * product->nodesLength);
@@ -1200,6 +1076,7 @@ static unsigned int multiply(any *right, any *left, any **result) {
                 return ERR_OUT_OF_MEMORY;
             }
 
+            newAll->count = (leftAll->count > rightAll->count ? leftAll->count: rightAll->count);
             newAll->expressions = malloc((rightAll->expressionsLength + leftAll->expressionsLength) * sizeof(unsigned int));
             if (!newAll->expressions) {
                 return ERR_OUT_OF_MEMORY;
@@ -1235,7 +1112,11 @@ static unsigned int multiply(any *right, any *left, any **result) {
     return RULES_OK;
 }
 
-static unsigned int createSingleQuery(ruleset *tree, char *name, expression *expr, any **resultAny) {
+static unsigned int createSingleQuery(ruleset *tree, 
+                                      char *name, 
+                                      expression *expr, 
+                                      unsigned short count, 
+                                      any **resultAny) {
     any *newAny = malloc(sizeof(any));
     if (!newAny) {
         return ERR_OUT_OF_MEMORY;
@@ -1252,6 +1133,7 @@ static unsigned int createSingleQuery(ruleset *tree, char *name, expression *exp
         return ERR_OUT_OF_MEMORY;
     }
 
+    newAny->nodes[0]->count = count;
     newAny->nodes[0]->expressionsLength = 1;
     newAny->nodes[0]->expressions = malloc(sizeof(unsigned int));
     if (!newAny->nodes[0]->expressions) {
@@ -1269,9 +1151,8 @@ static unsigned int createSingleQuery(ruleset *tree, char *name, expression *exp
         return result;
     }
 
-    newExpression->atLeast = expr->atLeast;
-    newExpression->atMost = expr->atMost;
-
+    newExpression->aliasOffset = expr->aliasOffset;
+    newExpression->termsLength = expr->termsLength;
     if (expr->termsLength) {
         result = allocateNext(tree, expr->termsLength, &newExpression->t.termsOffset);
         if (result != RULES_OK) {
@@ -1298,7 +1179,7 @@ static unsigned int createQueries(ruleset *tree,
         unsigned int result;
         expression *expr = &betaPath->expressions[i];
         if (betaPath->operator == OP_NOP) {
-            result = createSingleQuery(tree, postfix, expr, anyResult);
+            result = createSingleQuery(tree, postfix, expr, betaPath->count, anyResult);
             if (result != RULES_OK) {
                 return result;
             }
@@ -1317,7 +1198,7 @@ static unsigned int createQueries(ruleset *tree,
         
         any *newAny = NULL;    
         if (i >= betaPath->parentsLength || !betaPath->parents[i]) {
-            result = createSingleQuery(tree, nextPostfix, expr, &newAny);
+            result = createSingleQuery(tree, nextPostfix, expr, betaPath->count, &newAny);
             if (result != RULES_OK) {
                 return result;
             }
@@ -1339,7 +1220,7 @@ static unsigned int createQueries(ruleset *tree,
             }
         }
         else if (betaPath->operator == OP_ALL) {
-            result = multiply(currentAny, newAny, &currentAny);
+            result = multiply(tree, currentAny, newAny, &currentAny);
             if (result != RULES_OK) {
                 return result;
             }
@@ -1379,6 +1260,7 @@ static unsigned int fixupQueries(ruleset *tree, unsigned int actionOffset, char*
             return result;
         }
         
+        newJoin->count = currentAll->count;
         newJoin->expressionsLength = currentAll->expressionsLength;
         result = allocateNext(tree, currentAll->expressionsLength, &newJoin->expressionsOffset);
         if (result != RULES_OK) {
@@ -1435,21 +1317,17 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         }
 
         readNextValue(lastName, &first, &lastRuleValue, &type);
+        unsigned short count = 1;
+        getWindowSize(first, &count);
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
-            unsigned short atLeast = 1;
-            unsigned short atMost = 1;
             readNextValue(last, &first, &last, &type);
-            getWindowSize(first, &atLeast, &atMost);
             switch (hash) {
-                case HASH_WHEN:
-                    result = unwrapAndCreateAlpha(tree, first, actionOffset, atLeast, atMost, &betaPath);
+                case HASH_ANY:
+                    result = createBeta(tree, first, OP_ANY, actionOffset, NULL, count, &betaPath);
                     break;
-                case HASH_WHEN_ANY:
-                    result = createBeta(tree, first, OP_ANY, actionOffset, NULL, atLeast, atMost, &betaPath);
-                    break;
-                case HASH_WHEN_ALL:
-                    result = createBeta(tree, first, OP_ALL, actionOffset, NULL, atLeast, atMost, &betaPath);
+                case HASH_ALL:
+                    result = createBeta(tree, first, OP_ALL, actionOffset, NULL, count, &betaPath);
                     break;
             }
             result = readNextName(last, &first, &last, &hash);
@@ -1519,22 +1397,35 @@ unsigned int createRuleset(void **handle, char *name, char *rules, unsigned int 
     newNode->nameOffset = stringOffset;
     newNode->type = NODE_ALPHA;
     newNode->value.a.operator = OP_TYPE;
-    
-    result = storeString(tree, "s", &stringOffset, 1);
+    result = storeAlpha(tree, &newNode, &tree->andNodeOffset);
     if (result != RULES_OK) {
         return result;
     }
 
-    result = storeAlpha(tree, &newNode, &nodeOffset);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    newNode->nameOffset = stringOffset;
+    newNode->nameOffset = 0;
     newNode->type = NODE_ALPHA;
-    newNode->value.a.operator = OP_TYPE;
-    
+    newNode->value.a.operator = OP_AND;
+    result = storeAlpha(tree, &newNode, &tree->orNodeOffset);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    newNode->nameOffset = 0;
+    newNode->type = NODE_ALPHA;
+    newNode->value.a.operator = OP_OR;
+    result = storeAlpha(tree, &newNode, &tree->endNodeOffset);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    newNode->nameOffset = 0;
+    newNode->type = NODE_ALPHA;
+    newNode->value.a.operator = OP_END;
+
     *handle = tree;
+
+    // will use random numbers for state stored event mids
+    srand(time(NULL));
     return createTree(tree, rules);
 }
 

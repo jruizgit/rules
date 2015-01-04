@@ -10,16 +10,12 @@ typedef char functionHash[HASH_LENGTH + 1];
 typedef struct binding {
     redisContext *reContext;
     functionHash assertMessageHash;
-    functionHash dequeueActionHash;
+    functionHash peekActionHash;
+    functionHash removeActionHash;
     functionHash partitionHash;
     functionHash timersHash;
-    char *actionSortedset;
-    char *messageHashset;
-    char *resultsHashset;
     char *sessionHashset;
     char *timersSortedset;
-    char *partitionHashset;
-    char *rulesetSessionKey;
     functionHash *hashArray;
     unsigned int hashArrayLength;
 } binding;
@@ -66,15 +62,22 @@ unsigned int assertLastMessage(void *rulesBinding,
                               int actionIndex,
                               unsigned int messageCount);
 
-unsigned int assertTimer(void *rulesBinding, char *key, char *sid, char *mid, char *timer, unsigned int actionIndex);
-unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply);
+unsigned int peekAction(ruleset *tree, 
+                        void **bindingContext, 
+                        redisReply **reply);
+
+unsigned int removeAction(void *rulesBinding, 
+                          char *sid);
+
+unsigned int assertTimer(void *rulesBinding, 
+                         char *key, 
+                         char *sid, 
+                         char *timer, 
+                         jsonProperty *allProperties,
+                         unsigned int propertiesLength,
+                         unsigned int actionIndex);
+
 unsigned int peekTimers(ruleset *tree, void **bindingContext, redisReply **reply);
-unsigned int assertSession(void *rulesBinding, char *key, char *sid, char *state, unsigned int actionIndex);
-unsigned int assertSessionImmediate(void *rulesBinding, char *key, char *sid, char *state, unsigned int actionIndex);
-unsigned int negateMessage(void *rulesBinding, char *key, char *sid, char *mid);
-unsigned int negateSession(void *rulesBinding, char *key, char *sid);
-unsigned int removeAction(void *rulesBinding, char *action);
-unsigned int removeMessage(void *rulesBinding, char *mid);
 unsigned int prepareCommands(void *rulesBinding);
 unsigned int rollbackCommands(void *rulesBinding);
 unsigned int executeCommands(void *rulesBinding, unsigned int commandCount);

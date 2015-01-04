@@ -214,8 +214,6 @@ Handle<Value> jsStartAction(const Arguments& args) {
             array->Set(0, Number::New((long)actionHandle));
             array->Set(1, String::New(session));
             array->Set(2, String::New(messages));
-            free(session);
-            free(messages);
             return scope.Close(array);
         } else if (result != ERR_NO_ACTION_AVAILABLE) {
             char * message;

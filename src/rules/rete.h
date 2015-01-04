@@ -11,7 +11,10 @@
 #define OP_NEX 0x08
 #define OP_ALL 0x09
 #define OP_ANY 0x0A
-#define OP_TYPE 0x0B
+#define OP_OR 0x0B
+#define OP_AND 0x0C
+#define OP_END 0x0D
+#define OP_TYPE 0x0E
 
 #define NODE_ALPHA 0
 #define NODE_BETA_CONNECTOR 1
@@ -39,8 +42,7 @@ typedef struct jsonValue {
 
 typedef struct expression {
     unsigned int nameOffset;
-    unsigned short atLeast;
-    unsigned short atMost;
+    unsigned int aliasOffset;
     unsigned short termsLength;
     union {
         unsigned int termsOffset; 
@@ -49,6 +51,7 @@ typedef struct expression {
 } expression;
 
 typedef struct join {
+    unsigned short count;
     unsigned int expressionsOffset;
     unsigned short expressionsLength;
 } join;
@@ -103,6 +106,9 @@ typedef struct ruleset {
     unsigned int stateLength;
     unsigned int lruStateOffset;
     unsigned int mruStateOffset;
+    unsigned int orNodeOffset;
+    unsigned int andNodeOffset;
+    unsigned int endNodeOffset;
 } ruleset;
 
 

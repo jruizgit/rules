@@ -11,6 +11,8 @@ typedef struct jsonProperty {
     unsigned char isMaterial;
     unsigned short valueOffset;
     unsigned short valueLength;
+    unsigned short nameOffset;
+    unsigned short nameLength;
     union {
         long i; 
         double d; 

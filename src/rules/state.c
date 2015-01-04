@@ -244,6 +244,8 @@ unsigned int constructObject(char *parentName,
         property->hash = hash;
         property->valueOffset = first - object;
         property->valueLength = last - first;
+        property->nameOffset = firstName - object;
+        property->nameLength = lastName - firstName;
         property->type = type;
         *next = last;
         result = readNextName(last, &firstName, &lastName, &hash);
