@@ -48,6 +48,8 @@ unsigned int deleteRuleset(void *handle);
 unsigned int bindRuleset(void *handle, char *host, unsigned int port, char *password);
 unsigned int assertEvent(void *handle, char *message);
 unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results);
+unsigned int assertFact(void *handle, char *message);
+unsigned int retractFact(void *handle, char *sid, char *mid);
 unsigned int assertState(void *handle, char *state);
 unsigned int startAction(void *handle, char **state, char **messages, void **actionHandle);
 unsigned int completeAction(void *handle, void *actionHandle, char *state);

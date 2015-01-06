@@ -11,6 +11,7 @@
 #define JSON_OBJECT 0x06
 #define JSON_STATE_PROPERTY 0x07
 #define JSON_EVENT_PROPERTY 0x08
+#define JSON_IDIOM 0x09
 
 unsigned int readNextName(char *start, char **first, char **last, unsigned int *hash);
 unsigned int readNextValue(char *start, char **first, char **last, unsigned char *type);

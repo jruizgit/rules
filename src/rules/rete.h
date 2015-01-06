@@ -14,19 +14,21 @@
 #define OP_OR 0x0B
 #define OP_AND 0x0C
 #define OP_END 0x0D
-#define OP_TYPE 0x0E
+#define OP_ADD 0x0E
+#define OP_SUB 0x0F
+#define OP_MUL 0x10
+#define OP_DIV 0x11
+#define OP_TYPE 0x12
 
 #define NODE_ALPHA 0
 #define NODE_BETA_CONNECTOR 1
 #define NODE_ACTION 2
 #define NODE_M_OFFSET 0
-#define NODE_S_OFFSET 1
 
 typedef struct reference {
     unsigned int hash;
     unsigned int nameOffset;
     unsigned int idOffset;
-    unsigned int time;
 } reference;
 
 typedef struct jsonValue {
@@ -36,9 +38,16 @@ typedef struct jsonValue {
         double d; 
         unsigned char b; 
         unsigned int stringOffset;
+        unsigned int idiomOffset;
         reference property;
     } value;
 } jsonValue;
+
+typedef struct idiom {
+    unsigned char operator;
+    jsonValue left;
+    jsonValue right; 
+} idiom;
 
 typedef struct expression {
     unsigned int nameOffset;
@@ -95,6 +104,8 @@ typedef struct ruleset {
     unsigned int stringPoolLength; 
     expression *expressionPool;
     unsigned int expressionOffset;
+    idiom *idiomPool;
+    unsigned int idiomOffset;
     join *joinPool;
     unsigned int joinOffset;
     unsigned int actionCount;

@@ -15,6 +15,7 @@ typedef struct binding {
     functionHash partitionHash;
     functionHash timersHash;
     char *sessionHashset;
+    char *factsHashset;
     char *timersSortedset;
     functionHash *hashArray;
     unsigned int hashArrayLength;
@@ -37,21 +38,24 @@ unsigned int assertMessageImmediate(void *rulesBinding,
                                     char *message, 
                                     jsonProperty *allProperties,
                                     unsigned int propertiesLength,
-                                    unsigned int actionIndex);
+                                    unsigned int actionIndex,
+                                    unsigned char assertFact);
 
 unsigned int assertFirstMessage(void *rulesBinding, 
                                 char *key, 
                                 char *sid, 
                                 char *message, 
                                 jsonProperty *allProperties,
-                                unsigned int propertiesLength);
+                                unsigned int propertiesLength,
+                                unsigned char assertFact);
 
 unsigned int assertMessage(void *rulesBinding, 
                            char *key, 
                            char *sid, 
                            char *message, 
                            jsonProperty *allProperties,
-                           unsigned int propertiesLength);
+                           unsigned int propertiesLength, 
+                           unsigned char assertFact);
 
 unsigned int assertLastMessage(void *rulesBinding, 
                               char *key, 
@@ -60,7 +64,16 @@ unsigned int assertLastMessage(void *rulesBinding,
                               jsonProperty *allProperties,
                               unsigned int propertiesLength,
                               int actionIndex,
-                              unsigned int messageCount);
+                              unsigned int messageCount,
+                              unsigned char assertFact);
+
+unsigned int retractMessage(void *rulesBinding, 
+                            char *sid, 
+                            char *mid);
+
+unsigned int retractMessageImmediate(void *rulesBinding, 
+                                     char *sid, 
+                                     char *mid); 
 
 unsigned int peekAction(ruleset *tree, 
                         void **bindingContext, 

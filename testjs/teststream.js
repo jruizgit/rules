@@ -19,8 +19,9 @@ d.run({
     },
     a3: {
         r1: {
+            $count: 3,
             all: [ 
-                {$count: 3, a: {$and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]}},
+                {a: {$and: [{ subject: 'approve' }, { $lte: { amount: 1000 }}]}},
                 {s: {$and: [{$nex: {done: 1}}, {$s:1}]}}          
             ],
             run: requestApproval
