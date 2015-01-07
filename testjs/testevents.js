@@ -50,6 +50,113 @@ console.log(JSON.parse(result[2]));
 r.completeAction(handle, result[0], result[1]);
 r.deleteRuleset(handle);
 
+console.log('add1');
+
+handle = r.createRuleset('add1', 
+    JSON.stringify({
+        r1: {all:[
+            {m: 
+                {$lte: 
+                    {amount: {
+                        $add: { 
+                            $l: {$s: { name: 'maxAmount', id: 1}}, 
+                            $r: {$s: { name: 'minAmount', id: 2}}
+                        }  
+                    }}
+                }
+            }
+        ]}
+    })
+, 10);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+console.log(r.assertState(handle,
+    JSON.stringify({
+        sid: 1,
+        maxAmount: 300
+    })
+));
+
+console.log(r.assertState(handle,
+    JSON.stringify({
+        sid: 2,
+        minAmount: 200
+    })
+));
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 1,
+        sid: 3,
+        amount: 600 
+    })
+));
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 2,
+        sid: 3,
+        amount: 400 
+    })
+));
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+
+r.deleteRuleset(handle);
+
+console.log('add2');
+
+handle = r.createRuleset('add2', 
+    JSON.stringify({
+        r1: {all:[
+                {m: {name: {$add: {$l: {$s: {name: 'first_name', id: 1}}, $r: {$s: {name: 'last_name', id: 2}}}}}}
+            ]}
+        })
+, 10);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+console.log(r.assertState(handle,
+    JSON.stringify({
+        sid: 1,
+        first_name: "hello"
+    })
+));
+
+console.log(r.assertState(handle,
+    JSON.stringify({
+        sid: 2,
+        last_name: "world"
+    })
+));
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 1,
+        sid: 3,
+        name: "helloworld"
+    })
+));
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 2,
+        sid: 3,
+        name: "hellothere" 
+    })
+));
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+
+r.deleteRuleset(handle);
+
 console.log('fact0');
 
 handle = r.createRuleset('fact0',  
@@ -753,10 +860,10 @@ console.log('approval4');
 handle = r.createRuleset('approval4', 
     JSON.stringify({
         r1: { 
-            all:[{m: {$lte: {amount: {$s: { name: 'maxAmount', time: 60, id: 1}}}}}]
+            all:[{m: {$lte: {amount: {$s: { name: 'maxAmount', id: 1}}}}}]
         },
         r2: { 
-            all:[{m: {$gte: {amount: {$s: { name: 'minAmount', time: 60, id: 2}}}}}]
+            all:[{m: {$gte: {amount: {$s: { name: 'minAmount', id: 2}}}}}]
         },
     })
 , 4);

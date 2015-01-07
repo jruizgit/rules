@@ -138,7 +138,7 @@ Handle<Value> jsAssertEvents(const Arguments& args) {
     } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
         ThrowException(Exception::TypeError(String::New("Wrong argument type")));
     } else {
-        unsigned int *results;
+        unsigned int *results = NULL;
         unsigned int resultsLength;
         unsigned int result = assertEvents((void *)args[0]->IntegerValue(), 
                                            *v8::String::Utf8Value(args[1]->ToString()), 
@@ -148,18 +148,19 @@ Handle<Value> jsAssertEvents(const Arguments& args) {
         if (result == RULES_OK) {
             Handle<Array> array = Array::New(resultsLength);
             for (unsigned int i = 0; i < resultsLength; ++i) {
-                if (results[i] == RULES_OK) {
-                    array->Set(i, Number::New(1));
-                } else {
-                    array->Set(i, Number::New(0));
-                }
+                array->Set(i, Number::New(results[i]));
             }
-            free(results);
+            if (results) {
+                free(results);
+            }
             return scope.Close(array);
         } else {
             char * message;
             asprintf(&message, "Could not assert event, error code: %d", result);
             ThrowException(Exception::TypeError(String::New(message)));
+            if (results) {
+                free(results);
+            }   
             free(message);
         } 
     }

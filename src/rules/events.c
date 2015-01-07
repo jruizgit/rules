@@ -11,33 +11,24 @@
 #define MAX_NODE_RESULTS 16
 #define MAX_STACK_SIZE 64
 #define MAX_STATE_PROPERTY_TIME 120
+#define MAX_COMMAND_COUNT 512
 
-#define COMP_BOOL_BOOL 0x0404
-#define COMP_BOOL_INT 0x0402
-#define COMP_BOOL_DOUBLE 0x0403
-#define COMP_BOOL_STRING 0x0401
-#define COMP_INT_BOOL 0x0204
-#define COMP_INT_INT 0x0202
-#define COMP_INT_DOUBLE 0x0203
-#define COMP_INT_STRING 0x0201
-#define COMP_DOUBLE_BOOL 0x0304
-#define COMP_DOUBLE_INT 0x0302
-#define COMP_DOUBLE_DOUBLE 0x0303
-#define COMP_DOUBLE_STRING 0x0301
-#define COMP_STRING_BOOL 0x0104
-#define COMP_STRING_INT 0x0102
-#define COMP_STRING_DOUBLE 0x0103
-#define COMP_STRING_STRING 0x0101
-
-#define ACTION_ASSERT_EVENT_IMMEDIATE 0
-#define ACTION_ASSERT_FIRST_EVENT 1
-#define ACTION_ASSERT_EVENT 2
-#define ACTION_ASSERT_LAST_EVENT 3
-#define ACTION_ASSERT_FACT_IMMEDIATE 4
-#define ACTION_ASSERT_FIRST_FACT 5
-#define ACTION_ASSERT_FACT 6
-#define ACTION_ASSERT_LAST_FACT 7
-#define ACTION_ASSERT_TIMER 8
+#define OP_BOOL_BOOL 0x0404
+#define OP_BOOL_INT 0x0402
+#define OP_BOOL_DOUBLE 0x0403
+#define OP_BOOL_STRING 0x0401
+#define OP_INT_BOOL 0x0204
+#define OP_INT_INT 0x0202
+#define OP_INT_DOUBLE 0x0203
+#define OP_INT_STRING 0x0201
+#define OP_DOUBLE_BOOL 0x0304
+#define OP_DOUBLE_INT 0x0302
+#define OP_DOUBLE_DOUBLE 0x0303
+#define OP_DOUBLE_STRING 0x0301
+#define OP_STRING_BOOL 0x0104
+#define OP_STRING_INT 0x0102
+#define OP_STRING_DOUBLE 0x0103
+#define OP_STRING_STRING 0x0101
 
 typedef struct actionContext {
     void *rulesBinding;
@@ -54,13 +45,20 @@ typedef struct jsonResult {
     unsigned char children[MAX_NODE_RESULTS];
 } jsonResult;
 
-static unsigned int handleMessage(ruleset *tree, 
-                                char *state,
-                                char *message, 
-                                unsigned short actionType, 
-                                unsigned char ignoreStaleState,
-                                unsigned short *commandCount,
-                                void **rulesBinding);
+static unsigned int handleMessage(ruleset *tree,
+                                  char *state,
+                                  char *message, 
+                                  unsigned char assertFact, 
+                                  char **commands,
+                                  unsigned short *commandCount,
+                                  void **rulesBinding);
+
+static unsigned int reduceStateIdiom(ruleset *tree, 
+                                     char *sid,
+                                     unsigned int idiomOffset,
+                                     char **state,
+                                     unsigned char *releaseState,
+                                     jsonProperty **targetValue);
 
 static unsigned char compareBool(unsigned char left, 
                                  unsigned char right, 
@@ -210,98 +208,100 @@ static unsigned char compareStringAndStringProperty(char *leftFirst,
 
 }
 
+static long reduceInt(long left, 
+                      long right, 
+                      unsigned char op) {
+    switch(op) {
+        case OP_ADD:
+            return left + right;
+        case OP_SUB:
+            return left - right;
+        case OP_MUL:
+            return left * right;
+        case OP_DIV: 
+            return left / right;
+    }
+
+    return 0;
+}
+
+static double reduceDouble(double left, 
+                           double right, 
+                           unsigned char op) {
+    switch(op) {
+        case OP_ADD:
+            return left + right;
+        case OP_SUB:
+            return left - right;
+        case OP_MUL:
+            return left * right;
+        case OP_DIV: 
+            return left / right;
+    }
+
+    return 0;
+}
+
+static void freeCommands(char **commands,
+                         unsigned short commandCount) {
+    for (unsigned short i = 0; i < commandCount; ++i) {
+        free(commands[i]);
+    }
+}
+
 static unsigned int handleAction(ruleset *tree, 
                                  char *sid, 
-                                 char *mid,
                                  char *message,
                                  jsonProperty *allProperties,
                                  unsigned int propertiesLength,
                                  char *prefix, 
                                  node *node, 
-                                 unsigned short actionType, 
+                                 unsigned char assertFact, 
+                                 char **commands,
                                  unsigned short *commandCount,
                                  void **rulesBinding) {
-    *commandCount = *commandCount + 1;
+    char *newCommand = NULL;
     unsigned int result;
-    switch(actionType) {
-        case ACTION_ASSERT_EVENT_IMMEDIATE:
-        case ACTION_ASSERT_FACT_IMMEDIATE:
-            result = resolveBinding(tree, 
-                                    sid, 
-                                    rulesBinding);
-            if (result != RULES_OK) {
-                return result;
-            }
+    if (*rulesBinding == NULL) {
+        result = resolveBinding(tree, 
+                                sid, 
+                                rulesBinding);
+        if (result != RULES_OK) {
+            return result;
+        }
+    }
 
-            return assertMessageImmediate(*rulesBinding, 
-                                          prefix, 
-                                          sid, 
-                                          message, 
-                                          allProperties,
-                                          propertiesLength,
-                                          node->value.c.index,
-                                          actionType == ACTION_ASSERT_FACT_IMMEDIATE ? 1 : 0);
-        
-        case ACTION_ASSERT_FIRST_EVENT:
-        case ACTION_ASSERT_FIRST_FACT:
-            result = resolveBinding(tree, 
-                                    sid, 
-                                    rulesBinding);
-            if (result != RULES_OK) {
-                return result;
-            }
+    if (*commandCount == MAX_COMMAND_COUNT) {
+        return ERR_MAX_COMMAND_COUNT;
+    }
 
-            return assertFirstMessage(*rulesBinding, 
-                                      prefix, 
-                                      sid, 
-                                      message,
-                                      allProperties,
-                                      propertiesLength,
-                                      actionType == ACTION_ASSERT_FIRST_FACT ? 1 : 0);
-        
-        case ACTION_ASSERT_EVENT:
-        case ACTION_ASSERT_FACT:
-            return assertMessage(*rulesBinding, 
-                                 prefix, 
-                                 sid, 
-                                 message,
-                                 allProperties,
-                                 propertiesLength,
-                                 actionType == ACTION_ASSERT_FACT ? 1 : 0);
-
-        case ACTION_ASSERT_LAST_EVENT:
-        case ACTION_ASSERT_LAST_FACT:
-            return assertLastMessage(*rulesBinding, 
-                                     prefix, 
-                                     sid, 
-                                     message, 
-                                     allProperties,
-                                     propertiesLength,
-                                     node->value.c.index, 
-                                     *commandCount,
-                                     actionType == ACTION_ASSERT_LAST_FACT ? 1 : 0);
-
-        case ACTION_ASSERT_TIMER:
-            return assertTimer(*rulesBinding, 
+    result = formatEvalMessage(*rulesBinding, 
                                prefix, 
                                sid, 
                                message, 
                                allProperties,
                                propertiesLength,
-                               node->value.c.index);
-    }
+                               node->value.c.index,
+                               assertFact,
+                               &newCommand);
     
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    commands[*commandCount] = newCommand;
+    ++*commandCount;
     return RULES_OK;
 }
 
 static unsigned int handleBeta(ruleset *tree, 
                                char *sid,
-                               char *mid,
                                char *message, 
                                jsonProperty *allProperties,
                                unsigned int propertiesLength,
                                node *betaNode,
                                unsigned short actionType, 
+                               char **commands,
                                unsigned short *commandCount,
                                void **rulesBinding) {
     int prefixLength = 0;
@@ -339,15 +339,291 @@ static unsigned int handleBeta(ruleset *tree,
     }
     return handleAction(tree, 
                         sid, 
-                        mid,
                         message,
                         allProperties,
                         propertiesLength,
                         prefix, 
                         actionNode, 
                         actionType, 
-                        commandCount, 
+                        commands,
+                        commandCount,
                         rulesBinding);
+}
+
+
+static unsigned int valueToProperty(ruleset *tree,
+                                    char *sid,
+                                    jsonValue *sourceValue, 
+                                    char **state,
+                                    unsigned char *releaseState,
+                                    jsonProperty **targetProperty) {
+
+    unsigned int result = RULES_OK;
+    *releaseState = 0;
+    switch(sourceValue->type) {
+        case JSON_STATE_IDIOM:
+            result = reduceStateIdiom(tree, 
+                                    sid, 
+                                    sourceValue->value.idiomOffset,
+                                    state,
+                                    releaseState,
+                                    targetProperty);
+
+            return result;
+        case JSON_STATE_PROPERTY:
+            if (sourceValue->value.property.idOffset) {
+                sid = &tree->stringPool[sourceValue->value.property.idOffset];
+            }
+            result = fetchStateProperty(tree, 
+                                        sid, 
+                                        sourceValue->value.property.hash, 
+                                        MAX_STATE_PROPERTY_TIME, 
+                                        0,
+                                        state,
+                                        targetProperty);
+
+            if (result == ERR_STATE_NOT_LOADED || result == ERR_STALE_STATE) {
+                result = refreshState(tree,sid);
+                if (result != RULES_OK) {
+                    return result;
+                }
+
+                result = fetchStateProperty(tree, 
+                                            sid, 
+                                            sourceValue->value.property.hash, 
+                                            MAX_STATE_PROPERTY_TIME, 
+                                            0,
+                                            state,
+                                            targetProperty);
+            }
+
+            return result;
+        case JSON_STRING:
+            *state = &tree->stringPool[sourceValue->value.stringOffset];
+            (*targetProperty)->valueLength = strlen(*state);
+            (*targetProperty)->valueOffset = 0;
+            break;
+        case JSON_INT:
+            (*targetProperty)->value.i = sourceValue->value.i;
+            break;
+        case JSON_DOUBLE:
+            (*targetProperty)->value.d = sourceValue->value.d;
+            break;
+        case JSON_BOOL:
+            (*targetProperty)->value.b = sourceValue->value.b;
+            break;
+    }
+
+    (*targetProperty)->isMaterial = 1;
+    (*targetProperty)->type = sourceValue->type;
+    return result;
+}
+
+static unsigned int reduceProperties(unsigned char operator,
+                                     jsonProperty *leftProperty,
+                                     char *leftState, 
+                                     jsonProperty *rightProperty,
+                                     char *rightState,
+                                     jsonProperty *targetValue,
+                                     char **state) {
+
+    *state = NULL;
+    unsigned short type = leftProperty->type << 8;
+    type = type + rightProperty->type;
+    char leftTemp = 0;
+    char rightTemp = 0;
+    if (leftProperty->type == JSON_STRING || rightProperty->type == JSON_STRING) {
+        if (operator != OP_ADD) {
+            asprintf(state, "");
+            return RULES_OK;
+        }
+
+        if (leftProperty->type == JSON_STRING) {
+            leftTemp = leftState[leftProperty->valueOffset + leftProperty->valueLength];
+            leftState[leftProperty->valueOffset + leftProperty->valueLength] = '\0';
+        } 
+
+        if (rightProperty->type == JSON_STRING) {
+            rightTemp = rightState[rightProperty->valueOffset + rightProperty->valueLength];
+            rightState[rightProperty->valueOffset + rightProperty->valueLength] = '\0';
+        }
+    }
+
+    switch(type) {
+        case OP_BOOL_BOOL:
+            targetValue->value.i = reduceInt(leftProperty->value.b, rightProperty->value.b, operator); 
+            targetValue->type = JSON_INT;
+            break;
+        case OP_BOOL_INT: 
+            targetValue->value.i = reduceInt(leftProperty->value.b, rightProperty->value.i, operator); 
+            targetValue->type = JSON_INT;
+            break;
+        case OP_BOOL_DOUBLE: 
+            targetValue->value.d = reduceDouble(leftProperty->value.b, rightProperty->value.d, operator); 
+            targetValue->type = JSON_DOUBLE;
+            break;
+        case OP_BOOL_STRING:
+            if (asprintf(state, 
+                         "%s%s", 
+                         leftProperty->value.b ? "true" : "false", 
+                         rightState + rightProperty->valueOffset) == -1) {
+                return ERR_OUT_OF_MEMORY;
+            }
+            break;
+        case OP_INT_BOOL:
+            targetValue->value.i = reduceInt(leftProperty->value.i, rightProperty->value.b, operator); 
+            targetValue->type = JSON_INT;
+            break;
+        case OP_INT_INT:
+            targetValue->value.i = reduceInt(leftProperty->value.i, rightProperty->value.i, operator); 
+            targetValue->type = JSON_INT;
+            break;
+        case OP_INT_DOUBLE: 
+            targetValue->value.d = reduceDouble(leftProperty->value.i, rightProperty->value.d, operator); 
+            targetValue->type = JSON_DOUBLE;
+            break;
+        case OP_INT_STRING:
+            if (asprintf(state, 
+                         "%ld%s", 
+                         leftProperty->value.i, 
+                         rightState + rightProperty->valueOffset) == -1) {
+                return ERR_OUT_OF_MEMORY;
+            }
+            break;
+        case OP_DOUBLE_BOOL:
+            targetValue->value.d = reduceDouble(leftProperty->value.d, rightProperty->value.b, operator); 
+            targetValue->type = JSON_DOUBLE;
+            break;
+        case OP_DOUBLE_INT:
+            targetValue->value.d = reduceDouble(leftProperty->value.d, rightProperty->value.i, operator); 
+            targetValue->type = JSON_DOUBLE; 
+            break;
+        case OP_DOUBLE_DOUBLE:
+            targetValue->value.d = reduceDouble(leftProperty->value.d, rightProperty->value.d, operator); 
+            targetValue->type = JSON_DOUBLE; 
+            break;
+        case OP_DOUBLE_STRING:
+            if (asprintf(state, 
+                         "%g%s", 
+                         leftProperty->value.d, 
+                         rightState + rightProperty->valueOffset) == -1) {
+                return ERR_OUT_OF_MEMORY;
+            }
+
+            break;
+        case OP_STRING_BOOL:
+            if (asprintf(state, 
+                         "%s%s",
+                         leftState + leftProperty->valueOffset,
+                         rightProperty->value.b ? "true" : "false") == -1) {
+                return ERR_OUT_OF_MEMORY;
+            }
+            break;
+        case OP_STRING_INT: 
+            if (asprintf(state, 
+                         "%s%ld",
+                         leftState + leftProperty->valueOffset,
+                         rightProperty->value.i) == -1) {
+                return ERR_OUT_OF_MEMORY;
+            }
+            break;
+        case OP_STRING_DOUBLE: 
+            if (asprintf(state, 
+                         "%s%ld",
+                         leftState + leftProperty->valueOffset,
+                         rightProperty->value.i) == -1) {
+                return ERR_OUT_OF_MEMORY;
+            }
+            break;
+        case OP_STRING_STRING:
+            if (asprintf(state, 
+                         "%s%s",
+                         leftState + leftProperty->valueOffset,
+                         rightState + rightProperty->valueOffset) == -1) {
+                return ERR_OUT_OF_MEMORY;
+            }
+            break;
+    }    
+
+    if (leftProperty->type == JSON_STRING || rightProperty->type == JSON_STRING) {
+        targetValue->type = JSON_STRING;
+        targetValue->valueOffset = 0;
+        targetValue->valueLength = strlen(*state);
+                
+        if (leftTemp) {
+            leftState[leftProperty->valueOffset + leftProperty->valueLength] = leftTemp;
+        } 
+
+        if (rightTemp) {
+            rightState[rightProperty->valueOffset + rightProperty->valueLength] = rightTemp;
+        }
+    }
+
+    return RULES_OK;
+}
+
+static unsigned int reduceStateIdiom(ruleset *tree, 
+                                     char *sid,
+                                     unsigned int idiomOffset,
+                                     char **state,
+                                     unsigned char *releaseState,
+                                     jsonProperty **targetValue) {
+    unsigned int result = RULES_OK;
+    *releaseState = 0;
+    idiom *currentIdiom = &tree->idiomPool[idiomOffset];
+    jsonProperty leftValue;
+    jsonProperty *leftProperty = &leftValue;
+    unsigned char releaseLeftState = 0;
+    char *leftState = NULL;
+    result = valueToProperty(tree,
+                             sid,
+                             &currentIdiom->left,
+                             &leftState,
+                             &releaseLeftState,
+                             &leftProperty);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    jsonProperty rightValue;
+    jsonProperty *rightProperty = &rightValue;
+    unsigned char releaseRightState = 0;
+    char *rightState = NULL;
+    result = valueToProperty(tree,
+                             sid,
+                             &currentIdiom->right,
+                             &rightState,
+                             &releaseRightState,
+                             &rightProperty);
+    if (result != RULES_OK) {
+        if (releaseLeftState) {
+            free(leftState);
+        }
+
+        return result;
+    }
+
+    result = reduceProperties(currentIdiom->operator, 
+                            leftProperty, 
+                            leftState,
+                            rightProperty, 
+                            rightState, 
+                            *targetValue,
+                            state);
+
+    if (releaseLeftState) {
+        free(leftState);
+    }
+
+    if (releaseRightState) {
+        free(rightState);
+    }
+
+    if (state) {
+        *releaseState = 1;
+    }
+
+    return result;
 }
 
 static unsigned int isMatch(ruleset *tree,
@@ -355,8 +631,6 @@ static unsigned int isMatch(ruleset *tree,
                             char *message,
                             jsonProperty *currentProperty, 
                             alpha *currentAlpha,
-                            unsigned short actionType,
-                            unsigned char ignoreStaleState, 
                             unsigned char *propertyMatch,
                             void **rulesBinding) {
     unsigned char alphaOp = currentAlpha->operator;
@@ -370,61 +644,26 @@ static unsigned int isMatch(ruleset *tree,
     }
     
     rehydrateProperty(currentProperty, message);
-    jsonProperty *rightProperty;
     jsonProperty rightValue;
+    jsonProperty *rightProperty = &rightValue;
+    unsigned char releaseRightState = 0;
     char *rightState = NULL;
-    if (currentAlpha->right.type == JSON_STATE_PROPERTY) {
-        if (currentAlpha->right.value.property.idOffset) {
-            sid = &tree->stringPool[currentAlpha->right.value.property.idOffset];
-        }
-        
-        result = fetchStateProperty(tree, 
-                                    sid, 
-                                    currentAlpha->right.value.property.hash, 
-                                    MAX_STATE_PROPERTY_TIME, 
-                                    ignoreStaleState,
-                                    &rightState,
-                                    &rightProperty);
-    } else {
-        rightProperty = &rightValue;
-        rightValue.type = currentAlpha->right.type;
-        switch(rightValue.type) {
-            case JSON_BOOL:
-                rightValue.value.b = currentAlpha->right.value.b;
-                break;
-            case JSON_INT:
-                rightValue.value.i = currentAlpha->right.value.i;
-                break;
-            case JSON_DOUBLE:
-                rightValue.value.d = currentAlpha->right.value.d;
-                break;
-            case JSON_STRING:
-                rightState = &tree->stringPool[currentAlpha->right.value.stringOffset];
-                rightValue.valueOffset = 0;
-                rightValue.valueLength = strlen(rightState);
-                break;
-        }
-    }
-        
-    if ((result == ERR_STATE_NOT_LOADED || result == ERR_STALE_STATE) && !ignoreStaleState) {
-        if (actionType == ACTION_ASSERT_EVENT ||
-            actionType == ACTION_ASSERT_FACT ||
-            actionType == ACTION_ASSERT_TIMER) {
-            result = rollbackCommands(tree);
-            if (result != RULES_OK) {
-                return result;
-            }
-
-            result = refreshState(tree,sid);
-        } else {
-            result = refreshState(tree, sid);
-        }   
-
-        return result != RULES_OK ? result : ERR_NEED_RETRY;
-    }
-
+    result = valueToProperty(tree,
+                             sid,
+                             &currentAlpha->right,
+                             &rightState,
+                             &releaseRightState,
+                             &rightProperty);
     if (result != RULES_OK) {
-        return result != ERR_PROPERTY_NOT_FOUND ? result : RULES_OK;
+        if (releaseRightState) {
+            free(rightState);
+        }
+
+        if (result != ERR_NEW_SESSION && result != ERR_PROPERTY_NOT_FOUND) {
+            return result;    
+        }
+
+        return RULES_OK;
     }
     
     int leftLength;
@@ -432,16 +671,16 @@ static unsigned int isMatch(ruleset *tree,
     unsigned short type = propertyType << 8;
     type = type + rightProperty->type;
     switch(type) {
-        case COMP_BOOL_BOOL:
+        case OP_BOOL_BOOL:
             *propertyMatch = compareBool(currentProperty->value.b, rightProperty->value.b, alphaOp);
             break;
-        case COMP_BOOL_INT: 
+        case OP_BOOL_INT: 
             *propertyMatch = compareInt(currentProperty->value.b, rightProperty->value.i, alphaOp);
             break;
-        case COMP_BOOL_DOUBLE: 
+        case OP_BOOL_DOUBLE: 
             *propertyMatch = compareDouble(currentProperty->value.b, rightProperty->value.d, alphaOp);
             break;
-        case COMP_BOOL_STRING:
+        case OP_BOOL_STRING:
             if (currentProperty->value.b) {
                 *propertyMatch = compareStringProperty("true",
                                                        rightState + rightProperty->valueOffset, 
@@ -456,16 +695,16 @@ static unsigned int isMatch(ruleset *tree,
             }
             
             break;
-        case COMP_INT_BOOL:
+        case OP_INT_BOOL:
             *propertyMatch = compareInt(currentProperty->value.i, rightProperty->value.b, alphaOp);
             break;
-        case COMP_INT_INT: 
+        case OP_INT_INT: 
             *propertyMatch = compareInt(currentProperty->value.i, rightProperty->value.i, alphaOp);
             break;
-        case COMP_INT_DOUBLE: 
+        case OP_INT_DOUBLE: 
             *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.d, alphaOp);
             break;
-        case COMP_INT_STRING:
+        case OP_INT_STRING:
             {
                 rightLength = rightProperty->valueLength + 1;
                 char leftStringInt[rightLength];
@@ -476,16 +715,16 @@ static unsigned int isMatch(ruleset *tree,
                                                        alphaOp);
             }
             break;
-        case COMP_DOUBLE_BOOL:
+        case OP_DOUBLE_BOOL:
             *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.b, alphaOp);
             break;
-        case COMP_DOUBLE_INT: 
+        case OP_DOUBLE_INT: 
             *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.i, alphaOp);
             break;
-        case COMP_DOUBLE_DOUBLE: 
+        case OP_DOUBLE_DOUBLE: 
             *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.d, alphaOp);
             break;
-        case COMP_DOUBLE_STRING:
+        case OP_DOUBLE_STRING:
             {
                 rightLength = rightProperty->valueLength + 1;
                 char leftStringDouble[rightLength];
@@ -496,7 +735,7 @@ static unsigned int isMatch(ruleset *tree,
                                                        alphaOp);
             }
             break;
-        case COMP_STRING_BOOL:
+        case OP_STRING_BOOL:
             if (rightProperty->value.b) {
                 *propertyMatch = compareString(message + currentProperty->valueOffset, 
                                                currentProperty->valueLength, 
@@ -510,7 +749,7 @@ static unsigned int isMatch(ruleset *tree,
                                                alphaOp);
             }
             break;
-        case COMP_STRING_INT: 
+        case OP_STRING_INT: 
             {
                 leftLength = currentProperty->valueLength + 1;
                 char rightStringInt[leftLength];
@@ -521,7 +760,7 @@ static unsigned int isMatch(ruleset *tree,
                                                alphaOp);
             }
             break;
-        case COMP_STRING_DOUBLE: 
+        case OP_STRING_DOUBLE: 
             {
                 leftLength = currentProperty->valueLength + 1;
                 char rightStringDouble[leftLength];
@@ -532,7 +771,7 @@ static unsigned int isMatch(ruleset *tree,
                                                alphaOp);
             }
             break;
-        case COMP_STRING_STRING:
+        case OP_STRING_STRING:
             *propertyMatch = compareStringAndStringProperty(message + currentProperty->valueOffset, 
                                                             currentProperty->valueLength, 
                                                             rightState + rightProperty->valueOffset,
@@ -541,18 +780,21 @@ static unsigned int isMatch(ruleset *tree,
             break;
     }
     
+    if (releaseRightState) {
+        free(rightState);
+    }
+    
     return result;
 }
 
 static unsigned int handleAlpha(ruleset *tree, 
                                 char *sid, 
-                                char *mid,
                                 char *message,
                                 jsonProperty *allProperties,
                                 unsigned int propertiesLength,
                                 alpha *alphaNode, 
-                                unsigned short actionType,
-                                unsigned char ignoreStaleState, 
+                                unsigned char assertFact,
+                                char **commands,
                                 unsigned short *commandCount,
                                 void **rulesBinding) {
     unsigned int result = ERR_EVENT_NOT_HANDLED;
@@ -594,7 +836,7 @@ static unsigned int handleAlpha(ruleset *tree,
                 for (entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
                     node *hashNode = &tree->nodePool[nextHashset[entry]];
                     if (currentProperty->hash == hashNode->value.a.hash) {
-                        if (hashNode->value.a.right.type == JSON_EVENT_PROPERTY || hashNode->value.a.right.type == JSON_IDIOM) {
+                        if (hashNode->value.a.right.type == JSON_EVENT_PROPERTY || hashNode->value.a.right.type == JSON_EVENT_IDIOM) {
                             if (top == MAX_STACK_SIZE) {
                                 return ERR_MAX_STACK_SIZE;
                             }
@@ -608,8 +850,6 @@ static unsigned int handleAlpha(ruleset *tree,
                                                            message,
                                                            currentProperty, 
                                                            &hashNode->value.a,
-                                                           actionType,
-                                                           ignoreStaleState,
                                                            &match,
                                                            rulesBinding);
                             if (mresult != RULES_OK){
@@ -635,12 +875,12 @@ static unsigned int handleAlpha(ruleset *tree,
             for (unsigned int entry = 0; betaList[entry] != 0; ++entry) {
                 unsigned int bresult = handleBeta(tree, 
                                     sid, 
-                                    mid, 
                                     message,
                                     allProperties,
                                     propertiesLength,
                                     &tree->nodePool[betaList[entry]],  
-                                    actionType, 
+                                    assertFact, 
+                                    commands,
                                     commandCount,
                                     rulesBinding);
                 if (bresult != RULES_OK && bresult != ERR_NEW_SESSION) {
@@ -683,35 +923,34 @@ static unsigned int getId(jsonProperty *allProperties,
 }
 
 static unsigned int handleMessageCore(ruleset *tree,
-                                    char *state,
-                                    char *message, 
-                                    jsonProperty *properties, 
-                                    unsigned int propertiesLength, 
-                                    unsigned int midIndex, 
-                                    unsigned int sidIndex, 
-                                    unsigned short actionType, 
-                                    unsigned char ignoreStaleState,
-                                    unsigned short *commandCount,
-                                    void **rulesBinding) {
-    jsonProperty *idProperty;
-    int idLength;
-    int result = getId(properties, midIndex, &idProperty, &idLength);
+                                      char *state,
+                                      char *message, 
+                                      jsonProperty *properties, 
+                                      unsigned int propertiesLength, 
+                                      unsigned int midIndex, 
+                                      unsigned int sidIndex, 
+                                      unsigned char assertFact,
+                                      char **commands,
+                                      unsigned short *commandCount,
+                                      void **rulesBinding) {
+    jsonProperty *midProperty;
+    int midLength; 
+    jsonProperty *sidProperty;
+    int sidLength;
+    char *storeCommand;
+    int result = getId(properties, sidIndex, &sidProperty, &sidLength);
     if (result != RULES_OK) {
         return result;
     }
 
-    char mid[idLength + 1];
-    strncpy(mid, message + idProperty->valueOffset, idLength);
-    mid[idLength] = '\0';
-    
-    result = getId(properties, sidIndex, &idProperty, &idLength);
+    char sid[sidLength + 1];
+    strncpy(sid, message + sidProperty->valueOffset, sidLength);
+    sid[sidLength] = '\0';
+
+    result = getId(properties, midIndex, &midProperty, &midLength);
     if (result != RULES_OK) {
         return result;
     }
-
-    char sid[idLength + 1];
-    strncpy(sid, message + idProperty->valueOffset, idLength);
-    sid[idLength] = '\0';
 
     if (state) {
         if (!*rulesBinding) {
@@ -721,50 +960,120 @@ static unsigned int handleMessageCore(ruleset *tree,
             }
         }
 
-        if (actionType == ACTION_ASSERT_EVENT_IMMEDIATE || 
-            actionType == ACTION_ASSERT_FACT_IMMEDIATE) {
-            result = storeSessionImmediate(*rulesBinding, sid, state);
-        }
-        else {
-            *commandCount = *commandCount + 1;
-            result = storeSession(*rulesBinding, sid, state);
+        if (*commandCount == MAX_COMMAND_COUNT) {
+            return ERR_MAX_COMMAND_COUNT;
         }
 
+        result = formatStoreSession(*rulesBinding, sid, state, 0, &storeCommand);
         if (result != RULES_OK) {
             return result;
         }
+
+        commands[*commandCount] = storeCommand;
+        ++*commandCount;
     }
 
     result =  handleAlpha(tree, 
                           sid, 
-                          mid,
                           message, 
                           properties, 
                           propertiesLength,
                           &tree->nodePool[NODE_M_OFFSET].value.a, 
-                          actionType, 
-                          ignoreStaleState,
+                          assertFact, 
+                          commands,
                           commandCount,
                           rulesBinding);
 
-    if (result == ERR_NEW_SESSION) {
-        char stateMessage[36 + idLength];
-        int randomMid = rand();
-        if (idProperty->type == JSON_STRING) {
-            snprintf(stateMessage, 36 + idLength, "{\"id\":%d, \"sid\":\"%s\", \"$s\":1}", randomMid, sid);
-        }
-        else {
-            snprintf(stateMessage, 36 + idLength, "{\"id\":%d, \"sid\":%s, \"$s\":1}", randomMid, sid);
-        }
-        result = handleMessage(tree, 
-                             NULL,
-                             stateMessage,  
-                             ACTION_ASSERT_FACT_IMMEDIATE,
-                             ignoreStaleState,
-                             commandCount,
-                             rulesBinding);
-        if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-            return result;
+    if (result == RULES_OK) {
+        if (state) {
+            char mid[midLength + 1];
+            strncpy(mid, message + midProperty->valueOffset, midLength);
+            mid[midLength] = '\0';
+            if (*commandCount == MAX_COMMAND_COUNT) {
+                return ERR_MAX_COMMAND_COUNT;
+            }
+
+            result = formatStoreSessionFactId(*rulesBinding, sid, mid, 0, &storeCommand);
+            if (result != RULES_OK) {
+                return result;
+            }
+
+            commands[*commandCount] = storeCommand;
+            ++*commandCount;
+        } else {
+            // try creating state if doesn't exist
+            jsonProperty *targetProperty;
+            char *targetState;
+            result = fetchStateProperty(tree, 
+                                        sid, 
+                                        HASH_SID, 
+                                        MAX_STATE_PROPERTY_TIME, 
+                                        1,
+                                        &targetState,
+                                        &targetProperty);
+            if (result != ERR_STATE_NOT_LOADED && result != ERR_PROPERTY_NOT_FOUND) {
+                return result;
+            }
+
+            // this sid has been tried by this process already
+            if (result == ERR_PROPERTY_NOT_FOUND) {
+                return RULES_OK;
+            }
+
+            result = refreshState(tree,sid);
+            if (result != ERR_NEW_SESSION) {
+                return result;
+            }            
+            
+            char stateMessage[36 + sidLength];
+            char newState[12 + sidLength];
+            if (sidProperty->type == JSON_STRING) {
+                snprintf(stateMessage, 36 + sidLength, "{\"id\":\"$s\", \"sid\":\"%s\", \"$s\":1}", sid);
+                snprintf(newState, 12 + sidLength, "{\"sid\":\"%s\"}", sid);
+            }
+            else {
+                snprintf(stateMessage, 36 + sidLength, "{\"id\":\"$s\", \"sid\":%s, \"$s\":1}", sid);
+                snprintf(newState, 12 + sidLength, "{\"sid\":%s}", sid);
+            }
+
+            if (*commandCount == MAX_COMMAND_COUNT) {
+                return ERR_MAX_COMMAND_COUNT;
+            }
+
+            result = formatStoreSession(*rulesBinding, sid, newState, 1, &storeCommand);
+            if (result != RULES_OK) {
+                return result;
+            }
+
+            commands[*commandCount] = storeCommand;
+            ++*commandCount;
+
+            result = handleMessage(tree, 
+                                   NULL,
+                                   stateMessage,  
+                                   1,
+                                   commands,
+                                   commandCount,
+                                   rulesBinding);
+            if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+                return result;
+            }
+
+            if (result == ERR_EVENT_NOT_HANDLED) {
+                return RULES_OK;
+            }
+
+            if (*commandCount == MAX_COMMAND_COUNT) {
+                return ERR_MAX_COMMAND_COUNT;
+            }
+
+            result = formatStoreSessionFactId(*rulesBinding, sid, "$s", 1, &storeCommand);
+            if (result != RULES_OK) {
+                return result;
+            }
+
+            commands[*commandCount] = storeCommand;
+            ++*commandCount;
         }
 
         return RULES_OK;
@@ -774,12 +1083,12 @@ static unsigned int handleMessageCore(ruleset *tree,
 }
 
 static unsigned int handleMessage(ruleset *tree,
-                                char *state, 
-                                char *message, 
-                                unsigned short actionType, 
-                                unsigned char ignoreStaleState,
-                                unsigned short *commandCount,
-                                void **rulesBinding) {
+                                  char *state,
+                                  char *message, 
+                                  unsigned char assertFact, 
+                                  char **commands,
+                                  unsigned short *commandCount,
+                                  void **rulesBinding) {
     char *next;
     unsigned int propertiesLength = 0;
     unsigned int midIndex = UNDEFINED_INDEX;
@@ -799,166 +1108,111 @@ static unsigned int handleMessage(ruleset *tree,
     }
 
     return handleMessageCore(tree,
-                           state, 
-                           message, 
-                           properties, 
-                           propertiesLength, 
-                           midIndex, 
-                           sidIndex,  
-                           actionType,
-                           ignoreStaleState,
-                           commandCount,
-                           rulesBinding);
+                            state, 
+                            message, 
+                            properties, 
+                            propertiesLength, 
+                            midIndex, 
+                            sidIndex,  
+                            assertFact,
+                            commands,
+                            commandCount,
+                            rulesBinding);
 }
 
 static unsigned int handleMessages(void *handle, 
-                                 char *messages, 
-                                 unsigned char ignoreStaleState,
-                                 unsigned int *resultsLength,  
-                                 unsigned int **results) {
+                                   unsigned char assertFact,
+                                   char *messages, 
+                                   char **commands,
+                                   unsigned short *commandCount,
+                                   unsigned int *resultsLength,  
+                                   unsigned int **results,
+                                   void **rulesBinding) {
     unsigned int messagesLength = 64;
     unsigned int *resultsArray = malloc(sizeof(unsigned int) * messagesLength);
     if (!resultsArray) {
         return ERR_OUT_OF_MEMORY;
     }
 
+    *results = resultsArray;
     *resultsLength = 0;
-    unsigned short commandCount = 0;
-    unsigned short actionType = ACTION_ASSERT_FIRST_EVENT;
     unsigned int result;
-    void *rulesBinding = NULL;
-    jsonProperty properties0[MAX_EVENT_PROPERTIES];
-    jsonProperty properties1[MAX_EVENT_PROPERTIES];
-    jsonProperty *currentProperties = NULL;
-    unsigned int currentPropertiesLength = 0;
-    unsigned int currentPropertiesMidIndex = UNDEFINED_INDEX;
-    unsigned int currentPropertiesSidIndex = UNDEFINED_INDEX;
-    unsigned int nextPropertiesLength = 0;
-    unsigned int nextPropertiesMidIndex = UNDEFINED_INDEX;
-    unsigned int nextPropertiesSidIndex = UNDEFINED_INDEX;
+    jsonProperty properties[MAX_EVENT_PROPERTIES];
+    unsigned int propertiesLength = 0;
+    unsigned int propertiesMidIndex = UNDEFINED_INDEX;
+    unsigned int propertiesSidIndex = UNDEFINED_INDEX;
     
-    jsonProperty *nextProperties = properties0;
-    char *first = NULL;
+    char *first = messages;
     char *last = NULL;
-    char *next = NULL;
-    char *nextFirst = messages;
     char lastTemp;
 
-    while (nextFirst[0] != '{' && nextFirst[0] != '\0' ) {
-        ++nextFirst;
+    while (*first != '{' && *first != '\0' ) {
+        ++first;
     }
 
     while (constructObject(NULL, 
-                           nextFirst, 
+                           first, 
                            0,
                            MAX_EVENT_PROPERTIES,
-                           nextProperties, 
-                           &nextPropertiesLength, 
-                           &nextPropertiesMidIndex,
-                           &nextPropertiesSidIndex,
-                           &next) == RULES_OK) {
-        if (currentProperties) {
+                           properties, 
+                           &propertiesLength, 
+                           &propertiesMidIndex,
+                           &propertiesSidIndex,
+                           &last) == RULES_OK) {
 
-            result = handleMessageCore(handle,
-                                     NULL, 
-                                     first, 
-                                     currentProperties, 
-                                     currentPropertiesLength,
-                                     currentPropertiesMidIndex,
-                                     currentPropertiesSidIndex, 
-                                     actionType, 
-                                     ignoreStaleState,
-                                     &commandCount,
-                                     &rulesBinding);
-            last[0] = lastTemp;
-            if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-                free(resultsArray);
-                return result;
+        while (*last != ',' && *last != ']' ) {
+            ++last;
+        }
+
+        lastTemp = *last;
+        *last = '\0';
+        result = handleMessageCore(handle,
+                                 NULL, 
+                                 first, 
+                                 properties, 
+                                 propertiesLength,
+                                 propertiesMidIndex,
+                                 propertiesSidIndex, 
+                                 assertFact, 
+                                 commands,
+                                 commandCount,
+                                 rulesBinding);
+        
+        *last = lastTemp;
+        if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+            free(resultsArray);
+            return result;
+        }
+
+        if (*resultsLength >= messagesLength) {
+            messagesLength = messagesLength * 2;
+            resultsArray = realloc(resultsArray, sizeof(unsigned int) * messagesLength);
+            if (!resultsArray) {
+                return ERR_OUT_OF_MEMORY;
             }
-
-            if (result == RULES_OK) {
-                actionType = ACTION_ASSERT_EVENT;
-            }
-
-            if (*resultsLength >= messagesLength) {
-                messagesLength = messagesLength * 2;
-                resultsArray = realloc(resultsArray, sizeof(unsigned int) * messagesLength);
-                if (!resultsArray) {
-                    return ERR_OUT_OF_MEMORY;
-                }
-            }
-
-            resultsArray[*resultsLength] = result;
-            ++*resultsLength;
+            *results = resultsArray;
         }
 
-        while (next[0] != ',' && next[0] != ']' ) {
-            ++next;
-        }
-        last = next;
-        lastTemp = next[0];
-        next[0] = '\0';
-        currentProperties = nextProperties;
-        currentPropertiesLength = nextPropertiesLength;
-        currentPropertiesMidIndex = nextPropertiesMidIndex;
-        currentPropertiesSidIndex = nextPropertiesSidIndex;
-        first = nextFirst;
-        nextFirst = next + 1;
-        if (nextProperties == properties0) {
-            nextProperties = properties1;
-        } else {
-            nextProperties = properties0;
-        }
+        resultsArray[*resultsLength] = result;
+        ++*resultsLength;
+        propertiesLength = 0;
+        propertiesMidIndex = UNDEFINED_INDEX;
+        propertiesSidIndex = UNDEFINED_INDEX;        
 
-        nextPropertiesLength = 0;
-        nextPropertiesMidIndex = UNDEFINED_INDEX;
-        nextPropertiesSidIndex = UNDEFINED_INDEX;
-    }
-
-    if (actionType == ACTION_ASSERT_FIRST_EVENT) {
-        actionType = ACTION_ASSERT_EVENT_IMMEDIATE;
-    } else {
-        actionType = ACTION_ASSERT_LAST_EVENT;
-    }
-
-    result = handleMessageCore(handle, 
-                             NULL,
-                             first, 
-                             currentProperties, 
-                             currentPropertiesLength,
-                             currentPropertiesMidIndex,
-                             currentPropertiesSidIndex, 
-                             actionType, 
-                             ignoreStaleState,
-                             &commandCount,
-                             &rulesBinding);
-    last[0] = lastTemp;
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        free(resultsArray);
-        return result;
-    }
-
-    if (*resultsLength >= messagesLength) {
-        ++messagesLength;
-        resultsArray = realloc(resultsArray, sizeof(unsigned int) * messagesLength);
-        if (!resultsArray) {
-            return ERR_OUT_OF_MEMORY;
+        first = last;
+        while (*first != '{' && *first != '\0' ) {
+            ++first;
         }
     }
 
-    resultsArray[*resultsLength] = result;
-    ++*resultsLength;
-    *results = resultsArray;
     return RULES_OK;
 }
 
 static unsigned int handleState(ruleset *tree, 
                                 char *state, 
-                                unsigned short actionType, 
-                                unsigned char ignoreStaleState,
-                                void *rulesBinding,
-                                unsigned short *commandCount) {
-
+                                char **commands,
+                                unsigned short *commandCount,
+                                void **rulesBinding) {
     int stateLength = strlen(state);
     if (stateLength < 2) {
         return ERR_PARSE_OBJECT;
@@ -973,71 +1227,79 @@ static unsigned int handleState(ruleset *tree,
     int randomMid = rand();
     snprintf(stateMessage, 30 + stateLength - 1, "{\"id\":%d, \"$s\":1, %s", randomMid, stateMessagePostfix);
     unsigned int result = handleMessage(tree, 
-                                      state,
-                                      stateMessage,  
-                                      actionType,
-                                      ignoreStaleState,
-                                      commandCount,
-                                      &rulesBinding);
+                                        state,
+                                        stateMessage,  
+                                        1,
+                                        commands,
+                                        commandCount,
+                                        rulesBinding);
 
     return result;
 }
 
-static unsigned int handleTimers(void *handle, unsigned char ignoreStaleState) {
-    unsigned short commandCount = 2;
+static unsigned int handleTimers(void *handle, 
+                                 char **commands,
+                                 unsigned short *commandCount,
+                                 void **rulesBinding) {
     redisReply *reply;
-    void *rulesBinding;
-    unsigned int result = peekTimers(handle, &rulesBinding, &reply);
+    unsigned int result = peekTimers(handle, rulesBinding, &reply);
     if (result != RULES_OK) {
-        return result;
-    }
-
-    result = prepareCommands(rulesBinding);
-    if (result != RULES_OK) {
-        freeReplyObject(reply);
         return result;
     }
 
     for (unsigned long i = 0; i < reply->elements; ++i) {
-        result = removeTimer(rulesBinding, reply->element[i]->str);
+        if (*commandCount == MAX_COMMAND_COUNT) {
+            return ERR_MAX_COMMAND_COUNT;
+        }
+
+        char *command;
+        result = formatRemoveTimer(*rulesBinding, reply->element[i]->str, &command);
         if (result != RULES_OK) {
             freeReplyObject(reply);
             return result;
         }
 
-        ++commandCount;
+        commands[*commandCount] = command;
+        ++*commandCount;
+        
         result = handleMessage(handle, 
-                             NULL,
-                             reply->element[i]->str, 
-                             ACTION_ASSERT_TIMER, 
-                             ignoreStaleState,
-                             &commandCount, 
-                             &rulesBinding);
+                               NULL,
+                               reply->element[i]->str, 
+                               0,
+                               commands, 
+                               commandCount, 
+                               rulesBinding);
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
             freeReplyObject(reply);
             return result;
         }
     }
 
-    result = executeCommands(rulesBinding, commandCount);
     freeReplyObject(reply);
-    return result;
+    return RULES_OK;
 }
 
 unsigned int assertEvent(void *handle, char *message) {
+    char *commands[MAX_COMMAND_COUNT];
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
-    unsigned int result = ERR_NEED_RETRY;
-    while (result == ERR_NEED_RETRY) {
-        result = handleMessage(handle, 
-                             NULL,
-                             message, 
-                             ACTION_ASSERT_EVENT_IMMEDIATE, 
-                             0, 
-                             &commandCount, 
-                             &rulesBinding);
+    unsigned int result = handleMessage(handle, 
+                                        NULL,
+                                        message, 
+                                        0, 
+                                        commands,
+                                        &commandCount,
+                                        &rulesBinding);
+    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+        freeCommands(commands, commandCount);
+        return result;
     }
-    
+
+    unsigned int batchResult = executeBatch(rulesBinding, commands, commandCount);
+    if (batchResult != RULES_OK) {
+        return batchResult;
+    }
+
     return result;
 }
 
@@ -1045,34 +1307,86 @@ unsigned int assertEvents(void *handle,
                           char *messages, 
                           unsigned int *resultsLength, 
                           unsigned int **results) {
-
-    unsigned int result = ERR_NEED_RETRY;
-    while (result == ERR_NEED_RETRY) {
-        result = handleMessages(handle,
-                                  messages,
-                                  0,
-                                  resultsLength,
-                                  results);
-    }
+    char *commands[MAX_COMMAND_COUNT];
+    unsigned short commandCount = 0;
+    void *rulesBinding = NULL;
+    unsigned int result = handleMessages(handle,
+                                         0,
+                                         messages,
+                                         commands,
+                                         &commandCount,
+                                         resultsLength,
+                                         results,
+                                         &rulesBinding);
     
-    return result;
+    if (result != RULES_OK) {
+        freeCommands(commands, commandCount);
+        return result;
+    }
+
+    return executeBatch(rulesBinding, commands, commandCount);
 }
 
 unsigned int assertFact(void *handle, char *message) {
+    char *commands[MAX_COMMAND_COUNT];
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
-    unsigned int result = ERR_NEED_RETRY;
-    while (result == ERR_NEED_RETRY) {
-        result = handleMessage(handle, 
-                             NULL,
-                             message, 
-                             ACTION_ASSERT_FACT_IMMEDIATE, 
-                             0, 
-                             &commandCount, 
-                             &rulesBinding);
+    unsigned int result = handleMessage(handle, 
+                                        NULL,
+                                        message, 
+                                        1,
+                                        commands,
+                                        &commandCount,
+                                        &rulesBinding);
+    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+        freeCommands(commands, commandCount);
+        return result;
     }
-    
+
+    unsigned int batchResult = executeBatch(rulesBinding, commands, commandCount);
+    if (batchResult != RULES_OK) {
+        return batchResult;
+    }
+
     return result;
+}
+
+unsigned int assertState(void *handle, char *state) {
+    char *commands[MAX_COMMAND_COUNT];
+    unsigned short commandCount = 0;
+    void *rulesBinding = NULL;
+    unsigned int result = handleState(handle, 
+                                      state, 
+                                      commands,
+                                      &commandCount,
+                                      &rulesBinding);
+    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+        freeCommands(commands, commandCount);
+        return result;
+    }
+
+    unsigned int batchResult = executeBatch(rulesBinding, commands, commandCount);
+    if (batchResult != RULES_OK) {
+        return batchResult;
+    }
+
+    return result;
+}
+
+unsigned int assertTimers(void *handle) {
+    char *commands[MAX_COMMAND_COUNT];
+    unsigned short commandCount = 0;
+    void *rulesBinding = NULL;
+    unsigned int result = handleTimers(handle, 
+                                       commands,
+                                       &commandCount,
+                                       &rulesBinding);
+    if (result != RULES_OK) {
+        freeCommands(commands, commandCount);
+        return result;
+    }
+
+    return executeBatch(rulesBinding, commands, commandCount);
 }
 
 unsigned int retractFact(void *handle, char *sid, char *mid) {
@@ -1082,24 +1396,7 @@ unsigned int retractFact(void *handle, char *sid, char *mid) {
         return result;
     }
 
-    return retractMessageImmediate(rulesBinding, sid, mid);
-}
-
-unsigned int assertState(void *handle, char *state) {
-    unsigned short commandCount = 0;
-    void *rulesBinding = NULL;
-
-    unsigned int result = ERR_NEED_RETRY;
-    while(result == ERR_NEED_RETRY) {
-        result = handleState(handle, 
-                             state, 
-                             ACTION_ASSERT_FACT_IMMEDIATE, 
-                             0,
-                             rulesBinding, 
-                             &commandCount);
-    }
-    
-    return result;
+    return retractMessage(rulesBinding, sid, mid);
 }
 
 unsigned int startAction(void *handle, char **state, char **messages, void **actionHandle) {
@@ -1110,8 +1407,8 @@ unsigned int startAction(void *handle, char **state, char **messages, void **act
         return result;
     }
 
-    *state = reply->element[1]->str;
-    *messages = reply->element[2]->str;
+    *state = reply->element[2]->str;
+    *messages = reply->element[3]->str;
     actionContext *context = malloc(sizeof(actionContext));
     context->reply = reply;
     context->rulesBinding = rulesBinding;
@@ -1120,37 +1417,49 @@ unsigned int startAction(void *handle, char **state, char **messages, void **act
 }
 
 unsigned int completeAction(void *handle, void *actionHandle, char *state) {
-    unsigned short commandCount = 3;
+    char *commands[MAX_COMMAND_COUNT]; 
+    unsigned short commandCount = 0;
     actionContext *context = (actionContext*)actionHandle;
     redisReply *reply = context->reply;
     void *rulesBinding = context->rulesBinding;
-    unsigned int result = prepareCommands(rulesBinding);
+    
+    unsigned int result = formatRemoveAction(rulesBinding, 
+                                             reply->element[0]->str, 
+                                             &commands[commandCount]);
     if (result != RULES_OK) {
         freeReplyObject(reply);
         free(actionHandle);
         return result;
     }
 
-    result = removeAction(rulesBinding, reply->element[0]->str);
-    if (result != RULES_OK) {
-        freeReplyObject(reply);
-        free(actionHandle);
-        return result;
+    if (reply->element[1]->str != NULL) {
+        ++commandCount;
+        result = formatRetractMessage(rulesBinding, 
+                                      reply->element[0]->str, 
+                                      reply->element[1]->str, 
+                                      &commands[commandCount]);
+        if (result != RULES_OK) {
+            freeCommands(commands, commandCount);
+            freeReplyObject(reply);
+            free(actionHandle);
+            return result;
+        }
     }
 
+    ++commandCount;
     result = handleState(handle, 
                          state, 
-                         ACTION_ASSERT_FACT,  
-                         1, 
-                         rulesBinding, 
-                         &commandCount);
+                         commands,
+                         &commandCount,
+                         &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+        freeCommands(commands, commandCount);
         freeReplyObject(reply);
         free(actionHandle);
         return result;
     }
 
-    result = executeCommands(rulesBinding, commandCount);    
+    result = executeBatch(rulesBinding, commands, commandCount);  
     freeReplyObject(reply);
     free(actionHandle);
     return result;
@@ -1160,15 +1469,6 @@ unsigned int abandonAction(void *handle, void *actionHandle) {
     freeReplyObject(((actionContext*)actionHandle)->reply);
     free(actionHandle);
     return RULES_OK;
-}
-
-unsigned int assertTimers(void *handle) {
-    unsigned int result = handleTimers(handle, 0);
-    if (result == ERR_NEED_RETRY) {
-        return handleTimers(handle, 1);
-    }
-
-    return result;
 }
 
 unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *timer) {

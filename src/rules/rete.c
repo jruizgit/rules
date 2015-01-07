@@ -302,7 +302,8 @@ static void copyValue(ruleset *tree,
             right->value.property.nameOffset = ref->nameOffset;
             right->value.property.idOffset = ref->idOffset;
             break;
-        case JSON_IDIOM:
+        case JSON_STATE_IDIOM:
+        case JSON_EVENT_IDIOM:
             right->value.idiomOffset = idiomOffset;
             break;
         case JSON_STRING:
@@ -354,7 +355,8 @@ static unsigned char compareValue(ruleset *tree,
                 return 1;
 
             return 0;
-        case JSON_IDIOM:
+        case JSON_STATE_IDIOM:
+        case JSON_EVENT_IDIOM:
             return 0;
         case JSON_STRING:
             leftLength = last - first;
@@ -408,7 +410,7 @@ static unsigned int validateWindowSize(char *rule) {
     return PARSE_OK;
 }
 
-static unsigned int validateReference(char *rule) {
+static unsigned int validateReference(char *rule, unsigned char *referenceType) {
     char *first;
     char *last;
     unsigned char type;
@@ -421,11 +423,13 @@ static unsigned int validateReference(char *rule) {
     }
 
     if (hash != HASH_S) {
+        *referenceType = JSON_EVENT_PROPERTY;
         result = readNextString(last, &first, &last, &hash);
         if (result != PARSE_OK) {
             return result;
         }        
     } else {
+        *referenceType = JSON_STATE_PROPERTY;
         if (readNextString(last, &first, &last, &hash) != PARSE_OK) {
             result = readNextValue(last, &first, &last, &type);
             if (result != PARSE_OK) {
@@ -457,7 +461,7 @@ static unsigned int validateReference(char *rule) {
     return PARSE_OK;
 }
 
-static unsigned int validateIdiom(char *rule) {
+static unsigned int validateIdiom(char *rule, unsigned char *idiomType) {
     char *first;
     char *last;
     unsigned char type;
@@ -471,26 +475,44 @@ static unsigned int validateIdiom(char *rule) {
 
     if (hash != HASH_ADD && hash != HASH_SUB &&
         hash != HASH_MUL && hash != HASH_DIV) {
-        return validateReference(rule);
+        return validateReference(rule, idiomType);
     } else {
         result = readNextValue(last, &first, &last, &type);
         if (result != PARSE_OK) {
             return result;
         }
         
+        *idiomType = 0;
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
+            unsigned char newIdiomType = 0;
             result = readNextValue(last, &first, &last, &type);
             if (result != PARSE_OK) {
                 return result;
             }
 
             if (type == JSON_OBJECT) {
-                result = validateIdiom(first);
+                result = validateIdiom(first, &newIdiomType);
                 if (result != PARSE_OK) {
                     return result;
                 }
             }
+
+            if (newIdiomType == JSON_EVENT_PROPERTY || newIdiomType == JSON_EVENT_IDIOM) {
+                if (*idiomType == JSON_STATE_PROPERTY || *idiomType == JSON_STATE_IDIOM) {
+                    return ERR_UNEXPECTED_TYPE;
+                }
+
+                *idiomType = JSON_EVENT_IDIOM;
+            } 
+
+            if (newIdiomType == JSON_STATE_PROPERTY || newIdiomType == JSON_STATE_IDIOM) {
+                if (*idiomType == JSON_EVENT_PROPERTY || *idiomType == JSON_EVENT_IDIOM) {
+                    return ERR_UNEXPECTED_TYPE;
+                }
+
+                *idiomType = JSON_STATE_IDIOM;
+            }                    
 
             if (hash != HASH_L && hash != HASH_R) {
                 return ERR_UNEXPECTED_NAME;
@@ -589,7 +611,8 @@ static unsigned int validateExpression(char *rule) {
     }
 
     if (type == JSON_OBJECT) {
-        result = validateIdiom(first);
+        unsigned char idiomType = 0;
+        result = validateIdiom(first, &idiomType);
         if (result != PARSE_OK) {
             return result;
         }
@@ -848,7 +871,7 @@ static unsigned int readIdiom(ruleset *tree, char *rule, unsigned char *idiomTyp
             return result;
         }
 
-        *idiomType = JSON_IDIOM;
+        *idiomType = JSON_STATE_IDIOM;  
         newIdiom->operator = operator;
         readNextValue(last, &first, &last, &type);
         result = readNextName(first, &first, &last, &hash);
@@ -861,6 +884,10 @@ static unsigned int readIdiom(ruleset *tree, char *rule, unsigned char *idiomTyp
                 if (result != RULES_OK) {
                     return result;
                 }
+            }
+
+            if (type == JSON_EVENT_PROPERTY || type == JSON_EVENT_IDIOM) {
+                *idiomType = JSON_EVENT_IDIOM;  
             }
 
             switch (hash) {
@@ -952,7 +979,7 @@ static unsigned int findAlpha(ruleset *tree,
     newAlpha->value.a.hash = hash;
     newAlpha->value.a.operator = operator;
     copyValue(tree, &newAlpha->value.a.right, first, last, idiomOffset, &ref, type);
-    if (type == JSON_EVENT_PROPERTY || type == JSON_IDIOM) {
+    if (type == JSON_EVENT_PROPERTY || type == JSON_EVENT_IDIOM) {
         result = appendTerm(expr, *resultOffset);
         if (result != RULES_OK) {
             return result;

@@ -20,7 +20,7 @@ static unsigned int createIdiom(ruleset *tree, jsonValue *newValue, char **idiom
                 return ERR_OUT_OF_MEMORY;
             }
             break;
-        case JSON_IDIOM:
+        case JSON_EVENT_IDIOM:
             newIdiom = &tree->idiomPool[newValue->value.idiomOffset];
             char *op;
             switch (newIdiom->operator) {
@@ -293,6 +293,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local assert_fact = tonumber(ARGV[4])\n"
 "local events_hashset = \"%s!e!\" .. sid\n"
 "local facts_hashset = \"%s!f!\" .. sid\n"
+"local visited_hashset = \"%s!v!\" .. sid\n"
 "local actions_key = \"%s!a\"\n"
 "local keys\n"
 "local directory\n"
@@ -395,15 +396,10 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    local index = directory[key]\n"
 "    if index then\n"
 "        local count = 0\n"
-"        if message then\n"
-"            if assert_fact == 0 then\n"
-"                count = process_event(message, index, keys[index] .. \"!e!\" .. sid, events_hashset, false)\n"
-"            else\n"
-"                count = process_event(message, index, keys[index] .. \"!f!\" .. sid, facts_hashset, true)\n"
-"            end\n"
+"        if assert_fact == 0 then\n"
+"            count = process_event(message, index, keys[index] .. \"!e!\" .. sid, events_hashset, false)\n"
 "        else\n"
-"            count = count + process_frame({}, 1, keys[1] .. \"!e!\" .. sid, events_hashset, true)\n"
-"            count = count + process_frame({}, 1, keys[1] .. \"!f!\" .. sid, facts_hashset, true)\n"
+"            count = process_event(message, index, keys[index] .. \"!f!\" .. sid, facts_hashset, true)\n"
 "        end\n"
 "        if count > 0 then\n"
 "            local length = redis.call(\"llen\", results_key)\n"
@@ -420,25 +416,33 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        end\n"
 "    end\n"
 "end\n"
-"local message = nil\n"
-"if #ARGV > 4 then\n"
-"    message = {}\n"
-"    for index = 5, #ARGV, 3 do\n"
-"        if ARGV[index + 2] == \"1\" then\n"
-"           message[ARGV[index]] = ARGV[index + 1]\n"
-"        elseif ARGV[index + 2] == \"2\" or  ARGV[index + 2] == \"3\" then\n"
-"           message[ARGV[index]] = tonumber(ARGV[index + 1])\n"
-"        elseif ARGV[index + 2] == \"4\" then\n"
-"           message[ARGV[index]] = toboolean(ARGV[index + 1])\n"
+"local message = {}\n"
+"for index = 5, #ARGV, 3 do\n"
+"    if ARGV[index + 2] == \"1\" then\n"
+"       message[ARGV[index]] = ARGV[index + 1]\n"
+"    elseif ARGV[index + 2] == \"2\" or  ARGV[index + 2] == \"3\" then\n"
+"       message[ARGV[index]] = tonumber(ARGV[index + 1])\n"
+"    elseif ARGV[index + 2] == \"4\" then\n"
+"       message[ARGV[index]] = toboolean(ARGV[index + 1])\n"
+"    end\n"
+"end\n"
+"if not redis.call(\"hsetnx\", visited_hashset, message[\"id\"], 1) then\n"
+"    if assert_fact == 0 then\n"
+"        if not redis.call(\"hget\", events_hashset, message[\"id\"]) then\n"
+"            return false\n"
+"        end\n"
+"    else\n"
+"        if not redis.call(\"hget\", facts_hashset, message[\"id\"]) then\n"
+"            return false\n"
 "        end\n"
 "    end\n"
 "end\n%s"
-"return tonumber(redis.call(\"hsetnx\", \"%s!s\", sid, \"{ \\\"sid\\\":\\\"\" .. sid .. \"\\\"}\"))\n",
+"return true\n",
                          name,
                          name,
                          name,
-                         lua,
-                         name)  == -1) {
+                         name,
+                         lua)  == -1) {
                 return ERR_OUT_OF_MEMORY;
             }
 
@@ -488,8 +492,9 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    local sid = current_action[1]\n"
 "    local action_name, frame = load_next_frame(action_key .. \"!\" .. sid, sid)\n"
 "    redis.call(\"zincrby\", action_key, step, sid)\n"
+"    local state_fact_id = redis.call(\"hget\", ruleset_name .. \"!s\", sid .. \"!f\")\n"
 "    local state = redis.call(\"hget\", ruleset_name .. \"!s\", sid)\n"
-"    return {sid, state, cjson.encode({[action_name] = frame})}\n"
+"    return {sid, state_fact_id, state, cjson.encode({[action_name] = frame})}\n"
 "end\n"
 "return nil\n", name)  == -1) {
         return ERR_OUT_OF_MEMORY;
@@ -538,46 +543,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     }
 
     strncpy(rulesBinding->removeActionHash, reply->str, 40);
-    rulesBinding->removeActionHash[40] = '\0';
-    freeReplyObject(reply);
-    free(lua);
-    
-    if (asprintf(&lua, 
-"local message = {}\n"
-"local key = ARGV[1]\n"
-"local sid = ARGV[2]\n"
-"local assert_fact = tonumber(ARGV[3])\n"
-"for index = 4, #ARGV, 2 do\n"
-"    message[ARGV[index]] = ARGV[index + 1]\n"
-"end\n"
-"for index = 4, #ARGV, 3 do\n"
-"    if ARGV[index + 2] == \"1\" then\n"
-"       message[ARGV[index]] = ARGV[index + 1]\n"
-"    elseif ARGV[index + 2] == \"2\" or  ARGV[index + 2] == \"3\" then\n"
-"       message[ARGV[index]] = tonumber(ARGV[index + 1])\n"
-"    elseif ARGV[index + 2] == \"4\" then\n"
-"       message[ARGV[index]] = toboolean(ARGV[index + 1])\n"
-"    end\n"
-"end\n"
-"if assert_fact == 0 then\n"
-"    redis.call(\"hset\", \"%s!e!\" .. sid, message[\"id\"], cmsgpack.pack(message))\n"
-"    redis.call(\"rpush\", key .. \"!e!\" .. sid, message[\"id\"])\n"
-"else\n"
-"    redis.call(\"hset\", \"%s!f!\" .. sid, message[\"id\"], cmsgpack.pack(message))\n"
-"    redis.call(\"rpush\", key .. \"!f!\" .. sid, message[\"id\"])\n"
-"end\n", name, name)  == -1) {
-        return ERR_OUT_OF_MEMORY;
-    }
-    
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
-    redisGetReply(reContext, (void**)&reply);
-    if (reply->type == REDIS_REPLY_ERROR) {
-        freeReplyObject(reply);
-        free(lua);
-        return ERR_REDIS_ERROR;
-    }
-
-    strncpy(rulesBinding->assertMessageHash, reply->str, 40);
     rulesBinding->removeActionHash[40] = '\0';
     freeReplyObject(reply);
     free(lua);
@@ -788,17 +753,16 @@ unsigned int getBindingIndex(ruleset *tree, unsigned int sidHash, unsigned int *
     return RULES_OK;
 }
 
-unsigned int assertMessageImmediate(void *rulesBinding, 
-                                    char *key, 
-                                    char *sid, 
-                                    char *message, 
-                                    jsonProperty *allProperties,
-                                    unsigned int propertiesLength,
-                                    unsigned int actionIndex,
-                                    unsigned char assertFact) {
-
+unsigned int formatEvalMessage(void *rulesBinding, 
+                               char *key, 
+                               char *sid, 
+                               char *message, 
+                               jsonProperty *allProperties,
+                               unsigned int propertiesLength,
+                               unsigned int actionIndex,
+                               unsigned char assertFact,
+                               char **command) {
     binding *bindingContext = (binding*)rulesBinding;
-    redisContext *reContext = bindingContext->reContext;
     functionHash *currentAssertHash = &bindingContext->hashArray[actionIndex];
     time_t currentTime = time(NULL);
     char score[11];
@@ -831,172 +795,184 @@ unsigned int assertMessageImmediate(void *rulesBinding,
             argvl[7 + i * 3 + 1] = allProperties[i].valueLength + 1;
         }
 
-        char type[2];
-        snprintf(type, 2, "%d", allProperties[i].type);
-        argv[7 + i * 3 + 2] = type;
+        switch(allProperties[i].type) {
+            case JSON_STRING:
+                argv[7 + i * 3 + 2] = "1";
+                break;
+            case JSON_INT:
+                argv[7 + i * 3 + 2] = "2";
+                break;
+            case JSON_DOUBLE:
+                argv[7 + i * 3 + 2] = "3";
+                break;
+            case JSON_BOOL:
+                argv[7 + i * 3 + 2] = "4";
+                break;
+        }
         argvl[7 + i * 3 + 2] = 1; 
     }
 
-    int result = redisAppendCommandArgv(reContext, 7 + propertiesLength * 3, (const char**)argv, argvl); 
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
+    int result = redisFormatCommandArgv(command, 7 + propertiesLength * 3, (const char**)argv, argvl); 
+    if (result == 0) {
+        return ERR_OUT_OF_MEMORY;
     }
-
-    redisReply *reply;
-    result = redisGetReply(reContext, (void**)&reply);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("%s\n", reply->str);
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-
-    if (reply->type == REDIS_REPLY_INTEGER && reply->integer) {
-        freeReplyObject(reply);
-        return ERR_NEW_SESSION;
-    }
-    
-    freeReplyObject(reply);    
     return RULES_OK;
 }
 
-unsigned int assertFirstMessage(void *rulesBinding, 
-                                char *key, 
+unsigned int formatStoreSession(void *rulesBinding, 
                                 char *sid, 
-                                char *message,
-                                jsonProperty *allProperties,
-                                unsigned int propertiesLength,
-                                unsigned char assertFact) {
+                                char *state,
+                                unsigned char tryExists, 
+                                char **command) {
+    binding *currentBinding = (binding*)rulesBinding;
 
-    redisContext *reContext = ((binding*)rulesBinding)->reContext;
-    int result = redisAppendCommand(reContext, "multi");
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
+    int result;
+    if (tryExists) {
+        result = redisFormatCommand(command,
+                                    "hsetnx %s %s %s", 
+                                    currentBinding->sessionHashset, 
+                                    sid, 
+                                    state);
+    } else {
+        result = redisFormatCommand(command,
+                                    "hset %s %s %s", 
+                                    currentBinding->sessionHashset, 
+                                    sid, 
+                                    state);
     }
 
-    return assertMessage(rulesBinding, 
-                         key, 
-                         sid, 
-                         message, 
-                         allProperties, 
-                         propertiesLength,
-                         assertFact);
-}
-
-unsigned int assertMessage(void *rulesBinding, 
-                           char *key, 
-                           char *sid, 
-                           char *message,
-                           jsonProperty *allProperties,
-                           unsigned int propertiesLength,
-                           unsigned char assertFact) {
-
-    binding *bindingContext = (binding*)rulesBinding;
-    redisContext *reContext = bindingContext->reContext;
-    time_t currentTime = time(NULL);
-    char score[11];
-    snprintf(score, 11, "%ld", currentTime);
-    char *argv[6 + propertiesLength * 3];
-    size_t argvl[6 + propertiesLength * 3];
-
-    argv[0] = "evalsha";
-    argvl[0] = 7;
-    argv[1] = bindingContext->assertMessageHash;
-    argvl[1] = 40;
-    argv[2] = "0";
-    argvl[2] = 1;
-    argv[3] = key;
-    argvl[3] = strlen(key);
-    argv[4] = sid;
-    argvl[4] = strlen(sid);
-    argv[5] = assertFact ? "1" : "0";
-    argvl[5] = 1;
-    
-    for (unsigned int i = 0; i < propertiesLength; ++i) {
-        char propertyHash[10];
-        snprintf(propertyHash, 10, "%d", allProperties[i].hash);
-        argv[6 + i * 3] = message + allProperties[i].nameOffset;
-        argvl[6 + i * 3] = allProperties[i].nameLength;
-        argv[6 + i * 3 + 1] = message + allProperties[i].valueOffset;
-        if (allProperties[i].type == JSON_STRING) {
-            argvl[6 + i * 3 + 1] = allProperties[i].valueLength;
-        } else {
-            argvl[6 + i * 3 + 1] = allProperties[i].valueLength + 1;
-        }
-
-        char type[2];
-        snprintf(type, 2, "%d", allProperties[i].type);
-        argv[6 + i * 3 + 2] = type;
-        argvl[6 + i * 3 + 2] = 1; 
+    if (result == 0) {
+        return ERR_OUT_OF_MEMORY;
     }
-
-    int result = redisAppendCommandArgv(reContext, 6 + propertiesLength * 3, (const char**)argv, argvl); 
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
     return RULES_OK;
 }
 
-unsigned int assertLastMessage(void *rulesBinding, 
-                               char *key,
-                               char *sid, 
-                               char *message,
-                               jsonProperty *allProperties,
-                               unsigned int propertiesLength,
-                               int actionIndex, 
-                               unsigned int messageCount,
-                               unsigned char assertFact) {
+unsigned int formatStoreSessionFactId(void *rulesBinding, 
+                                      char *sid, 
+                                      char *mid,
+                                      unsigned char tryExists, 
+                                      char **command) {
+    binding *currentBinding = (binding*)rulesBinding;
 
-    unsigned int result = assertMessage(rulesBinding, 
-                                        key, 
-                                        sid, 
-                                        message, 
-                                        allProperties, 
-                                        propertiesLength,
-                                        assertFact); 
-    if (result != RULES_OK) {
-        return result;
+    int result;
+    if (tryExists) {
+        result = redisFormatCommand(command,
+                                    "hsetnx %s %s!f %s", 
+                                    currentBinding->sessionHashset, 
+                                    sid, 
+                                    mid);
+    } else {
+        result = redisFormatCommand(command,
+                                    "hset %s %s!f %s", 
+                                    currentBinding->sessionHashset, 
+                                    sid, 
+                                    mid);
     }
 
+    if (result == 0) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    return RULES_OK;
+}
+
+unsigned int formatRemoveTimer(void *rulesBinding, 
+                               char *timer, 
+                               char **command) {
+    binding *currentBinding = (binding*)rulesBinding;
+    int result = redisFormatCommand(command,
+                                    "zrem %s %s", 
+                                    currentBinding->timersSortedset, 
+                                    timer);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+    
+    return RULES_OK;
+}
+
+unsigned int formatRemoveAction(void *rulesBinding, 
+                                char *sid, 
+                                char **command) {
+    binding *bindingContext = (binding*)rulesBinding;
+    time_t currentTime = time(NULL);
+
+    int result = redisFormatCommand(command,
+                                    "evalsha %s 0 %s %ld", 
+                                    bindingContext->removeActionHash, 
+                                    sid, 
+                                    currentTime); 
+    if (result == 0) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    return RULES_OK;
+}
+
+unsigned int formatRetractMessage(void *rulesBinding, 
+                                  char *sid, 
+                                  char *mid,
+                                  char **command) {
+    binding *currentBinding = (binding*)rulesBinding;
+    int result = redisFormatCommand(command,
+                                    "hdel %s!%s %s", 
+                                    currentBinding->factsHashset, 
+                                    sid, 
+                                    mid);
+    if (result == 0) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    return RULES_OK;
+}
+
+unsigned int executeBatch(void *rulesBinding,
+                          char **commands,
+                          unsigned short commandCount) {
+    if (commandCount == 0) {
+        return RULES_OK;
+    }
+
+    unsigned int result;
+    unsigned short replyCount = commandCount;
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;
-    time_t currentTime = time(NULL);
-    functionHash *currentAssertHash = &currentBinding->hashArray[actionIndex];
+    if (commandCount > 1) {
+        ++replyCount;
+        result = redisAppendCommand(reContext, "multi");
+        if (result != REDIS_OK) {
+            for (unsigned short i = 0; i < commandCount; ++i) {
+                free(commands[i]);
+            }
 
-    result = redisAppendCommand(reContext, 
-                                "evalsha %s 0 0 %s %ld", 
-                                *currentAssertHash, 
-                                sid, 
-                                currentTime); 
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
+            return ERR_REDIS_ERROR;
+        }
     }
 
-    result = redisAppendCommand(reContext, "exec");
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
+    for (unsigned short i = 0; i < commandCount; ++i) {
+        sds newbuf;
+        newbuf = sdscatlen(reContext->obuf, commands[i], strlen(commands[i]));
+        if (newbuf == NULL) {
+            return ERR_OUT_OF_MEMORY;
+        }
+
+        reContext->obuf = newbuf;
+        free(commands[i]);
+    }
+
+    if (commandCount > 1) {
+        ++replyCount;
+        unsigned int result = redisAppendCommand(reContext, "exec");
+        if (result != REDIS_OK) {
+            return ERR_REDIS_ERROR;
+        }
     }
 
     redisReply *reply;
-    result = RULES_OK;
-    for (unsigned short i = 0; i < messageCount + 3; ++i) {
+    for (unsigned short i = 0; i < replyCount; ++i) {
         result = redisGetReply(reContext, (void**)&reply);
         if (result != REDIS_OK) {
             result = ERR_REDIS_ERROR;
         } else {
             if (reply->type == REDIS_REPLY_ERROR) {
                 result = ERR_REDIS_ERROR;
-            }
-
-            if (reply->type == REDIS_REPLY_ARRAY) {
-                redisReply *lastReply = reply->element[reply->elements - 1]; 
-                if (lastReply->type == REDIS_REPLY_INTEGER && lastReply->integer) {
-                    result = ERR_NEW_SESSION;
-                }
             }
 
             freeReplyObject(reply);    
@@ -1007,21 +983,6 @@ unsigned int assertLastMessage(void *rulesBinding,
 }
 
 unsigned int retractMessage(void *rulesBinding, char *sid, char *mid) {
-    binding *currentBinding = (binding*)rulesBinding;
-    redisContext *reContext = currentBinding->reContext; 
-    int result = redisAppendCommand(reContext, 
-                                    "hdel %s!%s %s", 
-                                    currentBinding->factsHashset, 
-                                    sid, 
-                                    mid);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    return RULES_OK;
-}
-
-unsigned int retractMessageImmediate(void *rulesBinding, char *sid, char *mid) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;  
     int result = redisAppendCommand(reContext, 
@@ -1087,74 +1048,6 @@ unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply
     return ERR_NO_ACTION_AVAILABLE;
 }
 
-unsigned int removeAction(void *rulesBinding, char *sid) {
-    binding *bindingContext = (binding*)rulesBinding;
-    redisContext *reContext = bindingContext->reContext; 
-    time_t currentTime = time(NULL);
-
-    int result = redisAppendCommand(reContext, 
-                                    "evalsha %s 0 %s %ld", 
-                                    bindingContext->removeActionHash, 
-                                    sid, 
-                                    currentTime); 
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    return RULES_OK;
-}
-
-unsigned int assertTimer(void *rulesBinding, 
-                         char *key, 
-                         char *sid, 
-                         char *timer, 
-                         jsonProperty *allProperties,
-                         unsigned int propertiesLength,
-                         unsigned int actionIndex) {
-
-    binding *bindingContext = (binding*)rulesBinding;
-    redisContext *reContext = bindingContext->reContext;
-    functionHash *currentAssertHash = &bindingContext->hashArray[actionIndex];
-    time_t currentTime = time(NULL);
-    char score[11];
-    snprintf(score, 11, "%ld", currentTime);
-    char *argv[7 + propertiesLength * 2];
-    size_t argvl[7 + propertiesLength * 2];
-
-    argv[0] = "evalsha";
-    argvl[0] = 7;
-    argv[1] = *currentAssertHash;
-    argvl[1] = 40;
-    argv[2] = "0";
-    argvl[2] = 1;
-    argv[3] = key;
-    argvl[3] = strlen(key);
-    argv[4] = sid;
-    argvl[4] = strlen(sid);
-    argv[5] = score;
-    argvl[5] = 10;
-    argv[6] = "0";
-    argvl[6] = 1;
-
-    for (unsigned int i = 0; i < propertiesLength; ++i) {
-        argv[7 + i * 2] = timer + allProperties[i].nameOffset;
-        argvl[7 + i * 2] = allProperties[i].nameLength;
-        argv[7 + i * 2 + 1] = timer + allProperties[i].valueOffset;
-        if (allProperties[i].type == JSON_STRING) {
-            argvl[7 + i * 2 + 1] = allProperties[i].valueLength;
-        } else {
-            argvl[7 + i * 2 + 1] = allProperties[i].valueLength + 1;
-        }
-    }
-
-    int result = redisAppendCommandArgv(reContext, 7 + propertiesLength * 2, (const char**)argv, argvl); 
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    return RULES_OK;
-}
-
 unsigned int peekTimers(ruleset *tree, void **bindingContext, redisReply **reply) {
     bindingsList *list = tree->bindingsList;
     for (unsigned int i = 0; i < list->bindingsLength; ++i) {
@@ -1192,21 +1085,6 @@ unsigned int peekTimers(ruleset *tree, void **bindingContext, redisReply **reply
     return ERR_NO_TIMERS_AVAILABLE;
 }
 
-unsigned int removeTimer(void *rulesBinding, char *timer) {
-    binding *currentBinding = (binding*)rulesBinding;
-    redisContext *reContext = currentBinding->reContext;  
-
-    int result = redisAppendCommand(reContext, 
-                                    "zrem %s %s", 
-                                    currentBinding->timersSortedset, 
-                                    timer);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-    
-    return RULES_OK;
-}
-
 unsigned int registerTimer(void *rulesBinding, unsigned int duration, char *timer) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;   
@@ -1234,63 +1112,6 @@ unsigned int registerTimer(void *rulesBinding, unsigned int duration, char *time
 
     freeReplyObject(reply);    
     return RULES_OK;
-}
-
-unsigned int prepareCommands(void *rulesBinding) {
-    redisContext *reContext = ((binding*)rulesBinding)->reContext;   
-    int result = redisAppendCommand(reContext, "multi");
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-    
-    return RULES_OK;
-}
-
-unsigned int rollbackCommands(void *rulesBinding) {
-    redisContext *reContext = ((binding*)rulesBinding)->reContext;   
-    int result = redisAppendCommand(reContext, "discard");
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-    
-    redisReply *reply;
-    result = redisGetReply(reContext, (void**)&reply);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    if (reply->type == REDIS_REPLY_ERROR) {
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-
-    freeReplyObject(reply);    
-    return RULES_OK;
-}
-
-unsigned int executeCommands(void *rulesBinding, unsigned int commandCount) {
-    redisContext *reContext = ((binding*)rulesBinding)->reContext;  
-    unsigned int result = redisAppendCommand(reContext, "exec");
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    redisReply *reply;
-    result = RULES_OK;
-    for (unsigned int i = 0; i < commandCount; ++i) {
-        result = redisGetReply(reContext, (void**)&reply);
-        if (result != REDIS_OK) {
-            result = ERR_REDIS_ERROR;
-        } else {
-            if (reply->type == REDIS_REPLY_ERROR) {
-                result = ERR_REDIS_ERROR;
-            }
-
-            freeReplyObject(reply);    
-        } 
-    }
-    
-    return result;
 }
 
 unsigned int getSession(void *rulesBinding, char *sid, char **state) {
@@ -1329,45 +1150,4 @@ unsigned int getSession(void *rulesBinding, char *sid, char **state) {
     return REDIS_OK;
 }
 
-unsigned int storeSession(void *rulesBinding, char *sid, char *state) {
-    binding *currentBinding = (binding*)rulesBinding;
-    redisContext *reContext = currentBinding->reContext; 
-    int result = redisAppendCommand(reContext, 
-                                    "hset %s %s %s", 
-                                    currentBinding->sessionHashset, 
-                                    sid, 
-                                    state);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    return RULES_OK;
-}
-
-unsigned int storeSessionImmediate(void *rulesBinding, char *sid, char *state) {
-    binding *currentBinding = (binding*)rulesBinding;
-    redisContext *reContext = currentBinding->reContext;  
-    int result = redisAppendCommand(reContext, 
-                                    "hset %s %s %s", 
-                                    currentBinding->sessionHashset, 
-                                    sid, 
-                                    state);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    redisReply *reply;
-    result = redisGetReply(reContext, (void**)&reply);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    if (reply->type == REDIS_REPLY_ERROR) {
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-    
-    freeReplyObject(reply);    
-    return RULES_OK;
-}
 

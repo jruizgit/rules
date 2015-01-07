@@ -328,17 +328,15 @@ unsigned int refreshState(void *handle,
         entry->state = NULL;
     }
 
-    memset(entry->properties, 0, MAX_STATE_PROPERTIES * sizeof(jsonProperty));
     result = getSession(rulesBinding, sid, &entry->state);
     if (result != RULES_OK) {
         if (result == ERR_NEW_SESSION) {
-            entry->lastRefresh = time(NULL);
-            return RULES_OK;
+            entry->lastRefresh = time(NULL);    
         }
-
         return result;
     }
 
+    memset(entry->properties, 0, MAX_STATE_PROPERTIES * sizeof(jsonProperty));
     char *next;
     unsigned int midIndex = UNDEFINED_INDEX;
     unsigned int sidIndex = UNDEFINED_INDEX;
