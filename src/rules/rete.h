@@ -80,6 +80,7 @@ typedef struct betaConnector {
 
 typedef struct action {
     unsigned int index;
+    unsigned short priority;
     unsigned int joinsOffset;
     unsigned short joinsLength;
 } action;

@@ -407,9 +407,12 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "            local new_count, prev_remain = math.modf(length / window)\n"
 "            local diff = new_count - prev_count\n"
 "            if diff > 0 then\n"
+"                local first_score = %d000000\n"
+"                local last_score = %d000000 - 1\n"
+"                local sequence = redis.call(\"zcount\", actions_key .. \"!\" .. sid, first_score, last_score)\n"
 "                for i = 0, diff - 1, 1 do\n"
-"                    redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
-"                    redis.call(\"rpush\", actions_key .. \"!\" .. sid, window)\n"
+"                    redis.call(\"zadd\", actions_key .. \"!\" .. sid, first_score + sequence, cmsgpack.pack({sequence, window, results_key}))\n"
+"                    sequence = sequence + 1\n"
 "                end\n"
 "                redis.call(\"zadd\", actions_key , score, sid)\n"
 "            end\n"
@@ -442,6 +445,8 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                          name,
                          name,
                          name,
+                         currentNode->value.c.priority,
+                         currentNode->value.c.priority + 1,
                          lua)  == -1) {
                 return ERR_OUT_OF_MEMORY;
             }
@@ -466,10 +471,10 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 
     if (asprintf(&lua, 
 "local load_next_frame = function(key, sid)\n"
-"    local rule_action_key = redis.call(\"lindex\", key, 0)\n"
-"    local count = tonumber(redis.call(\"lindex\", key, 1))\n"
+"    local count_action = cmsgpack.unpack(redis.call(\"zrange\", key, 0, 0)[1])\n"
+"    local rule_action_key = count_action[3]\n"
 "    local frames = {}\n"
-"    for i = 0, count - 1, 1 do\n"
+"    for i = 0, count_action[2] - 1, 1 do\n"
 "        local packed_frame = redis.call(\"lindex\", rule_action_key, i)\n"
 "        frames[i + 1] = cmsgpack.unpack(packed_frame)\n"
 "    end\n"
@@ -515,12 +520,12 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 
     if (asprintf(&lua, 
 "local delete_frame = function(key)\n"
-"    local rule_action_key = redis.call(\"lpop\", key)\n"
-"    local count = tonumber(redis.call(\"lpop\", key))\n"
-"    for i = 0, count - 1, 1 do\n"
-"        redis.call(\"lpop\", rule_action_key)\n"
+"    local count_action = cmsgpack.unpack(redis.call(\"zrange\", key, 0, 0)[1])\n"
+"    redis.call(\"zremrangebyrank\", key, 0, 0)\n"
+"    for i = 0, count_action[2] - 1, 1 do\n"
+"        redis.call(\"lpop\", count_action[3])\n"
 "    end\n"
-"    return (redis.call(\"llen\", key) > 0)\n"
+"    return (redis.call(\"zcard\", key) > 0)\n"
 "end\n"
 "local sid = ARGV[1]\n"
 "local max_score = tonumber(ARGV[2])\n"

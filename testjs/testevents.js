@@ -668,6 +668,79 @@ console.log(JSON.parse(result[2]));
 r.completeAction(handle, result[0], result[1]);
 r.deleteRuleset(handle);
 
+console.log('books5');
+
+handle = r.createRuleset('books3',  
+    JSON.stringify({
+        ship: {
+            pri: 2,
+            all: [ 
+                {m: {$and: [
+                    { country: 'US' },
+                    { seller: 'bookstore'},
+                    { currency: 'US' },
+                    { $lte: { amount: 1000 } },
+                ]}}
+            ],
+        },
+        order: {
+            pri: 1,
+            all: [ 
+                {m: {$and: [
+                    { country: 'US' },
+                    { seller: 'bookstore'},
+                    { currency: 'US' },
+                    { $lte: { amount: 1000 } },
+                ]}}
+            ],
+        },
+        submit: {
+            pri: 0,
+            all: [ 
+                {m: {$and: [
+                    { country: 'US' },
+                    { seller: 'bookstore'},
+                    { currency: 'US' },
+                    { $lte: { amount: 1000 } },
+                ]}}
+            ],
+        },
+    })
+, 100);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+r.assertFact(handle, 
+    JSON.stringify({
+        id: 1,
+        sid: 'first',
+        name: 'John Smith',
+        address: '1111 NE 22, Seattle, Wa',
+        phone: '206678787',
+        country: 'US',
+        currency: 'US',
+        seller: 'bookstore',
+        item: 'book',
+        reference: '75323',
+        amount: 500
+    })
+);
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+
+r.deleteRuleset(handle);
+
 console.log('approval1');
 
 handle = r.createRuleset('approval1', 

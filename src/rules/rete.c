@@ -8,6 +8,7 @@
 
 #define HASH_ALL 193486302 // all
 #define HASH_ANY 193486381 // any
+#define HASH_PRI 193502832 // pri
 #define HASH_LT 193419881 // $lt
 #define HASH_LTE 2087888878 // $lte
 #define HASH_GT 193419716 // $gt
@@ -410,6 +411,28 @@ static unsigned int validateWindowSize(char *rule) {
     return PARSE_OK;
 }
 
+static unsigned int validatePriority(char *rule) {
+    char *first;
+    char *last;
+    unsigned int hash;
+    unsigned char type;
+    unsigned int result = readNextName(rule, &first, &last, &hash);
+    while (result == PARSE_OK) {
+        if (hash == HASH_PRI) {
+            result = readNextValue(last, &first, &last, &type);
+            if (type != JSON_INT) {
+                return ERR_UNEXPECTED_TYPE;
+            }
+
+            return PARSE_OK;
+        }
+
+        result = readNextName(last, &first, &last, &hash);
+    }
+
+    return PARSE_OK;
+}
+
 static unsigned int validateReference(char *rule, unsigned char *referenceType) {
     char *first;
     char *last;
@@ -703,6 +726,11 @@ static unsigned int validateRuleset(char *rules) {
             return result;
         }
 
+        result = validatePriority(first);
+        if (result != PARSE_OK) {
+            return result;
+        }
+
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
             result = readNextValue(last, &first, &last, &type);
@@ -715,7 +743,7 @@ static unsigned int validateRuleset(char *rules) {
                 if (result != RULES_OK && result != PARSE_END) {
                     return result;
                 }
-            } else if (hash != HASH_COUNT) {
+            } else if (hash != HASH_COUNT && hash != HASH_PRI) {
                 return ERR_UNEXPECTED_NAME;
             }
 
@@ -1002,6 +1030,26 @@ static void getWindowSize(char *rule, unsigned short *count) {
             temp = first[last - first + 1];
             first[last - first + 1] = '\0';
             *count = atoi(first);
+            first[last - first + 1] = temp;
+            break;   
+        }
+        result = readNextName(last, &first, &last, &hash);
+    }
+}
+
+static void getPriority(char *rule, unsigned short *priority) {
+    char *first;
+    char *last;
+    char temp;
+    unsigned int hash;
+    unsigned char type;
+    unsigned int result = readNextName(rule, &first, &last, &hash);
+    while (result == PARSE_OK) {
+        readNextValue(last, &first, &last, &type);
+        if (hash == HASH_PRI) {
+            temp = first[last - first + 1];
+            first[last - first + 1] = '\0';
+            *priority = atoi(first);
             first[last - first + 1] = temp;
             break;   
         }
@@ -1526,6 +1574,8 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         }
 
         readNextValue(lastName, &first, &lastRuleValue, &type);
+        getPriority(first, &ruleAction->value.c.priority);
+        
         unsigned short count = 1;
         getWindowSize(first, &count);
         result = readNextName(first, &first, &last, &hash);
