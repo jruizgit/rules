@@ -1,34 +1,46 @@
 var d = require('../libjs/durable');
 
+// with (d.statechart('fraud')) {
+//     with (state('start')) {
+//         to('standby');
+//     }
+//     with (state('standby')) {
+//         to('metering').when(m.amount.gt(100), function (s) {
+//             s.startTimer('velocity', 30);
+//         });
+//     }
+//     with (state('metering')) {
+//         to('fraud').when(m.amount.gt(100), count(3), function (s) {
+//             console.log('fraud2 detected');
+//         });
+//         to('standby').when(timeout('velocity'), function (s) {
+//             console.log('fraud2 cleared');  
+//         });
+//     }
+//     state('fraud');
+//     whenStart(function (host) {
+//         host.post('fraud', {id: 1, sid: 1, amount: 200});
+//         host.post('fraud', {id: 2, sid: 1, amount: 200});
+//         host.post('fraud', {id: 3, sid: 1, amount: 200});
+//         host.post('fraud', {id: 4, sid: 1, amount: 200});
+//     });
+// }
 
-with (d.statechart('fraud')) {
-    with (state('start')) {
-        to('standby');
-    }
-    with (state('standby')) {
-        to('metering').when(m.amount.gt(100), function (s) {
-            s.startTimer('velocity', 30);
-        });
-    }
-    with (state('metering')) {
-        to('fraud').when(m.amount.gt(100).atLeast(2), function (s) {
-            console.log('fraud2 detected');
-        });
-        to('standby').when(timeout('velocity'), function (s) {
-            console.log('fraud2 cleared');  
-        });
-    }
-    state('fraud');
-    whenStart(function (host) {
-        host.post('fraud', {id: 1, sid: 1, amount: 200});
-        host.post('fraud', {id: 2, sid: 1, amount: 200});
-        host.post('fraud', {id: 3, sid: 1, amount: 200});
-    });
-}
+// with (d.ruleset('a11')) {
+//     whenAny(m.amount.lt(100), all(m.subject.eq('please'), count(3)), function (s, m) {
+//         console.log('a11 approved ->' + JSON.stringify(m));
+//     });
+//     whenStart(function (host) {
+//         host.postBatch('a11', {id: 1, sid: 1, amount: 10},
+//                               {id: 2, sid: 1, subject: 'please'},
+//                               {id: 3, sid: 1, subject: 'please'},
+//                               {id: 4, sid: 1, subject: 'please'});
+//     }); 
+// }
 
 with (d.ruleset('a0')) {
     when(m.amount.lt(100).or(m.subject.eq('approve')).or(m.subject.eq('ok')), function (s) {
-        console.log('a0 approved from ' + s.id);
+        console.log('a0 approved from ' + s.sid);
     });
     whenStart(function (host) {
         host.post('a0', {id: 1, sid: 1, amount: 10});
@@ -39,23 +51,23 @@ with (d.ruleset('a0')) {
 
 with (d.ruleset('a1')) {
     when(m.subject.eq('approve').and(m.amount.gt(1000)), function (s) {
-        console.log('a1 denied from: ' + s.id);
+        console.log('a1 denied from: ' + s.sid);
         s.status = 'done';
     });
     when(m.subject.eq('approve').and(m.amount.lte(1000)), function (s) {
-        console.log('a1 request approval from: ' + s.id);
+        console.log('a1 request approval from: ' + s.sid);
         s.status = 'pending';
     });
-    whenAll(m.subject.eq('approved'), s.status.eq('pending'), function (s) {
-        console.log('a1 second request approval from: ' + s.id);
+    when(m.subject.eq('approved'), s.status.eq('pending'), function (s) {
+        console.log('a1 second request approval from: ' + s.sid);
         s.status = 'approved';
     });
     when(s.status.eq('approved'), function (s) {
-        console.log('a1 approved from: ' + s.id);
+        console.log('a1 approved from: ' + s.sid);
         s.status = 'done';
     });
     when(m.subject.eq('denied'), function (s) {
-        console.log('a1 denied from: ' + s.id);
+        console.log('a1 denied from: ' + s.sid);
         s.status = 'done';
     });
     whenStart(function (host) {
@@ -70,22 +82,22 @@ with (d.ruleset('a1')) {
 with (d.statechart('a2')) {
     with (state('input')) {
         to('denied').when(m.subject.eq('approve').and(m.amount.gt(1000)), function (s) {
-            console.log('a2 denied from: ' + s.id);
+            console.log('a2 denied from: ' + s.sid);
         });
         to('pending').when(m.subject.eq('approve').and(m.amount.lte(1000)), function (s) {
-            console.log('a2 request approval from: ' + s.id);
+            console.log('a2 request approval from: ' + s.sid);
         });
     }
     with (state('pending')) {
         to('pending').when(m.subject.eq('approved'), function (s) {
-            console.log('a2 second request approval from: ' + s.id);
+            console.log('a2 second request approval from: ' + s.sid);
             s.status = 'approved';
         });
         to('approved').when(s.status.eq('approved'), function (s) {
-            console.log('a2 approved from: ' + s.id);
+            console.log('a2 approved from: ' + s.sid);
         });
         to('denied').when(m.subject.eq('denied'), function (s) {
-            console.log('a2 denied from: ' + s.id);
+            console.log('a2 denied from: ' + s.sid);
         });
     }
     state('denied');
@@ -106,7 +118,7 @@ with (d.flowchart('a3')) {
     }
     with (stage('request')) {
         run(function (s) {
-            console.log('a3 request approval from: ' + s.id);
+            console.log('a3 request approval from: ' + s.sid);
             if (s.status) 
                 s.status = 'approved';
             else
@@ -118,12 +130,12 @@ with (d.flowchart('a3')) {
     }
     with (stage('approve')) {
         run(function (s) {
-            console.log('a3 approved from: ' + s.id);
+            console.log('a3 approved from: ' + s.sid);
         });
     }
     with (stage('deny')) {
         run(function (s) {
-            console.log('a3 denied from: ' + s.id);
+            console.log('a3 denied from: ' + s.sid);
         });
     }
     whenStart(function (host) {
@@ -138,7 +150,7 @@ with (d.flowchart('a3')) {
 with (d.ruleset('a4')) {
     whenAny(all(m.subject.eq('approve'), m.amount.eq(1000)), 
             all(m.subject.eq('jumbo'), m.amount.eq(10000)), function (s) {
-        console.log('a4 action from: ' + s.id);
+        console.log('a4 action from: ' + s.sid);
     });
     whenStart(function (host) {
         host.post('a4', {id: 1, sid: 1, subject: 'approve'});
@@ -149,9 +161,9 @@ with (d.ruleset('a4')) {
 }
 
 with (d.ruleset('a5')) {
-    whenAll(any(m.subject.eq('approve'), m.subject.eq('jumbo')), 
-            any(m.amount.eq(100), m.amount.eq(10000)), function (s) {
-        console.log('a5 action from: ' + s.id);
+    when(any(m.subject.eq('approve'), m.subject.eq('jumbo')), 
+         any(m.amount.eq(100), m.amount.eq(10000)), function (s) {
+        console.log('a5 action from: ' + s.sid);
     });
     whenStart(function (host) {
         host.post('a5', {id: 1, sid: 1, subject: 'approve'});
@@ -197,7 +209,7 @@ with (d.ruleset('a7')) {
         console.log('a7 approved ' +  m.amount);
     });
     whenStart(function (host) {
-        host.patchState('a7', {id: 1, maxAmount: 100});
+        host.patchState('a7', {sid: 1, maxAmount: 100});
         host.post('a7', {id: 1, sid: 1, amount: 10});
         host.post('a7', {id: 2, sid: 1, amount: 1000});
     });
@@ -208,15 +220,15 @@ with (d.ruleset('a8')) {
         console.log('a8 approved ' +  m.amount);
     });
     whenStart(function (host) {
-        host.patchState('a8', {id: 1, maxAmount: 500});
-        host.patchState('a8', {id: 'global', minAmount: 100});
+        host.patchState('a8', {sid: 1, maxAmount: 500});
+        host.patchState('a8', {sid: 'global', minAmount: 100});
         host.post('a8', {id: 1, sid: 1, amount: 10});
         host.post('a8', {id: 2, sid: 1, amount: 200});
     });
 }
 
 with (d.ruleset('a9')) {
-    when(m.amount.lt(100), atLeast(5), atMost(6), function (s, m) {
+    when(m.amount.lt(100), count(3), function (s, m) {
         console.log('a9 approved ->' + JSON.stringify(m));
     });
     whenStart(function (host) {
@@ -230,7 +242,7 @@ with (d.ruleset('a9')) {
 }
 
 with (d.ruleset('a10')) {
-    whenAll(m.amount.lt(100), m.subject.eq('approve'), atLeast(3), atMost(6), function (s, m) {
+    when(m.amount.lt(100), m.subject.eq('approve'), count(3), function (s, m) {
         console.log('a10 approved ->' + JSON.stringify(m));
     });
     whenStart(function (host) {
@@ -240,18 +252,6 @@ with (d.ruleset('a10')) {
                               {id: 4, sid: 1, subject: 'approve'});
         host.postBatch('a10', {id: 5, sid: 1, subject: 'approve'},
                               {id: 6, sid: 1, subject: 'approve'});
-    }); 
-}
-
-with (d.ruleset('a11')) {
-    whenAll(m.amount.lt(100), m.subject.eq('please').atLeast(3).atMost(6), function (s, m) {
-        console.log('a11 approved ->' + JSON.stringify(m));
-    });
-    whenStart(function (host) {
-        host.postBatch('a11', {id: 1, sid: 1, amount: 10},
-                              {id: 2, sid: 1, subject: 'please'},
-                              {id: 3, sid: 1, subject: 'please'},
-                              {id: 4, sid: 1, subject: 'please'});
     }); 
 }
 
@@ -278,7 +278,7 @@ with (d.ruleset('p1')) {
             });
         }
     }
-    whenAll(m.end.eq('one'), m.end.eq('two'), function (s) {
+    when(m.end.eq('one'), m.end.eq('two'), function (s) {
         console.log('p1 approved');
         s.status = 'approved';
     });
@@ -290,7 +290,7 @@ with (d.ruleset('p1')) {
 with (d.statechart('p2')) {
     with (state('input')) {
         to('process').when(m.subject.eq('approve'), function (s, m) {
-            console.log('p2 input ' + m.quantity + ' from: ' + s.id);
+            console.log('p2 input ' + m.quantity + ' from: ' + s.sid);
             s.quantity = m.quantity;
         });
     }
@@ -299,7 +299,7 @@ with (d.statechart('p2')) {
             with (statechart('first')) {
                 with (state('evaluate')) {
                     to('end').when(s.quantity.lte(5), function (s) {
-                        console.log('p2 signaling approved from: ' + s.id);
+                        console.log('p2 signaling approved from: ' + s.sid);
                         s.signal({id: 1, subject: 'approved'});
                     });
                 }
@@ -308,7 +308,7 @@ with (d.statechart('p2')) {
             with (statechart('second')) {
                 with (state('evaluate')) {
                     to('end').when(s.quantity.gt(5), function (s) {
-                        console.log('p2 signaling denied from: ' + s.id);
+                        console.log('p2 signaling denied from: ' + s.sid);
                         s.signal({id: 1, subject: 'denied'});
                     });
                 }
@@ -318,10 +318,10 @@ with (d.statechart('p2')) {
     }
     with (state('result')) {
         to('approved').when(m.subject.eq('approved'), function (s) {
-            console.log('p2 approved from: ' + s.id);
+            console.log('p2 approved from: ' + s.sid);
         });
         to('denied').when(m.subject.eq('denied'), function (s) {
-            console.log('p2 denied from: ' + s.id);
+            console.log('p2 denied from: ' + s.sid);
         });
     }
     state('denied');
@@ -338,7 +338,7 @@ with (d.flowchart('p3')) {
     }
     with (stage('input')) {
         run(function (s, m) {
-            console.log('p3 input ' + m.quantity + ' from: ' + s.id);
+            console.log('p3 input ' + m.quantity + ' from: ' + s.sid);
             s.quantity = m.quantity;
         });
         to('process');
@@ -350,7 +350,7 @@ with (d.flowchart('p3')) {
             }
             with (stage('end')) {
                 run(function (s) {
-                    console.log('p3 signaling approved from: ' + s.id);
+                    console.log('p3 signaling approved from: ' + s.sid);
                     s.signal({id: 1, subject: 'approved'});
                 });
             }
@@ -361,7 +361,7 @@ with (d.flowchart('p3')) {
             }
             with (stage('end')) {
                 run(function (s) {
-                    console.log('p3 signaling denied from: ' + s.id);
+                    console.log('p3 signaling denied from: ' + s.sid);
                     s.signal({id: 1, subject: 'denied'});
                 });
             }
@@ -371,12 +371,12 @@ with (d.flowchart('p3')) {
     }
     with (stage('approve')) {
         run(function (s) {
-            console.log('p3 approved from: ' + s.id);
+            console.log('p3 approved from: ' + s.sid);
         });
     }
     with (stage('deny')) {
         run(function (s) {
-            console.log('p3 denied from: ' + s.id);
+            console.log('p3 denied from: ' + s.sid);
         });
     }
     whenStart(function (host) {

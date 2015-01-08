@@ -3,14 +3,14 @@ var d = require('../libjs/durable');
 d.run({
     timer1: {
         r1: {
-            when: { start: 'yes' },
+            all: [{m: {start: 'yes'}}],
             run: function (s) {
                 s.start = new Date().toString();
                 s.startTimer('myTimer', 5);
             }
         },
         r2: {
-            when: { $t: 'myTimer' },
+            all: [{m: {$t: 'myTimer'}}],
             run: function (s) {
                 console.log('started @' + s.start);
                 console.log('timeout @' + new Date());
@@ -20,7 +20,7 @@ d.run({
     timer2$state: {
         input: {
             review: {
-                when: { subject: 'approve' },
+                all: [{m: {subject: 'approve'}}],
                 run: {
                     first$state: {
                         send: {
@@ -31,7 +31,7 @@ d.run({
                         },
                         evaluate: {
                             wait: {
-                                when: { $t: 'first' },
+                                all: [{m: {$t: 'first'}}],
                                 run: function (s) { s.signal({ id: 2, subject: 'approved' }); },
                                 to: 'end'
                             }
@@ -49,7 +49,7 @@ d.run({
                         },
                         evaluate: {
                             wait: {
-                                when: { $t: 'second' },
+                                all: [{m: {$t: 'second'}}],
                                 run: function (s) { s.signal({ id: 3, subject: 'denied' }); },
                                 to: 'end'
                             }
@@ -63,12 +63,12 @@ d.run({
         },
         pending: {
             approve: {
-                when: { subject: 'approved' },
+                all: [{m: {subject: 'approved'}}],
                 run: function (s) { console.log('approved'); },
                 to: 'approved'
             },
             deny: {
-                when: { subject: 'denied' },
+                all: [{m: {subject: 'denied'}}],
                 run: function (s) { console.log('denied'); },
                 to: 'denied'
             }

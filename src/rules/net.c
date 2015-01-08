@@ -282,7 +282,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                     return ERR_OUT_OF_MEMORY;
                 }
                 free(oldLua);
-                    
             }
 
             oldLua = lua;
@@ -336,7 +335,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "            save_result(frame)\n"
 "            result = 1\n"
 "        else\n"
-"            result = process_frame(frame, index + 1, keys[index + 1] .. \"!e!\" .. sid, events_hashset, false)\n"
+"            result = process_frame(frame, index + 1, keys[index + 1] .. \"!e!\" .. sid, events_hashset, all)\n"
 "            result = result + process_frame(frame, index + 1, keys[index + 1] .. \"!f!\" .. sid, facts_hashset, true)\n"
 "            if result == 0 or all then\n"
 "                save_frame(keys[index + 1] .. \"!c!\" .. sid, frame)\n"
@@ -579,12 +578,10 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     if (asprintf(&lua,
 "local timer_key = \"%s!t\"\n"
 "local timestamp = tonumber(ARGV[1])\n"
-"local res = redis.call(\"zrangebyscore\", KEYS[1], 0, timestamp)\n"
-"if (res[1]) then\n"
-"  local i = 1\n"
-"  while (res[i]) do\n"
-"    redis.call(\"zincrby\", KEYS[1], 10, res[i])\n"
-"    i = i + 1\n"
+"local res = redis.call(\"zrangebyscore\", timer_key, 0, timestamp)\n"
+"if #res > 0 then\n"
+"  for i = 0, #res, 1 do\n"
+"    redis.call(\"zincrby\", timer_key, 10, res[i])\n"
 "  end\n"
 "  return res\n"
 "end\n"
@@ -888,10 +885,9 @@ unsigned int formatRemoveTimer(void *rulesBinding,
                                     "zrem %s %s", 
                                     currentBinding->timersSortedset, 
                                     timer);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
+    if (result == 0) {
+        return ERR_OUT_OF_MEMORY;
     }
-    
     return RULES_OK;
 }
 
@@ -1037,7 +1033,6 @@ unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply
         }
 
         if ((*reply)->type == REDIS_REPLY_ERROR) {
-            printf("error %s\n", (*reply)->str);
             freeReplyObject(*reply);
             return ERR_REDIS_ERROR;
         }

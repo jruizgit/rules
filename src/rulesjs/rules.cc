@@ -200,7 +200,7 @@ Handle<Value> jsRetractFact(const Arguments& args) {
 
     if (args.Length() < 3) {
         ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[1]->IsString() || args[2]->IsString()) {
+    } else if (!args[0]->IsNumber()) {
         ThrowException(Exception::TypeError(String::New("Wrong argument type")));
     } else {
         unsigned int result = retractFact((void *)args[0]->IntegerValue(),
@@ -332,7 +332,7 @@ Handle<Value> jsStartTimer(const Arguments& args) {
 
     if (args.Length() < 3) {
         ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[1]->IsString() || !args[2]->IsNumber() || !args[3]->IsString()) {
+    } else if (!args[0]->IsNumber() || !args[2]->IsNumber() || !args[3]->IsString()) {
         ThrowException(Exception::TypeError(String::New("Wrong argument type")));
     } else {
         unsigned int result = startTimer((void *)args[0]->IntegerValue(),
@@ -381,7 +381,7 @@ Handle<Value> jsGetState(const Arguments& args) {
 
     if (args.Length() < 2) {
         ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+    } else if (!args[0]->IsNumber()) {
         ThrowException(Exception::TypeError(String::New("Wrong argument type")));
     } else {
         char *state;

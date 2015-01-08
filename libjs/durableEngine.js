@@ -57,7 +57,7 @@ exports = module.exports = durableEngine = function () {
             var nameIndex = rulesetName.lastIndexOf('.');
             var parentNamespace = rulesetName.slice(0, nameIndex);
             var name = rulesetName.slice(nameIndex + 1);
-            message.sid = that.id;
+            message.sid = that.sid;
             message.id = name + '.' + message.id;
             that.post(parentNamespace, message);
         };
@@ -67,7 +67,7 @@ exports = module.exports = durableEngine = function () {
                 throw 'branch with name ' + branchName + ' already forked';
             } else {
                 branchNames.push(branchName);
-                branchDocument.id = branchSid;
+                branchDocument.sid = branchSid;
                 branchDirectory[branchName] = branchDocument;
             }
         };
@@ -205,7 +205,7 @@ exports = module.exports = durableEngine = function () {
 
         var execute = function (s) {
             for (var i = 0; i < branchNames.length; ++i) {
-                s.fork(branchNames[i], s.id, copy(s));
+                s.fork(branchNames[i], s.sid, copy(s));
             }
         };
 
@@ -330,7 +330,7 @@ exports = module.exports = durableEngine = function () {
                 var timerName = names[index];
                 var duration = timers[timerName];
                 try {
-                    r.startTimer(handle, s.id, duration, JSON.stringify({ sid: s.id, id:timerName, $t:timerName }));
+                    r.startTimer(handle, s.sid, duration, JSON.stringify({ sid: s.sid, id:timerName, $t:timerName }));
                     startTimers(timers, names, ++index, s, complete);
                 } catch (reason) {
                     complete(reason, s);
@@ -363,7 +363,7 @@ exports = module.exports = durableEngine = function () {
             } 
             else {
                 var document = JSON.parse(result[1]);
-                var output = JSON.parse(result[2])[name];
+                var output = JSON.parse(result[2]);
                 var actionName;
                 for (actionName in output) {
                     output = output[actionName];
@@ -512,31 +512,25 @@ exports = module.exports = durableEngine = function () {
                     for (triggerName in triggers) {
                         trigger = triggers[triggerName];
                         var rule = {};
-                        var stateTest = { label: qualifiedStateName };
-                        if (trigger.when) {
-                            if (trigger.when.$s) {
-                                rule.when = { $s: { $and: [stateTest, trigger.when.$s]}};
-                            } else {
-                                rule.whenAll = { $s: stateTest, $m: trigger.when };
-                            }
-                        } else if (trigger.whenAll) {
-                            var test = { $s: stateTest };
-                            for (var testName in trigger.whenAll) {
-                                if (testName !== '$s') {
-                                    test[testName] = trigger.whenAll[testName];
-                                } else {
-                                    test.$s = { $and: [stateTest, trigger.whenAll.$s]};
-                                }
-                            }
-
-                            rule.whenAll = test;
-                        } else if (trigger.whenAny) {
-                            rule.whenAll = { $s: stateTest, m$any: trigger.whenAny };
-                        } else if (trigger.whenSome) {
-                            rule.whenAll = { $s: stateTest, $m$some: trigger.whenSome };
-                        } else {
-                            rule.when = { $s: stateTest };
+                        var stateTest = {$s: {$and:[{label: qualifiedStateName}, {$s:1}]}};
+                        if (trigger.pri) {
+                            rule.pri = trigger.pri;
                         }
+
+                        if (trigger.all) {
+                            rule.all = trigger.all.concat(stateTest);
+                            if (trigger.$count) {
+                                rule.$count = trigger.$count;
+                            }
+                        } else if (trigger.any) {
+                            if (trigger.$count) {
+                                rule.all = [stateTest, {$count:trigger.$count, m$any: trigger.any}];
+                            } else {
+                                rule.all = [stateTest, {m$any: trigger.any}];
+                            }
+                        } else {
+                            rule.all = [stateTest];
+                        }    
 
                         if (trigger.run) {
                             if (typeof(trigger.run) === 'string') {
@@ -578,9 +572,9 @@ exports = module.exports = durableEngine = function () {
                 }
 
                 if (parentName) {
-                    rules[parentName + '$start'] = { when: { $s: { label: parentName }}, run: to(stateName)};
+                    rules[parentName + '$start'] = {all:[{$s: {$and: [{label: parentName}, {$s:1}]}}], run: to(stateName)};
                 } else {
-                    rules['$start'] = { when: { $s: { $nex: { label: 1 }} }, run: to(stateName)};
+                    rules['$start'] = {all: [{$s: {$and: [{$nex: {label: 1}}, {$s:1}]}}], run: to(stateName)};
                 }
 
                 started = true;
@@ -611,12 +605,12 @@ exports = module.exports = durableEngine = function () {
             var stage;
             for (stageName in chart) {
                 stage = chart[stageName];
-                var stageTest = { label: stageName };
+                var stageTest = {$s: {$and:[{label: stageName}, {$s:1}]}};
                 var nextStage;
                 if (stage.to) {
                     if (typeof(stage.to) === 'string') {
                         rule = {};
-                        rule.when = { $s: stageTest };
+                        rule.all = [stageTest];
                         nextStage = chart[stage.to];
 
                         if (!nextStage.run) {
@@ -639,25 +633,23 @@ exports = module.exports = durableEngine = function () {
                         for (var transitionName  in stage.to) {
                             var transition = stage.to[transitionName];
                             rule = {};
-                            if (transition.$s) {
-                                rule.when = { $s: { $and: [ stageTest, transition.$s]}};
-                            } else if (transition.$all) {
-                                for (var testName in transition.$all) {
-                                    var test = { $s: stageTest };
-                                    if (testName !== '$s') {
-                                        test[testName] = transition.$all[testName];
-                                    } else {
-                                        test.$s = { $and: [ stageTest, transition.$all.$s ]};
-                                    }
-                                }
+                            if (transition.pri) {
+                                rule.pri = transition.pri;
+                            }
 
-                                rule.whenAll = test;
-                            } else if (transition.$any) {
-                                rule.whenAll = { $s: stageTest, m$any: transition.$any };
-                            } else if (transition.$some) {
-                                rule.whenAll = { $s: stageTest, $m$some: transition.$some };
+                            if (transition.all) {
+                                rule.all = transition.all.concat(stageTest);
+                                if (transition.$count) {
+                                    rule.$count = transition.$count;
+                                }
+                            } else if (transition.any) {
+                                if (transition.$count) {
+                                    rule.all = [stageTest, {$count:transition.$count, m$any: transition.any}];
+                                } else {
+                                    rule.all = [stageTest, {m$any: transition.any}];
+                                }
                             } else {
-                                rule.whenAll = { $s: stageTest, $m: transition };
+                                rule.all = [stageTest];
                             }
 
                             nextStage = chart[transitionName];
@@ -694,15 +686,15 @@ exports = module.exports = durableEngine = function () {
                     }
 
                     stage = chart[stageName];
+                    rule = {all: [{$s: {$and: [{$nex: {label:1}}, {$s: 1}]}}]};
                     if (!stage.run) {
-                        rule = { when: { $s: { $nex: { label: 1 }} }, run: to(stageName) };
+                        rule.run = to(stageName);
                     } else {
                         if (typeof(stage.run) === 'string') {
-                            rule = { when: { $s: { $nex: { label: 1 }} }, run: to(stageName).continueWith(host.getAction(stage.run))};
+                            rule.run = to(stageName).continueWith(host.getAction(stage.run));
                         } else if (typeof(stage.run) === 'function' || stage.run.continueWith) {
-                            rule = { when: { $s: { $nex: { label: 1 }} }, run: to(stageName).continueWith(stage.run)};
+                            rule.run = to(stageName).continueWith(stage.run);
                         } else {
-                            rule = { when: { $s: { $nex: { label: 1 }} } };
                             rule.run = to(stageName).continueWith(fork(host.registerRulesets(name, stage.run), function (pName) {
                                 return (pName !== 'label');
                             }));

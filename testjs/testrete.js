@@ -3,24 +3,14 @@ r = require('../build/release/rules.node');
 handle = r.createRuleset('rules',  
     JSON.stringify({  
         r1: { 
-            all: [{$atLeast: 5, $atMost: 10, m: {$and: [{amount: 10000}, {subject: 'approve'}]}}]
+            $count: 5,
+            all: [{m: {$and: [{amount: 10000}, {subject: 'approve'}]}}]
         }
     })
 , 100);
 r.deleteRuleset(handle);
 
 console.log('created rules1');
-
-handle = r.createRuleset('rules',  
-    JSON.stringify({  
-        r1: { 
-            $atLeast: 5, $atMost: 10, all: [{m: {$and: [{amount: 10000}, {subject: 'approve'}]}}]
-        }
-    })
-, 100);
-r.deleteRuleset(handle);
-
-console.log('created rules2');
 
 handle = r.createRuleset('rules',  
     JSON.stringify({ 
@@ -31,7 +21,7 @@ handle = r.createRuleset('rules',
 , 100);
 r.deleteRuleset(handle);
 
-console.log('created rules3');
+console.log('created rules2');
 
 handle = r.createRuleset('rules',  
     JSON.stringify({ 
@@ -42,7 +32,7 @@ handle = r.createRuleset('rules',
 , 100);
 r.deleteRuleset(handle);
 
-console.log('created rules4');
+console.log('created rules3');
 
 handle = r.createRuleset('rules',  
     JSON.stringify({
@@ -53,7 +43,7 @@ handle = r.createRuleset('rules',
 , 100);
 r.deleteRuleset(handle);
 
-console.log('created rules5');
+console.log('created rules4');
 
 handle = r.createRuleset('rules', 
     JSON.stringify({ 
@@ -67,7 +57,7 @@ handle = r.createRuleset('rules',
 , 100);
 r.deleteRuleset(handle);
 
-console.log('created rules6');
+console.log('created rules5');
 
 handle = r.createRuleset('rules', 
     JSON.stringify({ r1: {
@@ -86,7 +76,7 @@ handle = r.createRuleset('rules',
 , 100);
 r.deleteRuleset(handle);
 
-console.log('created rules7');
+console.log('created rules6');
 
 handle = r.createRuleset('rules', 
     JSON.stringify({ r1: {
@@ -105,7 +95,7 @@ handle = r.createRuleset('rules',
 , 100);
 r.deleteRuleset(handle);
 
-console.log('created rules8');
+console.log('created rules7');
 
 handle = r.createRuleset('rules', 
     JSON.stringify({ r1: {
@@ -124,7 +114,7 @@ handle = r.createRuleset('rules',
 , 100);
 r.deleteRuleset(handle);
 
-console.log('created rules9');
+console.log('created rules8');
 
 handle = r.createRuleset('rules', 
     JSON.stringify({ r1: {
@@ -143,7 +133,7 @@ handle = r.createRuleset('rules',
 , 100);
 r.deleteRuleset(handle);
 
-console.log('created rules10');
+console.log('created rules9');
 
 handle = r.createRuleset('rules', 
     JSON.stringify({ r1: {
@@ -159,7 +149,7 @@ handle = r.createRuleset('rules',
 , 100);
 r.deleteRuleset(handle);
 
-console.log('created rules11');
+console.log('created rules10');
 
 handle = r.createRuleset('rules', 
     JSON.stringify({ r1: {
@@ -176,7 +166,7 @@ handle = r.createRuleset('rules',
 , 100);
 r.deleteRuleset(handle);
 
-console.log('created rules12');
+console.log('created rules11');
 
 handle = r.createRuleset('rules', 
     JSON.stringify({ r1: {
@@ -192,7 +182,7 @@ handle = r.createRuleset('rules',
 , 100);
 r.deleteRuleset(handle);
 
-console.log('created rules13');
+console.log('created rules12');
 
 handle = r.createRuleset('rules',  
     JSON.stringify({  
@@ -203,7 +193,7 @@ handle = r.createRuleset('rules',
 , 100);
 r.deleteRuleset(handle);
 
-console.log('created rules14');
+console.log('created rules13');
 
 handle = r.createRuleset('rules',  
     JSON.stringify({  
@@ -214,4 +204,4 @@ handle = r.createRuleset('rules',
 , 100);
 r.deleteRuleset(handle);
 
-console.log('created rules15');
+console.log('created rules14');

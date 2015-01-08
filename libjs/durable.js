@@ -141,16 +141,6 @@ exports = module.exports = durableEngine = function () {
             );
         };
 
-        that.atLeast = function (count) {
-            atLeast = count;
-            return that;
-        };    
-
-        that.atMost = function (count) {
-            atMost = count;
-            return that;
-        };
-
         that.and = function () {
             var terms = [that];
             argsToArray(arguments, terms);
@@ -190,20 +180,22 @@ exports = module.exports = durableEngine = function () {
                     newDefinition[op] = innerDefinition;
                 }
 
-                if (atLeast) {
-                    newDefinition['$atLeast'] = atLeast;
-                }
-
-                if (atMost) {
-                    newDefinition['$atMost'] = atMost;
-                }
-
-                return type === '$s' ? {$s: newDefinition}: newDefinition;
+                return type === '$s' ? {$and: [newDefinition, {$s: 1}]}: newDefinition;
             }
         };
 
         return that;
     };
+
+    var dispatcher = function(func) {
+        return function(s, m) {
+            if (m['m_0']) {
+                func(s, m['m_0']);
+            } else {
+                func(s, m);
+            }
+        }
+    }
 
     var rule = function(op, exp) {
         var that = {};
@@ -237,7 +229,7 @@ exports = module.exports = durableEngine = function () {
             var func;
 
             if (typeof(exp[exp.length - 1]) === 'function') {
-                func =  exp.pop();
+                func =  dispatcher(exp.pop());
             } else if (rulesetArray.length) {
                 var rulesetDefinitions = {};
                 for (var i = 0; i < rulesetArray.length; ++i) {
@@ -247,47 +239,34 @@ exports = module.exports = durableEngine = function () {
                 func =  rulesetDefinitions;
             }
 
-            if (!op) {
-                if (name === undefined) {
-                    newDefinition = {when: exp[0].define('m_1')};
+            var innerDefinition = [];
+            var refName;
+            var expObject;
+            for (var i = 0; i < exp.length; ++i) {
+                refName = 'm_' + i;
+                expObject = {};
+                expDefinition = exp[i].define(refName);
+                if (expDefinition['$count']) {
+                    newDefinition['$count'] = expDefinition['$count'];
                 } else {
-                    newDefinition = exp[0].define('m_1');
-                }
-                for (var i = 1; i < exp.length; ++i) {
-                    expDefinition = exp[i].define();
-                    if (expDefinition['$least']) {
-                        newDefinition['$atLeast'] = expDefinition['$least'];
-                    } else if (expDefinition['$most']) {
-                        newDefinition['$atMost'] = expDefinition['$most'];
-                    }
-                }
-            }
-            else {
-                var innerDefinition = {};
-                for (var i = 0; i < exp.length; ++i) {
-                    expDefinition = exp[i].define('m_' + i);
-                    if (expDefinition['$s']) {
-                        innerDefinition['$s'] = expDefinition['$s'];
-                    } else if (expDefinition['m_' + i + '$all']) {
-                        innerDefinition['m_' + i + '$all'] = expDefinition['m_' + i + '$all'];
-                    } else if (expDefinition['m_' + i + '$any']) {
-                        innerDefinition['m_' + i + '$any'] = expDefinition['m_' + i + '$any'];
-                    } else if (expDefinition['$least']) {
-                        innerDefinition['$atLeast'] = expDefinition['$least'];
-                    } else if (expDefinition['$most']) {
-                        innerDefinition['$atMost'] = expDefinition['$most'];
+                    if (expDefinition[refName + '$all']) {
+                        expObject[refName + '$all'] = expDefinition[refName + '$all'];
+                    } else if (expDefinition[refName + '$any']) {
+                        expObject[refName + '$any'] = expDefinition[refName + '$any'];
                     } else {
-                        innerDefinition['m_' + i] = expDefinition;
+                        expObject[refName] = expDefinition;
                     }
-                }
-                
-                if (name !== undefined) {
-                    newDefinition[name + op] = innerDefinition;
-                } else {
-                    newDefinition[op] = innerDefinition;
-                }   
-            }
 
+                    innerDefinition.push(expObject);
+                }
+            }
+            
+            if (name !== undefined) {
+                newDefinition[name + op] = innerDefinition;
+            } else {
+                newDefinition[op] = innerDefinition;
+            }   
+            
             if (func) {
                 newDefinition['run'] = func;
             }   
@@ -351,18 +330,10 @@ exports = module.exports = durableEngine = function () {
             return that;
         };
         
-        obj.atLeast = function (count) {
+        obj.count = function(count) {
             var that = {};
             that.define = function () {
-                return {$least: count};
-            }
-            return that;
-        };
-
-        obj.atMost = function (count) {
-            var that = {};
-            that.define = function () {
-                return {$most: count};
+                return {$count: count};
             }
             return that;
         };
@@ -386,22 +357,20 @@ exports = module.exports = durableEngine = function () {
         }  
 
         that.when = function () {
-            var newRule = rule(null, argsToArray(arguments));
-            rules.push(newRule);
-            return newRule;
-        };
-
-        that.whenAll = function () {
-            var newRule = rule('whenAll', argsToArray(arguments));
+            var newRule = rule('all', argsToArray(arguments));
             rules.push(newRule);
             return newRule;
         };
 
         that.whenAny = function () {
-            var newRule = rule('whenAny', argsToArray(arguments));
+            var newRule = rule('any', argsToArray(arguments));
             rules.push(newRule);
             return newRule;
         };
+
+        that.timeout = function(name) {
+            return m.$t.eq(name);
+        }
 
         that.whenStart = function (func) {
             startFunc = func;
@@ -430,25 +399,12 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.when = function () {
-            condition = rule(null, argsToArray(arguments));
-            return condition;
-        };
-
-        that.whenAll = function () {
-            if (flow) {
-                condition = rule('$all', argsToArray(arguments));
-            } else {
-                condition = rule('whenAll', argsToArray(arguments));
-            }
+            condition = rule('all', argsToArray(arguments));
             return condition;
         };
 
         that.whenAny = function () {
-            if (flow) {
-                condition = rule('$any', argsToArray(arguments));
-            } else {
-                condition = rule('whenAny', argsToArray(arguments));
-            }
+            condition = rule('any', argsToArray(arguments));
             return condition;
         };
 
@@ -598,7 +554,7 @@ exports = module.exports = durableEngine = function () {
         that.define = function () {
             var newDefinition = {};
             if (runFunc) {
-                newDefinition['run'] = runFunc;
+                newDefinition['run'] = dispatcher(runFunc);
             } else if (rulesetArray.length) {
                 var rulesetDefinitions = {};
                 for (var i = 0; i < rulesetArray.length; ++i) {
@@ -669,7 +625,7 @@ exports = module.exports = durableEngine = function () {
     var runAll = function(databases, basePath, stateCacheSize) {
         var definitions = {};
         for (var i = 0; i < rulesets.length; ++ i) {
-            definitions[rulesets[i].getName()] = rulesets[i].define();  
+            definitions[rulesets[i].getName()] = rulesets[i].define(); 
         }
 
         var rulesHost = d.host(databases, stateCacheSize);
