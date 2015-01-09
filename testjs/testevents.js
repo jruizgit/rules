@@ -1,6 +1,376 @@
 r = require('../build/release/rules.node');
 var cluster = require('cluster');
 
+console.log('fact0');
+
+handle = r.createRuleset('fact0',  
+    JSON.stringify({
+        suspect: {
+            all: [
+                {first: {t: 'purchase'}},
+                {second: {$neq: {location: {first: 'location'}}}}
+            ],
+        }
+    })
+, 100);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+r.assertFact(handle, 
+    JSON.stringify({
+        id: 1,
+        sid: 1,
+        t: 'purchase',
+        amount: '100',
+        location: 'US',
+    })
+);
+
+r.assertFact(handle, 
+    JSON.stringify({
+        id: 2,
+        sid: 1,
+        t: 'purchase',
+        amount: '200',
+        location: 'CA',
+    })
+);
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+
+r.deleteRuleset(handle);
+
+console.log('fact1');
+
+handle = r.createRuleset('fact1',  
+    JSON.stringify({
+        suspect: {
+            count: 2,
+            all: [
+                {first: {t: 'deposit'}},
+                {second: {$and: [
+                    {t: 'withrawal'},
+                    {ip: {first: 'ip'}}, 
+                ]}},
+                {third: {$and: [
+                    {t: 'balance'},
+                    {ip: {first: 'ip'}}, 
+                    {ip: {second: 'ip' }}, 
+                ]}}
+            ],
+        }
+    })
+, 100);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 1,
+        sid: 1,
+        t: 'withrawal',
+        ip: '1'
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 2,
+        sid: 1,
+        t: 'balance',
+        amount: '100',
+        ip: '1'
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 3,
+        sid: 1,
+        t: 'withrawal',
+        ip: '1'
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 4,
+        sid: 1,
+        t: 'balance',
+        amount: '100',
+        ip: '1'
+    })
+);
+
+r.assertFact(handle, 
+    JSON.stringify({
+        id: 5,
+        sid: 1,
+        t: 'deposit',
+        ip: '1'
+    })
+);
+
+result = r.startAction(handle);
+console.log(result[1]);
+console.log(result[2]);
+r.completeAction(handle, result[0], result[1]);
+r.deleteRuleset(handle);
+
+console.log('fact2');
+
+handle = r.createRuleset('fact2',  
+    JSON.stringify({
+        suspect: {
+            count: 3,
+            all: [
+                {first: {t: 'deposit'}},
+                {second: {$and: [
+                    {t: 'withrawal'},
+                    {ip: {first: 'ip'}}, 
+                ]}},
+                {third: {$and: [
+                    {t: 'balance'},
+                    {ip: {second: 'ip' }}, 
+                ]}},
+                {fourth: {$and: [
+                    {t: 'chargeback'},
+                    {ip: {third: 'ip' }}, 
+                ]}}
+            ],
+        }
+    })
+, 100);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 1,
+        sid: 1,
+        t: 'deposit',
+        ip: '1'
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 2,
+        sid: 1,
+        t: 'deposit',
+        amount: '100',
+        ip: '1'
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 3,
+        sid: 1,
+        t: 'deposit',
+        amount: '100',
+        ip: '1'
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 4,
+        sid: 1,
+        t: 'balance',
+        ip: '1'
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 5,
+        sid: 1,
+        t: 'balance',
+        amount: '100',
+        ip: '1'
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 6,
+        sid: 1,
+        t: 'balance',
+        amount: '100',
+        ip: '1'
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 7,
+        sid: 1,
+        t: 'chargeback',
+        ip: '1'
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 8,
+        sid: 1,
+        t: 'chargeback',
+        amount: '100',
+        ip: '1'
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 9,
+        sid: 1,
+        t: 'chargeback',
+        amount: '100',
+        ip: '1'
+    })
+);
+
+r.assertFact(handle, 
+    JSON.stringify({
+        id: 10,
+        sid: 1,
+        t: 'withrawal',
+        ip: '1'
+    })
+);
+
+result = r.startAction(handle);
+console.log(result[1]);
+console.log(result[2]);
+r.completeAction(handle, result[0], result[1]);
+r.deleteRuleset(handle);
+
+console.log('pri0');
+
+handle = r.createRuleset('pri0',  
+    JSON.stringify({
+        ship: {
+            pri: 2,
+            all: [ 
+                {m: {$and: [
+                    { country: 'US' },
+                    { seller: 'bookstore'},
+                    { currency: 'US' },
+                    { $lte: { amount: 1000 } },
+                ]}}
+            ],
+        },
+        order: {
+            pri: 1,
+            all: [ 
+                {m: {$and: [
+                    { country: 'US' },
+                    { seller: 'bookstore'},
+                    { currency: 'US' },
+                    { $lte: { amount: 1000 } },
+                ]}}
+            ],
+        },
+        submit: {
+            pri: 0,
+            all: [ 
+                {m: {$and: [
+                    { country: 'US' },
+                    { seller: 'bookstore'},
+                    { currency: 'US' },
+                    { $lte: { amount: 1000 } },
+                ]}}
+            ],
+        },
+    })
+, 100);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+r.assertFact(handle, 
+    JSON.stringify({
+        id: 1,
+        sid: 'first',
+        name: 'John Smith',
+        address: '1111 NE 22, Seattle, Wa',
+        phone: '206678787',
+        country: 'US',
+        currency: 'US',
+        seller: 'bookstore',
+        item: 'book',
+        reference: '75323',
+        amount: 500
+    })
+);
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+r.retractFact(handle, 'first', 1);
+result = r.startAction(handle);
+console.log(result == null);
+
+r.deleteRuleset(handle);
+
+console.log('fact0');
+
+handle = r.createRuleset('fact0',  
+    JSON.stringify({
+        suspect: {
+            all: [
+                {first: {t: 'purchase'}},
+                {second: {$neq: {location: {first: 'location'}}}}
+            ],
+        }
+    })
+, 100);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+r.assertFact(handle, 
+    JSON.stringify({
+        id: 1,
+        sid: 1,
+        t: 'purchase',
+        amount: '100',
+        location: 'US',
+    })
+);
+
+r.assertFact(handle, 
+    JSON.stringify({
+        id: 2,
+        sid: 1,
+        t: 'purchase',
+        amount: '200',
+        location: 'CA',
+    })
+);
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+
 console.log('add0');
 
 handle = r.createRuleset('add0',  
@@ -149,53 +519,6 @@ console.log(r.assertEvent(handle,
         name: "hellothere" 
     })
 ));
-
-result = r.startAction(handle);
-console.log(JSON.parse(result[1]));
-console.log(JSON.parse(result[2]));
-r.completeAction(handle, result[0], result[1]);
-
-r.deleteRuleset(handle);
-
-console.log('fact0');
-
-handle = r.createRuleset('fact0',  
-    JSON.stringify({
-        suspect: {
-            all: [
-                {first: {t: 'purchase'}},
-                {second: {$neq: {location: {first: 'location'}}}}
-            ],
-        }
-    })
-, 100);
-
-r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
-
-r.assertFact(handle, 
-    JSON.stringify({
-        id: 1,
-        sid: 1,
-        t: 'purchase',
-        amount: '100',
-        location: 'US',
-    })
-);
-
-r.assertFact(handle, 
-    JSON.stringify({
-        id: 2,
-        sid: 1,
-        t: 'purchase',
-        amount: '200',
-        location: 'CA',
-    })
-);
-
-result = r.startAction(handle);
-console.log(JSON.parse(result[1]));
-console.log(JSON.parse(result[2]));
-r.completeAction(handle, result[0], result[1]);
 
 result = r.startAction(handle);
 console.log(JSON.parse(result[1]));
@@ -666,79 +989,6 @@ result = r.startAction(handle);
 console.log(JSON.parse(result[1]));
 console.log(JSON.parse(result[2]));
 r.completeAction(handle, result[0], result[1]);
-r.deleteRuleset(handle);
-
-console.log('books5');
-
-handle = r.createRuleset('books3',  
-    JSON.stringify({
-        ship: {
-            pri: 2,
-            all: [ 
-                {m: {$and: [
-                    { country: 'US' },
-                    { seller: 'bookstore'},
-                    { currency: 'US' },
-                    { $lte: { amount: 1000 } },
-                ]}}
-            ],
-        },
-        order: {
-            pri: 1,
-            all: [ 
-                {m: {$and: [
-                    { country: 'US' },
-                    { seller: 'bookstore'},
-                    { currency: 'US' },
-                    { $lte: { amount: 1000 } },
-                ]}}
-            ],
-        },
-        submit: {
-            pri: 0,
-            all: [ 
-                {m: {$and: [
-                    { country: 'US' },
-                    { seller: 'bookstore'},
-                    { currency: 'US' },
-                    { $lte: { amount: 1000 } },
-                ]}}
-            ],
-        },
-    })
-, 100);
-
-r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
-
-r.assertFact(handle, 
-    JSON.stringify({
-        id: 1,
-        sid: 'first',
-        name: 'John Smith',
-        address: '1111 NE 22, Seattle, Wa',
-        phone: '206678787',
-        country: 'US',
-        currency: 'US',
-        seller: 'bookstore',
-        item: 'book',
-        reference: '75323',
-        amount: 500
-    })
-);
-
-result = r.startAction(handle);
-console.log(JSON.parse(result[1]));
-console.log(JSON.parse(result[2]));
-r.completeAction(handle, result[0], result[1]);
-result = r.startAction(handle);
-console.log(JSON.parse(result[1]));
-console.log(JSON.parse(result[2]));
-r.completeAction(handle, result[0], result[1]);
-result = r.startAction(handle);
-console.log(JSON.parse(result[1]));
-console.log(JSON.parse(result[2]));
-r.completeAction(handle, result[0], result[1]);
-
 r.deleteRuleset(handle);
 
 console.log('approval1');

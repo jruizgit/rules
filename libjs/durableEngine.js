@@ -253,6 +253,30 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
+        that.assertFact = function (message, complete) {
+            if (complete) {
+                try {
+                    complete(null, r.assertFact(handle, JSON.stringify(message)));
+                } catch(err) {
+                    complete(err);
+                }
+            } else {
+                r.assertEvent(handle, JSON.stringify(message));
+            }
+        };
+
+         that.retractFact = function (id, complete) {
+            if (complete) {
+                try {
+                    complete(null, r.retractFact(handle, id));
+                } catch(err) {
+                    complete(err);
+                }
+            } else {
+                r.assertEvent(handle, id);
+            }
+        };
+
         that.assertState = function (state, complete) {
             if (complete) {
                 try {
@@ -875,6 +899,26 @@ exports = module.exports = durableEngine = function () {
                     complete(err);
                 } else {
                     rules.assertEvent(message, complete);
+                }
+            });
+        };
+
+         that.assert = function (rulesetName, message, complete) {
+            that.getRuleset(rulesetName, function (err, rules) {
+                if (err) {
+                    complete(err);
+                } else {
+                    rules.assertFact(message, complete);
+                }
+            });
+        };
+
+        that.retract = function (rulesetName, id, complete) {
+            that.getRuleset(rulesetName, function (err, rules) {
+                if (err) {
+                    complete(err);
+                } else {
+                    rules.retractFact(id, complete);
                 }
             });
         };

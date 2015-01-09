@@ -333,7 +333,7 @@ exports = module.exports = durableEngine = function () {
         obj.count = function(count) {
             var that = {};
             that.define = function () {
-                return {$count: count};
+                return {count: count};
             }
             return that;
         };
@@ -356,7 +356,7 @@ exports = module.exports = durableEngine = function () {
             return startFunc;
         }  
 
-        that.when = function () {
+        that.whenAll = function () {
             var newRule = rule('all', argsToArray(arguments));
             rules.push(newRule);
             return newRule;
@@ -398,7 +398,7 @@ exports = module.exports = durableEngine = function () {
             return stateName;
         };
 
-        that.when = function () {
+        that.whenAll = function () {
             condition = rule('all', argsToArray(arguments));
             return condition;
         };
@@ -626,6 +626,7 @@ exports = module.exports = durableEngine = function () {
         var definitions = {};
         for (var i = 0; i < rulesets.length; ++ i) {
             definitions[rulesets[i].getName()] = rulesets[i].define(); 
+            console.log(JSON.stringify(definitions[rulesets[i].getName()]));
         }
 
         var rulesHost = d.host(databases, stateCacheSize);

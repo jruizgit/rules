@@ -50,6 +50,7 @@ static unsigned int handleMessage(ruleset *tree,
                                   char *message, 
                                   unsigned char assertFact, 
                                   char **commands,
+                                  unsigned short *commandPriorities,
                                   unsigned short *commandCount,
                                   void **rulesBinding);
 
@@ -258,6 +259,7 @@ static unsigned int handleAction(ruleset *tree,
                                  node *node, 
                                  unsigned char assertFact, 
                                  char **commands,
+                                 unsigned short *commandPriorities,
                                  unsigned short *commandCount,
                                  void **rulesBinding) {
     char *newCommand = NULL;
@@ -289,7 +291,16 @@ static unsigned int handleAction(ruleset *tree,
         return result;
     }
 
-    commands[*commandCount] = newCommand;
+    unsigned short priority = node->value.c.priority;
+    unsigned short index = *commandCount;
+    while (index > 0 && priority < commandPriorities[index - 1]) {
+        commands[index] = commands[index - 1];
+        commandPriorities[index] = commandPriorities[index - 1];
+        --index;
+    }
+
+    commands[index] = newCommand;
+    commandPriorities[index] = priority;
     ++*commandCount;
     return RULES_OK;
 }
@@ -302,6 +313,7 @@ static unsigned int handleBeta(ruleset *tree,
                                node *betaNode,
                                unsigned short actionType, 
                                char **commands,
+                               unsigned short *commandPriorities,
                                unsigned short *commandCount,
                                void **rulesBinding) {
     int prefixLength = 0;
@@ -346,6 +358,7 @@ static unsigned int handleBeta(ruleset *tree,
                         actionNode, 
                         actionType, 
                         commands,
+                        commandPriorities,
                         commandCount,
                         rulesBinding);
 }
@@ -795,6 +808,7 @@ static unsigned int handleAlpha(ruleset *tree,
                                 alpha *alphaNode, 
                                 unsigned char assertFact,
                                 char **commands,
+                                unsigned short *commandPriorities,
                                 unsigned short *commandCount,
                                 void **rulesBinding) {
     unsigned int result = ERR_EVENT_NOT_HANDLED;
@@ -881,6 +895,7 @@ static unsigned int handleAlpha(ruleset *tree,
                                     &tree->nodePool[betaList[entry]],  
                                     assertFact, 
                                     commands,
+                                    commandPriorities,
                                     commandCount,
                                     rulesBinding);
                 if (bresult != RULES_OK && bresult != ERR_NEW_SESSION) {
@@ -931,6 +946,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                                       unsigned int sidIndex, 
                                       unsigned char assertFact,
                                       char **commands,
+                                      unsigned short *commandPriorities,
                                       unsigned short *commandCount,
                                       void **rulesBinding) {
     jsonProperty *midProperty;
@@ -981,6 +997,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                           &tree->nodePool[NODE_M_OFFSET].value.a, 
                           assertFact, 
                           commands,
+                          commandPriorities,
                           commandCount,
                           rulesBinding);
 
@@ -1053,6 +1070,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                                    stateMessage,  
                                    1,
                                    commands,
+                                   commandPriorities,
                                    commandCount,
                                    rulesBinding);
             if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
@@ -1087,6 +1105,7 @@ static unsigned int handleMessage(ruleset *tree,
                                   char *message, 
                                   unsigned char assertFact, 
                                   char **commands,
+                                  unsigned short *commandPriorities,
                                   unsigned short *commandCount,
                                   void **rulesBinding) {
     char *next;
@@ -1116,6 +1135,7 @@ static unsigned int handleMessage(ruleset *tree,
                             sidIndex,  
                             assertFact,
                             commands,
+                            commandPriorities,
                             commandCount,
                             rulesBinding);
 }
@@ -1124,6 +1144,7 @@ static unsigned int handleMessages(void *handle,
                                    unsigned char assertFact,
                                    char *messages, 
                                    char **commands,
+                                   unsigned short *commandPriorities,
                                    unsigned short *commandCount,
                                    unsigned int *resultsLength,  
                                    unsigned int **results,
@@ -1175,6 +1196,7 @@ static unsigned int handleMessages(void *handle,
                                  propertiesSidIndex, 
                                  assertFact, 
                                  commands,
+                                 commandPriorities,
                                  commandCount,
                                  rulesBinding);
         
@@ -1211,6 +1233,7 @@ static unsigned int handleMessages(void *handle,
 static unsigned int handleState(ruleset *tree, 
                                 char *state, 
                                 char **commands,
+                                unsigned short *commandPriorities,
                                 unsigned short *commandCount,
                                 void **rulesBinding) {
     int stateLength = strlen(state);
@@ -1231,6 +1254,7 @@ static unsigned int handleState(ruleset *tree,
                                         stateMessage,  
                                         1,
                                         commands,
+                                        commandPriorities,
                                         commandCount,
                                         rulesBinding);
 
@@ -1239,6 +1263,7 @@ static unsigned int handleState(ruleset *tree,
 
 static unsigned int handleTimers(void *handle, 
                                  char **commands,
+                                 unsigned short *commandPriorities,
                                  unsigned short *commandCount,
                                  void **rulesBinding) {
     redisReply *reply;
@@ -1267,6 +1292,7 @@ static unsigned int handleTimers(void *handle,
                                reply->element[i]->str, 
                                0,
                                commands, 
+                               commandPriorities,
                                commandCount, 
                                rulesBinding);
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
@@ -1281,6 +1307,7 @@ static unsigned int handleTimers(void *handle,
 
 unsigned int assertEvent(void *handle, char *message) {
     char *commands[MAX_COMMAND_COUNT];
+    unsigned short commandPriorities[MAX_COMMAND_COUNT];
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
     unsigned int result = handleMessage(handle, 
@@ -1288,6 +1315,7 @@ unsigned int assertEvent(void *handle, char *message) {
                                         message, 
                                         0, 
                                         commands,
+                                        commandPriorities,
                                         &commandCount,
                                         &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
@@ -1308,12 +1336,14 @@ unsigned int assertEvents(void *handle,
                           unsigned int *resultsLength, 
                           unsigned int **results) {
     char *commands[MAX_COMMAND_COUNT];
+    unsigned short commandPriorities[MAX_COMMAND_COUNT];
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
     unsigned int result = handleMessages(handle,
                                          0,
                                          messages,
                                          commands,
+                                         commandPriorities,
                                          &commandCount,
                                          resultsLength,
                                          results,
@@ -1329,6 +1359,7 @@ unsigned int assertEvents(void *handle,
 
 unsigned int assertFact(void *handle, char *message) {
     char *commands[MAX_COMMAND_COUNT];
+    unsigned short commandPriorities[MAX_COMMAND_COUNT];
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
     unsigned int result = handleMessage(handle, 
@@ -1336,6 +1367,7 @@ unsigned int assertFact(void *handle, char *message) {
                                         message, 
                                         1,
                                         commands,
+                                        commandPriorities,
                                         &commandCount,
                                         &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
@@ -1353,11 +1385,13 @@ unsigned int assertFact(void *handle, char *message) {
 
 unsigned int assertState(void *handle, char *state) {
     char *commands[MAX_COMMAND_COUNT];
+    unsigned short commandPriorities[MAX_COMMAND_COUNT];
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
     unsigned int result = handleState(handle, 
                                       state, 
                                       commands,
+                                      commandPriorities,
                                       &commandCount,
                                       &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
@@ -1375,10 +1409,12 @@ unsigned int assertState(void *handle, char *state) {
 
 unsigned int assertTimers(void *handle) {
     char *commands[MAX_COMMAND_COUNT];
+    unsigned short commandPriorities[MAX_COMMAND_COUNT];
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
     unsigned int result = handleTimers(handle, 
                                        commands,
+                                       commandPriorities,
                                        &commandCount,
                                        &rulesBinding);
     if (result != RULES_OK) {
@@ -1417,7 +1453,8 @@ unsigned int startAction(void *handle, char **state, char **messages, void **act
 }
 
 unsigned int completeAction(void *handle, void *actionHandle, char *state) {
-    char *commands[MAX_COMMAND_COUNT]; 
+    char *commands[MAX_COMMAND_COUNT];
+    unsigned short commandPriorities[MAX_COMMAND_COUNT]; 
     unsigned short commandCount = 0;
     actionContext *context = (actionContext*)actionHandle;
     redisReply *reply = context->reply;
@@ -1450,6 +1487,7 @@ unsigned int completeAction(void *handle, void *actionHandle, char *state) {
     result = handleState(handle, 
                          state, 
                          commands,
+                         commandPriorities,
                          &commandCount,
                          &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {

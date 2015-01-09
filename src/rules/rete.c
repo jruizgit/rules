@@ -9,6 +9,7 @@
 #define HASH_ALL 193486302 // all
 #define HASH_ANY 193486381 // any
 #define HASH_PRI 193502832 // pri
+#define HASH_COUNT 255678574 // count
 #define HASH_LT 193419881 // $lt
 #define HASH_LTE 2087888878 // $lte
 #define HASH_GT 193419716 // $gt
@@ -21,7 +22,6 @@
 #define HASH_AND 2087876700 // $and
 #define HASH_S 5861212 // $s
 #define HASH_NAME 2090536006 // name 
-#define HASH_COUNT 1662456754 // $count
 #define HASH_ADD 2087876370 // $add
 #define HASH_SUB 2087896531 // $sub
 #define HASH_MUL 2087890007 // $mul
@@ -653,21 +653,7 @@ static unsigned int validateAlgebra(char *rule) {
     unsigned char reenter = 0;
     unsigned int result = readNextArrayValue(rule, &first, &lastArrayValue, &type);
     while (result == PARSE_OK) {
-        result = validateWindowSize(first);
-        if (result != PARSE_OK) {
-            return result;
-        }
-
         result = readNextName(first, &first, &last, &hash);
-        // Fast foward $count
-        if (hash == HASH_COUNT) {
-            readNextValue(last, &first, &last, &type);
-            result = readNextName(last, &first, &last, &hash);
-            if (result != PARSE_OK) {
-                return (result == PARSE_END ? RULES_OK: result);
-            }
-        }
-
         unsigned int nameLength = last - first; 
         if (nameLength >= 4) {
             if (!strncmp("$all", last - 4, 4)) {
@@ -1159,6 +1145,7 @@ static unsigned int createAlpha(ruleset *tree,
 static unsigned int createBetaConnector(ruleset *tree, 
                                         char *rule, 
                                         path *betaPath,
+                                        unsigned short count,
                                         unsigned int nextOffset) {
     char *first;
     char *last;
@@ -1167,19 +1154,7 @@ static unsigned int createBetaConnector(ruleset *tree,
     unsigned char type; 
     unsigned int result = readNextArrayValue(rule, &first, &lastArrayValue, &type);
     while (result == PARSE_OK) {
-        unsigned short count = 1;
-        getWindowSize(first, &count);
         readNextName(first, &first, &last, &hash);
-        
-        // Fast foward $count
-        if (hash == HASH_COUNT) {
-            readNextValue(last, &first, &last, &type);
-            result = readNextName(last, &first, &last, &hash);
-            if (result != PARSE_OK) {
-                return (result == PARSE_END ? RULES_OK: result);
-            }
-        }
-
         unsigned int nameLength = last - first; 
         unsigned char operator = OP_NOP;
         if (nameLength >= 4) { 
@@ -1301,7 +1276,7 @@ static unsigned int createBeta(ruleset *tree,
         *outPath = betaPath;
     }
 
-    return createBetaConnector(tree, rule, betaPath, nextOffset);    
+    return createBetaConnector(tree, rule, betaPath, count, nextOffset);    
 }
 
 static unsigned int add(any *right, any *left, any **result) {
@@ -1333,7 +1308,6 @@ static unsigned int multiply(ruleset *tree, any *right, any *left, any **result)
                 return ERR_OUT_OF_MEMORY;
             }
 
-            newAll->count = (leftAll->count > rightAll->count ? leftAll->count: rightAll->count);
             newAll->expressions = malloc((rightAll->expressionsLength + leftAll->expressionsLength) * sizeof(unsigned int));
             if (!newAll->expressions) {
                 return ERR_OUT_OF_MEMORY;
