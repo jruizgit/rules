@@ -855,7 +855,7 @@ static unsigned char readReference(ruleset *tree, char *rule, reference *ref) {
 static unsigned int readIdiom(ruleset *tree, char *rule, unsigned char *idiomType, unsigned int *idiomOffset, reference *ref) {
     char *first;
     char *last;
-    unsigned char type;
+    unsigned char type = 0;
     unsigned char operator = OP_NOP;
     unsigned int hash;
     unsigned int result;
@@ -899,11 +899,13 @@ static unsigned int readIdiom(ruleset *tree, char *rule, unsigned char *idiomTyp
                     return result;
                 }
             }
-
+            
             if (type == JSON_EVENT_PROPERTY || type == JSON_EVENT_IDIOM) {
                 *idiomType = JSON_EVENT_IDIOM;  
             }
 
+            // newIdiom address might have changed after readIdiom
+            newIdiom = &tree->idiomPool[*idiomOffset];
             switch (hash) {
                 case HASH_L:
                     copyValue(tree, &newIdiom->left, first, last, newIdiomOffset, &newRef, type);
@@ -1308,6 +1310,7 @@ static unsigned int multiply(ruleset *tree, any *right, any *left, any **result)
                 return ERR_OUT_OF_MEMORY;
             }
 
+            newAll->count = (leftAll->count > rightAll->count ? leftAll->count: rightAll->count);
             newAll->expressions = malloc((rightAll->expressionsLength + leftAll->expressionsLength) * sizeof(unsigned int));
             if (!newAll->expressions) {
                 return ERR_OUT_OF_MEMORY;

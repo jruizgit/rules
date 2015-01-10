@@ -4,18 +4,16 @@ exports = module.exports = durableEngine = function () {
     var stat = require('node-static');
     var r = require('../build/release/rules.node');
 
-    var session = function (document, output, handle, rulesetName) {
-        var that = document;
+    var closure = function (document, output, handle, rulesetName) {
+        var that = {};
         var messageRulesets = [];
         var messageDirectory = {};
         var timerNames = [];
         var timerDirectory = {};
         var branchNames = [];
         var branchDirectory = {};
-
-        if (output && output.$m) {
-            output = output.$m;
-        }
+        that.s = document;
+        that.m = output;
 
         that.getRulesetName = function () {
             return rulesetName;
@@ -57,7 +55,7 @@ exports = module.exports = durableEngine = function () {
             var nameIndex = rulesetName.lastIndexOf('.');
             var parentNamespace = rulesetName.slice(0, nameIndex);
             var name = rulesetName.slice(nameIndex + 1);
-            message.sid = that.sid;
+            message.sid = that.s.sid;
             message.id = name + '.' + message.id;
             that.post(parentNamespace, message);
         };
@@ -102,10 +100,10 @@ exports = module.exports = durableEngine = function () {
         var root = that;
         var next;
         var sync;
-        if (func.length <= 2) {
+        if (func.length == 1) {
             sync = true;
         }
-        else if (func.length === 3) {
+        else if (func.length === 2) {
             sync = false;
         }
         else {
@@ -133,34 +131,34 @@ exports = module.exports = durableEngine = function () {
             return next;
         };
 
-        that.run = function (s, complete) {
+        that.run = function (c, complete) {
             // complete should never throw
             if (sync) {
                 try {
-                    func(s, s.getOutput());
+                    func(c);
                 } catch (reason) {
-                    complete(reason, s);
+                    complete(reason, c);
                     return;
                 }
 
                 if (next) {
-                    next.run(s, complete);
+                    next.run(c, complete);
                 } else {
-                    complete(null, s);
+                    complete(null, c);
                 }
             } else {
                 try {
-                    func(s, s.getOutput(), function (err) {
+                    func(c, function (err) {
                         if (err) {
-                            complete(err, s);
+                            complete(err, c);
                         } else if (next) {
-                            next.run(s, complete);
+                            next.run(c, complete);
                         } else {
-                            complete(null, s);
+                            complete(null, c);
                         }
                     });
                 } catch (reason) {
-                    complete(reason, s);
+                    complete(reason, c);
                 }
             }
         };
@@ -170,8 +168,8 @@ exports = module.exports = durableEngine = function () {
 
     var to = function (state) {
 
-        var execute = function (s) {
-            s.label = state;
+        var execute = function (c) {
+            c.s.label = state;
         };
 
         var that = promise(execute);
@@ -203,9 +201,9 @@ exports = module.exports = durableEngine = function () {
             return newObject;
         };
 
-        var execute = function (s) {
+        var execute = function (c) {
             for (var i = 0; i < branchNames.length; ++i) {
-                s.fork(branchNames[i], s.sid, copy(s));
+                c.fork(branchNames[i], c.s.sid, copy(c.s));
             }
         };
 
@@ -261,7 +259,7 @@ exports = module.exports = durableEngine = function () {
                     complete(err);
                 }
             } else {
-                r.assertEvent(handle, JSON.stringify(message));
+                r.assertFact(handle, JSON.stringify(message));
             }
         };
 
@@ -273,7 +271,7 @@ exports = module.exports = durableEngine = function () {
                     complete(err);
                 }
             } else {
-                r.assertEvent(handle, id);
+                r.retractFact(handle, id);
             }
         };
 
@@ -305,59 +303,59 @@ exports = module.exports = durableEngine = function () {
             }
         }
 
-        var postMessages = function (messages, names, index, s, complete) {
+        var postMessages = function (messages, names, index, c, complete) {
             if (index == names.length) {
-                complete(null, s);
+                complete(null, c);
             } else {
                 var rules = names[index];
                 var messageList = messages[rules];
                 if (messageList.length == 1) {
                     host.post(rules, messageList[0], function (err) {
                         if (err) {
-                            complete(err, s);
+                            complete(err, c);
                         } else {
-                            postMessages(messages, names, ++index, s, complete);
+                            postMessages(messages, names, ++index, c, complete);
                         }
                     });
                 } else {
                     host.postBatch(rules, messageList, function (err) {
                         if (err) {
-                            complete(err, s);
+                            complete(err, c);
                         } else {
-                            postMessages(messages, names, ++index, s, complete);
+                            postMessages(messages, names, ++index, c, complete);
                         }
                     });
                 }
             }
         }
 
-        var startBranches = function (branches, names, index, s, complete) {
+        var startBranches = function (branches, names, index, c, complete) {
             if (index == names.length) {
-                complete(null, s);
+                complete(null, c);
             } else {
                 var branchName = names[index];
                 var state = branches[branchName];
                 host.patchState(branchName, state, function (err) {
                     if (err) {
-                        complete(err, s);
+                        complete(err, c);
                     } else {
-                        startBranches(branches, names, ++index, s, complete);
+                        startBranches(branches, names, ++index, c, complete);
                     }
                 });
             }
         }
 
-        var startTimers = function (timers, names, index, s, complete) {
+        var startTimers = function (timers, names, index, c, complete) {
             if (index == names.length) {
-                complete(null, s);
+                complete(null, c);
             } else {
                 var timerName = names[index];
                 var duration = timers[timerName];
                 try {
-                    r.startTimer(handle, s.sid, duration, JSON.stringify({ sid: s.sid, id:timerName, $t:timerName }));
-                    startTimers(timers, names, ++index, s, complete);
+                    r.startTimer(handle, c.s.sid, duration, JSON.stringify({ sid: c.s.sid, id:timerName, $t:timerName }));
+                    startTimers(timers, names, ++index, c, complete);
                 } catch (reason) {
-                    complete(reason, s);
+                    complete(reason, c);
                 }
             }
         }
@@ -394,48 +392,48 @@ exports = module.exports = durableEngine = function () {
                     break;
                 }
 
-                var s = session(document, output, result[0], name);
+                var c = closure(document, output, result[0], name);
                 var action = actions[actionName]; 
-                action.run(s, function (err, s) {
+                action.run(c, function (err, c) {
                     if (err) {
                         try {
-                            r.abandonAction(handle, s.getHandle());
+                            r.abandonAction(handle, c.getHandle());
                         } catch (reason) {
                             complete(reason);
                             return;
                         }
                         complete(err);
                     } else {
-                        var messages = s.getMessages();
-                        var rulesets = s.getMessageRulesets();
-                        postMessages(messages, rulesets, 0, s, function (err, s) {
+                        var messages = c.getMessages();
+                        var rulesets = c.getMessageRulesets();
+                        postMessages(messages, rulesets, 0, c, function (err, c) {
                             if (err) {
                                 try {
-                                    r.abandonAction(handle, s.getHandle());
+                                    r.abandonAction(handle, c.getHandle());
                                 } catch (reason) {
                                     complete(reason);
                                     return;
                                 }
                                 complete(err);
                             } else {
-                                var branches = s.getBranches();
-                                var branchNames = s.getBranchNames();
-                                startBranches(branches, branchNames, 0, s, function (err, s) {
+                                var branches = c.getBranches();
+                                var branchNames = c.getBranchNames();
+                                startBranches(branches, branchNames, 0, c, function (err, c) {
                                     if (err) {
                                         try {
-                                            r.abandonAction(handle, s.getHandle());
+                                            r.abandonAction(handle, c.getHandle());
                                         } catch (reason) {
                                             complete(reason);
                                             return;
                                         }
                                         complete(err);
                                     } else {
-                                        var timers = s.getTimers();
-                                        var timerNames = s.getTimerNames();
-                                        startTimers(timers, timerNames, 0, s, function (err, s) {
+                                        var timers = c.getTimers();
+                                        var timerNames = c.getTimerNames();
+                                        startTimers(timers, timerNames, 0, c, function (err, c) {
                                             if (err) {
                                                 try {
-                                                    r.abandonAction(handle, s.getHandle());
+                                                    r.abandonAction(handle, c.getHandle());
                                                 } catch (reason) {
                                                     complete(reason);
                                                     return;
@@ -443,7 +441,7 @@ exports = module.exports = durableEngine = function () {
                                                 complete(err);
                                             } else {
                                                 try {
-                                                    r.completeAction(handle, s.getHandle(), JSON.stringify(s));   
+                                                    r.completeAction(handle, c.getHandle(), JSON.stringify(c.s));   
                                                 } catch (reason) {
                                                     complete(reason);
                                                     return;
@@ -799,23 +797,41 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.getState = function (rulesetName, sid, complete) {
+            var lastError;
             that.getRuleset(rulesetName, function (err, rules) {
                 if (err) {
-                    complete(err);
+                    if (complete) {
+                        complete(err);
+                    } else {
+                        lastError = err;
+                    }
                 } else {
                     rules.getState(sid, complete);
                 }
             });
+
+            if (lastError) {
+                throw lastError;
+            }
         };
 
         that.patchState = function (rulesetName, state, complete) {
+            var lastError;
             that.getRuleset(rulesetName, function (err, rules) {
                 if (err) {
-                    complete(err);
+                    if (complete) {
+                        complete(err);
+                    } else {
+                        lastError = err;
+                    }
                 } else {
                     rules.assertState(state, complete);
                 }
             });
+
+            if (lastError) {
+                throw lastError;
+            }
         };
 
         that.getRuleset = function (rulesetName, complete) {
@@ -884,43 +900,79 @@ exports = module.exports = durableEngine = function () {
                 }
             }
 
+            var lastError;
             that.getRuleset(rulesetName, function (err, rules) {
                 if (err) {
-                    complete(err);
+                    if (complete) {
+                        complete(err);
+                    } else {
+                        lastError = err;
+                    }
                 } else {
                     rules.assertEvents(messages, complete);
                 }
-            }); 
+            });
+
+            if (lastError) {
+                throw lastError;
+            }
         };
 
         that.post = function (rulesetName, message, complete) {
+            var lastError;
             that.getRuleset(rulesetName, function (err, rules) {
                 if (err) {
-                    complete(err);
+                    if (complete) {
+                        complete(err);
+                    } else {
+                        lastError = err;
+                    }
                 } else {
                     rules.assertEvent(message, complete);
                 }
             });
+
+            if (lastError) {
+                throw lastError;
+            }
         };
 
          that.assert = function (rulesetName, message, complete) {
+            var lastError;
             that.getRuleset(rulesetName, function (err, rules) {
                 if (err) {
-                    complete(err);
+                    if (complete) {
+                        complete(err);
+                    } else {
+                        lastError = err;
+                    }
                 } else {
                     rules.assertFact(message, complete);
                 }
             });
+
+            if (lastError) {
+                throw lastError;
+            }
         };
 
         that.retract = function (rulesetName, id, complete) {
+            var lastError;
             that.getRuleset(rulesetName, function (err, rules) {
                 if (err) {
-                    complete(err);
+                    if (complete) {
+                        complete(err);
+                    } else {
+                        lastError = err;
+                    }
                 } else {
                     rules.retractFact(id, complete);
                 }
             });
+
+            if (lastError) {
+                throw lastError;
+            }
         };
 
         var dispatchRules = function (index) {

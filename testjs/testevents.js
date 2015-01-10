@@ -326,51 +326,6 @@ console.log(result == null);
 
 r.deleteRuleset(handle);
 
-console.log('fact0');
-
-handle = r.createRuleset('fact0',  
-    JSON.stringify({
-        suspect: {
-            all: [
-                {first: {t: 'purchase'}},
-                {second: {$neq: {location: {first: 'location'}}}}
-            ],
-        }
-    })
-, 100);
-
-r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
-
-r.assertFact(handle, 
-    JSON.stringify({
-        id: 1,
-        sid: 1,
-        t: 'purchase',
-        amount: '100',
-        location: 'US',
-    })
-);
-
-r.assertFact(handle, 
-    JSON.stringify({
-        id: 2,
-        sid: 1,
-        t: 'purchase',
-        amount: '200',
-        location: 'CA',
-    })
-);
-
-result = r.startAction(handle);
-console.log(JSON.parse(result[1]));
-console.log(JSON.parse(result[2]));
-r.completeAction(handle, result[0], result[1]);
-
-result = r.startAction(handle);
-console.log(JSON.parse(result[1]));
-console.log(JSON.parse(result[2]));
-r.completeAction(handle, result[0], result[1]);
-
 console.log('add0');
 
 handle = r.createRuleset('add0',  

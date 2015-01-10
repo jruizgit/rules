@@ -37,6 +37,7 @@ static unsigned int createIdiom(ruleset *tree, jsonValue *newValue, char **idiom
                     op = "/";
                     break;
             }
+            
             char *rightIdiomString = NULL;
             unsigned int result = createIdiom(tree, &newIdiom->right, &rightIdiomString);
             if (result != RULES_OK) {
@@ -52,6 +53,7 @@ static unsigned int createIdiom(ruleset *tree, jsonValue *newValue, char **idiom
             if (asprintf(idiomString, "(%s %s %s)", leftIdiomString, op, rightIdiomString) == -1) {
                 return ERR_OUT_OF_MEMORY;
             }
+            
             free(rightIdiomString);
             free(leftIdiomString);
             break;
@@ -455,7 +457,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "if assert_fact == 1 then\n"
 "   message[\"$f\"] = 1\n"
 "end\n"
-"if not redis.call(\"hsetnx\", visited_hashset, message[\"id\"], 1) then\n"
+"if redis.call(\"hsetnx\", visited_hashset, message[\"id\"], 1) == 0 then\n"
 "    if assert_fact == 0 then\n"
 "        if not redis.call(\"hget\", events_hashset, message[\"id\"]) then\n"
 "            return false\n"
@@ -474,7 +476,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                          lua)  == -1) {
                 return ERR_OUT_OF_MEMORY;
             }
-            
+
             free(oldLua);
             redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
             redisGetReply(reContext, (void**)&reply);
