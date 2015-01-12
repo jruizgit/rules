@@ -156,11 +156,38 @@ Handle<Value> jsAssertEvents(const Arguments& args) {
             return scope.Close(array);
         } else {
             char * message;
-            asprintf(&message, "Could not assert event, error code: %d", result);
+            asprintf(&message, "Could not assert events, error code: %d", result);
             ThrowException(Exception::TypeError(String::New(message)));
             if (results) {
                 free(results);
             }   
+            free(message);
+        } 
+    }
+
+    return scope.Close(Undefined());
+}
+
+Handle<Value> jsRetractEvent(const Arguments& args) {
+    HandleScope scope;
+
+    if (args.Length() < 2) {
+        ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
+    } else if (!args[0]->IsNumber()) {
+        ThrowException(Exception::TypeError(String::New("Wrong argument type")));
+    } else {
+        unsigned int result = retractEvent((void *)args[0]->IntegerValue(),
+                                           *v8::String::Utf8Value(args[1]->ToString()));
+        
+        if (result == RULES_OK) {
+            return scope.Close(Number::New(1));
+        }
+        else if (result == ERR_EVENT_NOT_HANDLED) {
+            return scope.Close(Number::New(0));
+        } else {
+            char * message;
+            asprintf(&message, "Could not retract event, error code: %d", result);
+            ThrowException(Exception::TypeError(String::New(message)));
             free(message);
         } 
     }
@@ -186,8 +213,46 @@ Handle<Value> jsAssertFact(const Arguments& args) {
             return scope.Close(Number::New(0));
         } else {
             char * message;
-            asprintf(&message, "Could not assert event, error code: %d", result);
+            asprintf(&message, "Could not assert fact, error code: %d", result);
             ThrowException(Exception::TypeError(String::New(message)));
+            free(message);
+        } 
+    }
+
+    return scope.Close(Undefined());
+}
+
+Handle<Value> jsAssertFacts(const Arguments& args) {
+    HandleScope scope;
+
+    if (args.Length() < 2) {
+        ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+        ThrowException(Exception::TypeError(String::New("Wrong argument type")));
+    } else {
+        unsigned int *results = NULL;
+        unsigned int resultsLength;
+        unsigned int result = assertFacts((void *)args[0]->IntegerValue(), 
+                                           *v8::String::Utf8Value(args[1]->ToString()), 
+                                           &resultsLength, 
+                                           &results);
+        
+        if (result == RULES_OK) {
+            Handle<Array> array = Array::New(resultsLength);
+            for (unsigned int i = 0; i < resultsLength; ++i) {
+                array->Set(i, Number::New(results[i]));
+            }
+            if (results) {
+                free(results);
+            }
+            return scope.Close(array);
+        } else {
+            char * message;
+            asprintf(&message, "Could not assert facts, error code: %d", result);
+            ThrowException(Exception::TypeError(String::New(message)));
+            if (results) {
+                free(results);
+            }   
             free(message);
         } 
     }
@@ -198,14 +263,13 @@ Handle<Value> jsAssertFact(const Arguments& args) {
 Handle<Value> jsRetractFact(const Arguments& args) {
     HandleScope scope;
 
-    if (args.Length() < 3) {
+    if (args.Length() < 2) {
         ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
     } else if (!args[0]->IsNumber()) {
         ThrowException(Exception::TypeError(String::New("Wrong argument type")));
     } else {
         unsigned int result = retractFact((void *)args[0]->IntegerValue(),
-                                           *v8::String::Utf8Value(args[1]->ToString()),
-                                           *v8::String::Utf8Value(args[2]->ToString()));
+                                           *v8::String::Utf8Value(args[1]->ToString()));
         
         if (result == RULES_OK) {
             return scope.Close(Number::New(1));
@@ -214,7 +278,7 @@ Handle<Value> jsRetractFact(const Arguments& args) {
             return scope.Close(Number::New(0));
         } else {
             char * message;
-            asprintf(&message, "Could not assert event, error code: %d", result);
+            asprintf(&message, "Could not retract fact, error code: %d", result);
             ThrowException(Exception::TypeError(String::New(message)));
             free(message);
         } 
@@ -477,8 +541,14 @@ void init(Handle<Object> exports) {
     exports->Set(String::NewSymbol("assertEvents"),
         FunctionTemplate::New(jsAssertEvents)->GetFunction());
 
+    exports->Set(String::NewSymbol("retractEvent"),
+        FunctionTemplate::New(jsRetractEvent)->GetFunction());
+
     exports->Set(String::NewSymbol("assertFact"),
         FunctionTemplate::New(jsAssertFact)->GetFunction());
+
+    exports->Set(String::NewSymbol("assertFacts"),
+        FunctionTemplate::New(jsAssertFacts)->GetFunction());
 
     exports->Set(String::NewSymbol("retractFact"),
         FunctionTemplate::New(jsRetractFact)->GetFunction());

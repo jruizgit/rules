@@ -9,6 +9,7 @@
 #define ERR_RULE_LIMIT_EXCEEDED 6 
 #define ERR_RULE_EXISTS_LIMIT_EXCEEDED 7 
 #define ERR_RULE_BETA_LIMIT_EXCEEDED 8
+#define ERR_RULE_WITHOUT_QUALIFIER 9
 #define ERR_PARSE_VALUE 101
 #define ERR_PARSE_STRING 102
 #define ERR_PARSE_NUMBER 103
@@ -48,8 +49,10 @@ unsigned int deleteRuleset(void *handle);
 unsigned int bindRuleset(void *handle, char *host, unsigned int port, char *password);
 unsigned int assertEvent(void *handle, char *message);
 unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results);
+unsigned int retractEvent(void *handle, char *message);
 unsigned int assertFact(void *handle, char *message);
-unsigned int retractFact(void *handle, char *sid, char *mid);
+unsigned int assertFacts(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results);
+unsigned int retractFact(void *handle, char *message);
 unsigned int assertState(void *handle, char *state);
 unsigned int startAction(void *handle, char **state, char **messages, void **actionHandle);
 unsigned int completeAction(void *handle, void *actionHandle, char *state);

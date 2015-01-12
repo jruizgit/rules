@@ -26,18 +26,6 @@ with (d.statechart('fraud0')) {
     });
 }
 
-with (d.ruleset('a9')) {
-    whenAll(m.amount.gt(c.s.maxAmount.add(c.s.id('global').minAmount)), function (c) {
-        console.log('a9 approved ' +  c.m.amount);
-    });
-    whenStart(function (host) {
-        host.patchState('a9', {sid: 1, maxAmount: 500});
-        host.patchState('a9', {sid: 'global', minAmount: 100});
-        host.post('a9', {id: 1, sid: 1, amount: 10});
-        host.post('a9', {id: 2, sid: 1, amount: 1000});
-    });
-}
-
 with (d.ruleset('fraud1')) {
     whenAll(c.first = m.amount.gt(100),
             c.second = m.location.neq(c.first.location), 
@@ -126,26 +114,22 @@ with (d.ruleset('fraud5')) {
     });
 }
 
-with (d.ruleset('a7')) {
-    whenAll(m.amount.lt(c.s.maxAmount), function (c) {
-        console.log('a7 approved ' +  c.m.amount);
-    });
+with (d.ruleset('fraud6')) {
+    whenAll(c.first = m.t.eq('deposit'),
+            not(m.t.eq('withrawal')), 
+            c.third = m.t.eq('chargeback'),
+            count(2),
+        function(c) {
+            console.log('fraud6 detected ' + JSON.stringify(c.m));
+        }
+    );
     whenStart(function (host) {
-        host.patchState('a7', {sid: 1, maxAmount: 100});
-        host.post('a7', {id: 1, sid: 1, amount: 10});
-        host.post('a7', {id: 2, sid: 1, amount: 1000});
-    });
-}
-
-with (d.ruleset('a8')) {
-    whenAll(m.amount.lt(c.s.maxAmount).and(m.amount.gt(c.s.id('global').minAmount)), function (c) {
-        console.log('a8 approved ' +  c.m.amount);
-    });
-    whenStart(function (host) {
-        host.patchState('a8', {sid: 1, maxAmount: 500});
-        host.patchState('a8', {sid: 'global', minAmount: 100});
-        host.post('a8', {id: 1, sid: 1, amount: 10});
-        host.post('a8', {id: 2, sid: 1, amount: 200});
+        host.post('fraud6', {id: 1, sid: 1, t: 'deposit'});
+        host.assert('fraud6', {id: 2, sid: 1, t: 'withrawal'});
+        host.post('fraud6', {id: 3, sid: 1, t: 'chargeback'});
+        host.post('fraud6', {id: 4, sid: 1, t: 'deposit'});
+        host.post('fraud6', {id: 5, sid: 1, t: 'chargeback'});
+        host.retract('fraud6', {id: 2, sid: 1, t: 'withrawal'});
     });
 }
 
@@ -315,41 +299,76 @@ with (d.statechart('a6')) {
     });
 }
 
-with (d.ruleset('a9')) {
-    whenAll(m.amount.lt(100), count(3), function (c) {
-        console.log('a9 approved ->' + JSON.stringify(c.m));
+with (d.ruleset('a7')) {
+    whenAll(m.amount.lt(c.s.maxAmount), function (c) {
+        console.log('a7 approved ' +  c.m.amount);
     });
     whenStart(function (host) {
-        host.postBatch('a9', {id: 1, sid: 1, amount: 10},
-                             {id: 2, sid: 1, amount: 10},
-                             {id: 3, sid: 1, amount: 10},
-                             {id: 4, sid: 1, amount: 10});
-        host.postBatch('a9', [{id: 5, sid: 1, amount: 10},
-                             {id: 6, sid: 1, amount: 10}]);
-    });   
+        host.patchState('a7', {sid: 1, maxAmount: 100});
+        host.post('a7', {id: 1, sid: 1, amount: 10});
+        host.post('a7', {id: 2, sid: 1, amount: 1000});
+    });
+}
+
+with (d.ruleset('a8')) {
+    whenAll(m.amount.lt(c.s.maxAmount).and(m.amount.gt(c.s.id('global').minAmount)), function (c) {
+        console.log('a8 approved ' +  c.m.amount);
+    });
+    whenStart(function (host) {
+        host.patchState('a8', {sid: 1, maxAmount: 500});
+        host.patchState('a8', {sid: 'global', minAmount: 100});
+        host.post('a8', {id: 1, sid: 1, amount: 10});
+        host.post('a8', {id: 2, sid: 1, amount: 200});
+    });
+}
+
+with (d.ruleset('a9')) {
+    whenAll(m.amount.gt(c.s.maxAmount.add(c.s.id('global').minAmount)), function (c) {
+        console.log('a9 approved ' +  c.m.amount);
+    });
+    whenStart(function (host) {
+        host.patchState('a9', {sid: 1, maxAmount: 500});
+        host.patchState('a9', {sid: 'global', minAmount: 100});
+        host.post('a9', {id: 1, sid: 1, amount: 10});
+        host.post('a9', {id: 2, sid: 1, amount: 1000});
+    });
 }
 
 with (d.ruleset('a10')) {
-    whenAll(m.amount.lt(100), m.subject.eq('approve'), count(3), function (c) {
+    whenAll(m.amount.lt(100), count(3), function (c) {
         console.log('a10 approved ->' + JSON.stringify(c.m));
     });
     whenStart(function (host) {
         host.postBatch('a10', {id: 1, sid: 1, amount: 10},
+                             {id: 2, sid: 1, amount: 10},
+                             {id: 3, sid: 1, amount: 10},
+                             {id: 4, sid: 1, amount: 10});
+        host.postBatch('a10', [{id: 5, sid: 1, amount: 10},
+                             {id: 6, sid: 1, amount: 10}]);
+    });   
+}
+
+with (d.ruleset('a11')) {
+    whenAll(m.amount.lt(100), m.subject.eq('approve'), count(3), function (c) {
+        console.log('a11 approved ->' + JSON.stringify(c.m));
+    });
+    whenStart(function (host) {
+        host.postBatch('a11', {id: 1, sid: 1, amount: 10},
                               {id: 2, sid: 1, amount: 10},
                               {id: 3, sid: 1, amount: 10},
                               {id: 4, sid: 1, subject: 'approve'});
-        host.postBatch('a10', {id: 5, sid: 1, subject: 'approve'},
+        host.postBatch('a11', {id: 5, sid: 1, subject: 'approve'},
                               {id: 6, sid: 1, subject: 'approve'});
     }); 
 }
 
-with (d.ruleset('a11')) {
+with (d.ruleset('a12')) {
     whenAny(m.amount.lt(100), m.subject.eq('please'), count(3), function (c) {
-        console.log('a11 approved ->' + JSON.stringify(c.m));
+        console.log('a12 approved ->' + JSON.stringify(c.m));
     });
     whenStart(function (host) {
-        host.assert('a11', {id: 1, sid: 1, amount: 10});           
-        host.postBatch('a11', {id: 2, sid: 1, subject: 'please'},
+        host.assert('a12', {id: 1, sid: 1, amount: 10});           
+        host.postBatch('a12', {id: 2, sid: 1, subject: 'please'},
                               {id: 3, sid: 1, subject: 'please'},
                               {id: 4, sid: 1, subject: 'please'});
     }); 

@@ -254,6 +254,86 @@ console.log(result[2]);
 r.completeAction(handle, result[0], result[1]);
 r.deleteRuleset(handle);
 
+console.log('fact3');
+
+handle = r.createRuleset('fact3',  
+    JSON.stringify({
+        suspect: {
+            all: [
+                {first: {t: 'deposit'}},
+                {second$not: {$and: [{t: 'withrawal'}, {ip: {first: 'ip'}}]}},
+                {third: {$and: [{t: 'chargeback'}, {ip: {first: 'ip' }}]}}
+            ],
+        }
+    })
+, 100);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 1,
+        sid: 1,
+        t: 'deposit',
+        ip: '1'
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 2,
+        sid: 1,
+        t: 'chargeback',
+        ip: '1'
+    })
+);
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+
+r.assertFact(handle, 
+    JSON.stringify({
+        id: 3,
+        sid: 1,
+        t: 'withrawal',
+        ip: 1
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 4,
+        sid: 1,
+        t: 'deposit',
+        ip: '1'
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 5,
+        sid: 1,
+        t: 'chargeback',
+        ip: '1'
+    })
+);
+
+r.retractFact(handle, 
+    JSON.stringify({
+        id: 3,
+        sid: 1,
+        t: 'withrawal',
+        ip: 1
+    })
+);
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
+
 console.log('pri0');
 
 handle = r.createRuleset('pri0',  
@@ -320,7 +400,21 @@ result = r.startAction(handle);
 console.log(JSON.parse(result[1]));
 console.log(JSON.parse(result[2]));
 r.completeAction(handle, result[0], result[1]);
-r.retractFact(handle, 'first', 1);
+r.retractFact(handle, 
+    JSON.stringify({
+        id: 1,
+        sid: 'first',
+        name: 'John Smith',
+        address: '1111 NE 22, Seattle, Wa',
+        phone: '206678787',
+        country: 'US',
+        currency: 'US',
+        seller: 'bookstore',
+        item: 'book',
+        reference: '75323',
+        amount: 500
+    })
+);
 result = r.startAction(handle);
 console.log(result == null);
 

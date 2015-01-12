@@ -263,15 +263,15 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
-         that.retractFact = function (id, complete) {
+         that.retractFact = function (message, complete) {
             if (complete) {
                 try {
-                    complete(null, r.retractFact(handle, id));
+                    complete(null, r.retractFact(handle, JSON.stringify(message)));
                 } catch(err) {
                     complete(err);
                 }
             } else {
-                r.retractFact(handle, id);
+                r.retractFact(handle, JSON.stringify(message));
             }
         };
 
@@ -956,7 +956,7 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
-        that.retract = function (rulesetName, id, complete) {
+        that.retract = function (rulesetName, message, complete) {
             var lastError;
             that.getRuleset(rulesetName, function (err, rules) {
                 if (err) {
@@ -966,7 +966,7 @@ exports = module.exports = durableEngine = function () {
                         lastError = err;
                     }
                 } else {
-                    rules.retractFact(id, complete);
+                    rules.retractFact(message, complete);
                 }
             });
 

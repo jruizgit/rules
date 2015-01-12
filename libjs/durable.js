@@ -402,6 +402,8 @@ exports = module.exports = durableEngine = function () {
                         expObject[refName + '$all'] = expDefinition[refName + '$all'];
                     } else if (expDefinition[refName + '$any']) {
                         expObject[refName + '$any'] = expDefinition[refName + '$any'];
+                    } else if (expDefinition[refName + '$not']) {
+                        expObject[refName + '$not'] = expDefinition[refName + '$not'][0]['m_0'];
                     } else {
                         expObject = expDefinition;
                     }
@@ -509,6 +511,11 @@ exports = module.exports = durableEngine = function () {
             return that;
         };
         
+        obj.not = function(exp) {
+            var that = rule('$not', [exp]);
+            return that;
+        }
+
         obj.pri = function(pri) {
             var that = {};
             that.define = function () {
@@ -813,6 +820,7 @@ exports = module.exports = durableEngine = function () {
         var definitions = {};
         for (var i = 0; i < rulesets.length; ++ i) {
             definitions[rulesets[i].getName()] = rulesets[i].define(); 
+            //console.log(JSON.stringify(definitions[rulesets[i].getName()]))
         }
 
         var rulesHost = d.host(databases, stateCacheSize);

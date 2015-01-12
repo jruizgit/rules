@@ -10,12 +10,14 @@ typedef char functionHash[HASH_LENGTH + 1];
 
 typedef struct binding {
     redisContext *reContext;
+    functionHash addMessageHash;
     functionHash peekActionHash;
     functionHash removeActionHash;
     functionHash partitionHash;
     functionHash timersHash;
     char *sessionHashset;
     char *factsHashset;
+    char *eventsHashset;
     char *timersSortedset;
     functionHash *hashArray;
     unsigned int hashArrayLength;
@@ -35,6 +37,7 @@ unsigned int getBindingIndex(ruleset *tree,
 unsigned int formatEvalMessage(void *rulesBinding, 
                                char *key, 
                                char *sid, 
+                               char *mid, 
                                char *message, 
                                jsonProperty *allProperties,
                                unsigned int propertiesLength,
@@ -42,17 +45,26 @@ unsigned int formatEvalMessage(void *rulesBinding,
                                unsigned char assertFact,
                                char **command);
 
+unsigned int formatStoreMessage(void *rulesBinding, 
+                                char *key, 
+                                char *sid, 
+                                char *message, 
+                                jsonProperty *allProperties,
+                                unsigned int propertiesLength,
+                                unsigned char storeFact,
+                                char **command);
+
 unsigned int formatStoreSession(void *rulesBinding, 
                                 char *sid, 
                                 char *state, 
                                 unsigned char tryExists,
                                 char **command);
 
-unsigned int formatStoreSessionFactId(void *rulesBinding, 
-                                      char *sid, 
-                                      char *mid,
-                                      unsigned char tryExists, 
-                                      char **command);
+unsigned int formatStoreSessionFact(void *rulesBinding, 
+                                    char *sid, 
+                                    char *message,
+                                    unsigned char tryExists, 
+                                    char **command);
 
 unsigned int formatRemoveTimer(void *rulesBinding, 
                                char *timer,
@@ -62,16 +74,17 @@ unsigned int formatRemoveAction(void *rulesBinding,
                                 char *sid, 
                                 char **command);
 
-unsigned int formatRetractMessage(void *rulesBinding, 
-                                  char *sid, 
-                                  char *mid,
-                                  char **command);
+unsigned int formatRemoveMessage(void *rulesBinding, 
+                                 char *sid, 
+                                 char *mid,
+                                 unsigned char removeFact,
+                                 char **command);
 
 unsigned int executeBatch(void *rulesBinding,
                           char **commands,
                           unsigned short commandCount);
 
-unsigned int retractMessage(void *rulesBinding, 
+unsigned int removeMessage(void *rulesBinding, 
                             char *sid, 
                             char *mid);
 

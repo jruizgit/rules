@@ -224,24 +224,52 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                     char *currentAlias = &tree->stringPool[expr->aliasOffset];
                     oldLua = lua;
                     if (iii == 0) {
-                        if (asprintf(&lua, 
+                        if (expr->not) { 
+                            if (asprintf(&lua, 
+"%skeys = {}\n"
+"notKeys = {}\n"
+"directory = {[\"0\"] = 1}\n"
+"reviewers = {}\n"
+"results_key = \"%s!%d!r!\" .. sid\n"                   
+"keys[1] = \"%s\"\n"
+"directory[\"%s\"] = 1\n"
+"reviewers[1] = function(message, frame, index)\n"
+"    if not message then\n"
+"        frame[\"$\" .. index] = 1\n"
+"        return true\n"
+"    end\n"
+"    return false\n"
+"end\n",
+                                         lua,
+                                         actionName,
+                                         ii,
+                                         currentKey,
+                                         currentKey)  == -1) {
+                                return ERR_OUT_OF_MEMORY;
+                            }
+                        } else {
+                            if (asprintf(&lua, 
 "%skeys = {}\n"
 "directory = {[\"0\"] = 1}\n"
 "reviewers = {}\n"
 "results_key = \"%s!%d!r!\" .. sid\n"                   
 "keys[1] = \"%s\"\n"
 "directory[\"%s\"] = 1\n"
-"reviewers[1] = function(message, frame)\n"
-"    frame[\"%s\"] = message\n"
-"    return true\n"
+"reviewers[1] = function(message, frame, index)\n"
+"    if message then\n"
+"        frame[\"%s\"] = message\n"
+"        return true\n"
+"    end\n"
+"    return false\n"
 "end\n",
-                                     lua,
-                                     actionName,
-                                     ii,
-                                     currentKey, 
-                                     currentKey,
-                                     currentAlias)  == -1) {
-                            return ERR_OUT_OF_MEMORY;
+                                         lua,
+                                         actionName,
+                                         ii,
+                                         currentKey,
+                                         currentKey,
+                                         currentAlias)  == -1) {
+                                return ERR_OUT_OF_MEMORY;
+                            }
                         }
                     } else {
                         char *test = NULL;
@@ -250,25 +278,47 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                             return result;
                         }
 
-                        if (asprintf(&lua,
+                        if (expr->not) { 
+                            if (asprintf(&lua,
 "%skeys[%d] = \"%s\"\n"
 "directory[\"%s\"] = %d\n"
-"reviewers[%d] = function(message, frame)\n"
-"    if %s then\n"
+"reviewers[%d] = function(message, frame, index)\n"
+"    if not message or not (%s) then\n"
+"        frame[\"$\" .. index] = 1\n"
+"        return true\n"
+"    end\n"
+"    return false\n"
+"end\n",
+                                         lua,
+                                         iii + 1, 
+                                         currentKey,
+                                         currentKey,
+                                         iii + 1,
+                                         iii + 1,
+                                         test)  == -1) {
+                                return ERR_OUT_OF_MEMORY;
+                            }
+                        } else {
+                            if (asprintf(&lua,
+"%skeys[%d] = \"%s\"\n"
+"directory[\"%s\"] = %d\n"
+"reviewers[%d] = function(message, frame, index)\n"
+"    if message and %s then\n"
 "        frame[\"%s\"] = message\n"
 "        return true\n"
 "    end\n"
 "    return false\n"
 "end\n",
-                                     lua,
-                                     iii + 1, 
-                                     currentKey,
-                                     currentKey,
-                                     iii + 1,
-                                     iii + 1,
-                                     test,
-                                     currentAlias)  == -1) {
-                            return ERR_OUT_OF_MEMORY;
+                                         lua,
+                                         iii + 1, 
+                                         currentKey,
+                                         currentKey,
+                                         iii + 1,
+                                         iii + 1,
+                                         test,
+                                         currentAlias)  == -1) {
+                                return ERR_OUT_OF_MEMORY;
+                            }
                         }
                         free(test);
                     }
@@ -290,8 +340,9 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
             if (asprintf(&lua,
 "local key = ARGV[1]\n"
 "local sid = ARGV[2]\n"
-"local score = tonumber(ARGV[3])\n"
-"local assert_fact = tonumber(ARGV[4])\n"
+"local mid = ARGV[3]\n"
+"local score = tonumber(ARGV[4])\n"
+"local assert_fact = tonumber(ARGV[5])\n"
 "local events_hashset = \"%s!e!\" .. sid\n"
 "local facts_hashset = \"%s!f!\" .. sid\n"
 "local visited_hashset = \"%s!v!\" .. sid\n"
@@ -300,18 +351,46 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local directory\n"
 "local reviewers\n"
 "local results_key\n"
+"local validate_frame_for_key = function(frame, index, events_key, messages_key)\n"
+"    local packed_message_list_len = redis.call(\"llen\", events_key)\n"
+"    for i = 0, packed_message_list_len - 1, 1  do\n"
+"        local new_mid = redis.call(\"lpop\", events_key)\n"
+"        local packed_message = redis.call(\"hget\", messages_key, new_mid)\n"
+"        if packed_message then\n"
+"            local message = cmsgpack.unpack(packed_message)\n"
+"            if not reviewers[index](message, frame, index) then\n"
+"                return false\n"
+"            end\n"
+"        end\n"
+"    end\n"
+"    return true\n"
+"end\n"
+"local validate_frame = function(frame, index)\n"
+"    local first_result = validate_frame_for_key(frame, index, keys[index] .. \"!e!\" .. sid, events_hashset)\n"
+"    local second_result = validate_frame_for_key(frame, index, keys[index] ..\"!f!\" .. sid, facts_hashset)\n"
+"    return first_result and second_result\n"
+"end\n"
 "local load_frame = function(packed_frame)\n"
 "    local frame = cmsgpack.unpack(packed_frame)\n"
-"    for name, mid in pairs(frame) do\n"
-"        local packed_message = redis.call(\"hget\", events_hashset, mid)\n"
-"        if not packed_message then\n"
-"            packed_message = redis.call(\"hget\", facts_hashset, mid)\n"
-"        end\n"
-"        if packed_message then\n"
-"            frame[name] = cmsgpack.unpack(packed_message)\n"
+"    local indexes = {}\n"
+"    for name, new_mid in pairs(frame) do\n"
+"        if string.sub(name, 1, 1) == \"$\" then\n"
+"            table.insert(indexes, tonumber(string.sub(name, 2)))\n"
 "        else\n"
-"            frame = nil\n"
-"            break\n"
+"            local packed_message = redis.call(\"hget\", events_hashset, new_mid)\n"
+"            if not packed_message then\n"
+"                packed_message = redis.call(\"hget\", facts_hashset, new_mid)\n"
+"            end\n"
+"            if packed_message then\n"
+"                frame[name] = cmsgpack.unpack(packed_message)\n"
+"            else\n"
+"                return nil\n"
+"            end\n"
+"        end\n"
+"    end\n"
+"    for i = 1, #indexes, 1 do\n"
+"        if not validate_frame(frame, indexes[i]) then\n"
+"            return nil\n"
 "        end\n"
 "    end\n"
 "    return frame\n"
@@ -319,7 +398,11 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local save_frame = function(frames_key, frame)\n"
 "    local frame_to_pack = {}\n"
 "    for name, message in pairs(frame) do\n"
-"        frame_to_pack[name] = message[\"id\"]\n"
+"        if message == 1 then\n"
+"            frame_to_pack[name] = 1\n"
+"        else\n"
+"            frame_to_pack[name] = message[\"id\"]\n"
+"        end\n"
 "    end\n"
 "    redis.call(\"rpush\", frames_key, cmsgpack.pack(frame_to_pack))\n"
 "end\n"
@@ -332,7 +415,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        frame[\"$f\"] = nil\n"
 "    end\n"
 "    for name, message in pairs(frame) do\n"
-"        if message[\"$f\"] ~= 1 then\n"
+"        if message ~= 1 and message[\"$f\"] ~= 1 then\n"
 "           redis.call(\"hdel\", events_hashset, message[\"id\"])\n"
 "           frame[name] = nil\n"
 "        end\n"
@@ -341,7 +424,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local is_pure_fact = function(frame, index)\n"
 "    local message_count = 0\n"
 "    for name, message in pairs(frame) do\n"
-"        if message[\"$f\"] ~= 1 then\n" 
+"        if message ~= 1 and message[\"$f\"] ~= 1 then\n" 
 "           return false\n"    
 "        end\n"
 "        message_count = message_count + 1\n"   
@@ -351,13 +434,12 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local process_frame\n"
 "local process_event_and_frame = function(message, frame, index, use_facts)\n"
 "    local result = 0\n"
-"    if reviewers[index](message, frame) then\n"
+"    if reviewers[index](message, frame, index) then\n"
 "        if (index == #reviewers) then\n"
 "            save_result(frame)\n"
 "            return 1\n"
 "        else\n"
-"            result = process_frame(frame, index + 1, keys[index + 1] .. \"!e!\" .. sid, false)\n"
-"            result = result + process_frame(frame, index + 1, keys[index + 1] .. \"!f!\" .. sid, true)\n"
+"            result = process_frame(frame, index + 1, use_facts)\n"
 "            if result == 0 or use_facts then\n"
 "                save_frame(keys[index + 1] .. \"!c!\" .. sid, frame)\n"
 "            end\n"
@@ -365,23 +447,25 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    end\n"
 "    return result\n"
 "end\n"
-"process_frame = function(frame, index, events_key, use_facts)\n"
+"local process_frame_for_key = function(frame, index, events_key, use_facts)\n"
 "    local packed_message_list_len = redis.call(\"llen\", events_key)\n"
-"    local result = 0\n"
+"    local result = nil\n"
 "    local messages_key = events_hashset\n"
 "    if use_facts then\n"
 "       messages_key = facts_hashset\n"
 "    end\n"
 "    for i = 0, packed_message_list_len - 1, 1  do\n"
-"        local mid = redis.call(\"lpop\", events_key)\n"
-"        local packed_message\n"
-"        packed_message = redis.call(\"hget\", messages_key, mid)\n"
+"        local new_mid = redis.call(\"lpop\", events_key)\n"
+"        local packed_message = redis.call(\"hget\", messages_key, new_mid)\n"
 "        if packed_message then\n"
 "            local message = cmsgpack.unpack(packed_message)\n"
 "            local count = process_event_and_frame(message, frame, index, use_facts)\n"
+"            if not result then\n"
+"                result = 0\n"
+"            end\n"
 "            result = result + count\n"
 "            if count == 0 or use_facts then\n"
-"                redis.call(\"rpush\", events_key, mid)\n"
+"                redis.call(\"rpush\", events_key, new_mid)\n"
 "            elseif not is_pure_fact(frame, index) then\n"
 "                break\n"
 "            end\n"
@@ -389,10 +473,34 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    end\n"
 "    return result\n"
 "end\n"
+"process_frame = function(frame, index, use_facts)\n"
+"    local first_result = process_frame_for_key(frame, index, keys[index] .. \"!e!\" .. sid, false)\n"
+"    local second_result = process_frame_for_key(frame, index, keys[index] .. \"!f!\" .. sid, true)\n"
+"    if not first_result and not second_result then\n"
+"        return process_event_and_frame(nil, frame, index, use_facts)\n"
+"    elseif not first_result then\n"
+"        return second_result\n"
+"    elseif not second_result then\n"
+"        return first_result\n"
+"    else\n"
+"        return first_result + second_result\n"
+"    end\n"
+"end\n"
 "local process_event = function(message, index, events_key, use_facts)\n"
+"    local messages_key = events_hashset\n"
+"    if use_facts then\n"
+"        messages_key = facts_hashset\n"
+"    end\n"
+"    if not message then\n"
+"        redis.call(\"hdel\", messages_key, mid)\n"
+"    end\n"
 "    local result = 0\n"
 "    if index == 1 then\n"
-"        result = process_event_and_frame(message, {}, 1, use_facts)\n"
+"        if message then\n"
+"            result = process_event_and_frame(message, {}, 1, use_facts)\n"
+"        else\n"
+"            result = process_frame({}, index, use_facts)\n"
+"        end\n"
 "    else\n"
 "        local frames_key = keys[index] .. \"!c!\" .. sid\n"
 "        local packed_frame_list_len = redis.call(\"llen\", frames_key)\n"
@@ -400,23 +508,24 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "            local packed_frame = redis.call(\"lpop\", frames_key)\n"
 "            local frame = load_frame(packed_frame)\n"
 "            if frame then\n"
-"                local count = process_event_and_frame(message, frame, index, use_facts)\n"
-"                result = result + count\n"
+"                local count\n"
+"                if message then\n"
+"                    count = process_event_and_frame(message, frame, index, use_facts)\n"
+"                else\n" 
+"                    count = process_frame(frame, index, use_facts)\n"
+"                end\n"     
+"                result = result + count\n"         
 "                if count == 0 or use_facts then\n"
 "                    redis.call(\"rpush\", frames_key, packed_frame)\n"
 "                else\n"
 "                    break\n"
-"                end\n"                
+"                end\n" 
 "            end\n"
 "        end\n"
 "    end\n"
-"    if result == 0 or use_facts then\n"
-"        local messages_key = events_hashset\n"
-"        if use_facts then\n"
-"            messages_key = facts_hashset\n"
-"        end\n"
-"        redis.call(\"rpush\", events_key, message[\"id\"])\n"
-"        redis.call(\"hsetnx\", messages_key, message[\"id\"], cmsgpack.pack(message))\n"
+"    if message and (result == 0 or use_facts) then\n"
+"        redis.call(\"rpush\", events_key, mid)\n"
+"        redis.call(\"hsetnx\", messages_key, mid, cmsgpack.pack(message))\n"
 "    end\n"
 "    return result\n"
 "end\n"
@@ -444,26 +553,29 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        end\n"
 "    end\n"
 "end\n"
-"local message = {}\n"
-"for index = 5, #ARGV, 3 do\n"
-"    if ARGV[index + 2] == \"1\" then\n"
-"       message[ARGV[index]] = ARGV[index + 1]\n"
-"    elseif ARGV[index + 2] == \"2\" or  ARGV[index + 2] == \"3\" then\n"
-"       message[ARGV[index]] = tonumber(ARGV[index + 1])\n"
-"    elseif ARGV[index + 2] == \"4\" then\n"
-"       message[ARGV[index]] = toboolean(ARGV[index + 1])\n"
+"local message = nil\n"
+"if #ARGV > 5 then\n"
+"    message = {}\n"
+"    for index = 6, #ARGV, 3 do\n"
+"        if ARGV[index + 2] == \"1\" then\n"
+"            message[ARGV[index]] = ARGV[index + 1]\n"
+"        elseif ARGV[index + 2] == \"2\" or  ARGV[index + 2] == \"3\" then\n"
+"            message[ARGV[index]] = tonumber(ARGV[index + 1])\n"
+"        elseif ARGV[index + 2] == \"4\" then\n"
+"            message[ARGV[index]] = toboolean(ARGV[index + 1])\n"
+"        end\n"
+"    end\n"
+"    if assert_fact == 1 then\n"
+"        message[\"$f\"] = 1\n"
 "    end\n"
 "end\n"
-"if assert_fact == 1 then\n"
-"   message[\"$f\"] = 1\n"
-"end\n"
-"if redis.call(\"hsetnx\", visited_hashset, message[\"id\"], 1) == 0 then\n"
+"if redis.call(\"hsetnx\", visited_hashset, mid, 1) == 0 then\n"
 "    if assert_fact == 0 then\n"
-"        if not redis.call(\"hget\", events_hashset, message[\"id\"]) then\n"
+"        if not redis.call(\"hget\", events_hashset, mid) then\n"
 "            return false\n"
 "        end\n"
 "    else\n"
-"        if not redis.call(\"hget\", facts_hashset, message[\"id\"]) then\n"
+"        if not redis.call(\"hget\", facts_hashset, mid) then\n"
 "            return false\n"
 "        end\n"
 "    end\n"
@@ -476,7 +588,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                          lua)  == -1) {
                 return ERR_OUT_OF_MEMORY;
             }
-
             free(oldLua);
             redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
             redisGetReply(reContext, (void**)&reply);
@@ -506,8 +617,10 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    else\n"
 "        frame[\"$f\"] = nil\n"
 "        for name, message in pairs(frame) do\n"
-"            if message[\"$f\"] == 1 and (not redis.call(\"hget\", facts_hashset, message[\"id\"])) then\n"
-"                return false\n"
+"            if message ~= 1 then\n"
+"                if message[\"$f\"] == 1 and (not redis.call(\"hget\", facts_hashset, message[\"id\"])) then\n"
+"                    return false\n"
+"                end\n"
 "            end\n"
 "        end\n"
 "        return true\n"
@@ -583,9 +696,9 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    return nil\n"
 "else\n"
 "    redis.call(\"zincrby\", action_key, tonumber(ARGV[1]), sid)\n"
-"    local state_fact_id = redis.call(\"hget\", state_key, sid .. \"!f\")\n"
+"    local state_fact = redis.call(\"hget\", state_key, sid .. \"!f\")\n"
 "    local state = redis.call(\"hget\", state_key, sid)\n"
-"    return {sid, state_fact_id, state, cjson.encode({[action_name] = frame})}\n"
+"    return {sid, state_fact, state, cjson.encode({[action_name] = frame})}\n"
 "end\n",
                 name,
                 name,
@@ -604,6 +717,64 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 
     strncpy(rulesBinding->peekActionHash, reply->str, 40);
     rulesBinding->peekActionHash[40] = '\0';
+    freeReplyObject(reply);
+    free(lua);
+
+    if (asprintf(&lua, 
+"local key = ARGV[1]\n"
+"local sid = ARGV[2]\n"
+"local assert_fact = tonumber(ARGV[3])\n"
+"local events_hashset = \"%s!e!\" .. sid\n"
+"local facts_hashset = \"%s!f!\" .. sid\n"
+"local visited_hashset = \"%s!v!\" .. sid\n"
+"local message = {}\n"
+"for index = 4, #ARGV, 3 do\n"
+"    if ARGV[index + 2] == \"1\" then\n"
+"        message[ARGV[index]] = ARGV[index + 1]\n"
+"    elseif ARGV[index + 2] == \"2\" or  ARGV[index + 2] == \"3\" then\n"
+"        message[ARGV[index]] = tonumber(ARGV[index + 1])\n"
+"    elseif ARGV[index + 2] == \"4\" then\n"
+"        message[ARGV[index]] = toboolean(ARGV[index + 1])\n"
+"    end\n"
+"end\n"
+"local mid = message[\"id\"]\n"
+"if redis.call(\"hsetnx\", visited_hashset, message[\"id\"], 1) == 0 then\n"
+"    if assert_fact == 0 then\n"
+"        if not redis.call(\"hget\", events_hashset, mid) then\n"
+"            return false\n"
+"        end\n"
+"    else\n"
+"        if not redis.call(\"hget\", facts_hashset, mid) then\n"
+"            return false\n"
+"        end\n"
+"    end\n"
+"end\n"
+"if assert_fact == 1 then\n"
+"    message[\"$f\"] = 1\n"
+"    redis.call(\"rpush\", key .. \"!f!\" .. sid, mid)\n"
+"    redis.call(\"hsetnx\", facts_hashset, mid, cmsgpack.pack(message))\n"
+"else\n"
+"    redis.call(\"rpush\", key .. \"!e!\" .. sid, mid)\n"
+"    redis.call(\"hsetnx\", events_hashset, mid, cmsgpack.pack(message))\n"
+"end\n",
+                name,
+                name,
+                name)  == -1) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+
+    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    redisGetReply(reContext, (void**)&reply);
+    if (reply->type == REDIS_REPLY_ERROR) {
+        printf("%s\n", reply->str);
+        freeReplyObject(reply);
+        free(lua);
+        return ERR_REDIS_ERROR;
+    }
+
+    strncpy(rulesBinding->addMessageHash, reply->str, 40);
+    rulesBinding->addMessageHash[40] = '\0';
     freeReplyObject(reply);
     free(lua);
 
@@ -712,6 +883,17 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     factsHashset[nameLength + 2] = '\0';
     rulesBinding->factsHashset = factsHashset;
 
+    char *eventsHashset = malloc((nameLength + 3) * sizeof(char));
+    if (!eventsHashset) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    strncpy(eventsHashset, name, nameLength);
+    eventsHashset[nameLength] = '!';
+    eventsHashset[nameLength + 1] = 'e';
+    eventsHashset[nameLength + 2] = '\0';
+    rulesBinding->eventsHashset = eventsHashset;
+
     char *timersSortedset = malloc((nameLength + 3) * sizeof(char));
     if (!timersSortedset) {
         return ERR_OUT_OF_MEMORY;
@@ -805,6 +987,7 @@ unsigned int deleteBindingsList(ruleset *tree) {
             free(currentBinding->timersSortedset);
             free(currentBinding->sessionHashset);
             free(currentBinding->factsHashset);
+            free(currentBinding->eventsHashset);
             free(currentBinding->hashArray);
         }
 
@@ -847,6 +1030,7 @@ unsigned int getBindingIndex(ruleset *tree, unsigned int sidHash, unsigned int *
 unsigned int formatEvalMessage(void *rulesBinding, 
                                char *key, 
                                char *sid, 
+                               char *mid,
                                char *message, 
                                jsonProperty *allProperties,
                                unsigned int propertiesLength,
@@ -858,8 +1042,8 @@ unsigned int formatEvalMessage(void *rulesBinding,
     time_t currentTime = time(NULL);
     char score[11];
     snprintf(score, 11, "%ld", currentTime);
-    char *argv[7 + propertiesLength * 3];
-    size_t argvl[7 + propertiesLength * 3];
+    char *argv[8 + propertiesLength * 3];
+    size_t argvl[8 + propertiesLength * 3];
 
     argv[0] = "evalsha";
     argvl[0] = 7;
@@ -871,39 +1055,100 @@ unsigned int formatEvalMessage(void *rulesBinding,
     argvl[3] = strlen(key);
     argv[4] = sid;
     argvl[4] = strlen(sid);
-    argv[5] = score;
-    argvl[5] = 10;
-    argv[6] = assertFact ? "1" : "0";
-    argvl[6] = 1;
+    argv[5] = mid;
+    argvl[5] = strlen(mid);
+    argv[6] = score;
+    argvl[6] = 10;
+    argv[7] = assertFact ? "1" : "0";
+    argvl[7] = 1;
 
     for (unsigned int i = 0; i < propertiesLength; ++i) {
-        argv[7 + i * 3] = message + allProperties[i].nameOffset;
-        argvl[7 + i * 3] = allProperties[i].nameLength;
-        argv[7 + i * 3 + 1] = message + allProperties[i].valueOffset;
+        argv[8 + i * 3] = message + allProperties[i].nameOffset;
+        argvl[8 + i * 3] = allProperties[i].nameLength;
+        argv[8 + i * 3 + 1] = message + allProperties[i].valueOffset;
         if (allProperties[i].type == JSON_STRING) {
-            argvl[7 + i * 3 + 1] = allProperties[i].valueLength;
+            argvl[8 + i * 3 + 1] = allProperties[i].valueLength;
         } else {
-            argvl[7 + i * 3 + 1] = allProperties[i].valueLength + 1;
+            argvl[8 + i * 3 + 1] = allProperties[i].valueLength + 1;
         }
 
         switch(allProperties[i].type) {
             case JSON_STRING:
-                argv[7 + i * 3 + 2] = "1";
+                argv[8 + i * 3 + 2] = "1";
                 break;
             case JSON_INT:
-                argv[7 + i * 3 + 2] = "2";
+                argv[8 + i * 3 + 2] = "2";
                 break;
             case JSON_DOUBLE:
-                argv[7 + i * 3 + 2] = "3";
+                argv[8 + i * 3 + 2] = "3";
                 break;
             case JSON_BOOL:
-                argv[7 + i * 3 + 2] = "4";
+                argv[8 + i * 3 + 2] = "4";
                 break;
         }
-        argvl[7 + i * 3 + 2] = 1; 
+        argvl[8 + i * 3 + 2] = 1; 
     }
 
-    int result = redisFormatCommandArgv(command, 7 + propertiesLength * 3, (const char**)argv, argvl); 
+    int result = redisFormatCommandArgv(command, 8 + propertiesLength * 3, (const char**)argv, argvl); 
+    if (result == 0) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    return RULES_OK;
+}
+
+unsigned int formatStoreMessage(void *rulesBinding, 
+                                char *key, 
+                                char *sid, 
+                                char *message, 
+                                jsonProperty *allProperties,
+                                unsigned int propertiesLength,
+                                unsigned char storeFact,
+                                char **command) {
+    binding *bindingContext = (binding*)rulesBinding;
+    char *argv[6 + propertiesLength * 3];
+    size_t argvl[6 + propertiesLength * 3];
+
+    argv[0] = "evalsha";
+    argvl[0] = 7;
+    argv[1] = bindingContext->addMessageHash;
+    argvl[1] = 40;
+    argv[2] = "0";
+    argvl[2] = 1;
+    argv[3] = key;
+    argvl[3] = strlen(key);
+    argv[4] = sid;
+    argvl[4] = strlen(sid);
+    argv[5] = assertFact ? "1" : "0";
+    argvl[5] = 1;
+
+    for (unsigned int i = 0; i < propertiesLength; ++i) {
+        argv[6 + i * 3] = message + allProperties[i].nameOffset;
+        argvl[6 + i * 3] = allProperties[i].nameLength;
+        argv[6 + i * 3 + 1] = message + allProperties[i].valueOffset;
+        if (allProperties[i].type == JSON_STRING) {
+            argvl[6 + i * 3 + 1] = allProperties[i].valueLength;
+        } else {
+            argvl[6 + i * 3 + 1] = allProperties[i].valueLength + 1;
+        }
+
+        switch(allProperties[i].type) {
+            case JSON_STRING:
+                argv[6 + i * 3 + 2] = "1";
+                break;
+            case JSON_INT:
+                argv[6 + i * 3 + 2] = "2";
+                break;
+            case JSON_DOUBLE:
+                argv[6 + i * 3 + 2] = "3";
+                break;
+            case JSON_BOOL:
+                argv[6 + i * 3 + 2] = "4";
+                break;
+        }
+        argvl[6 + i * 3 + 2] = 1; 
+    }
+
+    int result = redisFormatCommandArgv(command, 6 + propertiesLength * 3, (const char**)argv, argvl); 
     if (result == 0) {
         return ERR_OUT_OF_MEMORY;
     }
@@ -938,11 +1183,11 @@ unsigned int formatStoreSession(void *rulesBinding,
     return RULES_OK;
 }
 
-unsigned int formatStoreSessionFactId(void *rulesBinding, 
-                                      char *sid, 
-                                      char *mid,
-                                      unsigned char tryExists, 
-                                      char **command) {
+unsigned int formatStoreSessionFact(void *rulesBinding, 
+                                    char *sid, 
+                                    char *message,
+                                    unsigned char tryExists, 
+                                    char **command) {
     binding *currentBinding = (binding*)rulesBinding;
 
     int result;
@@ -951,13 +1196,13 @@ unsigned int formatStoreSessionFactId(void *rulesBinding,
                                     "hsetnx %s %s!f %s", 
                                     currentBinding->sessionHashset, 
                                     sid, 
-                                    mid);
+                                    message);
     } else {
         result = redisFormatCommand(command,
                                     "hset %s %s!f %s", 
                                     currentBinding->sessionHashset, 
                                     sid, 
-                                    mid);
+                                    message);
     }
 
     if (result == 0) {
@@ -997,16 +1242,28 @@ unsigned int formatRemoveAction(void *rulesBinding,
     return RULES_OK;
 }
 
-unsigned int formatRetractMessage(void *rulesBinding, 
+unsigned int formatRemoveMessage(void *rulesBinding, 
                                   char *sid, 
                                   char *mid,
+                                  unsigned char removeFact,
                                   char **command) {
     binding *currentBinding = (binding*)rulesBinding;
-    int result = redisFormatCommand(command,
+
+    int result = 0;
+    if (removeFact) {
+        result = redisFormatCommand(command,
                                     "hdel %s!%s %s", 
                                     currentBinding->factsHashset, 
                                     sid, 
                                     mid);
+    } else {
+        result = redisFormatCommand(command,
+                                    "hdel %s!%s %s", 
+                                    currentBinding->eventsHashset, 
+                                    sid, 
+                                    mid);
+    }
+
     if (result == 0) {
         return ERR_OUT_OF_MEMORY;
     }
@@ -1073,7 +1330,7 @@ unsigned int executeBatch(void *rulesBinding,
     return result;
 }
 
-unsigned int retractMessage(void *rulesBinding, char *sid, char *mid) {
+unsigned int removeMessage(void *rulesBinding, char *sid, char *mid) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;  
     int result = redisAppendCommand(reContext, 

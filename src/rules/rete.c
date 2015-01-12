@@ -662,6 +662,12 @@ static unsigned int validateAlgebra(char *rule) {
             } else if (!strncmp("$any", last - 4, 4)) {
                 nameLength = nameLength - 4;
                 reenter = 1;
+            } else if (!strncmp("$not", last - 4, 4)) {
+                nameLength = nameLength - 4;    
+            }
+
+            if (nameLength == 0) {
+                return ERR_RULE_WITHOUT_QUALIFIER;
             } 
         } 
         
@@ -1166,6 +1172,9 @@ static unsigned int createBetaConnector(ruleset *tree,
             } else if (!strncmp("$any", last - 4, 4)) {
                 nameLength = nameLength - 4;
                 operator = OP_ANY;
+            } else if (!strncmp("$not", last - 4, 4)) {
+                nameLength = nameLength - 4;
+                operator = OP_NOT;
             }
         }        
         
@@ -1186,6 +1195,7 @@ static unsigned int createBetaConnector(ruleset *tree,
         connector->nameOffset = stringOffset;
         connector->type = NODE_BETA_CONNECTOR;
         connector->value.b.nextOffset = nextOffset;
+        connector->value.b.not = (operator == OP_NOT) ? 1 : 0;
         if (betaPath->expressionsLength == 0) {
             betaPath->expressionsLength = 1;
             betaPath->expressions = malloc(sizeof(expression));
@@ -1207,9 +1217,10 @@ static unsigned int createBetaConnector(ruleset *tree,
 
         expr->nameOffset = stringOffset;
         expr->aliasOffset = stringOffset;
+        expr->not = (operator == OP_NOT) ? 1 : 0;
         expr->termsLength = 0;
         expr->t.termsPointer = NULL;
-        if (operator == OP_NOP) {
+        if (operator == OP_NOP || operator == OP_NOT) {
             unsigned int resultOffset = NODE_M_OFFSET;
             readNextValue(last, &first, &last, &type);
             result = createAlpha(tree, first, expr, connectorOffset, &resultOffset);
@@ -1387,6 +1398,7 @@ static unsigned int createSingleQuery(ruleset *tree,
 
     newExpression->aliasOffset = expr->aliasOffset;
     newExpression->termsLength = expr->termsLength;
+    newExpression->not = expr->not;
     if (expr->termsLength) {
         result = allocateNext(tree, expr->termsLength, &newExpression->t.termsOffset);
         if (result != RULES_OK) {

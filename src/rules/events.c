@@ -30,6 +30,15 @@
 #define OP_STRING_DOUBLE 0x0103
 #define OP_STRING_STRING 0x0101
 
+#define ACTION_ASSERT_FACT 1
+#define ACTION_ASSERT_EVENT 2
+#define ACTION_RETRACT_FACT 3
+#define ACTION_RETRACT_EVENT 4
+#define ACTION_ADD_FACT 5
+#define ACTION_ADD_EVENT 6
+#define ACTION_REMOVE_FACT 7
+#define ACTION_REMOVE_EVENT 8
+
 typedef struct actionContext {
     void *rulesBinding;
     redisReply *reply;
@@ -48,7 +57,7 @@ typedef struct jsonResult {
 static unsigned int handleMessage(ruleset *tree,
                                   char *state,
                                   char *message, 
-                                  unsigned char assertFact, 
+                                  unsigned char actionType, 
                                   char **commands,
                                   unsigned short *commandPriorities,
                                   unsigned short *commandCount,
@@ -252,12 +261,13 @@ static void freeCommands(char **commands,
 
 static unsigned int handleAction(ruleset *tree, 
                                  char *sid, 
+                                 char *mid,
                                  char *message,
                                  jsonProperty *allProperties,
                                  unsigned int propertiesLength,
                                  char *prefix, 
                                  node *node, 
-                                 unsigned char assertFact, 
+                                 unsigned char actionType, 
                                  char **commands,
                                  unsigned short *commandPriorities,
                                  unsigned short *commandCount,
@@ -277,15 +287,54 @@ static unsigned int handleAction(ruleset *tree,
         return ERR_MAX_COMMAND_COUNT;
     }
 
-    result = formatEvalMessage(*rulesBinding, 
-                               prefix, 
-                               sid, 
-                               message, 
-                               allProperties,
-                               propertiesLength,
-                               node->value.c.index,
-                               assertFact,
-                               &newCommand);
+    switch (actionType) {
+        case ACTION_ASSERT_EVENT:
+        case ACTION_ASSERT_FACT:
+            result = formatEvalMessage(*rulesBinding, 
+                                       prefix, 
+                                       sid, 
+                                       mid,
+                                       message, 
+                                       allProperties,
+                                       propertiesLength,
+                                       node->value.c.index,
+                                       actionType == ACTION_ASSERT_FACT ? 1 : 0,
+                                       &newCommand);
+            break;
+        case ACTION_RETRACT_EVENT:
+        case ACTION_RETRACT_FACT:
+            result = formatEvalMessage(*rulesBinding, 
+                                       prefix, 
+                                       sid, 
+                                       mid,
+                                       NULL, 
+                                       NULL,
+                                       0,
+                                       node->value.c.index,
+                                       actionType == ACTION_RETRACT_FACT ? 1 : 0,
+                                       &newCommand);
+            break;
+        case ACTION_ADD_EVENT:
+        case ACTION_ADD_FACT:
+            result = formatStoreMessage(*rulesBinding, 
+                                        prefix, 
+                                        sid, 
+                                        message, 
+                                        allProperties,
+                                        propertiesLength,
+                                        actionType == ACTION_ADD_FACT ? 1 : 0,
+                                        &newCommand);  
+            break;
+        case ACTION_REMOVE_EVENT:
+        case ACTION_REMOVE_FACT:
+            result = formatRemoveMessage(*rulesBinding, 
+                                         sid,
+                                         mid, 
+                                         actionType == ACTION_REMOVE_FACT ? 1 : 0,
+                                         &newCommand);  
+            break;
+
+    }
     
     if (result != RULES_OK) {
         return result;
@@ -307,6 +356,7 @@ static unsigned int handleAction(ruleset *tree,
 
 static unsigned int handleBeta(ruleset *tree, 
                                char *sid,
+                               char *mid,
                                char *message, 
                                jsonProperty *allProperties,
                                unsigned int propertiesLength,
@@ -325,6 +375,22 @@ static unsigned int handleBeta(ruleset *tree,
         if (currentNode->type == NODE_ACTION) {
             currentNode = NULL;
         } else {
+            if (currentNode->value.b.not) {
+                switch (actionType) {
+                    case ACTION_ASSERT_FACT:
+                        actionType = ACTION_ADD_FACT;
+                        break;
+                    case ACTION_ASSERT_EVENT:
+                        actionType = ACTION_ADD_EVENT;
+                        break;
+                    case ACTION_REMOVE_FACT:
+                        actionType = ACTION_RETRACT_FACT;
+                        break;
+                    case ACTION_REMOVE_EVENT:
+                        actionType = ACTION_RETRACT_EVENT;
+                        break;
+                }
+            }
             currentNode = &tree->nodePool[currentNode->value.b.nextOffset];
         }
     }
@@ -351,6 +417,7 @@ static unsigned int handleBeta(ruleset *tree,
     }
     return handleAction(tree, 
                         sid, 
+                        mid,
                         message,
                         allProperties,
                         propertiesLength,
@@ -802,11 +869,12 @@ static unsigned int isMatch(ruleset *tree,
 
 static unsigned int handleAlpha(ruleset *tree, 
                                 char *sid, 
+                                char *mid,
                                 char *message,
                                 jsonProperty *allProperties,
                                 unsigned int propertiesLength,
                                 alpha *alphaNode, 
-                                unsigned char assertFact,
+                                unsigned char actionType,
                                 char **commands,
                                 unsigned short *commandPriorities,
                                 unsigned short *commandCount,
@@ -869,7 +937,6 @@ static unsigned int handleAlpha(ruleset *tree,
                             if (mresult != RULES_OK){
                                 return mresult;
                             }
-                            
                             if (match) {
                                 if (top == MAX_STACK_SIZE) {
                                     return ERR_MAX_STACK_SIZE;
@@ -889,11 +956,12 @@ static unsigned int handleAlpha(ruleset *tree,
             for (unsigned int entry = 0; betaList[entry] != 0; ++entry) {
                 unsigned int bresult = handleBeta(tree, 
                                     sid, 
+                                    mid,
                                     message,
                                     allProperties,
                                     propertiesLength,
                                     &tree->nodePool[betaList[entry]],  
-                                    assertFact, 
+                                    actionType, 
                                     commands,
                                     commandPriorities,
                                     commandCount,
@@ -944,7 +1012,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                                       unsigned int propertiesLength, 
                                       unsigned int midIndex, 
                                       unsigned int sidIndex, 
-                                      unsigned char assertFact,
+                                      unsigned char actionType,
                                       char **commands,
                                       unsigned short *commandPriorities,
                                       unsigned short *commandCount,
@@ -966,6 +1034,13 @@ static unsigned int handleMessageCore(ruleset *tree,
     result = getId(properties, midIndex, &midProperty, &midLength);
     if (result != RULES_OK) {
         return result;
+    }
+
+    char mid[midLength + 1];
+    strncpy(mid, message + midProperty->valueOffset, midLength);
+    mid[midLength] = '\0';
+    if (*commandCount == MAX_COMMAND_COUNT) {
+        return ERR_MAX_COMMAND_COUNT;
     }
 
     if (state) {
@@ -991,11 +1066,12 @@ static unsigned int handleMessageCore(ruleset *tree,
 
     result =  handleAlpha(tree, 
                           sid, 
+                          mid,
                           message, 
                           properties, 
                           propertiesLength,
                           &tree->nodePool[NODE_M_OFFSET].value.a, 
-                          assertFact, 
+                          actionType, 
                           commands,
                           commandPriorities,
                           commandCount,
@@ -1003,14 +1079,7 @@ static unsigned int handleMessageCore(ruleset *tree,
 
     if (result == RULES_OK) {
         if (state) {
-            char mid[midLength + 1];
-            strncpy(mid, message + midProperty->valueOffset, midLength);
-            mid[midLength] = '\0';
-            if (*commandCount == MAX_COMMAND_COUNT) {
-                return ERR_MAX_COMMAND_COUNT;
-            }
-
-            result = formatStoreSessionFactId(*rulesBinding, sid, mid, 0, &storeCommand);
+            result = formatStoreSessionFact(*rulesBinding, sid, message, 0, &storeCommand);
             if (result != RULES_OK) {
                 return result;
             }
@@ -1068,7 +1137,7 @@ static unsigned int handleMessageCore(ruleset *tree,
             result = handleMessage(tree, 
                                    NULL,
                                    stateMessage,  
-                                   1,
+                                   ACTION_ASSERT_FACT,
                                    commands,
                                    commandPriorities,
                                    commandCount,
@@ -1085,7 +1154,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                 return ERR_MAX_COMMAND_COUNT;
             }
 
-            result = formatStoreSessionFactId(*rulesBinding, sid, "$s", 1, &storeCommand);
+            result = formatStoreSessionFact(*rulesBinding, sid, stateMessage, 1, &storeCommand);
             if (result != RULES_OK) {
                 return result;
             }
@@ -1103,7 +1172,7 @@ static unsigned int handleMessageCore(ruleset *tree,
 static unsigned int handleMessage(ruleset *tree,
                                   char *state,
                                   char *message, 
-                                  unsigned char assertFact, 
+                                  unsigned char actionType, 
                                   char **commands,
                                   unsigned short *commandPriorities,
                                   unsigned short *commandCount,
@@ -1133,7 +1202,7 @@ static unsigned int handleMessage(ruleset *tree,
                             propertiesLength, 
                             midIndex, 
                             sidIndex,  
-                            assertFact,
+                            actionType,
                             commands,
                             commandPriorities,
                             commandCount,
@@ -1141,7 +1210,7 @@ static unsigned int handleMessage(ruleset *tree,
 }
 
 static unsigned int handleMessages(void *handle, 
-                                   unsigned char assertFact,
+                                   unsigned char actionType,
                                    char *messages, 
                                    char **commands,
                                    unsigned short *commandPriorities,
@@ -1194,7 +1263,7 @@ static unsigned int handleMessages(void *handle,
                                  propertiesLength,
                                  propertiesMidIndex,
                                  propertiesSidIndex, 
-                                 assertFact, 
+                                 actionType, 
                                  commands,
                                  commandPriorities,
                                  commandCount,
@@ -1252,7 +1321,7 @@ static unsigned int handleState(ruleset *tree,
     unsigned int result = handleMessage(tree, 
                                         state,
                                         stateMessage,  
-                                        1,
+                                        ACTION_ASSERT_FACT,
                                         commands,
                                         commandPriorities,
                                         commandCount,
@@ -1290,7 +1359,7 @@ static unsigned int handleTimers(void *handle,
         result = handleMessage(handle, 
                                NULL,
                                reply->element[i]->str, 
-                               0,
+                               ACTION_ASSERT_EVENT,
                                commands, 
                                commandPriorities,
                                commandCount, 
@@ -1305,7 +1374,9 @@ static unsigned int handleTimers(void *handle,
     return RULES_OK;
 }
 
-unsigned int assertEvent(void *handle, char *message) {
+static unsigned int executeHandleMessage(void *handle, 
+                                         char *message, 
+                                         unsigned char actionType) {
     char *commands[MAX_COMMAND_COUNT];
     unsigned short commandPriorities[MAX_COMMAND_COUNT];
     unsigned short commandCount = 0;
@@ -1313,7 +1384,7 @@ unsigned int assertEvent(void *handle, char *message) {
     unsigned int result = handleMessage(handle, 
                                         NULL,
                                         message, 
-                                        0, 
+                                        actionType, 
                                         commands,
                                         commandPriorities,
                                         &commandCount,
@@ -1331,16 +1402,17 @@ unsigned int assertEvent(void *handle, char *message) {
     return result;
 }
 
-unsigned int assertEvents(void *handle, 
-                          char *messages, 
-                          unsigned int *resultsLength, 
-                          unsigned int **results) {
+static unsigned int executeHandleMessages(void *handle, 
+                                          char *messages, 
+                                          unsigned char actionType,
+                                          unsigned int *resultsLength, 
+                                          unsigned int **results) {
     char *commands[MAX_COMMAND_COUNT];
     unsigned short commandPriorities[MAX_COMMAND_COUNT];
     unsigned short commandCount = 0;
     void *rulesBinding = NULL;
     unsigned int result = handleMessages(handle,
-                                         0,
+                                         actionType,
                                          messages,
                                          commands,
                                          commandPriorities,
@@ -1348,28 +1420,6 @@ unsigned int assertEvents(void *handle,
                                          resultsLength,
                                          results,
                                          &rulesBinding);
-    
-    if (result != RULES_OK) {
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    return executeBatch(rulesBinding, commands, commandCount);
-}
-
-unsigned int assertFact(void *handle, char *message) {
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned short commandPriorities[MAX_COMMAND_COUNT];
-    unsigned short commandCount = 0;
-    void *rulesBinding = NULL;
-    unsigned int result = handleMessage(handle, 
-                                        NULL,
-                                        message, 
-                                        1,
-                                        commands,
-                                        commandPriorities,
-                                        &commandCount,
-                                        &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         freeCommands(commands, commandCount);
         return result;
@@ -1381,6 +1431,36 @@ unsigned int assertFact(void *handle, char *message) {
     }
 
     return result;
+}
+
+unsigned int assertEvent(void *handle, char *message) {
+    return executeHandleMessage(handle, message, ACTION_ASSERT_EVENT);
+}
+
+unsigned int assertEvents(void *handle, 
+                          char *messages, 
+                          unsigned int *resultsLength, 
+                          unsigned int **results) {
+    return executeHandleMessages(handle, messages, ACTION_ASSERT_EVENT, resultsLength, results);
+}
+
+unsigned int retractEvent(void *handle, char *message) {
+    return executeHandleMessage(handle, message, ACTION_REMOVE_EVENT);
+}
+
+unsigned int assertFact(void *handle, char *message) {
+    return executeHandleMessage(handle, message, ACTION_ASSERT_FACT);
+}
+
+unsigned int assertFacts(void *handle, 
+                          char *messages, 
+                          unsigned int *resultsLength, 
+                          unsigned int **results) {
+    return executeHandleMessages(handle, messages, ACTION_ASSERT_FACT, resultsLength, results);
+}
+
+unsigned int retractFact(void *handle, char *message) {
+    return executeHandleMessage(handle, message, ACTION_REMOVE_FACT);
 }
 
 unsigned int assertState(void *handle, char *state) {
@@ -1425,16 +1505,6 @@ unsigned int assertTimers(void *handle) {
     return executeBatch(rulesBinding, commands, commandCount);
 }
 
-unsigned int retractFact(void *handle, char *sid, char *mid) {
-    void *rulesBinding = NULL;
-    unsigned int result = resolveBinding(handle, sid, &rulesBinding);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    return retractMessage(rulesBinding, sid, mid);
-}
-
 unsigned int startAction(void *handle, char **state, char **messages, void **actionHandle) {
     redisReply *reply;
     void *rulesBinding;
@@ -1469,12 +1539,16 @@ unsigned int completeAction(void *handle, void *actionHandle, char *state) {
         return result;
     }
 
+    ++commandCount;
     if (reply->element[1]->str != NULL) {
-        ++commandCount;
-        result = formatRetractMessage(rulesBinding, 
-                                      reply->element[0]->str, 
-                                      reply->element[1]->str, 
-                                      &commands[commandCount]);
+        result = handleMessage(handle,
+                               NULL,
+                               reply->element[1]->str,
+                               ACTION_REMOVE_FACT,
+                               commands,
+                               commandPriorities,
+                               &commandCount,
+                               &rulesBinding);
         if (result != RULES_OK) {
             freeCommands(commands, commandCount);
             freeReplyObject(reply);
@@ -1483,7 +1557,6 @@ unsigned int completeAction(void *handle, void *actionHandle, char *state) {
         }
     }
 
-    ++commandCount;
     result = handleState(handle, 
                          state, 
                          commands,

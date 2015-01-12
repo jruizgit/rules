@@ -19,6 +19,7 @@
 #define OP_MUL 0x10
 #define OP_DIV 0x11
 #define OP_TYPE 0x12
+#define OP_NOT 0x13
 
 #define NODE_ALPHA 0
 #define NODE_BETA_CONNECTOR 1
@@ -53,6 +54,7 @@ typedef struct expression {
     unsigned int nameOffset;
     unsigned int aliasOffset;
     unsigned short termsLength;
+    unsigned char not;
     union {
         unsigned int termsOffset; 
         unsigned int *termsPointer;
@@ -76,6 +78,7 @@ typedef struct alpha {
 
 typedef struct betaConnector {
     unsigned int nextOffset;
+    unsigned char not;
 } betaConnector;
 
 typedef struct action {
