@@ -4,24 +4,24 @@ require_relative '../src/rulesrb/rules'
 puts('books1 *****')
 handle = Rules.create_ruleset 'books1', JSON.generate({
   :ship => {
-    :whenAll => {
-      :order => {
+    :all => [
+      {:order => {
         :$and => [
             {:$lte => {:amount => 1000}},
             {:country => 'US'},
             {:currency => 'US'},
-            {:seller => 'bookstore'} 
+            {:seller => 'bookstore'}
         ]
-      },
-      :available => {
+      }},
+      {:available => {
         :$and => [
             {:item => 'book'},
             {:country => 'US'},
             {:seller => 'bookstore'},
             {:status => 'available'} 
         ]
-      }
-    }
+      }}
+    ]
   }
 }), 100
 
@@ -62,24 +62,24 @@ puts 'books2 ******'
 
 handle = Rules.create_ruleset 'books2',  JSON.generate({
   :ship => {
-    :when => {
-      :$and => [
+    :all => [
+      :m => {:$and => [
           {:country => 'US'},
           {:seller => 'bookstore'},
           {:currency => 'US'},
           {:$lte => {:amount => 1000}},
-      ]
-    }
+      ]}
+    ]
   },
   :order => {
-    :when => {
-      :$and => [
+    :all => [
+      :m => {:$and => [
           {:country => 'US'},
           {:seller => 'bookstore'},
           {:currency => 'US'},
           {:$lte => {:amount => 1000}},
-      ]
-    }
+      ]}
+    ]
   }
 }), 100
 
@@ -111,7 +111,7 @@ puts 'books3 ******'
 
 handle = Rules.create_ruleset 'books3', JSON.generate({
   :ship => {
-    :when => {:$nex => {:label => 1}}
+    :all => [:m => {:$nex => {:label => 1}}]
  }
 }), 100
 
@@ -136,13 +136,13 @@ puts 'books4 ******'
 
 handle = Rules.create_ruleset 'books4', JSON.generate({
   :ship => {
-    :when => {
-      :$atLeast => 5,
-      :$and => [
+    :count => 5,
+    :all => [
+      :m => {:$and => [
           {:$lte => {:amount => 1000}},
           {:subject => 'approve'}
-      ]
-    }
+      ]}
+    ]
   }
 }), 100
 
@@ -168,16 +168,16 @@ puts 'approval1 ******'
 
 handle = Rules.create_ruleset 'approval1', JSON.generate({
   :r1 => {
-    :whenAll => {
-      'a$any' => {
-        :b => {:subject => 'approve'},
-        :c => {:subject => 'review'}
-      },
-      'd$any' => {
-        :e => {:$lt => {:total => 1000}},
-        :f => {:$lt => {:amount => 1000}}
-      }
-    }
+    :all => [
+      {'a$any' => [
+        {:b => {:subject => 'approve'}},
+        {:c => {:subject => 'review'}}
+      ]},
+      {'d$any' => [
+        {:e => {:$lt => {:total => 1000}}},
+        {:f => {:$lt => {:amount => 1000}}}
+      ]}
+    ]
   }
 }), 100
 
@@ -207,16 +207,16 @@ puts 'approval2 ******'
 
 handle = Rules.create_ruleset 'approval2', JSON.generate({
   :r2 => {
-    :whenAny => {
-      'a$all' => {
-        :b => {:subject => 'approve'},
-        :c => {:subject => 'review'}
-      },
-      'd$all' => {
-        :e => {:$lt => {:total => 1000}},
-        :f => {:$lt => {:amount => 1000}}
-      }
-    }
+    :any => [
+      {'a$all' => [
+        {:b => {:subject => 'approve'}},
+        {:c => {:subject => 'review'}}
+      ]},
+      {'d$all' => [
+        {:e => {:$lt => {:total => 1000}}},
+        {:f => {:$lt => {:amount => 1000}}}
+      ]}
+    ]
   }
 }), 100
 

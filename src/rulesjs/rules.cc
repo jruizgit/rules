@@ -173,7 +173,7 @@ Handle<Value> jsRetractEvent(const Arguments& args) {
 
     if (args.Length() < 2) {
         ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
-    } else if (!args[0]->IsNumber()) {
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
         ThrowException(Exception::TypeError(String::New("Wrong argument type")));
     } else {
         unsigned int result = retractEvent((void *)args[0]->IntegerValue(),
@@ -265,7 +265,7 @@ Handle<Value> jsRetractFact(const Arguments& args) {
 
     if (args.Length() < 2) {
         ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
-    } else if (!args[0]->IsNumber()) {
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
         ThrowException(Exception::TypeError(String::New("Wrong argument type")));
     } else {
         unsigned int result = retractFact((void *)args[0]->IntegerValue(),

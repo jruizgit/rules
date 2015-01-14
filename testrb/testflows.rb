@@ -1,27 +1,32 @@
 require_relative "../librb/durable"
 
 def denied
-  -> s {
-    puts "denied from: #{s.ruleset_name}, #{s.id}"
-    s.status = "done"
+  -> c {
+    sid = c.s["sid"]
+    puts "denied from: #{c.ruleset_name}, #{sid}"
+    puts c.m
+    c.s["status"] = "done"
   }
 end
 
 def approved 
-  -> s {
-    puts "approved from: #{s.ruleset_name}, #{s.id}"
-    s.status = "done"
+  -> c {
+    sid = c.s["sid"]
+    puts "approved from: #{c.ruleset_name}, #{sid}"
+    puts c.m
+    c.s["status"] = "done"
   }
 end
 
 def request_approval 
-  -> s {
-    puts "request_approval from: #{s.ruleset_name}, #{s.id}"
-    puts (s.event.to_s)
-    if s.status?
-        s.status = "approved"
+  -> c {
+    sid = c.s["sid"]
+    puts "request_approval from: #{c.ruleset_name}, #{sid}"
+    puts c.m
+    if c.s.key? "status"
+        c.s["status"] = "approved"
     else
-        s.status = "pending"
+        c.s["status"] = "pending"
     end
   }
 end
@@ -29,49 +34,49 @@ end
 Durable.run({
   :a1 => {
     :r1 => {
-      :when => {:$and => [{:subject => "approve"}, {:$gt => {:amount => 1000}}]},
+      :all => [:m => {:$and => [{:subject => "approve"}, {:$gt => {:amount => 1000}}]}],
       :run => denied
     },
     :r2 => {
-      :when => {:$and => [{:subject => "approve" }, {:$lte => {:amount => 1000 }}]},
+      :all => [:m => {:$and => [{:subject => "approve"}, {:$lte => {:amount => 1000 }}]}],
       :run => request_approval
     },
     :r3 => {
-      :whenAll => {
-        "m$any" => {:a => {:subject => "approved"}, :b => {:subject => "ok"}},
-        :$s => {:status => "pending"}
-      },
+      :all => [
+        {"m$any" => [{:a => {:subject => "approved"}}, {:b => {:subject => "ok"}}]},
+        {:$s => {:$and => [{:status => "pending"}, {:$s => 1}]}}
+      ],
       :run => request_approval
     },
-    :r4 => {:when => {:$s => {:status => "approved"}}, :run => approved},
-    :r5 => {:when => {:subject => "denied"}, :run => denied}
+    :r4 => {:all => [:s => {:$and => [{:status => "approved"}, {:$s => 1}]}], :run => approved},
+    :r5 => {:all => [:m => {:subject => "denied"}], :run => denied}
   },
   "a2$state" => {
     :input => {
       :deny => {
-        :when => {:$and => [{:subject => "approve"}, {:$gt => {:amount => 1000}}]},
+        :all => [:m => {:$and => [{:subject => "approve"}, {:$gt => {:amount => 1000}}]}],
         :run => denied,
         :to => :denied
       },
       :request => {
-        :when => {:$and => [{:subject => "approve"}, {:$lte => {:amount => 1000}}]},
+        :all => [:m => {:$and => [{:subject => "approve"}, {:$lte => {:amount => 1000}}]}],
         :run => request_approval,
         :to => :pending
       }
     },
     :pending => {
       :request => {
-        :whenAny => {:a => {:subject => "approved"}, :b => {:subject => "ok"}},
+        :any => [{:a => {:subject => "approved"}}, {:b => {:subject => "ok"}}],
         :run => request_approval,
         :to => :pending
       },
       :approve => {
-        :when => {:$s => {:status => "approved"}},
+        :all => [:s => {:$and => [{:status => "approved"}, {:$s => 1}]}],
         :run => approved,
         :to => :approved
       },
       :deny => {
-        :when => {:subject => "denied"},
+        :all => [:m => {:subject => "denied"}],
         :run => denied,
         :to => :denied
       }
@@ -84,16 +89,16 @@ Durable.run({
   "a3$flow" => {
     :input => {
       :to => {
-        :request => {:$and => [{:subject => "approve" }, {:$lte => {:amount => 1000}}]},
-        :deny => {:$and => [{:subject => "approve"}, {:$gt => {:amount => 1000}}]}
+        :request => {:all => [{:m => {:$and => [{:subject => "approve"}, {:$lte => {:amount => 1000}}]}}]},
+        :deny => {:all => [{:m => {:$and => [{:subject => "approve"}, {:$gt => {:amount => 1000}}]}}]}
       }
     },
     :request => {
       :run => request_approval,
       :to => {
-        :approve => {:$s => {:status => "approved"}},
-        :deny => {:subject => "denied"},
-        :request => {:$any => {:a => {:subject => "approved"}, :b => {:subject => "ok"}}}
+        :approve => {:all => [{:s => {:$and => [{:status => "approved"}, {:$s => 1}]}}]},
+        :deny => {:all => [{:m => {:subject => "denied"}}]},
+        :request => {:any => [{:a => {:subject => "approved"}}, {:b => {:subject => "ok"}}]}
       }
     },
     :approve => {:run => approved},

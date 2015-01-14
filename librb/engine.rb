@@ -5,20 +5,17 @@ require_relative "../src/rulesrb/rules"
 module Engine
   
   class Session
-    attr_reader :handle, :state, :ruleset_name, :timers, :branches, :messages, :event
+    attr_reader :handle, :ruleset_name, :timers, :branches, :messages
+    attr_accessor :s, :m
 
-    def initialize(state, event, handle, ruleset_name)
-      @state = state
+    def initialize(state, message, handle, ruleset_name)
+      @s = state
+      @m = message
       @ruleset_name = ruleset_name
       @handle = handle
       @timers = {}
       @messages = {}
       @branches = {}
-      if (event.kind_of? Hash) && (event.key? "$m")
-        @event = event["$m"]
-      else
-        @event = event
-      end
     end
 
     def signal(message)
@@ -26,7 +23,7 @@ module Engine
       parent_ruleset_name = ruleset_name[0, name_index]
       name = ruleset_name[name_index + 1..-1]
       message_id = (message.key? :id) ? message[:id]: message["id"] 
-      message[:sid] = @state["id"]
+      message[:sid] = @s["sid"]
       message[:id] = "#{name}.#{message_id}"
       post parent_ruleset_name, message
     end
@@ -57,56 +54,6 @@ module Engine
       end
     end
 
-    private
-    
-    def handle_state(name, value=nil)
-      name = name.to_s
-      if name.end_with? '='
-        @state[name[0..-2]] = value
-        nil
-      elsif name.end_with? '?'
-        state.key? name[0..-2]
-      elsif name == 's'
-        self
-      elsif name == 'm'
-        Event.new @event
-      else
-        @state[name]
-      end
-    end
-
-    alias method_missing handle_state
-
-  end
-
-  class Event
-
-    def initialize(data)
-      @data = data
-    end
-
-    def to_s
-      @data.to_s
-    end
-    
-    private
-
-    def handle_property(name, value=nil)
-      name = name.to_s
-      if name.end_with? '?'
-        @data.key? name[0..-2]
-      else
-        current = @data[name]
-        if current.kind_of? Hash
-          Event.new current
-        else
-          current
-        end
-      end
-    end
-
-    alias method_missing handle_property
-
   end
 
   class Promise
@@ -132,27 +79,27 @@ module Engine
       @next
     end
 
-    def run(s, complete)
+    def run(c, complete)
       if @sync
         begin
-          @func.call s  
+          @func.call c  
         rescue Exception => e
           complete.call e
           return
         end
         
         if @next
-          @next.run s, complete
+          @next.run c, complete
         else
           complete.call nil
         end
       else
         begin
-          @func.call s, -> e {
+          @func.call c, -> e {
             if e
               complete.call e
             elsif @next
-              @next.run s, complete
+              @next.run c, complete
             else
               complete.call nil
             end
@@ -169,11 +116,11 @@ module Engine
   class Fork < Promise
 
     def initialize(branch_names, state_filter = nil)
-      super -> s {
+      super -> c {
         for branch_name in branch_names do
-          state = s.state.dup
+          state = c.s.dup
           state_filter.call state if state_filter
-          s.fork branch_name, state
+          c.fork branch_name, state
         end 
       }
     end
@@ -184,8 +131,8 @@ module Engine
   class To < Promise
 
     def initialize(state)
-      super -> s {
-        s.state["label"] = state
+      super -> c {
+        c.s["label"] = state
       }
     end
 
@@ -244,6 +191,22 @@ module Engine
       Rules.assert_events @handle, JSON.generate(messages)
     end
 
+    def retract_event(message)
+      Rules.retract_event @handle, JSON.generate(message)
+    end
+
+    def assert_fact(message)
+      Rules.assert_fact @handle, JSON.generate(message)
+    end
+
+    def assert_facts(messages)
+      Rules.assert_facts @handle, JSON.generate(messages)
+    end
+
+    def retract_fact(message)
+      Rules.retract_fact @handle, JSON.generate(message)
+    end
+
     def assert_state(state)
       Rules.assert_state @handle, JSON.generate(state)
     end
@@ -297,24 +260,24 @@ module Engine
         complete.call nil
       else
         state = JSON.parse result[0]
-        event = JSON.parse(result[1])[@name]
+        event = JSON.parse result[1]
         action_name = nil
         for action_name, event in event do
           break
-        end
-
-        s = Session.new state, event, result[2], @name
-        @actions[action_name].run s, -> e {
+        end  
+        
+        c = Session.new state, event, result[2], @name
+        @actions[action_name].run c, -> e {
           if e
-            Rules.abandon_action @handle, s.handle
+            Rules.abandon_action @handle, c.handle
             complete.call e
           else
             begin
-              for branch_name, branch_state in s.branches do
+              for branch_name, branch_state in c.branches do
                 @host.patch_state branch_name, branch_state
               end
 
-              for ruleset_name, messages in s.messages do
+              for ruleset_name, messages in c.messages do
                 if messages.length == 1
                   @host.post ruleset_name, messages[0]
                 else
@@ -322,15 +285,15 @@ module Engine
                 end
               end
 
-              for timer_name, timer_duration in s.timers do
-                timer = {:sid => s.id, :id => timer_name, :$t => timer_name}
-                Rules.start_timer @handle, s.id, timer_duration, JSON.generate(timer)
+              for timer_name, timer_duration in c.timers do
+                timer = {:sid => c.s.sid, :id => timer_name, :$t => timer_name}
+                Rules.start_timer @handle, c.s.sid, timer_duration, JSON.generate(timer)
               end
 
-              Rules.complete_action @handle, s.handle, JSON.generate(s.state)
+              Rules.complete_action @handle, c.handle, JSON.generate(c.s)
               complete.call nil
             rescue Exception => e
-              Rules.abandon_action @handle, s.handle
+              Rules.abandon_action @handle, c.handle
               complete.call e
             end
           end
@@ -357,9 +320,9 @@ module Engine
     end
 
     def transform(parent_name, parent_triggers, parent_start_state, chart_definition, rules)
-      state_filter = stage_filter = -> s { 
-        s.delete :label if (s.key? :label)
-        s.delete "label" if (s.key? "label")
+      state_filter = stage_filter = -> c { 
+        c.s.delete :label if (c.s.key? :label)
+        c.s.delete "label" if (c.s.key? "label")
       }
       start_state = {}
       
@@ -404,52 +367,40 @@ module Engine
           for trigger_name, trigger in triggers do
             trigger_name = trigger_name.to_s
             rule = {}
-            state_test = {:label => qualified_name}
-            if (trigger.key? :when) || (trigger.key? "when")
-              when_trigger = nil
-              if trigger.key? :when
-                when_trigger = trigger[:when]
-              else
-                when_trigger = trigger["when"]
-              end
-
-              if when_trigger.key? :$s 
-                rule[:when] = {:$s => {:$and => [state_test, when_trigger[:$s]]}}
-              elsif when_trigger.key? "$s"
-                rule[:when] = {:$s => {:$and => [state_test, when_trigger["$s"]]}}
-              else
-                rule[:whenAll] = {:$s => state_test, :$m => when_trigger}
-              end
-            elsif (trigger.key? :whenAll) || (trigger.key? "whenAll")
-              test = {:$s => state_test}
-              when_trigger = nil
-              if trigger.key? :whenAll
-                when_trigger = trigger[:whenAll]
-              else
-                when_trigger = trigger["whenAll"]
-              end
-
-              for test_name, current_test in when_trigger do
-                test_name = test_name.to_s
-                if test_name != "$s"
-                  test[test_name] = current_test
-                else
-                  test[:$s] = {:$and => [state_test, current_test]}
-                end 
-              end
-              rule[:whenAll] = test
-            elsif trigger.key? :whenAny
-              rule[:whenAll] = {:$s => state_test, "m$any" => trigger[:whenAny]}
-            elsif trigger.key? :whenSome
-              rule[:whenAll] = {:$s => state_test, "m$some" => trigger[:whenSome]}
-            elsif trigger.key? "whenAny"
-              rule[:whenAll] = {:$s => state_test, "m$any" => trigger["whenAny"]}
-            elsif trigger.key? "whenSome"
-              rule[:whenAll] = {:$s => state_test, "m$some" => trigger["whenSome"]}
-            else
-              rule[:when] = {:$s => state_test}
+            state_test = {:$s => {:$and => [{:label => qualified_name}, {:$s => 1}]}}
+            if trigger.key? :pri
+              rule[:pri] = trigger[:pri]
+            elsif trigger.key? "pri"
+              rule[:pri] = trigger["pri"]
             end
 
+            if trigger.key? :count
+              rule[:count] = trigger[:count]
+            elsif trigger.key? "count"
+              rule[:count] = trigger["count"]
+            end
+
+            if (trigger.key? :all) || (trigger.key? "all")
+              all_trigger = nil
+              if trigger.key? :all
+                all_trigger = trigger[:all]
+              else
+                all_trigger = trigger["all"]
+              end
+              rule[:all] = all_trigger.dup 
+              rule[:all] << state_test
+            elsif (trigger.key? :any) || (trigger.key? "any")
+              any_trigger = nil
+              if trigger.key? :any
+                any_trigger = trigger[:any]
+              else
+                any_trigger = trigger["any"]
+              end
+              rule[:all] = [state_test, {"m$any" => any_trigger}]
+            else 
+              rule[:all] = [state_test]
+            end
+              
             if (trigger.key? "run") || (trigger.key? :run)
               trigger_run = nil
               if trigger.key? :run
@@ -502,10 +453,11 @@ module Engine
         raise ArgumentError, "Chart #{@name} has more than one start state" if started
         state_name = state_name.to_s
         started = true
+
         if parent_name
-          rules[parent_name + "$start"] = {:when => {:$s => {:label => parent_name}}, :run => To.new(state_name)}
+          rules[parent_name + "$start"] = {:all => [{:$s => {:$and => [{:label => parent_name}, {:$s => 1}]}}], run: To.new(state_name)};
         else
-          rules[:$start] = {:when => {:$s => {:$nex => {:label => 1}}}, :run => To.new(state_name)}
+          rules[:$start] = {:all => [{:$s => {:$and => [{:$nex => {:label => 1}}, {:$s => 1}]}}], run: To.new(state_name)};
         end
       end
 
@@ -526,15 +478,15 @@ module Engine
     end
 
     def transform(chart_definition, rules)
-      stage_filter = -> s { 
-        s.delete :label if (s.key? :label)
-        s.delete "label" if (s.key? "label")
+      stage_filter = -> c { 
+        c.s.delete :label if (c.s.key? :label)
+        c.s.delete "label" if (c.s.key? "label")
       }
 
       visited = {}
       for stage_name, stage in chart_definition do
         stage_name = stage_name.to_s
-        stage_test = {:label => stage_name}
+        stage_test = {:$s => {:$and => [{:label => stage_name}, {:$s => 1}]}}
         if (stage.key? :to) || (stage.key? "to")
           stage_to = (stage.key? :to) ? stage[:to]: stage["to"]
           if (stage_to.kind_of? String) || (stage_to.kind_of? Symbol)
@@ -567,33 +519,40 @@ module Engine
             visited[stage_to] = true
           else
             for transition_name, transition in stage_to do
-              rule = nil
+              rule = {}
               next_stage = nil
-              if transition.key? :$s
-                rule = {:when => {:$s => {:$and => [stage_test, transition[:$s]]}}}
-              elsif transition.key? :$any 
-                rule = {:whenAll => {:$s => stage_test, "m$any" => transition[:$any]}}
-              elsif transition.key? :$some
-                rule = {:whenAll => {:$s => stage_test, "m$some" => transition[:$some]}}
-              elsif (transition.key? :$all) || (transition.key? "$all")
-                transition_all = (transition.key? :$all) ? transition[:$all]: transition["$all"]
-                for test_name, all_test in transition_all do
-                  test = {:$s => stage_test}
-                  if test_name != :$s && test_name != "$s"
-                    test[test_name] = all_test
-                  else
-                    test[:$s] = {:$and => [state_test, all_test]}
-                  end
-                end 
-                rule = {:whenAll => test}
-              elsif transition.key? "$s"
-                rule = {:when => {:$s => {:$and => [stage_test, transition["$s"]]}}}
-              elsif transition.key? "$any"
-                rule = {:whenAll => {:$s => stage_test, "m$any" => transition["$any"]}}
-              elsif transition.key? "$some"
-                rule = {:whenAll => {:$s => stage_test, "m$some" => transition["$some"]}}
-              else
-                rule = {:whenAll => {:$s => stage_test, :$m => transition}}
+
+              if transition.key? :pri
+                rule[:pri] = transition[:pri]
+              elsif transition.key? "pri"
+                rule[:pri] = transition["pri"]
+              end
+
+              if transition.key? :count
+                rule[:count] = transition[:count]
+              elsif transition.key? "count"
+                rule[:count] = transition["count"]
+              end
+
+              if (transition.key? :all) || (transition.key? "all")
+                all_transition = nil
+                if transition.key? :all
+                  all_transition = transition[:all]
+                else
+                  all_transition = transition["all"]
+                end
+                rule[:all] = all_transition.dup 
+                rule[:all] << stage_test
+              elsif (transition.key? :any) || (transition.key? "any")
+                any_transition = nil
+                if transition.key? :any
+                  any_transition = transition[:any]
+                else
+                  any_transition = transition["any"]
+                end
+                rule[:all] = [stage_test, {"m$any" => any_transition}]
+              else 
+                rule[:all] = [stage_test]
               end
 
               if chart_definition.key? transition_name
@@ -633,7 +592,7 @@ module Engine
           end
 
           started = true
-          rule = {:when => {:$s =>{:$nex => {:label => 1}}}}
+          rule = {:all => [{:$s => {:$and => [{:$nex => {:label => 1}}, {:$s => 1}]}}]}
           if !(stage.key? :run) && !(stage.key? "run")
             rule[:run] = To.new stage_name
           else
@@ -695,12 +654,20 @@ module Engine
       get_ruleset(ruleset_name).get_state sid
     end
 
-    def post_batch(ruleset_name, *messages)
-      get_ruleset(ruleset_name).assert_events messages
+    def post_batch(ruleset_name, *events)
+      get_ruleset(ruleset_name).assert_events events
     end
 
-    def post(ruleset_name, message)
-      get_ruleset(ruleset_name).assert_event message
+    def post(ruleset_name, event)
+      get_ruleset(ruleset_name).assert_event event
+    end
+
+    def assert(ruleset_name, fact)
+      get_ruleset(ruleset_name).assert_fact fact
+    end
+
+    def retract(ruleset_name, fact)
+      get_ruleset(ruleset_name).retract_fact fact
     end
 
     def patch_state(ruleset_name, state)
@@ -726,7 +693,7 @@ module Engine
       index = 1
       timers = Timers::Group.new
   
-      dispatch_ruleset = -> s {
+      dispatch_ruleset = -> c {
 
         callback = -> e {
           if index % 10 == 0

@@ -442,4 +442,37 @@ module Durable
 
   end
 
+  class Data
+
+    def initialize(data)
+      @data = data
+    end
+
+    def to_s
+      @data.to_s
+    end
+    
+    private
+
+    def handle_property(name, value=nil)
+      name = name.to_s
+      if name.end_with? '='
+        @data[name[0..-2]] = value
+        nil
+      elsif name.end_with? '?'
+        @data.key? name[0..-2]
+      else
+        current = @data[name]
+        if current.kind_of? Hash
+          Data.new current
+        else
+          current
+        end
+      end
+    end
+
+    alias method_missing handle_property
+
+  end
+
 end

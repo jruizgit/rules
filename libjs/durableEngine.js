@@ -539,17 +539,14 @@ exports = module.exports = durableEngine = function () {
                             rule.pri = trigger.pri;
                         }
 
+                        if (trigger.count) {
+                            rule.count = trigger.count;
+                        }
+
                         if (trigger.all) {
                             rule.all = trigger.all.concat(stateTest);
-                            if (trigger.$count) {
-                                rule.$count = trigger.$count;
-                            }
                         } else if (trigger.any) {
-                            if (trigger.$count) {
-                                rule.all = [stateTest, {$count:trigger.$count, m$any: trigger.any}];
-                            } else {
-                                rule.all = [stateTest, {m$any: trigger.any}];
-                            }
+                            rule.all = [stateTest, {m$any: trigger.any}];
                         } else {
                             rule.all = [stateTest];
                         }    
@@ -659,17 +656,14 @@ exports = module.exports = durableEngine = function () {
                                 rule.pri = transition.pri;
                             }
 
+                            if (transition.count) {
+                                rule.count = transition.count;
+                            }
+
                             if (transition.all) {
-                                rule.all = transition.all.concat(stageTest);
-                                if (transition.$count) {
-                                    rule.$count = transition.$count;
-                                }
+                                rule.all = transition.all.concat(stageTest);   
                             } else if (transition.any) {
-                                if (transition.$count) {
-                                    rule.all = [stageTest, {$count:transition.$count, m$any: transition.any}];
-                                } else {
-                                    rule.all = [stageTest, {m$any: transition.any}];
-                                }
+                                rule.all = [stageTest, {m$any: transition.any}];
                             } else {
                                 rule.all = [stageTest];
                             }

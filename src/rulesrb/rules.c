@@ -84,17 +84,108 @@ static VALUE rbAssertEvents(VALUE self, VALUE handle, VALUE events) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(events, T_STRING);
 
-    unsigned int *results;
-    unsigned int resultsLength;
+    unsigned int *results = NULL;
+    unsigned int resultsLength = 0;
     unsigned int result = assertEvents((void *)FIX2LONG(handle), RSTRING_PTR(events), &resultsLength, &results);
     if (result == RULES_OK) {
-        free(results);
+        if (results) {
+            free(results);
+        }
         return INT2FIX(resultsLength);   
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
+            if (results) {
+                free(results);
+            }
             rb_raise(rb_eException, "Could not assert events, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
+static VALUE rbRetractEvent(VALUE self, VALUE handle, VALUE event) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(event, T_STRING);
+
+    unsigned int result = retractEvent((void *)FIX2LONG(handle), RSTRING_PTR(event));
+    if (result == RULES_OK) {
+        return INT2FIX(1);    
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        return INT2FIX(0);    
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not retract event, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
+static VALUE rbAssertFact(VALUE self, VALUE handle, VALUE fact) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(fact, T_STRING);
+
+    unsigned int result = assertFact((void *)FIX2LONG(handle), RSTRING_PTR(fact));
+    if (result == RULES_OK) {
+        return INT2FIX(1);    
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        return INT2FIX(0);    
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not assert fact, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
+static VALUE rbAssertFacts(VALUE self, VALUE handle, VALUE facts) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(facts, T_STRING);
+
+    unsigned int *results = NULL;
+    unsigned int resultsLength = 0;
+    unsigned int result = assertFacts((void *)FIX2LONG(handle), RSTRING_PTR(facts), &resultsLength, &results);
+    if (result == RULES_OK) {
+        if (results) {
+            free(results);
+        }
+        return INT2FIX(resultsLength);   
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            if (results) {
+                free(results);
+            }
+            rb_raise(rb_eException, "Could not assert events, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
+static VALUE rbRetractFact(VALUE self, VALUE handle, VALUE fact) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(fact, T_STRING);
+
+    unsigned int result = retractFact((void *)FIX2LONG(handle), RSTRING_PTR(fact));
+    if (result == RULES_OK) {
+        return INT2FIX(1);    
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        return INT2FIX(0);    
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not retract fact, error code: %d", result);
         }
     }
 
@@ -142,8 +233,6 @@ static VALUE rbStartAction(VALUE self, VALUE handle) {
     rb_ary_push(output, rb_str_new2(state));
     rb_ary_push(output, rb_str_new2(messages));
     rb_ary_push(output, INT2FIX(actionHandle));
-    free(state);
-    free(messages);
     return output;
 }
 
@@ -243,6 +332,10 @@ void Init_rules() {
     rb_define_singleton_method(rulesModule, "bind_ruleset", rbBindRuleset, 4);
     rb_define_singleton_method(rulesModule, "assert_event", rbAssertEvent, 2);
     rb_define_singleton_method(rulesModule, "assert_events", rbAssertEvents, 2);
+    rb_define_singleton_method(rulesModule, "retract_event", rbRetractEvent, 2);
+    rb_define_singleton_method(rulesModule, "assert_fact", rbAssertFact, 2);
+    rb_define_singleton_method(rulesModule, "assert_facts", rbAssertFacts, 2);
+    rb_define_singleton_method(rulesModule, "retract_fact", rbRetractFact, 2);
     rb_define_singleton_method(rulesModule, "assert_state", rbAssertState, 2);
     rb_define_singleton_method(rulesModule, "start_action", rbStartAction, 1);
     rb_define_singleton_method(rulesModule, "complete_action", rbCompleteAction, 3);
