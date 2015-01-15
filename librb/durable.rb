@@ -25,6 +25,7 @@ module Durable
 
   def self.ruleset(name, &block) 
     ruleset = Ruleset.new name, block
+    puts JSON.generate(ruleset.rules)
     @@rulesets[name] = ruleset.rules
     @@start_blocks << ruleset.start if ruleset.start
   end
@@ -58,12 +59,8 @@ module Durable
     
     def definition
       if not @op
-        if @sid && @time
-          {@type => { :name => @left, :id => @sid, :time => @time}}
-        elsif @sid
+        if @sid
           {@type => { :name => @left, :id => @sid}}
-        elsif @time
-          {@type => { :name => @left, :time => @time}}
         else
           {@type => @left}
         end
@@ -82,16 +79,8 @@ module Durable
           new_definition = {@op => {@left => righ_definition}}
         end
 
-        if @at_least
-          new_definition["$atLeast"] = @at_least
-        end
-
-        if @at_most
-          new_definition["$atMost"] = @at_most
-        end
-
         if @type == :$s
-          {:$s => new_definition}
+          {:$and => [new_definition, {:$s => 1}]}
         else
           new_definition
         end
@@ -160,20 +149,6 @@ module Durable
       Expression.new @type, @left, sid, @time
     end
 
-    def time(time)
-      Expression.new @type, @left, @sid, time
-    end
-
-    def at_least(limit)
-      @at_least = limit
-      self
-    end
-
-    def at_most(limit)
-      @at_most = limit
-      self
-    end
-
     private 
 
     def default(name, value=nil)
@@ -206,17 +181,19 @@ module Durable
 
     def definition
       index = 0
-      new_definition = {}
+      new_definition = []
       for expression in @expressions do
-        expression_name = "m_#{index}"
-        if expression.type == :$s
-          new_definition[:$s] = expression.definition[:$s]
-        elsif expression.type == :$all
-          new_definition[expression_name + "$all"] = expression.definition
-        elsif expression.type == :$any
-          new_definition[expression_name + "$any"] = expression.definition
+        if @expressions.length == 1 
+          expression_name = "m"
         else
-          new_definition[expression_name] = expression.definition
+          expression_name = "m_#{index}"
+        end
+        if expression.type == :$all
+          new_definition << {expression_name + "$all" => expression.definition()}
+        elsif expression.type == :$any
+          new_definition << {expression_name + "$any" => expression.definition()}
+        else
+          new_definition << {expression_name => expression.definition()}
         end
         index += 1
       end
@@ -238,20 +215,16 @@ module Durable
       self.instance_exec &block
     end        
 
-    def when_(expression, opt0 = {}, opt1 = {}, opt2 = {}, &block)
-      define_rule :when, expression.definition, opt0.merge!(opt1).merge!(opt2), &block
-    end
-
     def when_all(*args, &block)
       options = get_options(*args)
       args_length = args.length - options.length - 1
-      define_rule :whenAll, Expressions.new(:$any, args[0..args_length]).definition, options, &block
+      define_rule :all, Expressions.new(:$all, args[0..args_length]).definition, options, &block
     end
 
     def when_any(*args, &block)
       options = get_options(*args)
       args_length = args.length - options.length
-      define_rule :whenAny, Expressions.new(:$any, args[0..args_length]).definition, options, &block
+      define_rule :any, Expressions.new(:$any, args[0..args_length]).definition, options, &block
     end
 
     def all(*args)
@@ -267,12 +240,12 @@ module Durable
       self
     end
 
-    def at_least(limit)
-      {:atLeast => limit}
+    def count(value)
+      {:count => limit}
     end
 
-    def at_most(limit)
-      {:atMost => limit}
+    def pri(value)
+      {:pri => limit}
     end
 
     def paralel
@@ -331,17 +304,20 @@ module Durable
         self.instance_exec &block
         rule = operator ? {operator => expression_definition, :run => @paralel_rulesets} : {:run => @paralel_rulesets}
       elsif block
-        rule = operator ? {operator => expression_definition, :run => -> s {s.instance_exec s, &block}} : {:run => -> s {s.instance_exec s, &block}}
+        run_lambda = -> c {
+          c.instance_exec c, &block
+        }
+        rule = operator ? {operator => expression_definition, :run => run_lambda} : {:run => run_lambda}
       else
         rule = operator ? {operator => expression_definition} : {}
       end
 
-      if options.key? :atLeast
-        rule["$atLeast"] = options[:atLeast]
+      if options.key? :count
+        rule["count"] = options[:count]
       end
 
-      if options.key? :atMost
-        rule["$atMost"] = options[:atMost]
+      if options.key? :pri
+        rule["pri"] = options[:pri]
       end
 
       @rules[rule_name] = rule
@@ -416,12 +392,10 @@ module Durable
     def to(stage_name, rule = nil)
       if !rule
         stages[@current_stage][:to] = stage_name
-      elsif rule.key? :when
-        stages[@current_stage][:to][stage_name] = rule[:when]
-      elsif rule.key? :whenAll
-        stages[@current_stage][:to][stage_name] = {:$all => rule[:whenAll]}
+      elsif rule.key? :all
+        stages[@current_stage][:to][stage_name] = {:all => rule[:all]}
       else
-        stages[@current_stage][:to][stage_name] = {:$any => rule[:whenAny]}
+        stages[@current_stage][:to][stage_name] = {:any => rule[:any]}
       end
     end
 
@@ -442,37 +416,6 @@ module Durable
 
   end
 
-  class Data
-
-    def initialize(data)
-      @data = data
-    end
-
-    def to_s
-      @data.to_s
-    end
-    
-    private
-
-    def handle_property(name, value=nil)
-      name = name.to_s
-      if name.end_with? '='
-        @data[name[0..-2]] = value
-        nil
-      elsif name.end_with? '?'
-        @data.key? name[0..-2]
-      else
-        current = @data[name]
-        if current.kind_of? Hash
-          Data.new current
-        else
-          current
-        end
-      end
-    end
-
-    alias method_missing handle_property
-
-  end
+  
 
 end

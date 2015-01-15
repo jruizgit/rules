@@ -2,31 +2,28 @@ require_relative "../librb/durable"
 
 def denied
   -> c {
-    sid = c.s["sid"]
-    puts "denied from: #{c.ruleset_name}, #{sid}"
-    puts c.m
-    c.s["status"] = "done"
+    puts "denied from: #{c.ruleset_name}, #{c.s.sid}"
+    puts c.m.to_s
+    c.status = "done"
   }
 end
 
 def approved 
   -> c {
-    sid = c.s["sid"]
-    puts "approved from: #{c.ruleset_name}, #{sid}"
-    puts c.m
-    c.s["status"] = "done"
+    puts "approved from: #{c.ruleset_name}, #{c.s.sid}"
+    puts c.m.to_s
+    c.s.status = "done"
   }
 end
 
 def request_approval 
   -> c {
-    sid = c.s["sid"]
-    puts "request_approval from: #{c.ruleset_name}, #{sid}"
-    puts c.m
-    if c.s.key? "status"
-        c.s["status"] = "approved"
+    puts "request_approval from: #{c.ruleset_name}, #{c.s.sid}"
+    puts c.m.to_s 
+    if c.s.status
+      c.s.status = "approved"
     else
-        c.s["status"] = "pending"
+      c.s.status = "pending"
     end
   }
 end

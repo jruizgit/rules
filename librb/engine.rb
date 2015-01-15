@@ -5,17 +5,17 @@ require_relative "../src/rulesrb/rules"
 module Engine
   
   class Session
-    attr_reader :handle, :ruleset_name, :timers, :branches, :messages
-    attr_accessor :s, :m
+    attr_reader :handle, :ruleset_name, :_timers, :_branches, :_messages
+    attr_accessor :s
 
     def initialize(state, message, handle, ruleset_name)
-      @s = state
+      @s = Data.new(state)
       @m = message
       @ruleset_name = ruleset_name
       @handle = handle
-      @timers = {}
-      @messages = {}
-      @branches = {}
+      @_timers = {}
+      @_messages = {}
+      @_branches = {}
     end
 
     def signal(message)
@@ -53,6 +53,56 @@ module Engine
         @branches[branch_name] = branch_state
       end
     end
+
+    def handle_property(name, value=nil)
+      name = name.to_s
+      if name.end_with? '?'
+        @m.key? name[0..-2]
+      else
+        current = @m[name]
+        if current.kind_of? Hash
+          Data.new current
+        else
+          current
+        end
+      end
+    end
+
+    alias method_missing handle_property
+
+  end
+
+  class Data
+    attr_reader :_d
+
+    def initialize(data)
+      @_d = data
+    end
+
+    def to_s
+      @_d.to_s
+    end
+    
+    private
+
+    def handle_property(name, value=nil)
+      name = name.to_s
+      if name.end_with? '='
+        @_d[name[0..-2]] = value
+        nil
+      elsif name.end_with? '?'
+        @_d.key? name[0..-2]
+      else
+        current = @_d[name]
+        if current.kind_of? Hash
+          Data.new current
+        else
+          current
+        end
+      end
+    end
+
+    alias method_missing handle_property
 
   end
 
@@ -118,7 +168,7 @@ module Engine
     def initialize(branch_names, state_filter = nil)
       super -> c {
         for branch_name in branch_names do
-          state = c.s.dup
+          state = c.s._d.dup
           state_filter.call state if state_filter
           c.fork branch_name, state
         end 
@@ -132,7 +182,7 @@ module Engine
 
     def initialize(state)
       super -> c {
-        c.s["label"] = state
+        c.s.label = state
       }
     end
 
@@ -273,11 +323,11 @@ module Engine
             complete.call e
           else
             begin
-              for branch_name, branch_state in c.branches do
+              for branch_name, branch_state in c._branches do
                 @host.patch_state branch_name, branch_state
               end
 
-              for ruleset_name, messages in c.messages do
+              for ruleset_name, messages in c._messages do
                 if messages.length == 1
                   @host.post ruleset_name, messages[0]
                 else
@@ -285,12 +335,12 @@ module Engine
                 end
               end
 
-              for timer_name, timer_duration in c.timers do
+              for timer_name, timer_duration in c._timers do
                 timer = {:sid => c.s.sid, :id => timer_name, :$t => timer_name}
                 Rules.start_timer @handle, c.s.sid, timer_duration, JSON.generate(timer)
               end
 
-              Rules.complete_action @handle, c.handle, JSON.generate(c.s)
+              Rules.complete_action @handle, c.handle, JSON.generate(c.s._d)
               complete.call nil
             rescue Exception => e
               Rules.abandon_action @handle, c.handle
@@ -321,8 +371,8 @@ module Engine
 
     def transform(parent_name, parent_triggers, parent_start_state, chart_definition, rules)
       state_filter = stage_filter = -> c { 
-        c.s.delete :label if (c.s.key? :label)
-        c.s.delete "label" if (c.s.key? "label")
+        c.s._d.delete :label if (c.s._d.key? :label)
+        c.s._d.delete "label" if (c.s._d.key? "label")
       }
       start_state = {}
       
@@ -479,8 +529,8 @@ module Engine
 
     def transform(chart_definition, rules)
       stage_filter = -> c { 
-        c.s.delete :label if (c.s.key? :label)
-        c.s.delete "label" if (c.s.key? "label")
+        c.s._d.delete :label if (c.s._d.key? :label)
+        c.s._d.delete "label" if (c.s._d.key? "label")
       }
 
       visited = {}
