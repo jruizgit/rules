@@ -25,7 +25,6 @@ module Durable
 
   def self.ruleset(name, &block) 
     ruleset = Ruleset.new name, block
-    puts JSON.generate(ruleset.rules)
     @@rulesets[name] = ruleset.rules
     @@start_blocks << ruleset.start if ruleset.start
   end
@@ -42,48 +41,154 @@ module Durable
     @@start_blocks << flowchart.start if flowchart.start
   end
 
-  class Expression
-    attr_reader :type, :op
-    attr_accessor :left
+  class Arithmetic
 
-    def initialize(type, left = nil, sid = nil, time = nil)
-      @type = type
+    def initialize(name, left = nil, sid = nil, op = nil, right = nil)
+      @name = name
       @left = left
-      @right = nil
-      @definitions = nil
       @sid = sid
-      @time = time
-      @at_least = nil
-      @at_most = nil
+      @right = right
+      @op = op
     end
     
     def definition
       if not @op
         if @sid
-          {@type => { :name => @left, :id => @sid}}
+          {@name => {:name => @left, :id => @sid}}
         else
-          {@type => @left}
+          {@name => @left}
         end
       else
         new_definition = nil
+        left_definition = nil
+        if @left.kind_of? Arithmetic
+          left_definition = @left.definition
+        else
+          left_definition = {@name => @left}
+        end
+
         righ_definition = @right
-        if @right.kind_of? Expression
+        if @right.kind_of? Arithmetic
           righ_definition = @right.definition
         end
 
-        if @op == :$or || @op == :$and
-          new_definition = {@op => @definitions}
-        elsif @op == :$eq
-          new_definition = {@left => righ_definition}
-        else
-          new_definition = {@op => {@left => righ_definition}}
-        end
+        return {@op => {:$l => left_definition, :$r => righ_definition}}
+      end
+    end
 
-        if @type == :$s
-          {:$and => [new_definition, {:$s => 1}]}
-        else
-          new_definition
-        end
+    def +(other)
+      set_right(:$add, other)
+    end
+
+    def -(other)
+      set_right(:$sub, other)
+    end
+
+    def *(other)
+      set_right(:$mul, other)
+    end
+
+    def /(other)
+      set_right(:$div, other)
+    end
+
+    def ==(other)
+      return Expression.new(@name, @left) == other
+    end
+
+    def !=(other)
+      return Expression.new(@name, @left) != other
+    end
+
+    def <(other)
+      return Expression.new(@name, @left) < other
+    end
+
+    def <=(other)
+      return Expression.new(@name, @left) <= other
+    end
+
+    def >(other)
+      return Expression.new(@name, @left) > other
+    end
+
+    def >=(other)
+      return Expression.new(@name, @left) >= other
+    end
+
+    def !
+      return !Expression.new(@name, @left)
+    end
+
+    def ~
+      return ~Expression.new(@name, @left)
+    end
+
+    def |(other)
+      return Expression.new(@name, @left) | other
+    end
+
+    def &(other)
+      return Expression.new(@name, @left) & other
+    end
+
+
+    def id(sid)
+      Arithmetic.new @name, @left, sid
+    end
+
+    private 
+
+    def set_right(op, other) 
+      if @right
+        @left = Arithmetic.new @name, @left, @sid, @op, @right 
+      end
+
+      @op = op
+      @right = other
+      self
+    end
+
+    def default(name, value=nil)
+      @left = name
+      self
+    end
+
+    alias method_missing default
+
+  end
+
+  class Expression
+    attr_reader :type, :op
+    attr_accessor :left, :name
+
+    def initialize(type, left = nil)
+      @type = type
+      @left = left
+      @right = nil
+      @definitions = nil
+      @name = nil
+    end
+    
+    def definition
+      new_definition = nil
+      righ_definition = @right
+      if (@right.kind_of? Expression) || (@right.kind_of? Arithmetic)
+        righ_definition = @right.definition
+      end
+
+      if @op == :$or || @op == :$and
+        new_definition = {@op => @definitions}
+      elsif @op == :$eq
+        new_definition = {@left => righ_definition}
+      else
+        new_definition = {@op => {@left => righ_definition}}
+      end
+
+      if @type == :$s
+        {:$and => [new_definition, {:$s => 1}]}
+      else
+        new_definition
       end
     end
 
@@ -145,10 +250,6 @@ module Durable
       self
     end
 
-    def id(sid)
-      Expression.new @type, @left, sid, @time
-    end
-
     private 
 
     def default(name, value=nil)
@@ -160,7 +261,7 @@ module Durable
       raise ArgumentError, "Right type doesn't match" if other.type != @type
       @definitions = [self.definition] if !@definitions
       @op = op
-      if other.op == @op
+      if other.op && (other.op == @op)
         @definitions + other.definition[@op] 
       else 
         @definitions << other.definition
@@ -183,7 +284,9 @@ module Durable
       index = 0
       new_definition = []
       for expression in @expressions do
-        if @expressions.length == 1 
+        if (expression.kind_of? Expression) && expression.name
+          expression_name = expression.name
+        elsif @expressions.length == 1 
           expression_name = "m"
         else
           expression_name = "m_#{index}"
@@ -192,6 +295,8 @@ module Durable
           new_definition << {expression_name + "$all" => expression.definition()}
         elsif expression.type == :$any
           new_definition << {expression_name + "$any" => expression.definition()}
+        elsif  expression.type == :$not
+          new_definition << {expression_name + "$not" => expression.definition()[0]["m"]}
         else
           new_definition << {expression_name => expression.definition()}
         end
@@ -200,6 +305,28 @@ module Durable
       new_definition
     end
 
+  end
+
+  class Closure
+
+    def s
+      Arithmetic.new(:$s)
+    end
+
+    private
+
+    def handle_property(name, value=nil)
+      name = name.to_s
+      if name.end_with? '='
+        name = name[0..-2] 
+        value.name = name
+        return value        
+      else
+        Arithmetic.new(name)
+      end
+    end
+
+    alias method_missing handle_property
   end
 
   class Ruleset
@@ -216,15 +343,13 @@ module Durable
     end        
 
     def when_all(*args, &block)
-      options = get_options(*args)
-      args_length = args.length - options.length - 1
-      define_rule :all, Expressions.new(:$all, args[0..args_length]).definition, options, &block
+      options, new_args = get_options(*args)
+      define_rule :all, Expressions.new(:$all, new_args).definition, options, &block
     end
 
     def when_any(*args, &block)
-      options = get_options(*args)
-      args_length = args.length - options.length
-      define_rule :any, Expressions.new(:$any, args[0..args_length]).definition, options, &block
+      options, new_args = get_options(*args)
+      define_rule :any, Expressions.new(:$any, new_args).definition, options, &block
     end
 
     def all(*args)
@@ -235,17 +360,21 @@ module Durable
       Expressions.new :$any, args
     end
 
+    def no(*args)
+      Expressions.new :$not, args
+    end
+
     def when_start(&block)
       @start = block
       self
     end
 
     def count(value)
-      {:count => limit}
+      {:count => value}
     end
 
     def pri(value)
-      {:pri => limit}
+      {:pri => value}
     end
 
     def paralel
@@ -265,13 +394,17 @@ module Durable
     end
 
     def s
-      Expression.new(:$s)
+      Arithmetic.new(:$s)
     end
     
     def m
       Expression.new(:$m)
     end
     
+    def c
+      Closure.new()
+    end
+
     def timeout(name)
       expression = Expression.new(:$m)
       expression.left = :$t
@@ -282,16 +415,15 @@ module Durable
 
     def get_options(*args)
       options = {}
-      if args[-1].kind_of? Hash
-        options = options.merge!(args[-1])
+      new_args = []
+      for arg in args do
+        if arg.kind_of? Hash
+          options = options.merge!(arg)
+        else
+          new_args << arg 
+        end
       end
-      if args[-2].kind_of? Hash
-        options = options.merge!(args[-2])
-      end
-      if args[-3].kind_of? Hash
-        options = options.merge!(args[-3])
-      end
-      options
+      return options, new_args
     end
 
     def define_rule(operator, expression_definition, options, &block)
@@ -323,6 +455,14 @@ module Durable
       @rules[rule_name] = rule
       rule
     end
+
+    private
+
+    def handle_property(name, value=nil)
+      return Arithmetic.new(name.to_s)
+    end
+
+    alias method_missing handle_property
 
   end
 

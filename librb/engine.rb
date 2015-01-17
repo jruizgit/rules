@@ -4,18 +4,28 @@ require_relative "../src/rulesrb/rules"
 
 module Engine
   
-  class Session
+  class Closure
     attr_reader :handle, :ruleset_name, :_timers, :_branches, :_messages
     attr_accessor :s
 
     def initialize(state, message, handle, ruleset_name)
-      @s = Data.new(state)
-      @m = message
+      @s = Content.new(state)
       @ruleset_name = ruleset_name
       @handle = handle
       @_timers = {}
       @_messages = {}
       @_branches = {}
+      if message.kind_of? Hash
+        @m = message
+      else
+        @m = []
+        for one_message in message do
+          if (one_message.key? "m") && (one_message.size == 1)
+            one_message = one_message["m"]
+          end
+          @m << Content.new(one_message)
+        end
+      end
     end
 
     def signal(message)
@@ -23,48 +33,52 @@ module Engine
       parent_ruleset_name = ruleset_name[0, name_index]
       name = ruleset_name[name_index + 1..-1]
       message_id = (message.key? :id) ? message[:id]: message["id"] 
-      message[:sid] = @s["sid"]
+      message[:sid] = @s.sid
       message[:id] = "#{name}.#{message_id}"
       post parent_ruleset_name, message
     end
 
     def post(ruleset_name, message)
       message_list = []
-      if @messages.key? ruleset_name
-        message_list = @messages[ruleset_name]
+      if @_messages.key? ruleset_name
+        message_list = @_messages[ruleset_name]
       else
-        @messages[ruleset_name] = message_list
+        @_messages[ruleset_name] = message_list
       end
       message_list << message
     end
 
     def start_timer(timer_name, duration)
-      if @timers.key? timer_name
+      if @_timers.key? timer_name
         raise ArgumentError, "Timer with name #{timer_name} already added"
       else
-        @timers[timer_name] = duration
+        @_timers[timer_name] = duration
       end
     end
 
     def fork(branch_name, branch_state)
-      if @branches.key? branch_name
+      if @_branches.key? branch_name
         raise ArgumentError, "Branch with name #{branch_name} already forked"
       else
-        @branches[branch_name] = branch_state
+        @_branches[branch_name] = branch_state
       end
     end
+
+    private
 
     def handle_property(name, value=nil)
       name = name.to_s
       if name.end_with? '?'
         @m.key? name[0..-2]
-      else
+      elsif @m.kind_of? Hash
         current = @m[name]
         if current.kind_of? Hash
-          Data.new current
+          Content.new current
         else
           current
         end
+      else
+        @m
       end
     end
 
@@ -72,7 +86,7 @@ module Engine
 
   end
 
-  class Data
+  class Content
     attr_reader :_d
 
     def initialize(data)
@@ -95,7 +109,7 @@ module Engine
       else
         current = @_d[name]
         if current.kind_of? Hash
-          Data.new current
+          Content.new current
         else
           current
         end
@@ -316,7 +330,7 @@ module Engine
           break
         end  
         
-        c = Session.new state, event, result[2], @name
+        c = Closure.new state, event, result[2], @name
         @actions[action_name].run c, -> e {
           if e
             Rules.abandon_action @handle, c.handle
@@ -337,7 +351,7 @@ module Engine
 
               for timer_name, timer_duration in c._timers do
                 timer = {:sid => c.s.sid, :id => timer_name, :$t => timer_name}
-                Rules.start_timer @handle, c.s.sid, timer_duration, JSON.generate(timer)
+                Rules.start_timer @handle, c.s.sid.to_s, timer_duration, JSON.generate(timer)
               end
 
               Rules.complete_action @handle, c.handle, JSON.generate(c.s._d)
@@ -370,9 +384,9 @@ module Engine
     end
 
     def transform(parent_name, parent_triggers, parent_start_state, chart_definition, rules)
-      state_filter = stage_filter = -> c { 
-        c.s._d.delete :label if (c.s._d.key? :label)
-        c.s._d.delete "label" if (c.s._d.key? "label")
+      state_filter = stage_filter = -> s { 
+        s.delete :label if (s.key? :label)
+        s.delete "label" if (s.key? "label")
       }
       start_state = {}
       
@@ -528,9 +542,9 @@ module Engine
     end
 
     def transform(chart_definition, rules)
-      stage_filter = -> c { 
-        c.s._d.delete :label if (c.s._d.key? :label)
-        c.s._d.delete "label" if (c.s._d.key? "label")
+      stage_filter = -> s { 
+        s.delete :label if (s.key? :label)
+        s.delete "label" if (s.key? "label")
       }
 
       visited = {}
@@ -541,7 +555,7 @@ module Engine
           stage_to = (stage.key? :to) ? stage[:to]: stage["to"]
           if (stage_to.kind_of? String) || (stage_to.kind_of? Symbol)
             next_stage = nil
-            rule = {:when => {:$s => stage_test}}
+            rule = {:all => [stage_test]}
             if chart_definition.key? stage_to
               next_stage = chart_definition[stage_to]
             elsif chart_definition.key? stage_to.to_s

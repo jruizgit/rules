@@ -1,6 +1,5 @@
 require_relative '../librb/durable'
 
-
 Durable.ruleset :a0 do
   when_all (m.amount < 100) | (m.subject == "approve") | (m.subject == "ok") do
     puts "a0 approved"
@@ -144,277 +143,400 @@ Durable.statechart :a6 do
   end
 end
 
-# Durable.ruleset :a7 do
-#   when_ m.amount < s.max_amount do
-#     puts "a7 approved " + m.amount.to_s
-#   end
-#   when_start do
-#     patch_state :a7, {:id => 1, :max_amount => 100}
-#     post :a7, {:id => 1, :sid => 1, :amount => 10}
-#     post :a7, {:id => 2, :sid => 1, :amount => 1000}
-#   end
-# end
+Durable.ruleset :a7 do
+  when_all m.amount < s.max_amount do
+    puts "a7 approved " + m.amount.to_s
+  end
+  when_start do
+    patch_state :a7, {:sid => 1, :max_amount => 100}
+    post :a7, {:id => 1, :sid => 1, :amount => 10}
+    post :a7, {:id => 2, :sid => 1, :amount => 1000}
+  end
+end
 
-# Durable.ruleset :a8 do
-#   when_ (m.amount < s.max_amount) & (m.amount > s.id(:global).min_amount) do
-#     puts "a8 approved " + m.amount.to_s
-#   end
-#   when_start do
-#     patch_state :a8, {:id => 1, :max_amount => 500}
-#     patch_state :a8, {:id => :global, :min_amount => 100}
-#     post :a8, {:id => 1, :sid => 1, :amount => 10}
-#     post :a8, {:id => 2, :sid => 1, :amount => 200}
-#   end
-# end
+Durable.ruleset :a8 do
+  when_all (m.amount < s.max_amount) & (m.amount > s.id(:global).min_amount) do
+    puts "a8 approved " + m.amount.to_s
+  end
+  when_start do
+    patch_state :a8, {:sid => 1, :max_amount => 500}
+    patch_state :a8, {:sid => :global, :min_amount => 100}
+    post :a8, {:id => 1, :sid => 1, :amount => 10}
+    post :a8, {:id => 2, :sid => 1, :amount => 200}
+  end
+end
 
-# Durable.ruleset :a9 do
-#   when_ (m.amount < 100), at_least(3), at_most(6) do
-#     puts "a9 approved ->" + m.to_s
-#   end
-#   when_start do
-#     post_batch :a9, {:id => 1, :sid => 1, :amount => 10},
-#                     {:id => 2, :sid => 1, :amount => 10},
-#                     {:id => 3, :sid => 1, :amount => 10},
-#                     {:id => 4, :sid => 1, :amount => 10}
-#     post_batch :a9, {:id => 5, :sid => 1, :amount => 10},
-#                     {:id => 6, :sid => 1, :amount => 10}
-#   end
-# end
+Durable.ruleset :a9 do
+  when_all (m.amount < 100), count(3) do
+    puts "a9 approved ->" + (m[0].amount + m[1].amount + m[2].amount).to_s
+  end
+  when_start do
+    post_batch :a9, {:id => 1, :sid => 1, :amount => 10},
+                    {:id => 2, :sid => 1, :amount => 10},
+                    {:id => 3, :sid => 1, :amount => 10},
+                    {:id => 4, :sid => 1, :amount => 10}
+    post_batch :a9, {:id => 5, :sid => 1, :amount => 10},
+                    {:id => 6, :sid => 1, :amount => 10}
+  end
+end
 
-# Durable.ruleset :a10 do
-#   when_all (m.amount < 100), (m.subject == "approve"), at_least(3), at_most(6) do
-#     puts "a10 approved ->" + m.to_s
-#   end
-#   when_start do
-#     post_batch :a10, {:id => 1, :sid => 1, :amount => 10},
-#                      {:id => 2, :sid => 1, :amount => 10},
-#                      {:id => 3, :sid => 1, :amount => 10},
-#                      {:id => 4, :sid => 1, :subject => "approve"}
-#     post_batch :a10, {:id => 5, :sid => 1, :subject => "approve"},
-#                      {:id => 6, :sid => 1, :subject => "approve"}
-#   end
-# end
+Durable.ruleset :a10 do
+  when_all (m.amount < 100), (m.subject == "approve"), count(3) do
+    puts "a10 approved ->" + m[0].m_0.amount.to_s + " " + m[0].m_1.subject
+    puts "             ->" + m[1].m_0.amount.to_s + " " + m[1].m_1.subject
+    puts "             ->" + m[2].m_0.amount.to_s + " " + m[2].m_1.subject
+  end
+  when_start do
+    post_batch :a10, {:id => 1, :sid => 1, :amount => 10},
+                     {:id => 2, :sid => 1, :amount => 10},
+                     {:id => 3, :sid => 1, :amount => 10},
+                     {:id => 4, :sid => 1, :subject => "approve"}
+    post_batch :a10, {:id => 5, :sid => 1, :subject => "approve"},
+                     {:id => 6, :sid => 1, :subject => "approve"}
+  end
+end
 
-# Durable.ruleset :a11 do
-#   when_all (m.amount < 100), (m.subject == "please").at_least(3).at_most(6) do
-#     puts "a11 approved ->" + m.to_s
-#   end
-#   when_start do
-#     post_batch :a11, {:id => 1, :sid => 1, :amount => 10},
-#                      {:id => 2, :sid => 1, :subject => "please"},
-#                      {:id => 3, :sid => 1, :subject => "please"},
-#                      {:id => 4, :sid => 1, :subject => "please"}
-#   end
-# end
+Durable.ruleset :a11 do
+  when_all m.amount < s.max_amount + s.id(:global).min_amount do
+    puts "a11 approved " + m.amount.to_s
+  end
+  when_start do
+    patch_state :a11, {:sid => 1, :max_amount => 500}
+    patch_state :a11, {:sid => :global, :min_amount => 100}
+    post :a11, {:id => 1, :sid => 1, :amount => 10}
+  end
+end
 
-# Durable.statechart :fraud2 do
-#   state :start do
-#     to :standby
-#   end
-#   state :standby do
-#     to :metering, when_(m.amount > 100) do
-#       start_timer :velocity, 30
-#     end
-#   end
-#   state :metering do
-#     to :fraud, when_(m.amount > 100, at_least(3)) do
-#       puts "fraud 2 detected"
-#     end
-#     to :standby, when_(timeout :velocity) do
-#       puts "fraud 2 cleared"
-#     end
-#   end
-#   state :fraud
-#   when_start do
-#     post :fraud2, {:id => 1, :sid => 1, :amount => 200}
-#     post :fraud2, {:id => 2, :sid => 1, :amount => 200}
-#     post :fraud2, {:id => 3, :sid => 1, :amount => 200}
-#   end
-# end
+Durable.statechart :fraud0 do
+  state :start do
+    to :standby
+  end
+  state :standby do
+    to :metering, when_all(m.amount < 100) do
+      start_timer :velocity, 30
+    end
+  end
+  state :metering do
+    to :fraud, when_all(m.amount > 100, count(3)) do
+      puts "fraud 2 detected"
+    end
+    to :standby, when_all(timeout :velocity) do
+      puts "fraud 2 cleared"
+    end
+  end
+  state :fraud
+  when_start do
+    post :fraud0, {:id => 1, :sid => 1, :amount => 20}
+    post :fraud0, {:id => 2, :sid => 1, :amount => 200}
+    post :fraud0, {:id => 3, :sid => 1, :amount => 200}
+    post :fraud0, {:id => 4, :sid => 1, :amount => 200}
+  end
+end
 
+Durable.ruleset :fraud1 do
+  when_all c.first = m.t == "purchase",
+           c.second = m.location != first.location do
+    puts "fraud1 detected " + first.location + " " + second.location
+  end
+  when_start do
+    post :fraud1, {:id => 1, :sid => 1, :t => "purchase", :location => "US"}
+    post :fraud1, {:id => 2, :sid => 1, :t => "purchase", :location => "CA"}
+  end
+end
 
-# Durable.ruleset :p1 do
-#   when_ m.start == "yes", paralel do 
-#     ruleset :one do 
-#       when_ !s.start do
-#         s.start = 1
-#       end
-#       when_ s.start == 1 do
-#         puts "p1 finish one"
-#         s.signal :id => 1, :end => "one"
-#         s.start = 2
-#       end 
-#     end
-#     ruleset :two do 
-#       when_ !s.start do
-#         s.start = 1
-#       end
-#       when_ s.start == 1 do
-#         puts "p1 finish two"
-#         s.signal :id => 1, :end => "two"
-#         s.start = 2
-#       end 
-#     end
-#   end
-#   when_all m.end == "one", m.end == "two" do
-#     puts 'p1 approved'
-#     s.status = 'approved'
-#   end
-#   when_start do
-#     post :p1, {:id => 1, :sid => 1, :start => "yes"}
-#   end
-# end
+Durable.ruleset :fraud2 do
+  when_all c.first = m.t == "purchase",
+           c.second = (m.ip == first.ip) & (m.cc != first.cc),
+           c.third = (m.ip == second.ip) & (m.cc != first.cc) & (m.cc != second.cc) do
+    puts "fraud2 detected " + first.cc + " " + second.cc + " " + third.cc
+  end
+  when_start do
+    post :fraud2, {:id => 1, :sid => 1, :t => "purchase", :ip => "a", :cc => "1"}
+    post :fraud2, {:id => 2, :sid => 1, :t => "purchase", :ip => "a", :cc => "2"}
+    post :fraud2, {:id => 3, :sid => 1, :t => "purchase", :ip => "a", :cc => "3"}
+  end
+end
 
-# Durable.statechart :p2 do
-#   state :input do
-#     to :process, when_(m.subject == "approve") do
-#       puts "p2 input #{m.quantity} from: #{s.id}"
-#       s.quantity = m.quantity
-#     end 
-#   end
-#   state :process do
-#     to :result, when_(~s.quantity), paralel do
-#       statechart :first do
-#         state :evaluate do
-#           to :end, when_(s.quantity <= 5) do
-#             puts "p2 signaling approved from: #{s.id}"
-#             s.signal :id => 1, :subject => "approved"  
-#           end
-#         end
-#         state :end
-#       end
-#       statechart :second do
-#         state :evaluate do
-#           to :end, when_(s.quantity > 5) do
-#             puts "p2 signaling denied from: #{s.id}"
-#             s.signal :id => 1, :subject => "denied"
-#           end
-#         end
-#         state :end
-#       end
-#     end
-#   end
-#   state :result do
-#     to :approved, when_(m.subject == "approved") do
-#       puts "p2 approved from: #{s.id}"
-#     end
-#     to :denied, when_(m.subject == "denied") do
-#       puts "p2 denied from: #{s.id}"
-#     end
-#   end
-#   state :denied
-#   state :approved
-#   when_start do
-#     post :p2, {:id => 1, :sid => 1, :subject => "approve", :quantity => 3}
-#     post :p2, {:id => 2, :sid => 2, :subject => "approve", :quantity => 10}
-#   end
-# end
+Durable.ruleset :fraud3 do
+  when_all c.first = m.t == "purchase",
+           c.second = m.amount > first.amount * 2 do
+    puts "fraud3 detected " + first.amount.to_s + " " + second.amount.to_s
+  end
+  when_start do
+    post :fraud3, {:id => 1, :sid => 1, :t => "purchase", :amount => 100}
+    post :fraud3, {:id => 2, :sid => 1, :t => "purchase", :amount => 300}
+  end
+end
 
-# Durable.flowchart :p3 do
-#   stage :start; to :input, when_(m.subject == "approve")
-#   stage :input do
-#     puts "p3 input #{m.quantity} from: #{s.id}"
-#     s.quantity = m.quantity
-#   end
-#   to :process
+Durable.ruleset :fraud4 do
+  when_all c.first = m.t == "purchase",
+           c.second = m.amount > first.amount,
+           c.third = m.amount > second.amount,
+           c.fourth = m.amount > (first.amount + second.amount + third.amount) / 3 do
+    puts "fraud4 detected -> " + first.amount.to_s 
+    puts "                -> " + second.amount.to_s
+    puts "                -> " + third.amount.to_s 
+    puts "                -> " + fourth.amount.to_s
+  end
+  when_start do
+    post :fraud4, {:id => 1, :sid => 1, :t => "purchase", :amount => 100}
+    post :fraud4, {:id => 2, :sid => 1, :t => "purchase", :amount => 200}
+    post :fraud4, {:id => 3, :sid => 1, :t => "purchase", :amount => 300}
+    post :fraud4, {:id => 4, :sid => 1, :t => "purchase", :amount => 250}
+  end
+end
 
-#   stage :process, paralel do
-#     flowchart :first do
-#       stage :start; to :end, when_(s.quantity <= 5)
-#       stage :end do
-#         puts "p3 signaling approved from: #{s.id}"
-#         s.signal :id => 1, :subject => "approved" 
-#       end
-#     end
-#     flowchart :second do
-#       stage :start; to :end, when_(s.quantity > 5)
-#       stage :end do
-#         puts "p3 signaling denied from: #{s.id}"
-#         s.signal :id => 1, :subject => "denied"
-#       end
-#     end
-#   end
-#   to :approve, when_(m.subject == "approved")
-#   to :deny, when_(m.subject == "denied")
+Durable.ruleset :pri0 do
+  when_all pri(3), m.amount < 300 do
+    puts "pri0, 1 approved " + m.amount.to_s
+  end
+  when_all pri(2), m.amount < 200 do
+    puts "pri0, 2 approved " + m.amount.to_s
+  end
+  when_all pri(1), m.amount < 100  do
+    puts "pri0, 3 approved " + m.amount.to_s
+  end
+  when_start do
+    post :pri0, {:id => 1, :sid => 1, :amount => 50}
+    post :pri0, {:id => 2, :sid => 1, :amount => 150}
+    post :pri0, {:id => 3, :sid => 1, :amount => 250}
+  end
+end
 
-#   stage :approve do
-#     puts "p3 approved from: #{s.id}"
-#   end
-#   stage :deny do
-#     puts "p3 denied from: #{s.id}"
-#   end
-#   when_start do
-#     post :p3, {:id => 1, :sid => 1, :subject => "approve", :quantity => 3}
-#     post :p3, {:id => 2, :sid => 2, :subject => "approve", :quantity => 10}
-#   end
-# end
+Durable.ruleset :fact0 do
+  when_all c.first = m.t == "purchase",
+           c.second = m.location != first.location,
+           count(2) do
+    puts "fact0 detected ->" + m[0].first.location + " " + m[0].second.location
+    puts "                ->" + m[1].first.location + " " + m[1].second.location
+  end
+  when_start do
+    assert :fact0, {:id => 1, :sid => 1, :t => "purchase", :location => "US"}
+    assert :fact0, {:id => 2, :sid => 1, :t => "purchase", :location => "CA"}
+  end
+end
 
-# Durable.ruleset :t1 do
-#   when_ m.start == "yes" do
-#     s.start = Time.now
-#     start_timer(:my_timer, 5)
-#   end
-#   when_ timeout :my_timer do
-#     puts "t1 End"
-#     puts "t1 Started #{s.start}"
-#     puts "t1 Ended #{Time.now}"
-#   end
-#   when_start do
-#     post :t1, {:id => 1, :sid => 1, :start => "yes"}
-#   end
-# end
+Durable.ruleset :fact1 do
+  when_all pri(3), count(3), m.amount < 300 do
+    puts "fact1, 1 approved ->" + m[0].amount.to_s
+    puts "                 ->" + m[1].amount.to_s
+    puts "                 ->" + m[2].amount.to_s
+  end
+  when_all pri(2), count(2), m.amount < 200 do
+    puts "fact1, 2 approved ->" + m[0].amount.to_s
+    puts "                 ->" + m[1].amount.to_s
+  end
+  when_all pri(1), m.amount < 100  do
+    puts "fact1, 3 approved " + m.amount.to_s
+  end
+  when_start do
+    assert :fact1, {:id => 1, :sid => 1, :amount => 50}
+    assert :fact1, {:id => 2, :sid => 1, :amount => 150}
+    assert :fact1, {:id => 3, :sid => 1, :amount => 250}
+  end
+end
 
-# Durable.statechart :t2 do
-#   state :input do
-#     to :pending, when_(m.subject == "approve"), paralel do
-#       statechart :first do
-#         state :send do
-#           to :evaluate do
-#             s.start = Time.now
-#             start_timer :first, 4
-#           end
-#         end
-#         state :evaluate do
-#           to :end, when_(timeout :first) do
-#             s.signal :id => 2, :subject => "approved", :start => s.start
-#           end
-#         end
-#         state :end
-#       end
-#       statechart :second do
-#         state :send do
-#           to :evaluate do
-#             s.start = Time.now
-#             start_timer :second, 3
-#           end
-#         end
-#         state :evaluate do
-#           to :end, when_(timeout :second) do
-#             s.signal :id => 3, :subject => "denied", :start => s.start
-#           end
-#         end
-#         state :end
-#       end
-#     end
-#   end
-#   state :pending do
-#     to :approved, when_(m.subject == "approved") do
-#       puts "t2 Approved"
-#       puts "t2 Started #{m.start}"
-#       puts "t2 Ended #{Time.now}"
-#     end
-#     to :denied, when_(m.subject == "denied") do
-#       puts "t2 Denied t2"
-#       puts "t2 Started #{m.start}"
-#       puts "t2 Ended #{Time.now}"
-#     end
-#   end
-#   state :approved
-#   state :denied
-#   when_start do
-#     post :t2, {:id => 1, :sid => 1, :subject => "approve"}
-#   end
-# end
+Durable.ruleset :fact2 do
+  when_all c.first = m.t == "deposit",
+           no(m.t == "balance"),
+           c.third = m.t == "withrawal",
+           c.fourth = m.t == "chargeback" do
+    puts "fact2 " + first.t + " " + third.t + " " + fourth.t
+  end
+  when_start do
+    post :fact2, {:id => 1, :sid => 1, :t => "deposit"}
+    post :fact2, {:id => 2, :sid => 1, :t => "withrawal"}
+    post :fact2, {:id => 3, :sid => 1, :t => "chargeback"}
+    assert :fact2, {:id => 4, :sid => 1, :t => "balance"}
+    post :fact2, {:id => 5, :sid => 1, :t => "deposit"}
+    post :fact2, {:id => 6, :sid => 1, :t => "withrawal"}
+    post :fact2, {:id => 7, :sid => 1, :t => "chargeback"}
+    retract :fact2, {:id => 4, :sid => 1, :t => "balance"}
+  end
+end
+
+Durable.ruleset :p1 do
+  when_all m.start == "yes", paralel do 
+    ruleset :one do 
+      when_all !s.start do
+        s.start = 1
+      end
+      when_all s.start == 1 do
+        puts "p1 finish one"
+        signal :id => 1, :end => "one"
+        s.start = 2
+      end 
+    end
+    ruleset :two do 
+      when_all !s.start do
+        s.start = 1
+      end
+      when_all s.start == 1 do
+        puts "p1 finish two"
+        signal :id => 1, :end => "two"
+        s.start = 2
+      end 
+    end
+  end
+  when_all m.end == "one", m.end == "two" do
+    puts 'p1 approved'
+    s.status = 'approved'
+  end
+  when_start do
+    post :p1, {:id => 1, :sid => 1, :start => "yes"}
+  end
+end
+
+Durable.statechart :p2 do
+  state :input do
+    to :process, when_all(m.subject == "approve") do
+      puts "p2 input #{m.quantity} from: #{s.sid}"
+      s.quantity = m.quantity
+    end 
+  end
+  state :process do
+    to :result, when_all(~s.quantity), paralel do
+      statechart :first do
+        state :evaluate do
+          to :end, when_all(s.quantity <= 5) do
+            puts "p2 signaling approved from: #{s.sid}"
+            signal :id => 1, :subject => "approved"  
+          end
+        end
+        state :end
+      end
+      statechart :second do
+        state :evaluate do
+          to :end, when_all(s.quantity > 5) do
+            puts "p2 signaling denied from: #{s.sid}"
+            signal :id => 1, :subject => "denied"
+          end
+        end
+        state :end
+      end
+    end
+  end
+  state :result do
+    to :approved, when_all(m.subject == "approved") do
+      puts "p2 approved from: #{s.sid}"
+    end
+    to :denied, when_all(m.subject == "denied") do
+      puts "p2 denied from: #{s.sid}"
+    end
+  end
+  state :denied
+  state :approved
+  when_start do
+    post :p2, {:id => 1, :sid => 1, :subject => "approve", :quantity => 3}
+    post :p2, {:id => 2, :sid => 2, :subject => "approve", :quantity => 10}
+  end
+end
+
+Durable.flowchart :p3 do
+  stage :start; to :input, when_all(m.subject == "approve")
+  stage :input do
+    puts "p3 input #{m.quantity} from: #{s.sid}"
+    s.quantity = m.quantity
+  end
+  to :process
+
+  stage :process, paralel do
+    flowchart :first do
+      stage :start; to :end, when_all(s.quantity <= 5)
+      stage :end do
+        puts "p3 signaling approved from: #{s.sid}"
+        signal :id => 1, :subject => "approved" 
+      end
+    end
+    flowchart :second do
+      stage :start; to :end, when_all(s.quantity > 5)
+      stage :end do
+        puts "p3 signaling denied from: #{s.sid}"
+        signal :id => 1, :subject => "denied"
+      end
+    end
+  end
+  to :approve, when_all(m.subject == "approved")
+  to :deny, when_all(m.subject == "denied")
+
+  stage :approve do
+    puts "p3 approved from: #{s.sid}"
+  end
+  stage :deny do
+    puts "p3 denied from: #{s.sid}"
+  end
+  when_start do
+    post :p3, {:id => 1, :sid => 1, :subject => "approve", :quantity => 3}
+    post :p3, {:id => 2, :sid => 2, :subject => "approve", :quantity => 10}
+  end
+end
+
+Durable.ruleset :t1 do
+  when_all m.start == "yes" do
+    s.start = Time.now
+    start_timer(:my_timer, 5)
+  end
+  when_all timeout :my_timer do
+    puts "t1 End"
+    puts "t1 Started #{s.start}"
+    puts "t1 Ended #{Time.now}"
+  end
+  when_start do
+    post :t1, {:id => 1, :sid => 1, :start => "yes"}
+  end
+end
+
+Durable.statechart :t2 do
+  state :input do
+    to :pending, when_all(m.subject == "approve"), paralel do
+      statechart :first do
+        state :send do
+          to :evaluate do
+            s.start = Time.now
+            start_timer :first, 4
+          end
+        end
+        state :evaluate do
+          to :end, when_all(timeout :first) do
+            signal :id => 2, :subject => "approved", :start => s.start
+          end
+        end
+        state :end
+      end
+      statechart :second do
+        state :send do
+          to :evaluate do
+            s.start = Time.now
+            start_timer :second, 3
+          end
+        end
+        state :evaluate do
+          to :end, when_all(timeout :second) do
+            signal :id => 3, :subject => "denied", :start => s.start
+          end
+        end
+        state :end
+      end
+    end
+  end
+  state :pending do
+    to :approved, when_all(m.subject == "approved") do
+      puts "t2 Approved"
+      puts "t2 Started #{m.start}"
+      puts "t2 Ended #{Time.now}"
+    end
+    to :denied, when_all(m.subject == "denied") do
+      puts "t2 Denied t2"
+      puts "t2 Started #{m.start}"
+      puts "t2 Ended #{Time.now}"
+    end
+  end
+  state :approved
+  state :denied
+  when_start do
+    post :t2, {:id => 1, :sid => 1, :subject => "approve"}
+  end
+end
 
 Durable.run_all
 
