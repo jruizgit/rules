@@ -3,26 +3,26 @@ import json
 
 print('books1 *****')
 
-handle = rules.create_ruleset('books1',  json.dumps({
+handle = rules.create_ruleset(5, 'books1',  json.dumps({
     'ship': {
-        'whenAll': {
-            'order': {
+        'all': [
+            {'order': {
                 '$and': [
                     {'$lte': {'amount': 1000}},
                     {'country': 'US'},
                     {'currency': 'US'},
                     {'seller': 'bookstore'} 
                 ]
-            },
-            'available':  {
+            }},
+            {'available':  {
                 '$and': [
                     {'item': 'book'},
                     {'country': 'US'},
                     {'seller': 'bookstore'},
                     {'status': 'available'} 
                 ]
-            }
-        }
+            }}
+        ]
     }
 }))
 
@@ -61,26 +61,26 @@ rules.delete_ruleset(handle)
 
 print('books2 ******')
 
-handle = rules.create_ruleset('books2',  json.dumps({
+handle = rules.create_ruleset(5, 'books2',  json.dumps({
     'ship': {
-        'when': {
-            '$and': [
+        'all': [ 
+            {'m': {'$and': [
                 {'country': 'US'},
                 {'seller': 'bookstore'},
                 {'currency': 'US'},
                 {'$lte': {'amount': 1000}},
-            ]
-        }
+            ]}}
+        ]
     },
     'order': {
-        'when': {
-            '$and': [
+        'all': [
+            {'m': {'$and': [
                 {'country': 'US'},
                 {'seller': 'bookstore'},
                 {'currency': 'US'},
                 {'$lte': {'amount': 1000}},
-            ]
-        }
+            ]}}
+        ]
     }
 }))
 
@@ -110,9 +110,9 @@ rules.delete_ruleset(handle)
 
 print('books3 ******')
 
-handle = rules.create_ruleset('books3',  json.dumps({
+handle = rules.create_ruleset(5, 'books3',  json.dumps({
     'ship': {
-        'when': {'$nex': {'label': 1}}
+        'all': [{'m': {'$nex': {'label': 1}}}]
    }
 }))
 
@@ -135,14 +135,15 @@ rules.delete_ruleset(handle)
 
 print('books4 ******')
 
-handle = rules.create_ruleset('books4', json.dumps({
+handle = rules.create_ruleset(5, 'books4', json.dumps({
     'ship': {
-        'whenSome': {
-            '$and': [
+        'count': 5,
+        'all': [
+            {'m': {'$and': [
                 {'$lte': {'amount': 1000}},
                 {'subject': 'approve'}
-            ]
-        }
+            ]}}
+        ]
     }
 }))
 
@@ -166,18 +167,18 @@ rules.delete_ruleset(handle)
 
 print('approval1 ******')
 
-handle = rules.create_ruleset('approval1',  json.dumps({
+handle = rules.create_ruleset(5, 'approval1',  json.dumps({
     'r1': {
-        'whenAll': {
-            'a$any': {
-                'b': {'subject': 'approve'},
-                'c': {'subject': 'review'}
-            },
-            'd$any': {
-                'e': {'$lt': {'total': 1000}},
-                'f': {'$lt': {'amount': 1000}}
-            }
-        }
+        'all': [
+            {'a$any': [
+                {'b': {'subject': 'approve'}},
+                {'c': {'subject': 'review'}}
+            ]},
+            {'d$any': [
+                {'e': {'$lt': {'total': 1000}}},
+                {'f': {'$lt': {'amount': 1000}}}
+            ]}
+        ]
     }
 }))
 
@@ -205,18 +206,18 @@ rules.delete_ruleset(handle)
 
 print('approval2 ******')
 
-handle = rules.create_ruleset('approval2',  json.dumps({
+handle = rules.create_ruleset(5, 'approval2',  json.dumps({
     'r2': {
-        'whenAny': {
-            'a$all': {
-                'b': {'subject': 'approve'},
-                'c': {'subject': 'review'}
-            },
-            'd$all': {
-                'e': {'$lt': {'total': 1000}},
-                'f': {'$lt': {'amount': 1000}}
-            }
-        }
+        'any': [
+            {'a$all': [
+                {'b': {'subject': 'approve'}},
+                {'c': {'subject': 'review'}}
+            ]},
+            {'d$all': [
+                {'e': {'$lt': {'total': 1000}}},
+                {'f': {'$lt': {'amount': 1000}}}
+            ]}
+        ]
     }
 }))
 

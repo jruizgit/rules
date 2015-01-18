@@ -1,73 +1,193 @@
 from durable.lang import *
 import datetime
 
-
-with statechart('fraud2'):
+with statechart('fraud0'):
     with state('start'):
         to('standby')
 
     with state('standby'):
         @to('metering')
-        @when(m.amount > 100)
-        def start_metering(s):
-            s.start_timer('velocity', 30)
+        @when_all(m.amount < 100)
+        def start_metering(c):
+            c.start_timer('velocity', 30)
 
     with state('metering'):
         @to('fraud')
-        @when((m.amount > 100).at_least(2))
-        def report_fraud(s):
-            print('fraud2 detected')
+        @when_all(m.amount > 100, count = 2)
+        def report_fraud(c):
+            print('fraud0 detected')
 
         @to('standby')
-        @when(timeout('velocity'))
-        def clear_fraud(s):
-            print('fraud2 cleared')
+        @when_all(timeout('velocity'))
+        def clear_fraud(c):
+            print('fraud0 cleared')
 
     state('fraud')
 
     @when_start
     def start(host):
-        host.post('fraud2', {'id': 1, 'sid': 1, 'amount': 200})
-        host.post('fraud2', {'id': 2, 'sid': 1, 'amount': 200})
-        host.post('fraud2', {'id': 3, 'sid': 1, 'amount': 200})
+        host.post('fraud0', {'id': 1, 'sid': 1, 'amount': 50})
+        host.post('fraud0', {'id': 2, 'sid': 1, 'amount': 200})
+        host.post('fraud0', {'id': 3, 'sid': 1, 'amount': 200})
+
+
+with ruleset('fraud1'):
+    @when_all(c.first << m.t == 'purchase',
+              c.second << m.location != c.first.location)
+    def detected(c):
+        print ('fraud1 detected {0}, {1}'.format(c.first.location, c.second.location))
+
+    @when_start
+    def start(host):
+        host.post('fraud1', {'id': 1, 'sid': 1, 't': 'purchase', 'location': 'US'})
+        host.post('fraud1', {'id': 2, 'sid': 1, 't': 'purchase', 'location': 'CA'})
+
+
+with ruleset('fraud2'):
+    @when_all(c.first << m.amount > 10,
+              c.second << m.amount > c.first.amount * 2)
+    def detected(c):
+        print('fraud2 detected {0}, {1}'.format(c.first.amount, c.second.amount))
+
+    @when_start
+    def start(host):
+        host.post('fraud2', {'id': 1, 'sid': 1, 'amount': 50})
+        host.post('fraud2', {'id': 2, 'sid': 1, 'amount': 150})
+
+
+with ruleset('fraud3'):
+    @when_all(c.first << m.amount > 100,
+              c.second << m.amount > c.first.amount,
+              c.third << m.amount > c.second.amount,
+              c.fourth << m.amount > (c.first.amount + c.second.amount + c.third.amount) / 3)
+    def detected(c):
+        print('fraud3 detected -> {0}'.format(c.first.amount))
+        print('                -> {0}'.format(c.second.amount))
+        print('                -> {0}'.format(c.third.amount))
+        print('                -> {0}'.format(c.fourth.amount))
+
+    @when_start
+    def start(host):
+        host.post('fraud3', {'id': 1, 'sid': 1, 'amount': 101})
+        host.post('fraud3', {'id': 2, 'sid': 1, 'amount': 102})
+        host.post('fraud3', {'id': 3, 'sid': 1, 'amount': 103})
+        host.post('fraud3', {'id': 4, 'sid': 1, 'amount': 104})
+
+
+with ruleset('fraud4'):
+    @when_all(m.amount < 300, pri = 3)
+    def first_detect(c):
+        print('fraud4 first detect {0}'.format(c.m.amount))
+
+    @when_all(m.amount < 200, pri = 2)
+    def second_detect(c):
+        print('fraud4 second detect {0}'.format(c.m.amount))
+
+    @when_all(m.amount < 100, pri = 1)
+    def third_detect(c):
+        print('fraud4 third detect {0}'.format(c.m.amount))
+
+    @when_start
+    def start(host):
+        host.post('fraud4', {'id': 1, 'sid': 1, 'amount': 50})
+        host.post('fraud4', {'id': 2, 'sid': 1, 'amount': 150})
+        host.post('fraud4', {'id': 3, 'sid': 1, 'amount': 250})
+
+
+with ruleset('fraud5'):
+    @when_all(c.first << m.t == 'purchase',
+              c.second << m.location != c.first.location,
+              count = 2)
+    def detected(c):
+        print ('fraud5 detected {0}, {1}'.format(c.m[0].first.location, c.m[0].second.location))
+        print ('               {0}, {1}'.format(c.m[1].first.location, c.m[1].second.location))
+
+    @when_start
+    def start(host):
+        host.assert_fact('fraud5', {'id': 1, 'sid': 1, 't': 'purchase', 'location': 'US'})
+        host.assert_fact('fraud5', {'id': 2, 'sid': 1, 't': 'purchase', 'location': 'CA'})
+
+
+with ruleset('fraud6'):
+    @when_all(m.amount < 300, pri = 3, count = 3)
+    def first_detect(c):
+        print('fraud6 first detect ->{0}'.format(c.m[0].amount))
+        print('                    ->{0}'.format(c.m[1].amount))
+        print('                    ->{0}'.format(c.m[2].amount))
+
+    @when_all(m.amount < 200, pri = 2, count = 2)
+    def second_detect(c):
+        print('fraud6 second detect ->{0}'.format(c.m[0].amount))
+        print('                     ->{0}'.format(c.m[1].amount))
+
+    @when_all(m.amount < 100, pri = 1)
+    def third_detect(c):
+        print('fraud6 third detect ->{0}'.format(c.m.amount))
+        
+    @when_start
+    def start(host):
+        host.assert_fact('fraud6', {'id': 1, 'sid': 1, 'amount': 50})
+        host.assert_fact('fraud6', {'id': 2, 'sid': 1, 'amount': 150})
+        host.assert_fact('fraud6', {'id': 3, 'sid': 1, 'amount': 250})
+
+
+with ruleset('fraud7'):
+    @when_all(c.first << m.t == 'deposit',
+              none(m.t == 'balance'),
+              c.third << m.t == 'withrawal',
+              c.fourth << m.t == 'chargeback')
+    def detected(c):
+        print('fraud7 detected {0}, {1}, {2}'.format(c.first.t, c.third.t, c.fourth.t))
+
+    @when_start
+    def start(host):
+        host.post('fraud7', {'id': 1, 'sid': 1, 't': 'deposit'})
+        host.post('fraud7', {'id': 2, 'sid': 1, 't': 'withrawal'})
+        host.post('fraud7', {'id': 3, 'sid': 1, 't': 'chargeback'})
+        host.assert_fact('fraud7', {'id': 4, 'sid': 1, 't': 'balance'})
+        host.post('fraud7', {'id': 5, 'sid': 1, 't': 'deposit'})
+        host.post('fraud7', {'id': 6, 'sid': 1, 't': 'withrawal'})
+        host.post('fraud7', {'id': 7, 'sid': 1, 't': 'chargeback'})
+        host.retract_fact('fraud7', {'id': 4, 'sid': 1, 't': 'balance'})
 
 
 with ruleset('a0'):
-    @when((m.amount > 1000) | (m.subject == 'approve') | (m.subject == 'ok'))
-    def approved(s, m):
-        print ('a0 approved ->{0}'.format(m))
+    @when_all((m.subject == 'go') | (m.subject == 'approve') | (m.subject == 'ok'))
+    def approved(c):
+        print ('a0 approved ->{0}'.format(c.m.subject))
 
     @when_start
     def start(host):
         host.post('a0', {'id': 1, 'sid': 1, 'subject': 'approve'})
-        host.post('a0', {'id': 2, 'sid': 2, 'amount': 2000})
+        host.post('a0', {'id': 2, 'sid': 2, 'subject': 'go'})
         host.post('a0', {'id': 3, 'sid': 3, 'subject': 'ok'})
 
+
 with ruleset('a1'):
-    @when((m.subject == 'approve') & (m.amount > 1000))
-    def denied(s):
-        print ('a1 denied from: {0}'.format(s.id))
-        s.status = 'done'
+    @when_all((m.subject == 'approve') & (m.amount > 1000))
+    def denied(c):
+        print ('a1 denied from: {0}'.format(c.s.sid))
+        c.s.status = 'done'
     
-    @when((m.subject == 'approve') & (m.amount <= 1000))
-    def request(s):
-        print ('a1 request approval from: {0}'.format(s.id))
-        s.status = 'pending'
+    @when_all((m.subject == 'approve') & (m.amount <= 1000))
+    def request(c):
+        print ('a1 request approval from: {0}'.format(c.s.sid))
+        c.s.status = 'pending'
 
     @when_all(m.subject == 'approved', s.status == 'pending')
-    def second_request(s):
-        print ('a1 second request approval from: {0}'.format(s.id))
-        s.status = 'approved'
+    def second_request(c):
+        print ('a1 second request approval from: {0}'.format(c.s.sid))
+        c.s.status = 'approved'
 
-    @when(s.status == 'approved')
-    def approved(s):
-        print ('a1 approved from: {0}'.format(s.id))
-        s.status = 'done'
+    @when_all(s.status == 'approved')
+    def approved(c):
+        print ('a1 approved from: {0}'.format(c.s.sid))
+        c.s.status = 'done'
 
-    @when(m.subject == 'denied')
-    def denied(s):
-        print ('a1 denied from: {0}'.format(s.id))
-        s.status = 'done'
+    @when_all(m.subject == 'denied')
+    def denied(c):
+        print ('a1 denied from: {0}'.format(c.s.sid))
+        c.s.status = 'done'
 
     @when_start
     def start(host):
@@ -81,31 +201,31 @@ with ruleset('a1'):
 with statechart('a2'):
     with state('input'):
         @to('denied')
-        @when((m.subject == 'approve') & (m.amount > 1000))
-        def denied(s):
-            print ('a2 denied from: {0}'.format(s.id))
+        @when_all((m.subject == 'approve') & (m.amount > 1000))
+        def denied(c):
+            print ('a2 denied from: {0}'.format(c.s.sid))
         
         @to('pending')    
-        @when((m.subject == 'approve') & (m.amount <= 1000))
-        def request(s):
-            print ('a2 request approval from: {0}'.format(s.id))
+        @when_all((m.subject == 'approve') & (m.amount <= 1000))
+        def request(c):
+            print ('a2 request approval from: {0}'.format(c.s.sid))
         
     with state('pending'):
         @to('pending')
-        @when(m.subject == 'approved')
-        def second_request(s):
-            print ('a2 second request approval from: {0}'.format(s.id))
-            s.status = 'approved'
+        @when_all(m.subject == 'approved')
+        def second_request(c):
+            print ('a2 second request approval from: {0}'.format(c.s.sid))
+            c.s.status = 'approved'
 
         @to('approved')
-        @when(s.status == 'approved')
-        def approved(s):
-            print ('a2 approved from: {0}'.format(s.id))
+        @when_all(s.status == 'approved')
+        def approved(c):
+            print ('a2 approved from: {0}'.format(c.s.sid))
         
         @to('denied')
-        @when(m.subject == 'denied')
-        def denied(s):
-            print ('a2 denied from: {0}'.format(s.id))
+        @when_all(m.subject == 'denied')
+        def denied(c):
+            print ('a2 denied from: {0}'.format(c.s.sid))
         
     state('denied')
     state('approved')
@@ -120,31 +240,31 @@ with statechart('a2'):
 
 with flowchart('a3'):
     with stage('input'): 
-        to('request').when((m.subject == 'approve') & (m.amount <= 1000))
-        to('deny').when((m.subject == 'approve') & (m.amount > 1000))
+        to('request').when_all((m.subject == 'approve') & (m.amount <= 1000))
+        to('deny').when_all((m.subject == 'approve') & (m.amount > 1000))
     
     with stage('request'):
         @run
-        def request(s):
-            print ('a3 request approval from: {0}'.format(s.id))
-            if s.status:
-                s.status = 'approved'
+        def request(c):
+            print ('a3 request approval from: {0}'.format(c.s.sid))
+            if c.s.status:
+                c.s.status = 'approved'
             else:
-                s.status = 'pending'
+                c.s.status = 'pending'
 
-        to('approve').when(s.status == 'approved')
-        to('deny').when(m.subject == 'denied')
+        to('approve').when_all(s.status == 'approved')
+        to('deny').when_all(m.subject == 'denied')
         to('request').when_any(m.subject == 'approved', m.subject == 'ok')
     
     with stage('approve'):
         @run 
-        def approved(s):
-            print ('a3 approved from: {0}'.format(s.id))
+        def approved(c):
+            print ('a3 approved from: {0}'.format(c.s.sid))
 
     with stage('deny'):
         @run
-        def denied(s):
-            print ('a3 denied from: {0}'.format(s.id))
+        def denied(c):
+            print ('a3 denied from: {0}'.format(c.s.sid))
 
     @when_start
     def start(host):
@@ -158,8 +278,8 @@ with flowchart('a3'):
 with ruleset('a4'):
     @when_any(all(m.subject == 'approve', m.amount == 1000), 
               all(m.subject == 'jumbo', m.amount == 10000))
-    def action(s):
-        print ('a4 action {0}'.format(s.id))
+    def action(c):
+        print ('a4 action {0}'.format(c.s.sid))
     
     @when_start
     def start(host):
@@ -172,8 +292,8 @@ with ruleset('a4'):
 with ruleset('a5'):
     @when_all(any(m.subject == 'approve', m.subject == 'jumbo'), 
               any(m.amount == 100, m.amount == 10000))
-    def action(s):
-        print ('a5 action {0}'.format(s.id))
+    def action(c):
+        print ('a5 action {0}'.format(c.s.sid))
     
     @when_start
     def start(host):
@@ -187,24 +307,24 @@ with statechart('a6'):
     with state('work'):
         with state('enter'):
             @to('process')
-            @when(m.subject == 'enter')
-            def continue_process(s):
+            @when_all(m.subject == 'enter')
+            def continue_process(c):
                 print('a6 continue_process')
     
         with state('process'):
             @to('process')
-            @when(m.subject == 'continue')
-            def continue_process(s):
+            @when_all(m.subject == 'continue')
+            def continue_process(c):
                 print('a6 processing')
 
         @to('work')
-        @when(m.subject == 'reset')
-        def reset(s):
+        @when_all(m.subject == 'reset')
+        def reset(c):
             print('a6 resetting')
 
         @to('canceled')
-        @when(m.subject == 'cancel')
-        def cancel(s):
+        @when_all(m.subject == 'cancel')
+        def cancel(c):
             print('a6 canceling')
 
     state('canceled')
@@ -214,40 +334,67 @@ with statechart('a6'):
         host.post('a6', {'id': 2, 'sid': 1, 'subject': 'continue'})
         host.post('a6', {'id': 3, 'sid': 1, 'subject': 'continue'})
        
-        
+
 with ruleset('a7'):
-    @when(m.amount < s.max_amount)
-    def approved(s):
-        print ('a7 approved')
+    @when_all(m.amount < c.s.max_amount)
+    def approved(c):
+        print ('a7 approved {0}'.format(c.m.amount))
 
     @when_start
     def start(host):
-        host.patch_state('a7', {'id': 1, 'max_amount': 100})
+        host.patch_state('a7', {'sid': 1, 'max_amount': 100})
         host.post('a7', {'id': 1, 'sid': 1, 'amount': 10})
         host.post('a7', {'id': 2, 'sid': 1, 'amount': 100})
 
 
 with ruleset('a8'):
-    @when((m.amount < s.max_amount) & (m.amount > s.id('global').min_amount))
-    def approved(s):
-        print ('a8 approved')
+    @when_all((m.amount < c.s.max_amount) & (m.amount > c.s.id('global').min_amount))
+    def approved(c):
+        print ('a8 approved {0}'.format(c.m.amount))
 
     @when_start
     def start(host):
-        host.patch_state('a8', {'id': 1, 'max_amount': 500})
-        host.patch_state('a8', {'id': 'global', 'min_amount': 300})
+        host.patch_state('a8', {'sid': 1, 'max_amount': 500})
+        host.patch_state('a8', {'sid': 'global', 'min_amount': 300})
         host.post('a8', {'id': 1, 'sid': 1, 'amount': 400})
         host.post('a8', {'id': 2, 'sid': 1, 'amount': 1600})
 
 
 with ruleset('a9'):
-    @when((m.subject == 'approve') & (m.amount == 100), at_least = 5, at_most = 10)
-    def approved(s, m):
-        print ('a9 approved ->{0}'.format(m))
+    @when_all(m.amount < c.s.max_amount * 2)
+    def approved(c):
+        print ('a9 approved {0}'.format(c.m.amount))
 
     @when_start
     def start(host):
-        host.post_batch('a9', [{'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100},
+        host.patch_state('a9', {'sid': 1, 'max_amount': 100})
+        host.post('a9', {'id': 1, 'sid': 1, 'amount': 100})
+        host.post('a9', {'id': 2, 'sid': 1, 'amount': 300})
+
+
+with ruleset('a10'):
+    @when_all(m.amount < c.s.max_amount + c.s.id('global').max_amount)
+    def approved(c):
+        print ('a10 approved {0}'.format(c.m.amount))
+
+    @when_start
+    def start(host):
+        host.patch_state('a10', {'sid': 1, 'max_amount': 500})
+        host.patch_state('a10', {'sid': 'global', 'max_amount': 300})
+        host.post('a10', {'id': 1, 'sid': 1, 'amount': 400})
+        host.post('a10', {'id': 2, 'sid': 1, 'amount': 900})
+
+
+with ruleset('a11'):
+    @when_all((m.subject == 'approve') & (m.amount == 100), count = 3)
+    def approved(c):
+        print ('a11 approved ->{0}'.format(c.m[0].amount))
+        print ('             ->{0}'.format(c.m[1].amount))
+        print ('             ->{0}'.format(c.m[2].amount))
+
+    @when_start
+    def start(host):
+        host.post_batch('a11', [{'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100},
                                {'id': 2, 'sid': 1, 'subject': 'approve', 'amount': 100},
                                {'id': 3, 'sid': 1, 'subject': 'approve', 'amount': 100},
                                {'id': 4, 'sid': 1, 'subject': 'approve', 'amount': 100},
@@ -255,86 +402,47 @@ with ruleset('a9'):
                                {'id': 6, 'sid': 1, 'subject': 'approve', 'amount': 100}])
 
 
-with ruleset('a10'):
-    @when_all(m.subject == 'approve', m.subject == 'approved', at_least = 2, at_most = 4)
-    def approved(s, m):
-        print ('a10 approved ->{0}'.format(m))
-
+with ruleset('a12'):
+    @when_any(m.subject == 'approve', m.subject == 'approved', count = 2)
+    def approved(c):
+        print ('a12 approved ->{0}'.format(c.m[0].m_0.subject))
+        print ('             ->{0}'.format(c.m[1].m_0.subject))
+    
     @when_start
     def start(host):
-        host.post_batch('a10', [{'id': 1, 'sid': 1, 'subject': 'approve'},
-                                {'id': 2, 'sid': 1, 'subject': 'approve'},
-                                {'id': 3, 'sid': 1, 'subject': 'approve'}])
-        host.post_batch('a10', [{'id': 7, 'sid': 1, 'subject': 'approved'},
-                                {'id': 8, 'sid': 1, 'subject': 'approved'},
-                                {'id': 9, 'sid': 1, 'subject': 'approved'}])
-
-
-with ruleset('a11'):
-    @when_any(m.subject == 'approve', m.subject == 'approved', at_least = 3)
-    def approved(s, m):
-        print ('a11 approved ->{0}'.format(m))
-
-    @when_start
-    def start(host):
-        host.post_batch('a11', [{'id': 1, 'sid': 1, 'subject': 'approve'},
+        host.post_batch('a12', [{'id': 1, 'sid': 1, 'subject': 'approve'},
                                 {'id': 2, 'sid': 1, 'subject': 'approve'},
                                 {'id': 3, 'sid': 1, 'subject': 'approve'},
                                 {'id': 4, 'sid': 1, 'subject': 'approve'}])
 
 
-with ruleset('a12'):
-    @when_any(m.subject == 'approve', (m.subject == 'please').at_least(3))
-    def approved(s, m):
-        print ('a12 approved ->{0}'.format(m))
-
-    @when_start
-    def start(host):
-        host.post('a12', {'id': 1, 'sid': 1, 'subject': 'approve'})
-        host.post_batch('a12', [{'id': 2, 'sid': 2, 'subject': 'please'},
-                                {'id': 3, 'sid': 2, 'subject': 'please'},
-                                {'id': 4, 'sid': 2, 'subject': 'please'}])
-
-
-with ruleset('a13'):
-    @when_all((m.subject == 'approve').at_least(2), m.subject == 'please')
-    def approved(s, m):
-        print ('a13 approved ->{0}'.format(m))
-
-    @when_start
-    def start(host):
-        host.post('a13', {'id': 1, 'sid': 1, 'subject': 'please'})
-        host.post_batch('a13', [{'id': 2, 'sid': 1, 'subject': 'approve'},
-                                {'id': 3, 'sid': 1, 'subject': 'approve'}])
-                                
-
 with ruleset('p1'):
-    with when(m.start == 'yes'): 
+    with when_all(m.start == 'yes'): 
         with ruleset('one'):
-            @when(-s.start)
-            def continue_flow(s):
-                s.start = 1
+            @when_all(-s.start)
+            def continue_flow(c):
+                c.s.start = 1
 
-            @when(s.start == 1)
-            def finish_one(s):
-                print('p1 finish one {0}'.format(s.id))
-                s.signal({'id': 1, 'end': 'one'})
-                s.start = 2
+            @when_all(s.start == 1)
+            def finish_one(c):
+                print('p1 finish one {0}'.format(c.s.sid))
+                c.signal({'id': 1, 'end': 'one'})
+                c.s.start = 2
 
         with ruleset('two'): 
-            @when(-s.start)
-            def continue_flow(s):
-                s.start = 1
+            @when_all(-s.start)
+            def continue_flow(c):
+                c.s.start = 1
 
-            @when(s.start == 1)
-            def finish_two(s):
-                print('p1 finish two {0}'.format(s.id))
-                s.signal({'id': 1, 'end': 'two'})
-                s.start = 2
+            @when_all(s.start == 1)
+            def finish_two(c):
+                print('p1 finish two {0}'.format(c.s.sid))
+                c.signal({'id': 1, 'end': 'two'})
+                c.s.start = 2
 
     @when_all(m.end == 'one', m.end == 'two')
-    def done(s):
-        print('p1 done {0}'.format(s.id))
+    def done(c):
+        print('p1 done {0}'.format(c.s.sid))
 
     @when_start
     def start(host):
@@ -344,43 +452,43 @@ with ruleset('p1'):
 with statechart('p2'):
     with state('input'):
         @to('process')
-        @when(m.subject == 'approve')
-        def get_input(s, m):
-            print('p2 input {0} from: {1}'.format(m.quantity, s.id))
-            s.quantity = m.quantity
+        @when_all(m.subject == 'approve')
+        def get_input(c):
+            print('p2 input {0} from: {1}'.format(c.m.quantity, c.s.sid))
+            c.s.quantity = c.m.quantity
 
     with state('process'):
-        with to('result').when(+s.quantity):
+        with to('result').when_all(+s.quantity):
             with statechart('first'):
                 with state('evaluate'):
                     @to('end')
-                    @when(s.quantity <= 5)
-                    def signal_approved(s):
-                        print('p2 signaling approved from: {0}'.format(s.id))
-                        s.signal({'id': 1, 'subject': 'approved'})
+                    @when_all(s.quantity <= 5)
+                    def signal_approved(c):
+                        print('p2 signaling approved from: {0}'.format(c.s.sid))
+                        c.signal({'id': 1, 'subject': 'approved'})
 
                 state('end')
         
             with statechart('second'):
                 with state('evaluate'):
                     @to('end')
-                    @when(s.quantity > 5)
-                    def signal_denied(s):
-                        print('p2 signaling denied from: {0}'.format(s.id))
-                        s.signal({'id': 1, 'subject': 'denied'})
+                    @when_all(s.quantity > 5)
+                    def signal_denied(c):
+                        print('p2 signaling denied from: {0}'.format(c.s.sid))
+                        c.signal({'id': 1, 'subject': 'denied'})
                 
                 state('end')
     
     with state('result'):
         @to('approved')
-        @when(m.subject == 'approved')
-        def report_approved(s):
-            print('p2 approved from: {0}'.format(s.id))
+        @when_all(m.subject == 'approved')
+        def report_approved(c):
+            print('p2 approved from: {0}'.format(c.s.sid))
 
         @to('denied')
-        @when(m.subject == 'denied')
-        def report_denied(s):
-            print('p2 denied from: {0}'.format(s.id)) 
+        @when_all(m.subject == 'denied')
+        def report_denied(c):
+            print('p2 denied from: {0}'.format(c.s.sid)) 
     
     state('denied')
     state('approved')
@@ -390,66 +498,68 @@ with statechart('p2'):
         host.post('p2', {'id': 1, 'sid': 1, 'subject': 'approve', 'quantity': 3})
         host.post('p2', {'id': 2, 'sid': 2, 'subject': 'approve', 'quantity': 10})
 
+
 with flowchart('p3'):
     with stage('start'):
-        to('input').when(m.subject == 'approve')
+        to('input').when_all(m.subject == 'approve')
     
     with stage('input'):
         @run
-        def get_input(s, m):
-            print('p3 input {0} from: {1}'.format(m.quantity, s.id))
-            s.quantity = m.quantity
+        def get_input(c):
+            print('p3 input {0} from: {1}'.format(c.m.quantity, c.s.sid))
+            c.s.quantity = c.m.quantity
 
         to('process')
     
     with stage('process'):
         with flowchart('first'):
             with stage('start'):
-                to('end').when(s.quantity <= 5)
+                to('end').when_all(s.quantity <= 5)
             
             with stage('end'):
                 @run
-                def signal_approved(s):
-                    print('p3 signaling approved from: {0}'.format(s.id))
-                    s.signal({'id': 1, 'subject': 'approved'})
+                def signal_approved(c):
+                    print('p3 signaling approved from: {0}'.format(c.s.sid))
+                    c.signal({'id': 1, 'subject': 'approved'})
 
         with flowchart('second'):
             with stage('start'):
-                to('end').when(s.quantity > 5)
+                to('end').when_all(s.quantity > 5)
 
             with stage('end'):
                 @run
-                def signal_denied(s):
-                    print('p3 signaling denied from: {0}'.format(s.id))
-                    s.signal({'id': 1, 'subject': 'denied'})
+                def signal_denied(c):
+                    print('p3 signaling denied from: {0}'.format(c.s.sid))
+                    c.signal({'id': 1, 'subject': 'denied'})
 
-        to('approve').when(m.subject == 'approved')
-        to('deny').when(m.subject == 'denied')
+        to('approve').when_all(m.subject == 'approved')
+        to('deny').when_all(m.subject == 'denied')
 
     with stage('approve'):
         @run
-        def report_approved(s):
-            print('p3 approved from: {0}'.format(s.id))
+        def report_approved(c):
+            print('p3 approved from: {0}'.format(c.s.sid))
 
     with stage('deny'):
         @run
-        def report_denied(s):
-            print('p3 denied from: {0}'.format(s.id)) 
+        def report_denied(c):
+            print('p3 denied from: {0}'.format(c.s.sid)) 
 
     @when_start
     def start(host):
         host.post('p3', {'id': 1, 'sid': 1, 'subject': 'approve', 'quantity': 3})
         host.post('p3', {'id': 2, 'sid': 2, 'subject': 'approve', 'quantity': 10})
 
-with ruleset('t1'): 
-    @when(m.start == 'yes')
-    def start_timer(s):
-        s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
-        s.start_timer('my_timer', 5)
 
-    @when(timeout('my_timer'))
-    def end_timer(s):
-        print('t1 started @%s' % s.start)
+with ruleset('t1'): 
+    @when_all(m.start == 'yes')
+    def start_timer(c):
+        c.s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
+        c.start_timer('my_timer', 5)
+
+    @when_all(timeout('my_timer'))
+    def end_timer(c):
+        print('t1 started @%s' % c.s.start)
         print('t1 ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
 
     @when_start
@@ -459,50 +569,50 @@ with ruleset('t1'):
 
 with statechart('t2'):
     with state('input'):
-        with to('pending').when(m.subject == 'approve'):
+        with to('pending').when_all(m.subject == 'approve'):
             with statechart('first'):
                 with state('send'):
                     @to('evaluate')
-                    def start_timer(s):
-                        s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
-                        s.start_timer('first', 4)   
+                    def start_timer(c):
+                        c.s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
+                        c.start_timer('first', 4)   
 
                 with state('evaluate'):
                     @to('end')
-                    @when(timeout('first'))
-                    def signal_approved(s):
-                        s.signal({'id': 2, 'subject': 'approved', 'start': s.start})
+                    @when_all(timeout('first'))
+                    def signal_approved(c):
+                        c.signal({'id': 2, 'subject': 'approved', 'start': c.s.start})
 
                 state('end')
 
             with statechart('second'):
                 with state('send'):
                     @to('evaluate')
-                    def start_timer(s):
-                        s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
-                        s.start_timer('second', 3)
+                    def start_timer(c):
+                        c.s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
+                        c.start_timer('second', 3)
 
                 with state('evaluate'):
                     @to('end')
-                    @when(timeout('second'))
-                    def signal_denied(s):
-                        s.signal({'id': 3, 'subject': 'denied', 'start': s.start})
+                    @when_all(timeout('second'))
+                    def signal_denied(c):
+                        c.signal({'id': 3, 'subject': 'denied', 'start': c.s.start})
 
                 state('end')
 
     with state('pending'):
         @to('approved')
-        @when(m.subject == 'approved')
-        def report_approved(s, m):
-            print('t2 approved {0}'.format(s.id))
-            print('t2 started @%s' % m.start)
+        @when_all(m.subject == 'approved')
+        def report_approved(c):
+            print('t2 approved {0}'.format(c.s.sid))
+            print('t2 started @%s' % c.m.start)
             print('t2 ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
 
         @to('denied')
-        @when(m.subject == 'denied')
-        def report_denied(s):
-            print('t2 denied {0}'.format(s.id))
-            print('t2 started @%s' % m.start)
+        @when_all(m.subject == 'denied')
+        def report_denied(c):
+            print('t2 denied {0}'.format(c.s.sid))
+            print('t2 started @%s' % c.m.start)
             print('t2 ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
 
     state('approved')

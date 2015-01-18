@@ -1,18 +1,89 @@
 import engine
 import interface
 
+class avalue(object):
+
+    def __init__(self, name, left = None, sid = None, op = None, right = None):
+        self._name = name
+        self._left = left
+        self._sid = sid
+        self._op = op
+        self._right = right
+        
+    def __add__(self, other):
+        return self._set_right('$add', other)
+
+    def __sub__(self, other):
+        return self._set_right('$sub', other)
+
+    def __mul__(self, other):
+        return self._set_right('$mul', other)
+
+    def __div__(self, other):
+        return self._set_right('$div', other)
+
+    def __lshift__(self, other):
+        other.alias = self._name
+        return other
+
+    def __getattr__(self, name):
+        print('setting {0}'.format(name))
+        self._left = name
+        return self
+
+    def _set_right(self, op, other):
+        if self._right:
+            self._left = avalue(self._name, self._left, self._sid, self._op, self._right) 
+
+        self._op = op
+        self._right = other
+        return self
+
+    def id(self, id):
+        self._sid = id 
+        return self
+
+    def define(self):
+        if not self._left:
+            raise Exception('Property name for {0} not defined'.format(self._name))
+
+        if not self._op:
+            if self._sid:
+                return {self._name: {'name': self._left, 'id': self._sid}}
+            else:
+                return {self._name: self._left}
+
+        left_definition = None
+        if isinstance(self._left, avalue):
+            left_definition = self._left.define()
+        else:
+            left_definition = {self._name: self._left}
+        
+        righ_definition = self._right
+        if isinstance(self._right, avalue):
+            righ_definition = self._right.define()
+
+        return {self._op: {'$l': left_definition, '$r': righ_definition}}
+        
+
+class closure(object):
+
+    def __getattr__(self, name):
+        if name == 's':
+            return avalue('$s')
+
+        return avalue(name)
+
+
 class value(object):
 
-    def __init__(self, vtype, left = None, op = None, right = None):
+    def __init__(self, vtype = None, left = None, op = None, right = None):
+        self.alias = None
         self._type = vtype
         self._left = left
         self._op = op
         self._right = right
-        self._id = None
-        self._time = None
-        self._at_least = None
-        self._at_most = None
-
+        
     def __lt__(self, other):
         self._op = '$lt'
         self._right = other
@@ -58,45 +129,18 @@ class value(object):
         return value(self._type, self, '$or', other)
 
     def __getattr__(self, name):
-        new_value = value(self._type, name)
-        new_value._time = self._time
-        new_value._id = self._id
-        return new_value
-
-    def id(self, id):
-        new_value = value(self._type)
-        new_value._id = id
-        new_value._time = self._time    
-        return new_value
-
-    def time(self, time):
-        new_value = value(self._type)
-        new_value._time = time
-        new_value._id = self._id
-        return new_value
-
-    def at_least(self, at_least):
-        self._at_least = at_least
-        return self
-
-    def at_most(self, at_most):
-        self._at_most = at_most
-        return self
+        if self._type:
+            return value(self._type, name)
+        else:
+            return value(self.alias, name)
 
     def define(self):
-        if self._op == None:
-            if self._time and self._id:
-                return {self._type: {'name': self._left, 'id': self._id, 'time': self._time}}
-            elif self._time:
-                return {self._type: {'name': self._left, 'time': self._time}}
-            elif self._id:
-                return {self._type: {'name': self._left, 'id': self._id}}
-            else:
-                return {self._type: self._left}
+        if not self._left:
+            raise Exception('Property name for {0} not defined'.format(self._type))
 
         new_definition = None
         right_definition = self._right
-        if isinstance(self._right, value):
+        if isinstance(self._right, value) or isinstance(self._right, avalue):
             right_definition = right_definition.define();
 
         if self._op == '$or' or self._op == '$and':
@@ -115,14 +159,8 @@ class value(object):
         else:
             new_definition = {self._op: {self._left: right_definition}}
         
-        if self._at_least:
-            new_definition['$atLeast'] = self._at_least
-
-        if self._at_most:
-            new_definition['$atMost'] = self._at_most
-
         if self._type == '$s':
-            return {'$s': new_definition}
+            return {'$and': [new_definition, {'$s': 1}]}
         else:
             return new_definition
 
@@ -143,6 +181,7 @@ class rule(object):
     def __init__(self, operator, multi, *args, **kw):
         self.operator = operator
         self.multi = multi
+        self.alias = None
         
         if len(_ruleset_stack) and isinstance(_ruleset_stack[-1], ruleset):
             _ruleset_stack[-1].rules.append(self)
@@ -156,15 +195,15 @@ class rule(object):
             self.func = args[-1:]
             args = args[:-1]
 
-        if 'at_least' in kw:
-            self.at_least = kw['at_least']
+        if 'count' in kw:
+            self.count = kw['count']
         else:
-            self.at_least = 0
+            self.count = None
 
-        if 'at_most' in kw:
-            self.at_most = kw['at_most']
+        if 'pri' in kw:
+            self.pri = kw['pri']
         else:
-            self.at_most = 0        
+            self.pri = None        
 
         if not multi:
             self.expression = args[0]
@@ -189,65 +228,67 @@ class rule(object):
             defined_expression = self.expression.define()
         else:
             index = 0
-            defined_expression = {}
+            defined_expression = []
             for current_expression in self.expression:
+                new_expression = None
+                name = None
+                if current_expression.alias:
+                    name = current_expression.alias
+                elif len(self.expression) == 1:
+                    name = 'm'
+                else:
+                    name = 'm_{0}'.format(index)
+
                 if isinstance(current_expression, all):
-                    defined_expression['m_{0}$all'.format(index)] = current_expression.define()['whenAll']
+                    new_expression = {'{0}$all'.format(name): current_expression.define()['all']}
                 elif isinstance(current_expression, any):
-                    defined_expression['m_{0}$any'.format(index)] = current_expression.define()['whenAny']
-                elif current_expression._type == '$s':
-                    defined_expression['$s'] = current_expression.define()['$s']
+                    new_expression = {'{0}$any'.format(name): current_expression.define()['any']}
+                elif isinstance(current_expression, none):
+                    new_expression = {'{0}$not'.format(name): current_expression.define()['none'][0]['m']}
                 else:    
-                    defined_expression['m_{0}'.format(index)] = current_expression.define()
+                    new_expression = {name: current_expression.define()}
                 
+                defined_expression.append(new_expression)
                 index += 1
         
-        if self.at_least:
-            defined_expression['$atLeast'] = self.at_least
-
-        if self.at_most:
-            defined_expression['$atMost'] = self.at_most
-
         if len(self.func):
             if len(self.func) == 1 and not hasattr(self.func[0], 'define'):
-                return {self.operator: defined_expression, 'run': self.func[0]}
+                defined_expression = {self.operator: defined_expression, 'run': self.func[0]}
             else:
                 ruleset_definitions = {}
                 for rset in self.func:
                     ruleset_name, ruleset_definition = rset.define()
                     ruleset_definitions[ruleset_name] = ruleset_definition
 
-                return {self.operator: defined_expression, 'run': ruleset_definitions}   
-        else:
-            if not self.operator:
-                return defined_expression
-            else:
-                return {self.operator: defined_expression}
+                defined_expression = {self.operator: defined_expression, 'run': ruleset_definitions}   
+        elif self.operator:
+                defined_expression = {self.operator: defined_expression}
 
+        if self.count:
+            defined_expression['count'] = self.count
 
-class when(rule):
+        if self.pri:
+            defined_expression['pri'] = self.pri
 
-    def __init__(self, *args, **kw):
-        super(when, self).__init__('when', False, *args, **kw)
-
+        return defined_expression
 
 class when_all(rule):
 
     def __init__(self, *args, **kw):
-        super(when_all, self).__init__('whenAll', True, *args, **kw)
+        super(when_all, self).__init__('all', True, *args, **kw)
 
 
 class when_any(rule):
 
     def __init__(self, *args, **kw):
-        super(when_any, self).__init__('whenAny', True, *args, **kw)
+        super(when_any, self).__init__('any', True, *args, **kw)
 
 
 class all(rule):
 
     def __init__(self, *args, **kw):
         _ruleset_stack.append(self)
-        super(all, self).__init__('whenAll', True, *args, **kw)
+        super(all, self).__init__('all', True, *args, **kw)
         _ruleset_stack.pop()
 
 
@@ -255,7 +296,15 @@ class any(rule):
 
     def __init__(self, *args, **kw):
         _ruleset_stack.append(self)
-        super(any, self).__init__('whenAny', True, *args, **kw)
+        super(any, self).__init__('any', True, *args, **kw)
+        _ruleset_stack.pop()
+
+
+class none(rule):
+
+    def __init__(self, *args, **kw):
+        _ruleset_stack.append(self)
+        super(none, self).__init__('none', True, *args, **kw)
         _ruleset_stack.pop()
 
 
@@ -323,16 +372,12 @@ class to(object):
         self.rule = None
         self.func = func
 
-    def when(self, *args):
-        self.rule = rule('when', False, *args)
-        return self.rule
-
-    def wehn_all(self, *args):
-        self.rule = rule('whenAll', True, *args)
+    def when_all(self, *args):
+        self.rule = rule('all', True, *args)
         return self.rule
 
     def when_any(self, *args):
-        self.rule = rule('whenAny', True, *args)
+        self.rule = rule('any', True, *args)
         return self.rule 
 
     def __call__(self, *args):
@@ -348,6 +393,7 @@ class to(object):
         if self.rule:
             return self.state_name, self.rule.define()
         else:
+            print('no rule')
             if self.func:
                 return self.state_name, {'run': self.func}
             else:
@@ -474,12 +520,10 @@ class stage(object):
                 if not switch_definition:
                     to = stage_name
                     break
-                elif 'when' in switch_definition:
-                    switch_definition = switch_definition['when']
-                elif 'whenAll' in switch_definition:
-                    switch_definition = {'$all': switch_definition['whenAll']}
-                elif 'whenAny' in switch_definition:
-                    switch_definition = {'$any': switch_definition['whenAny']}
+                elif 'all' in switch_definition:
+                    switch_definition = {'all': switch_definition['all']}
+                elif 'any' in switch_definition:
+                    switch_definition = {'any': switch_definition['any']}
 
                 to[stage_name] = switch_definition
 
@@ -517,11 +561,13 @@ class flowchart(object):
 
         return '{0}$flow'.format(self.name), new_definition
 
+
 def timeout(name):
     return (value('$m', '$t') == name) 
 
-m = value('$m')
+m = value('m')
 s = value('$s')
+c = closure()
 
 _rule_stack = []
 _ruleset_stack = []

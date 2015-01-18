@@ -5,19 +5,24 @@ import threading
 import inspect
 
 
-class Session(object):
+class Closure(object):
 
-    def __init__(self, state, event, handle, ruleset_name):
+    def __init__(self, state, message, handle, ruleset_name):
         self.ruleset_name = ruleset_name
-        self.state = state
+        self.s = Content(state)
         self._handle = handle
         self._timer_directory = {}
         self._message_directory = {}
         self._branch_directory = {}
-        if '$m' in event:
-            self.event = Event(event['$m'])
+        if isinstance(message, dict): 
+            self._m = message
         else:
-            self.event = Event(event)
+            self.m = []
+            for one_message in message:
+                if ('m' in one_message) and len(one_message) == 1:
+                    one_message = one_message['m']
+
+                self.m.append(Content(one_message))
 
     def get_timers(self):
         return self._timer_directory
@@ -32,7 +37,7 @@ class Session(object):
         name_index = self.ruleset_name.rindex('.')
         parent_ruleset_name = self.ruleset_name[:name_index]
         name = self.ruleset_name[name_index + 1:]
-        message['sid'] = self.id
+        message['sid'] = self.s['sid']
         message['id'] = '{0}.{1}'.format(name, message['id'])
         self.post(parent_ruleset_name, message)
 
@@ -58,39 +63,52 @@ class Session(object):
             self._branch_directory[branch_name] = branch_state
 
     def __getattr__(self, name):   
-        if name in self.state:
-            return self.state[name]
+        if name in self._m:
+            return Content(self._m[name])
         else:
             return None
 
-    def __setattr__(self, name, value):
-        if name in ['state', 'ruleset_name', 'event', '_handle', '_timer_directory', '_message_directory', '_branch_directory']:
-            self.__dict__[name] = value
-        else:
-            self.state[name] = value
+class Content(object):
 
-class Event(object):
-
-    def __init__(self, state):
-        self.state = state
+    def __init__(self, data):
+        self._d = data
 
     def __getitem__(self, key):
-        if key in self.state:
-            return self.state[key]
+        if key in self._d:
+            data = self._d[key]
+            if isinstance(data, dict):
+                data = Content(data)
+
+            return data 
         else:
             return None
+
+    def __setitem__(self, key, value):
+        if isinstance(value, Content):
+            self._d[key] = value._d
+        else:    
+            self._d[key] = value
+
+    def __iter__(self):
+        return self._d.__iter__
+
+    def __contains__(self, key):
+        return key in self._d
 
     def __getattr__(self, name):   
-        if name in self.state:
-            return self.state[name]
+        return self.__getitem__(name)
+
+    def __setattr__(self, name, value):
+        if name == '_d':
+            self.__dict__['_d'] = value
         else:
-            return None
+            self.__setitem__(name, value)
 
     def __repr__(self):
-        return repr(self.state);
+        return repr(self._d)
 
     def __str__(self):
-        return str(self.state);
+        return str(self._d)
 
 
 class Promise(object):
@@ -105,13 +123,9 @@ class Promise(object):
         if inspect.ismethod(func):
             arg_count -= 1
 
-        if arg_count == 1:
-            self._pass_event = False
-        elif arg_count == 2:
-            self._pass_event = True
-        elif arg_count == 3:
+        if arg_count == 2:
             self._sync = False
-        else:
+        elif arg_count != 1:
             raise Exception('Invalid function signature')
 
     def continue_with(self, next):
@@ -125,20 +139,17 @@ class Promise(object):
         self._next.root = self.root
         return self._next
 
-    def run(self, s, complete):
+    def run(self, c, complete):
         if self._sync:
             try:
-                if self._pass_event:
-                    self._func(s, s.event)    
-                else:
-                    self._func(s)
+                self._func(c)
 
             except Exception as error:
                 complete(error)
                 return
 
             if self._next:
-                self._next.run(s, complete)
+                self._next.run(c, complete)
             else:
                 complete(None)
         else:
@@ -147,11 +158,11 @@ class Promise(object):
                     if e: 
                         complete(e) 
                     elif self._next: 
-                        self._next.run(s, complete) 
+                        self._next.run(c, complete) 
                     else: 
                         complete(None)
 
-                self._func(s, s.event, callback)
+                self._func(c, callback)
             except Exception as error:
                 complete(error)
 
@@ -163,13 +174,13 @@ class Fork(Promise):
         self.branch_names = branch_names
         self.state_filter = state_filter
         
-    def _execute(self, s):
+    def _execute(self, c):
         for branch_name in self.branch_names:
-            state = copy.deepcopy(s.state)
+            state = copy.deepcopy(c.s._d)
             if self.state_filter:
                 self.state_filter(state)
 
-            s.fork(branch_name, state)
+            c.fork(branch_name, state)
         
 
 class To(Promise):
@@ -178,8 +189,8 @@ class To(Promise):
         super(To, self).__init__(self._execute)
         self._state = state
         
-    def _execute(self, s):
-        s.state['label'] = self._state
+    def _execute(self, c):
+        c.s['label'] = self._state
 
 
 class Ruleset(object):
@@ -216,6 +227,12 @@ class Ruleset(object):
     def assert_events(self, messages):
         rules.assert_events(self._handle, json.dumps(messages))
         
+    def assert_fact(self, fact):
+        rules.assert_fact(self._handle, json.dumps(fact))
+
+    def retract_fact(self, fact):
+        rules.retract_fact(self._handle, json.dumps(fact))
+
     def assert_state(self, state):
         rules.assert_state(self._handle, json.dumps(state))
         
@@ -270,39 +287,39 @@ class Ruleset(object):
             complete(None)
         else:
             state = json.loads(result[0])
-            event = json.loads(result[1])[self._name]
+            message = json.loads(result[1])
             action_name = None
-            for action_name, event in event.iteritems():
+            for action_name, message in message.iteritems():
                 break
 
-            s = Session(state, event, result[2], self._name)
+            c = Closure(state, message, result[2], self._name)
             
             def action_callback(e):
                 if e:
-                    rules.abandon_action(self._handle, s._handle)
+                    rules.abandon_action(self._handle, c._handle)
                     complete(e)
                 else:
                     try:
-                        for branch_name, branch_state in s.get_branches().iteritems():
+                        for branch_name, branch_state in c.get_branches().iteritems():
                             self._host.patch_state(branch_name, branch_state)  
 
-                        for ruleset_name, messages in s.get_messages().iteritems():
+                        for ruleset_name, messages in c.get_messages().iteritems():
                             if len(messages) == 1:
                                 self._host.post(ruleset_name, messages[0])
                             else:
                                 self._host.post_batch(rule_name, messages)
 
-                        for timer_name, timer_duration in s.get_timers().iteritems():
-                            timer = {'sid':s.id, 'id':timer_name, '$t':timer_name}
-                            rules.start_timer(self._handle, str(s.id), timer_duration, json.dumps(timer))
+                        for timer_name, timer_duration in c.get_timers().iteritems():
+                            timer = {'sid':c.s['sid'], 'id':timer_name, '$t':timer_name}
+                            rules.start_timer(self._handle, str(c.s['sid']), timer_duration, json.dumps(timer))
 
-                        rules.complete_action(self._handle, s._handle, json.dumps(s.state))
+                        rules.complete_action(self._handle, c._handle, json.dumps(c.s._d))
                         complete(None)
                     except Exception as error:
-                        rules.abandon_action(self._handle, s._handle)
+                        rules.abandon_action(self._handle, c._handle)
                         complete(error)
             
-            self._actions[action_name].run(s, action_callback)         
+            self._actions[action_name].run(c, action_callback)         
 
 
 class Statechart(Ruleset):
@@ -353,27 +370,20 @@ class Statechart(Ruleset):
             else:
                 for trigger_name, trigger in triggers.iteritems():
                     rule = {}
-                    state_test = {'label': qualified_name} 
-                    if 'when' in trigger:
-                        if '$s' in trigger['when']:
-                            rule['when'] = {'$s': {'$and': [state_test, trigger['when']['$s']]}}
-                        else:
-                            rule['whenAll'] = {'$s': state_test, '$m': trigger['when']}
+                    state_test = {'$s': {'$and':[{'label': qualified_name}, {'$s':1}]}}
+                    if 'pri' in trigger:
+                        rule['pri'] = trigger['pri']
 
-                    elif 'whenAll' in trigger:
-                        test = {'$s': state_test}
-                        for test_name, current_test in trigger['whenAll'].iteritems():
-                            if test_name != '$s':
-                                test[test_name] = current_test
-                            else:
-                                test['$s'] = {'$and': [state_test, current_test]}
-                        rule['whenAll'] = test
-                    elif 'whenAny' in trigger:
-                        rule['whenAll'] = {'$s': state_test, 'm$any': trigger['whenAny']}
-                    elif 'whenSome' in trigger:
-                        rule['whenAll'] = {'$s': state_test, 'm$some': trigger['whenSome']}
+                    if 'count' in trigger:
+                        rule['count'] = trigger['count']
+
+                    if 'all' in trigger:
+                        rule['all'] = list(trigger['all'])
+                        rule['all'].append(state_test)
+                    elif 'any' in trigger:
+                        rule['all'] = [state_test, {'m$any': trigger['any']}]
                     else:
-                        rule['when'] = {'$s': state_test}
+                        rule['all'] = [state_test]
 
                     if 'run' in trigger:
                         if isinstance(trigger['run'], basestring):
@@ -408,9 +418,9 @@ class Statechart(Ruleset):
 
             started = True
             if parent_name:
-                rules[parent_name + '$start'] = {'when': {'$s': {'label': parent_name}}, 'run': To(state_name)}
+                rules[parent_name + '$start'] = {'all':[{'$s': {'$and': [{'label': parent_name}, {'$s':1}]}}], 'run': To(state_name)};
             else:
-                rules['$start'] = {'when': {'$s': {'$nex': {'label': 1}}}, 'run': To(state_name)}
+                rules['$start'] = {'all': [{'$s': {'$and': [{'$nex': {'label': 1}}, {'$s':1}]}}], 'run': To(state_name)};
 
         if not started:
             raise Exception('Chart {0} has no start state'.format(self._name))
@@ -434,11 +444,11 @@ class Flowchart(Ruleset):
 
         visited = {}
         for stage_name, stage in chart_definition.iteritems():
-            stage_test = {'label': stage_name}
+            stage_test = {'$s': {'$and':[{'label': stage_name}, {'$s':1}]}}
             if 'to' in stage:
                 if isinstance(stage['to'], basestring):
                     next_stage = None
-                    rule = {'when': {'$s': stage_test}}
+                    rule = {'all': [stage_test]}
                     if stage['to'] in chart_definition:
                         next_stage = chart_definition[stage['to']]
                     else:
@@ -459,25 +469,22 @@ class Flowchart(Ruleset):
                     visited[stage['to']] = True
                 else:
                     for transition_name, transition in stage['to'].iteritems():
-                        rule = None
+                        rule = {}
                         next_stage = None
-                        if '$s' in transition:
-                            rule = {'when': {'$s': {'$and': [stage_test, transition['$s']]}}}
-                        elif '$all' in transition:
-                            for test_name, all_test in transition['$all'].iteritems():
-                                test = {'$s': stage_test}
-                                if test_name != '$s':
-                                    test[test_name] = all_test
-                                else:
-                                    test['$s'] = {'$and': [stage_test, all_test]}
 
-                            rule = {'whenAll': test}
-                        elif '$any' in transition:
-                            rule = {'whenAll': {'$s': stage_test, 'm$any': transition['$any']}}
-                        elif '$some' in transition:
-                            rule = {'whenAll': {'$s': stage_test, 'm$some': transition['$some']}}
+                        if 'pri' in transition:
+                            rule['pri'] = transition['pri']
+
+                        if 'count' in transition:
+                            rule['count'] = transition['count']
+
+                        if 'all' in transition:
+                            rule['all'] = list(transition['all'])
+                            rule['all'].append(stage_test)
+                        elif 'any' in transition:
+                            rule['all'] = [stage_test, {'m$any': transition['any']}]
                         else:
-                            rule = {'whenAll': {'$s': stage_test, '$m': transition}}
+                            rule['all'] = [stage_test]
 
                         if transition_name in chart_definition:
                             next_stage = chart_definition[transition_name]
@@ -504,7 +511,7 @@ class Flowchart(Ruleset):
                 if started:
                     raise Exception('Chart {0} has more than one start state'.format(self._name))
 
-                rule = {'when': {'$s': {'$nex': {'label': 1}}}}
+                rule = {'all': [{'$s': {'$and': [{'$nex': {'label':1}}, {'$s': 1}]}}]}
                 if not 'run' in stage:
                     rule['run'] = To(stage_name)
                 else:
@@ -563,6 +570,12 @@ class Host(object):
     def post(self, ruleset_name, message):
         self.get_ruleset(ruleset_name).assert_event(message)
         
+    def assert_fact(self, ruleset_name, fact):
+        self.get_ruleset(ruleset_name).assert_fact(fact)
+
+    def retract_fact(self, ruleset_name, fact):
+        self.get_ruleset(ruleset_name).retract_fact(fact)
+
     def patch_state(self, ruleset_name, state):
         self.get_ruleset(ruleset_name).assert_state(state)
 

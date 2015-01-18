@@ -52,6 +52,10 @@ module Durable
     end
     
     def definition
+      if not @left
+        raise ArgumentError, "Property for #{@name} not defined"
+      end 
+
       if not @op
         if @sid
           {@name => {:name => @left, :id => @sid}}
@@ -172,17 +176,22 @@ module Durable
     
     def definition
       new_definition = nil
-      righ_definition = @right
-      if (@right.kind_of? Expression) || (@right.kind_of? Arithmetic)
-        righ_definition = @right.definition
-      end
-
       if @op == :$or || @op == :$and
         new_definition = {@op => @definitions}
-      elsif @op == :$eq
-        new_definition = {@left => righ_definition}
       else
-        new_definition = {@op => {@left => righ_definition}}
+        if not @left
+          raise ArgumentError, "Property for #{@op} not defined"
+        end 
+        righ_definition = @right
+        if (@right.kind_of? Expression) || (@right.kind_of? Arithmetic)
+          righ_definition = @right.definition
+        end
+
+        if @op == :$eq
+          new_definition = {@left => righ_definition}
+        else
+          new_definition = {@op => {@left => righ_definition}}
+        end
       end
 
       if @type == :$s
