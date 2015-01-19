@@ -338,7 +338,7 @@ end
 
 Durable.ruleset :fact2 do
   when_all c.first = m.t == "deposit",
-           no(m.t == "balance"),
+           none(m.t == "balance"),
            c.third = m.t == "withrawal",
            c.fourth = m.t == "chargeback" do
     puts "fact2 " + first.t + " " + third.t + " " + fourth.t
@@ -358,7 +358,7 @@ end
 Durable.ruleset :p1 do
   when_all m.start == "yes", paralel do 
     ruleset :one do 
-      when_all !s.start do
+      when_all -s.start do
         s.start = 1
       end
       when_all s.start == 1 do
@@ -368,7 +368,7 @@ Durable.ruleset :p1 do
       end 
     end
     ruleset :two do 
-      when_all !s.start do
+      when_all -s.start do
         s.start = 1
       end
       when_all s.start == 1 do
@@ -395,7 +395,7 @@ Durable.statechart :p2 do
     end 
   end
   state :process do
-    to :result, when_all(~s.quantity), paralel do
+    to :result, when_all(+s.quantity), paralel do
       statechart :first do
         state :evaluate do
           to :end, when_all(s.quantity <= 5) do

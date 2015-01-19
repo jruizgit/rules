@@ -52,10 +52,6 @@ module Durable
     end
     
     def definition
-      if not @left
-        raise ArgumentError, "Property for #{@name} not defined"
-      end 
-
       if not @op
         if @sid
           {@name => {:name => @left, :id => @sid}}
@@ -120,12 +116,12 @@ module Durable
       return Expression.new(@name, @left) >= other
     end
 
-    def !
-      return !Expression.new(@name, @left)
+    def -@
+      return -Expression.new(@name, @left)
     end
 
-    def ~
-      return ~Expression.new(@name, @left)
+    def +@
+      return +Expression.new(@name, @left)
     end
 
     def |(other)
@@ -135,7 +131,6 @@ module Durable
     def &(other)
       return Expression.new(@name, @left) & other
     end
-
 
     def id(sid)
       Arithmetic.new @name, @left, sid
@@ -154,6 +149,7 @@ module Durable
     end
 
     def default(name, value=nil)
+      puts("setting #{name}")
       @left = name
       self
     end
@@ -237,13 +233,13 @@ module Durable
       self
     end
 
-    def !
+    def -@
       @op = :$nex
       @right = 1
       self
     end
 
-    def ~
+    def +@
       @op = :$ex
       @right = 1
       self
@@ -369,21 +365,13 @@ module Durable
       Expressions.new :$any, args
     end
 
-    def no(*args)
+    def none(*args)
       Expressions.new :$not, args
     end
 
     def when_start(&block)
       @start = block
       self
-    end
-
-    def count(value)
-      {:count => value}
-    end
-
-    def pri(value)
-      {:pri => value}
     end
 
     def paralel
@@ -412,6 +400,14 @@ module Durable
     
     def c
       Closure.new()
+    end
+
+    def count(value)
+      {:count => value}
+    end
+
+    def pri(value)
+      {:pri => value}
     end
 
     def timeout(name)
@@ -562,9 +558,6 @@ module Durable
       @current_stage = stage_name
       self
     end
-
   end
-
-  
 
 end

@@ -511,7 +511,7 @@ exports = module.exports = durableEngine = function () {
             return that;
         };
         
-        obj.not = function(exp) {
+        obj.none = function(exp) {
             var that = rule('$not', [exp]);
             return that;
         }

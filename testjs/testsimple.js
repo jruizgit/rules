@@ -116,7 +116,7 @@ with (d.ruleset('fraud5')) {
 
 with (d.ruleset('fraud6')) {
     whenAll(c.first = m.t.eq('deposit'),
-            not(m.t.eq('withrawal')), 
+            none(m.t.eq('withrawal')), 
             c.third = m.t.eq('chargeback'),
             count(2),
         function(c) {

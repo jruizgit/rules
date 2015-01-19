@@ -13,7 +13,7 @@ with statechart('fraud0'):
 
     with state('metering'):
         @to('fraud')
-        @when_all(m.amount > 100, count = 2)
+        @when_all(m.amount > 100, count(2))
         def report_fraud(c):
             print('fraud0 detected')
 
@@ -75,15 +75,15 @@ with ruleset('fraud3'):
 
 
 with ruleset('fraud4'):
-    @when_all(m.amount < 300, pri = 3)
+    @when_all(pri(3), m.amount < 300)
     def first_detect(c):
         print('fraud4 first detect {0}'.format(c.m.amount))
 
-    @when_all(m.amount < 200, pri = 2)
+    @when_all(pri(2), m.amount < 200)
     def second_detect(c):
         print('fraud4 second detect {0}'.format(c.m.amount))
 
-    @when_all(m.amount < 100, pri = 1)
+    @when_all(pri(1), m.amount < 100)
     def third_detect(c):
         print('fraud4 third detect {0}'.format(c.m.amount))
 
@@ -97,7 +97,7 @@ with ruleset('fraud4'):
 with ruleset('fraud5'):
     @when_all(c.first << m.t == 'purchase',
               c.second << m.location != c.first.location,
-              count = 2)
+              count(2))
     def detected(c):
         print ('fraud5 detected {0}, {1}'.format(c.m[0].first.location, c.m[0].second.location))
         print ('               {0}, {1}'.format(c.m[1].first.location, c.m[1].second.location))
@@ -109,18 +109,18 @@ with ruleset('fraud5'):
 
 
 with ruleset('fraud6'):
-    @when_all(m.amount < 300, pri = 3, count = 3)
+    @when_all(pri(3), count(3), m.amount < 300)
     def first_detect(c):
         print('fraud6 first detect ->{0}'.format(c.m[0].amount))
         print('                    ->{0}'.format(c.m[1].amount))
         print('                    ->{0}'.format(c.m[2].amount))
 
-    @when_all(m.amount < 200, pri = 2, count = 2)
+    @when_all(pri(2), count(2), m.amount < 200)
     def second_detect(c):
         print('fraud6 second detect ->{0}'.format(c.m[0].amount))
         print('                     ->{0}'.format(c.m[1].amount))
 
-    @when_all(m.amount < 100, pri = 1)
+    @when_all(pri(1), m.amount < 100)
     def third_detect(c):
         print('fraud6 third detect ->{0}'.format(c.m.amount))
         
@@ -386,7 +386,7 @@ with ruleset('a10'):
 
 
 with ruleset('a11'):
-    @when_all((m.subject == 'approve') & (m.amount == 100), count = 3)
+    @when_all((m.subject == 'approve') & (m.amount == 100), count(3))
     def approved(c):
         print ('a11 approved ->{0}'.format(c.m[0].amount))
         print ('             ->{0}'.format(c.m[1].amount))
@@ -403,7 +403,7 @@ with ruleset('a11'):
 
 
 with ruleset('a12'):
-    @when_any(m.subject == 'approve', m.subject == 'approved', count = 2)
+    @when_any(m.subject == 'approve', m.subject == 'approved', count(2))
     def approved(c):
         print ('a12 approved ->{0}'.format(c.m[0].m_0.subject))
         print ('             ->{0}'.format(c.m[1].m_0.subject))

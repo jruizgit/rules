@@ -27,7 +27,6 @@ class avalue(object):
         return other
 
     def __getattr__(self, name):
-        print('setting {0}'.format(name))
         self._left = name
         return self
 
@@ -178,7 +177,7 @@ class run(object):
 
 class rule(object):
 
-    def __init__(self, operator, multi, *args, **kw):
+    def __init__(self, operator, multi, *args):
         self.operator = operator
         self.multi = multi
         self.alias = None
@@ -189,26 +188,27 @@ class rule(object):
         if not len(args):
             raise Exception('Invalid number of arguments')
 
-        if isinstance(args[-1], value) or isinstance(args[-1], rule):
-            self.func = []
-        else:
-            self.func = args[-1:]
-            args = args[:-1]
-
-        if 'count' in kw:
-            self.count = kw['count']
-        else:
-            self.count = None
-
-        if 'pri' in kw:
-            self.pri = kw['pri']
-        else:
-            self.pri = None        
-
+        self.count = None
+        self.pri = None
+        self.func = []
+        new_args = []
+        for arg in args:
+            if isinstance(arg, dict):
+                if 'count' in arg:
+                    self.count = arg['count']
+                elif 'pri' in arg:
+                    self.pri = arg['pri']
+                else:
+                    self.func = arg
+            elif isinstance(arg, value) or isinstance(arg, rule):
+                new_args.append(arg)
+            else:
+                self.func = arg
+            
         if not multi:
-            self.expression = args[0]
+            self.expression = new_args[0]
         else:
-            self.expression = args
+            self.expression = new_args
 
     def __enter__(self):
         _rule_stack.append(self)
@@ -274,37 +274,37 @@ class rule(object):
 
 class when_all(rule):
 
-    def __init__(self, *args, **kw):
-        super(when_all, self).__init__('all', True, *args, **kw)
+    def __init__(self, *args):
+        super(when_all, self).__init__('all', True, *args)
 
 
 class when_any(rule):
 
-    def __init__(self, *args, **kw):
-        super(when_any, self).__init__('any', True, *args, **kw)
+    def __init__(self, *args):
+        super(when_any, self).__init__('any', True, *args)
 
 
 class all(rule):
 
-    def __init__(self, *args, **kw):
+    def __init__(self, *args):
         _ruleset_stack.append(self)
-        super(all, self).__init__('all', True, *args, **kw)
+        super(all, self).__init__('all', True, *args)
         _ruleset_stack.pop()
 
 
 class any(rule):
 
-    def __init__(self, *args, **kw):
+    def __init__(self, *args):
         _ruleset_stack.append(self)
-        super(any, self).__init__('any', True, *args, **kw)
+        super(any, self).__init__('any', True, *args)
         _ruleset_stack.pop()
 
 
 class none(rule):
 
-    def __init__(self, *args, **kw):
+    def __init__(self, *args):
         _ruleset_stack.append(self)
-        super(none, self).__init__('none', True, *args, **kw)
+        super(none, self).__init__('none', True, *args)
         _ruleset_stack.pop()
 
 
@@ -393,7 +393,6 @@ class to(object):
         if self.rule:
             return self.state_name, self.rule.define()
         else:
-            print('no rule')
             if self.func:
                 return self.state_name, {'run': self.func}
             else:
@@ -564,6 +563,12 @@ class flowchart(object):
 
 def timeout(name):
     return (value('$m', '$t') == name) 
+
+def count(value):
+    return {'count': value}
+
+def pri(value):
+    return {'pri': value}
 
 m = value('m')
 s = value('$s')
