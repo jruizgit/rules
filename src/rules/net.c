@@ -199,8 +199,14 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     char actionKey[nameLength + 3];
     snprintf(actionKey, nameLength + 3, "%s!a", name);
     char *lua = NULL;
+    char *peekActionLua = NULL;
+    if (asprintf(&peekActionLua, "")  == -1) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
     for (unsigned int i = 0; i < tree->nodeOffset; ++i) {
         char *oldLua;
+        char *oldPeekActionLua;
         node *currentNode = &tree->nodePool[i];
         if (asprintf(&lua, "")  == -1) {
             return ERR_OUT_OF_MEMORY;
@@ -217,6 +223,20 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                 unsigned int currentJoinOffset = tree->nextPool[currentNode->value.c.joinsOffset + ii];
                 join *currentJoin = &tree->joinPool[currentJoinOffset];
                 
+                oldPeekActionLua = peekActionLua;
+                if (asprintf(&peekActionLua, 
+"%sreviewers = {}\n"
+"reviewers_directory[\"%s!%d!r!\"] = reviewers\n"
+"keys = {}\n"
+"keys_directory[\"%s!%d!r!\"] = keys\n",
+                            peekActionLua,
+                            actionName,
+                            ii,
+                            actionName,
+                            ii)  == -1) {
+                    return ERR_OUT_OF_MEMORY;
+                }  
+                free(oldPeekActionLua);
                 for (unsigned int iii = 0; iii < currentJoin->expressionsLength; ++iii) {
                     unsigned int expressionOffset = tree->nextPool[currentJoin->expressionsOffset + iii];
                     expression *expr = &tree->expressionPool[expressionOffset];
@@ -227,7 +247,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                         if (expr->not) { 
                             if (asprintf(&lua, 
 "%skeys = {}\n"
-"notKeys = {}\n"
 "directory = {[\"0\"] = 1}\n"
 "reviewers = {}\n"
 "results_key = \"%s!%d!r!\" .. sid\n"                   
@@ -236,6 +255,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "reviewers[1] = function(message, frame, index)\n"
 "    if not message then\n"
 "        frame[\"$\" .. index] = 1\n"
+"        frame[\"$f\"] = 1\n"
 "        return true\n"
 "    end\n"
 "    return false\n"
@@ -247,6 +267,20 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                                          currentKey)  == -1) {
                                 return ERR_OUT_OF_MEMORY;
                             }
+                            oldPeekActionLua = peekActionLua;
+                            if (asprintf(&peekActionLua, 
+"%skeys[1] = \"%s\"\n"
+"reviewers[1] = function(message, frame, index)\n"
+"    if not message then\n"
+"        return true\n"
+"    end\n"
+"    return false\n"
+"end\n",
+                                         peekActionLua,
+                                         currentKey)  == -1) {
+                                return ERR_OUT_OF_MEMORY;
+                            }  
+                            free(oldPeekActionLua);
                         } else {
                             if (asprintf(&lua, 
 "%skeys = {}\n"
@@ -285,6 +319,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "reviewers[%d] = function(message, frame, index)\n"
 "    if not message or not (%s) then\n"
 "        frame[\"$\" .. index] = 1\n"
+"        frame[\"$f\"] = 1\n"
 "        return true\n"
 "    end\n"
 "    return false\n"
@@ -298,6 +333,23 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                                          test)  == -1) {
                                 return ERR_OUT_OF_MEMORY;
                             }
+                            oldPeekActionLua = peekActionLua;
+                            if (asprintf(&peekActionLua, 
+"%skeys[%d] = \"%s\"\n"
+"reviewers[%d] = function(message, frame, index)\n"
+"    if not message or not (%s) then\n"
+"        return true\n"
+"    end\n"
+"    return false\n"
+"end\n",
+                                         peekActionLua,
+                                         iii + 1, 
+                                         currentKey,
+                                         iii + 1,
+                                         test)  == -1) {
+                                return ERR_OUT_OF_MEMORY;
+                            }  
+                            free(oldPeekActionLua);
                         } else {
                             if (asprintf(&lua,
 "%skeys[%d] = \"%s\"\n"
@@ -357,6 +409,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        local new_mid = redis.call(\"lpop\", events_key)\n"
 "        local packed_message = redis.call(\"hget\", messages_key, new_mid)\n"
 "        if packed_message then\n"
+"            redis.call(\"rpush\", events_key, new_mid)\n"
 "            local message = cmsgpack.unpack(packed_message)\n"
 "            if not reviewers[index](message, frame, index) then\n"
 "                return false\n"
@@ -375,7 +428,9 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    local indexes = {}\n"
 "    for name, new_mid in pairs(frame) do\n"
 "        if string.sub(name, 1, 1) == \"$\" then\n"
-"            table.insert(indexes, tonumber(string.sub(name, 2)))\n"
+"            if name ~= \"$f\" then\n"
+"                table.insert(indexes, tonumber(string.sub(name, 2)))\n"
+"            end\n"
 "        else\n"
 "            local packed_message = redis.call(\"hget\", events_hashset, new_mid)\n"
 "            if not packed_message then\n"
@@ -396,6 +451,9 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    return frame\n"
 "end\n"
 "local save_frame = function(frames_key, frame)\n"
+"    if assert_fact == 1 then\n"
+"        frame[\"$f\"] = 1\n"
+"    end\n"
 "    local frame_to_pack = {}\n"
 "    for name, message in pairs(frame) do\n"
 "        if message == 1 then\n"
@@ -411,13 +469,9 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        frame[\"$f\"] = 1\n"
 "    end\n"
 "    redis.call(\"rpush\", results_key, cmsgpack.pack(frame))\n"
-"    if assert_fact == 1 then\n"
-"        frame[\"$f\"] = nil\n"
-"    end\n"
 "    for name, message in pairs(frame) do\n"
 "        if message ~= 1 and message[\"$f\"] ~= 1 then\n"
 "           redis.call(\"hdel\", events_hashset, message[\"id\"])\n"
-"           frame[name] = nil\n"
 "        end\n"
 "    end\n"
 "end\n"
@@ -434,14 +488,18 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local process_frame\n"
 "local process_event_and_frame = function(message, frame, index, use_facts)\n"
 "    local result = 0\n"
-"    if reviewers[index](message, frame, index) then\n"
+"    local new_frame = {}\n"
+"    for name, message in pairs(frame) do\n"
+"        new_frame[name] = message\n"
+"    end\n"
+"    if reviewers[index](message, new_frame, index) then\n"
 "        if (index == #reviewers) then\n"
-"            save_result(frame)\n"
+"            save_result(new_frame)\n"
 "            return 1\n"
 "        else\n"
-"            result = process_frame(frame, index + 1, use_facts)\n"
+"            result = process_frame(new_frame, index + 1, use_facts)\n"
 "            if result == 0 or use_facts then\n"
-"                save_frame(keys[index + 1] .. \"!c!\" .. sid, frame)\n"
+"                save_frame(keys[index + 1] .. \"!c!\" .. sid, new_frame)\n"
 "            end\n"
 "        end\n"
 "    end\n"
@@ -608,25 +666,79 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 
     if (asprintf(&lua, 
 "local facts_key = \"%s!f!\"\n"
+"local events_key = \"%s!e!\"\n"
 "local action_key = \"%s!a\"\n"
 "local state_key = \"%s!s\"\n"
-"local review_frame = function(frame, sid)\n"
+"local timers_key = \"%s!t\"\n"
+"local reviewers_directory = {}\n"
+"local reviewers\n"
+"local keys_directory = {}\n"
+"local keys\n"
+"local validate_frame_for_key = function(frame, index, events_key, messages_key)\n"
+"    local packed_message_list_len = redis.call(\"llen\", events_key)\n"
+"    for i = 0, packed_message_list_len - 1, 1  do\n"
+"        local new_mid = redis.call(\"lpop\", events_key)\n"
+"        local packed_message = redis.call(\"hget\", messages_key, new_mid)\n"
+"        if packed_message then\n"
+"            redis.call(\"rpush\", events_key, new_mid)\n"
+"            local message = cmsgpack.unpack(packed_message)\n"
+"            if not reviewers[index](message, frame, index) then\n"
+"                return false\n"
+"            end\n"
+"        end\n"
+"    end\n"
+"    return true\n"
+"end\n"
+"local validate_frame = function(frame, index, sid, events_hashset, facts_hashset)\n"
+"    local first_result = validate_frame_for_key(frame, index, keys[index] .. \"!e!\" .. sid, events_hashset)\n"
+"    local second_result = validate_frame_for_key(frame, index, keys[index] ..\"!f!\" .. sid, facts_hashset)\n"
+"    return first_result and second_result\n"
+"end\n"
+"local review_frame = function(frame, rule_action_key, sid, max_score)\n"
 "    local facts_hashset = facts_key .. sid\n"
+"    local indexes = {}\n"
 "    if frame[\"$f\"] ~= 1 then\n"
 "         return true\n"
 "    else\n"
 "        frame[\"$f\"] = nil\n"
+"        local result = true\n"
+"        local events_to_cancel = {}\n"
+"        local events_hashset = events_key .. sid\n"
 "        for name, message in pairs(frame) do\n"
-"            if message ~= 1 then\n"
-"                if message[\"$f\"] == 1 and (not redis.call(\"hget\", facts_hashset, message[\"id\"])) then\n"
-"                    return false\n"
+"            if message == 1 then\n"
+"                table.insert(indexes, tonumber(string.sub(name, 2)))\n"
+"            else\n"
+"                if message[\"$f\"] ~= 1 then\n"
+"                    table.insert(events_to_cancel, message)\n"
+"                else\n"
+"                    if not redis.call(\"hget\", facts_hashset, message[\"id\"]) then\n"
+"                        result = false\n"
+"                    end\n"
 "                end\n"
 "            end\n"
 "        end\n"
-"        return true\n"
+"        if result and (#indexes > 0) then\n"
+"            local action_id = string.sub(rule_action_key, 1, (string.len(sid) + 1) * -1)\n"
+"            keys = keys_directory[action_id]\n"
+"            reviewers = reviewers_directory[action_id]\n"
+"            for i = 1, #indexes, 1 do\n"
+"                if not validate_frame(frame, indexes[i], sid, events_hashset, facts_hashset) then\n"
+"                    result = false\n"
+"                    break\n"
+"                end\n"
+"            end\n"
+"        end\n"
+"        if not result then\n"
+"            for i = 1, #events_to_cancel, 1 do\n"
+"                local message = events_to_cancel[i]\n"
+"                redis.call(\"hsetnx\", events_hashset, message[\"id\"], cmsgpack.pack(message))\n"
+"                redis.call(\"zadd\", timers_key, max_score, cjson.encode(message))\n"
+"            end\n"
+"        end\n"
+"        return result\n"
 "    end\n"
 "end\n"
-"local load_frame_from_rule = function(rule_action_key, count, sid)\n"
+"local load_frame_from_rule = function(rule_action_key, count, sid, max_score)\n"
 "    local frames = {}\n"
 "    local packed_frames = {}\n"
 "    while count > 0 do\n"
@@ -635,7 +747,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "            break\n"
 "        else\n"
 "            local frame = cmsgpack.unpack(packed_frame)\n"
-"            if review_frame(frame, sid) then\n"
+"            if review_frame(frame, rule_action_key, sid, max_score) then\n"
 "                table.insert(frames, frame)\n"
 "                table.insert(packed_frames, packed_frame)\n"
 "                count = count - 1\n"
@@ -656,11 +768,11 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        end\n"
 "    end\n"
 "end\n"
-"local load_frame_from_sid = function(sid)\n"
+"local load_frame_from_sid = function(sid, max_score)\n"
 "    local action_list = action_key .. \"!\" .. sid\n"
 "    local rule_action_key = redis.call(\"lindex\", action_list, 0)\n"
 "    local count = tonumber(redis.call(\"lindex\", action_list, 1))\n"
-"    local name, frame = load_frame_from_rule(rule_action_key, count, sid)\n"
+"    local name, frame = load_frame_from_rule(rule_action_key, count, sid, max_score)\n"
 "    while not frame do\n"
 "        redis.call(\"lpop\", action_list)\n"
 "        redis.call(\"lpop\", action_list)\n"
@@ -669,7 +781,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "            return nil, nil\n"
 "        end\n"
 "        count = tonumber(redis.call(\"lindex\", action_list, 1))\n"
-"        name, frame = load_frame_from_rule(rule_action_key, count, sid)\n"
+"        name, frame = load_frame_from_rule(rule_action_key, count, sid, max_score)\n"
 "    end\n"
 "    return name, frame\n"
 "end\n"
@@ -679,7 +791,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        return nil, nil, nil\n"
 "    end\n"
 "    local sid = current_action[1]\n"
-"    local name, frame = load_frame_from_sid(sid)\n"
+"    local name, frame = load_frame_from_sid(sid, max_score)\n"
 "    while not frame do\n"
 "        redis.call(\"zremrangebyrank\", action_key, 0, 0)\n"
 "        current_action = redis.call(\"zrange\", action_key, 0, 0, \"withscores\")\n"
@@ -687,14 +799,12 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "            return nil, nil, nil\n"
 "        end\n"
 "        sid = current_action[1]\n"
-"        name, frame = load_frame_from_sid(sid)\n"
+"        name, frame = load_frame_from_sid(sid, max_score)\n"
 "    end\n"
 "    return sid, name, frame\n"
 "end\n"
-"local sid, action_name, frame = load_frame(tonumber(ARGV[2]))\n"
-"if not frame then\n"
-"    return nil\n"
-"else\n"
+"%slocal sid, action_name, frame = load_frame(tonumber(ARGV[2]))\n"
+"if frame then\n"
 "    redis.call(\"zincrby\", action_key, tonumber(ARGV[1]), sid)\n"
 "    local state_fact = redis.call(\"hget\", state_key, sid .. \"!f\")\n"
 "    local state = redis.call(\"hget\", state_key, sid)\n"
@@ -702,10 +812,14 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "end\n",
                 name,
                 name,
-                name)  == -1) {
+                name,
+                name,
+                name,
+                peekActionLua)  == -1) {
         return ERR_OUT_OF_MEMORY;
     }
     
+    free(peekActionLua);
     redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
     redisGetReply(reContext, (void**)&reply);
     if (reply->type == REDIS_REPLY_ERROR) {
@@ -838,7 +952,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     if (asprintf(&lua,
 "local timer_key = \"%s!t\"\n"
 "local timestamp = tonumber(ARGV[1])\n"
-"local res = redis.call(\"zrangebyscore\", timer_key, 0, timestamp)\n"
+"local res = redis.call(\"zrangebyscore\", timer_key, 0, timestamp, \"limit\", 0, 10)\n"
 "if #res > 0 then\n"
 "  for i = 0, #res, 1 do\n"
 "    redis.call(\"zincrby\", timer_key, 10, res[i])\n"

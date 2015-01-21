@@ -275,7 +275,7 @@ r.assertEvent(handle,
         id: 1,
         sid: 1,
         t: 'deposit',
-        ip: '1'
+        ip: 1
     })
 );
 
@@ -284,14 +284,9 @@ r.assertEvent(handle,
         id: 2,
         sid: 1,
         t: 'chargeback',
-        ip: '1'
+        ip: 1
     })
 );
-
-result = r.startAction(handle);
-console.log(JSON.parse(result[1]));
-console.log(JSON.parse(result[2]));
-r.completeAction(handle, result[0], result[1]);
 
 r.assertFact(handle, 
     JSON.stringify({
@@ -301,6 +296,31 @@ r.assertFact(handle,
         ip: 1
     })
 );
+
+result = r.startAction(handle);
+if (result != null) {
+    throw 'expecting null';
+}
+
+r.retractFact(handle, 
+    JSON.stringify({
+        id: 3,
+        sid: 1,
+        t: 'withrawal',
+        ip: 1
+    })
+);
+
+result = r.startAction(handle);
+if (result != null) {
+    throw 'expecting null';
+}
+
+r.assertTimers(handle);
+result = r.startAction(handle);
+console.log(JSON.parse(result[1]));
+console.log(JSON.parse(result[2]));
+r.completeAction(handle, result[0], result[1]);
 
 r.assertEvent(handle, 
     JSON.stringify({
@@ -317,15 +337,6 @@ r.assertEvent(handle,
         sid: 1,
         t: 'chargeback',
         ip: '1'
-    })
-);
-
-r.retractFact(handle, 
-    JSON.stringify({
-        id: 3,
-        sid: 1,
-        t: 'withrawal',
-        ip: 1
     })
 );
 
