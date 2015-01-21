@@ -5,7 +5,7 @@ with (d.statechart('fraud0')) {
         to('standby');
     }
     with (state('standby')) {
-        to('metering').whenAll(m.amount.lt(100), function (c) {
+        to('metering').whenAll(m.amount.gt(100), function (c) {
             c.startTimer('velocity', 30);
         });
     }
@@ -19,7 +19,7 @@ with (d.statechart('fraud0')) {
     }
     state('fraud');
     whenStart(function (host) {
-        host.post('fraud0', {id: 1, sid: 1, amount: 20});
+        host.post('fraud0', {id: 1, sid: 1, amount: 200});
         host.post('fraud0', {id: 2, sid: 1, amount: 200});
         host.post('fraud0', {id: 3, sid: 1, amount: 200});
         host.post('fraud0', {id: 4, sid: 1, amount: 200});

@@ -212,7 +212,7 @@ Durable.statechart :fraud0 do
     to :standby
   end
   state :standby do
-    to :metering, when_all(m.amount < 100) do
+    to :metering, when_all(m.amount > 100) do
       start_timer :velocity, 30
     end
   end
@@ -226,7 +226,7 @@ Durable.statechart :fraud0 do
   end
   state :fraud
   when_start do
-    post :fraud0, {:id => 1, :sid => 1, :amount => 20}
+    post :fraud0, {:id => 1, :sid => 1, :amount => 200}
     post :fraud0, {:id => 2, :sid => 1, :amount => 200}
     post :fraud0, {:id => 3, :sid => 1, :amount => 200}
     post :fraud0, {:id => 4, :sid => 1, :amount => 200}

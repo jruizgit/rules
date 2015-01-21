@@ -7,7 +7,7 @@ with statechart('fraud0'):
 
     with state('standby'):
         @to('metering')
-        @when_all(m.amount < 100)
+        @when_all(m.amount > 100)
         def start_metering(c):
             c.start_timer('velocity', 30)
 
@@ -26,7 +26,7 @@ with statechart('fraud0'):
 
     @when_start
     def start(host):
-        host.post('fraud0', {'id': 1, 'sid': 1, 'amount': 50})
+        host.post('fraud0', {'id': 1, 'sid': 1, 'amount': 200})
         host.post('fraud0', {'id': 2, 'sid': 1, 'amount': 200})
         host.post('fraud0', {'id': 3, 'sid': 1, 'amount': 200})
 
