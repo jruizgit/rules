@@ -3,6 +3,7 @@ import copy
 import rules
 import threading
 import inspect
+import random
 
 
 class Closure(object):
@@ -310,7 +311,7 @@ class Ruleset(object):
                                 self._host.post_batch(rule_name, messages)
 
                         for timer_name, timer_duration in c.get_timers().iteritems():
-                            timer = {'sid':c.s['sid'], 'id':timer_name, '$t':timer_name}
+                            timer = {'sid':c.s['sid'], 'id':random.randint(100000, 10000000), '$t':timer_name}
                             rules.start_timer(self._handle, str(c.s['sid']), timer_duration, json.dumps(timer))
 
                         rules.complete_action(self._handle, c._handle, json.dumps(c.s._d))

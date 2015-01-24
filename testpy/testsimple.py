@@ -1,5 +1,6 @@
 from durable.lang import *
 import datetime
+import random
 
 with statechart('fraud0'):
     with state('start'):
@@ -549,6 +550,26 @@ with flowchart('p3'):
     def start(host):
         host.post('p3', {'id': 1, 'sid': 1, 'subject': 'approve', 'quantity': 3})
         host.post('p3', {'id': 2, 'sid': 2, 'subject': 'approve', 'quantity': 10})
+
+
+with ruleset('t0'):
+    @when_all(timeout('my_timer') | (m.start == "yes"))
+    def start_timer(c):
+        if not c.s.count:
+            c.s.count = 1
+        else:
+            c.s.count += 1
+
+        c.post('t0', {'id': c.s.count, 'sid': 1, 't': 'purchase'})
+        c.start_timer('my_timer', random.randint(1, 3))
+
+    @when_all(span(5), m.t == 'purchase')
+    def pulse(c):
+        print('t0 pulse -> {0}'.format(len(c.m)))
+
+    @when_start
+    def start(host):
+        host.post('t0', {'id': 1, 'sid': 1, 'start': 'yes'})
 
 
 with ruleset('t1'): 

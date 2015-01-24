@@ -397,6 +397,8 @@ exports = module.exports = durableEngine = function () {
                     newDefinition['count'] = expDefinition['count'];
                 } else if (expDefinition['pri']) {
                     newDefinition['pri'] = expDefinition['pri'];
+                } else if (expDefinition['span']) {
+                    newDefinition['span'] = expDefinition['span'];
                 } else {
                     if (expDefinition[refName + '$all']) {
                         expObject[refName + '$all'] = expDefinition[refName + '$all'];
@@ -528,6 +530,14 @@ exports = module.exports = durableEngine = function () {
             var that = {};
             that.define = function () {
                 return {count: count};
+            }
+            return that;
+        };
+
+        obj.span = function(span) {
+            var that = {};
+            that.define = function () {
+                return {span: span};
             }
             return that;
         };

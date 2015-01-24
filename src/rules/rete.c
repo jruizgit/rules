@@ -10,6 +10,7 @@
 #define HASH_ANY 193486381 // any
 #define HASH_PRI 193502832 // pri
 #define HASH_COUNT 255678574 // count
+#define HASH_SPAN 2090731639 // span
 #define HASH_LT 193419881 // $lt
 #define HASH_LTE 2087888878 // $lte
 #define HASH_GT 193419716 // $gt
@@ -56,7 +57,6 @@ static unsigned int createBeta(ruleset *tree,
                                unsigned char operator, 
                                unsigned int nextOffset, 
                                path *nextPath, 
-                               unsigned short count,
                                path **outPath);
 
 static unsigned int storeString(ruleset *tree, 
@@ -389,14 +389,14 @@ static unsigned char compareValue(ruleset *tree,
     return 0;
 }
 
-static unsigned int validateWindowSize(char *rule) {
+static unsigned int validateSetting(unsigned int settingHash, char *rule) {
     char *first;
     char *last;
     unsigned int hash;
     unsigned char type;
     unsigned int result = readNextName(rule, &first, &last, &hash);
     while (result == PARSE_OK) {
-        if (hash == HASH_COUNT) {
+        if (hash == settingHash) {
             result = readNextValue(last, &first, &last, &type);
             if (type != JSON_INT) {
                 return ERR_UNEXPECTED_TYPE;
@@ -408,29 +408,7 @@ static unsigned int validateWindowSize(char *rule) {
         result = readNextName(last, &first, &last, &hash);
     }
 
-    return PARSE_OK;
-}
-
-static unsigned int validatePriority(char *rule) {
-    char *first;
-    char *last;
-    unsigned int hash;
-    unsigned char type;
-    unsigned int result = readNextName(rule, &first, &last, &hash);
-    while (result == PARSE_OK) {
-        if (hash == HASH_PRI) {
-            result = readNextValue(last, &first, &last, &type);
-            if (type != JSON_INT) {
-                return ERR_UNEXPECTED_TYPE;
-            }
-
-            return PARSE_OK;
-        }
-
-        result = readNextName(last, &first, &last, &hash);
-    }
-
-    return PARSE_OK;
+    return ERR_SETTING_NOT_FOUND;
 }
 
 static unsigned int validateReference(char *rule, unsigned char *referenceType) {
@@ -713,13 +691,22 @@ static unsigned int validateRuleset(char *rules) {
             return ERR_UNEXPECTED_TYPE;
         }
 
-        result = validateWindowSize(first);
-        if (result != PARSE_OK) {
-            return result;
+        unsigned int countResult = validateSetting(HASH_COUNT, first);
+        if (countResult != PARSE_OK && countResult != ERR_SETTING_NOT_FOUND) {
+            return countResult;
         }
 
-        result = validatePriority(first);
-        if (result != PARSE_OK) {
+        unsigned int spanResult = validateSetting(HASH_SPAN, first);
+        if (spanResult != PARSE_OK && spanResult != ERR_SETTING_NOT_FOUND) {
+            return spanResult;
+        }
+
+        if (spanResult == PARSE_OK && countResult == PARSE_OK) {
+            return ERR_UNEXPECTED_NAME;
+        }
+
+        result = validateSetting(HASH_PRI, first);
+        if (result != PARSE_OK && result != ERR_SETTING_NOT_FOUND) {
             return result;
         }
 
@@ -735,7 +722,7 @@ static unsigned int validateRuleset(char *rules) {
                 if (result != RULES_OK && result != PARSE_END) {
                     return result;
                 }
-            } else if (hash != HASH_COUNT && hash != HASH_PRI) {
+            } else if (hash != HASH_COUNT && hash != HASH_PRI && hash != HASH_SPAN) {
                 return ERR_UNEXPECTED_NAME;
             }
 
@@ -1011,7 +998,7 @@ static unsigned int findAlpha(ruleset *tree,
     return linkAlpha(tree, parentOffset, *resultOffset);
 }
 
-static void getWindowSize(char *rule, unsigned short *count) {
+static void getSetting(unsigned int settingHash, char *rule, unsigned short *value) {
     char *first;
     char *last;
     char temp;
@@ -1020,30 +1007,10 @@ static void getWindowSize(char *rule, unsigned short *count) {
     unsigned int result = readNextName(rule, &first, &last, &hash);
     while (result == PARSE_OK) {
         readNextValue(last, &first, &last, &type);
-        if (hash == HASH_COUNT) {
+        if (hash == settingHash) {
             temp = first[last - first + 1];
             first[last - first + 1] = '\0';
-            *count = atoi(first);
-            first[last - first + 1] = temp;
-            break;   
-        }
-        result = readNextName(last, &first, &last, &hash);
-    }
-}
-
-static void getPriority(char *rule, unsigned short *priority) {
-    char *first;
-    char *last;
-    char temp;
-    unsigned int hash;
-    unsigned char type;
-    unsigned int result = readNextName(rule, &first, &last, &hash);
-    while (result == PARSE_OK) {
-        readNextValue(last, &first, &last, &type);
-        if (hash == HASH_PRI) {
-            temp = first[last - first + 1];
-            first[last - first + 1] = '\0';
-            *priority = atoi(first);
+            *value = atoi(first);
             first[last - first + 1] = temp;
             break;   
         }
@@ -1153,7 +1120,6 @@ static unsigned int createAlpha(ruleset *tree,
 static unsigned int createBetaConnector(ruleset *tree, 
                                         char *rule, 
                                         path *betaPath,
-                                        unsigned short count,
                                         unsigned int nextOffset) {
     char *first;
     char *last;
@@ -1227,7 +1193,7 @@ static unsigned int createBetaConnector(ruleset *tree,
         }
         else {
             readNextValue(last, &first, &last, &type);
-            result = createBeta(tree, first, operator, connectorOffset, betaPath, count, NULL);
+            result = createBeta(tree, first, operator, connectorOffset, betaPath, NULL);
         }
 
         if (result != RULES_OK) {
@@ -1245,7 +1211,6 @@ static unsigned int createBeta(ruleset *tree,
                                unsigned char operator, 
                                unsigned int nextOffset, 
                                path *nextPath, 
-                               unsigned short count,
                                path **outPath) {
 
     path *betaPath = malloc(sizeof(path));
@@ -1258,8 +1223,7 @@ static unsigned int createBeta(ruleset *tree,
     betaPath->expressions = NULL;
     betaPath->parents = NULL;
     betaPath->parentsLength = 0;
-    betaPath->count = count;
-
+    
     if (nextPath) {
         if (nextPath->parentsLength == 0) {
             nextPath->parentsLength = nextPath->expressionsLength;
@@ -1289,7 +1253,7 @@ static unsigned int createBeta(ruleset *tree,
         *outPath = betaPath;
     }
 
-    return createBetaConnector(tree, rule, betaPath, count, nextOffset);    
+    return createBetaConnector(tree, rule, betaPath, nextOffset);    
 }
 
 static unsigned int add(any *right, any *left, any **result) {
@@ -1360,7 +1324,6 @@ static unsigned int multiply(ruleset *tree, any *right, any *left, any **result)
 static unsigned int createSingleQuery(ruleset *tree, 
                                       char *name, 
                                       expression *expr, 
-                                      unsigned short count, 
                                       any **resultAny) {
     any *newAny = malloc(sizeof(any));
     if (!newAny) {
@@ -1378,7 +1341,6 @@ static unsigned int createSingleQuery(ruleset *tree,
         return ERR_OUT_OF_MEMORY;
     }
 
-    newAny->nodes[0]->count = count;
     newAny->nodes[0]->expressionsLength = 1;
     newAny->nodes[0]->expressions = malloc(sizeof(unsigned int));
     if (!newAny->nodes[0]->expressions) {
@@ -1425,7 +1387,7 @@ static unsigned int createQueries(ruleset *tree,
         unsigned int result;
         expression *expr = &betaPath->expressions[i];
         if (betaPath->operator == OP_NOP) {
-            result = createSingleQuery(tree, postfix, expr, betaPath->count, anyResult);
+            result = createSingleQuery(tree, postfix, expr, anyResult);
             if (result != RULES_OK) {
                 return result;
             }
@@ -1444,7 +1406,7 @@ static unsigned int createQueries(ruleset *tree,
         
         any *newAny = NULL;    
         if (i >= betaPath->parentsLength || !betaPath->parents[i]) {
-            result = createSingleQuery(tree, nextPostfix, expr, betaPath->count, &newAny);
+            result = createSingleQuery(tree, nextPostfix, expr, &newAny);
             if (result != RULES_OK) {
                 return result;
             }
@@ -1506,7 +1468,6 @@ static unsigned int fixupQueries(ruleset *tree, unsigned int actionOffset, char*
             return result;
         }
         
-        newJoin->count = currentAll->count;
         newJoin->expressionsLength = currentAll->expressionsLength;
         result = allocateNext(tree, currentAll->expressionsLength, &newJoin->expressionsOffset);
         if (result != RULES_OK) {
@@ -1563,19 +1524,25 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         }
 
         readNextValue(lastName, &first, &lastRuleValue, &type);
-        getPriority(first, &ruleAction->value.c.priority);
-        
-        unsigned short count = 1;
-        getWindowSize(first, &count);
+        ruleAction->value.c.priority = 0;
+        ruleAction->value.c.count = 0;
+        ruleAction->value.c.span = 0;
+        getSetting(HASH_PRI, first, &ruleAction->value.c.priority);
+        getSetting(HASH_COUNT, first, &ruleAction->value.c.count);
+        getSetting(HASH_SPAN, first, &ruleAction->value.c.span);
+        if (!ruleAction->value.c.count && !ruleAction->value.c.span) {
+            ruleAction->value.c.count = 1;
+        }
+
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
             readNextValue(last, &first, &last, &type);
             switch (hash) {
                 case HASH_ANY:
-                    result = createBeta(tree, first, OP_ANY, actionOffset, NULL, count, &betaPath);
+                    result = createBeta(tree, first, OP_ANY, actionOffset, NULL, &betaPath);
                     break;
                 case HASH_ALL:
-                    result = createBeta(tree, first, OP_ALL, actionOffset, NULL, count, &betaPath);
+                    result = createBeta(tree, first, OP_ALL, actionOffset, NULL, &betaPath);
                     break;
             }
             result = readNextName(last, &first, &last, &hash);

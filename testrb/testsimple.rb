@@ -471,6 +471,24 @@ Durable.flowchart :p3 do
   end
 end
 
+Durable.ruleset :t0 do
+  when_all (timeout :my_timer) | (m.start == "yes") do
+    if not s.count
+      s.count = 1
+    else
+      s.count += 1
+    end
+    post :t0, {:id => s.count, :sid => 1, :t => "purchase"}
+    start_timer(:my_timer, rand(3))
+  end
+  when_all span(5), m.t == "purchase" do 
+    puts("t0 pulse -> #{m.count}")
+  end 
+  when_start do
+    post :t0, {:id => 0, :sid => 1, :start => "yes"}
+  end
+end
+
 Durable.ruleset :t1 do
   when_all m.start == "yes" do
     s.start = Time.now

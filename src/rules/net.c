@@ -379,12 +379,23 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                 }
 
                 oldLua = lua;
-                if (asprintf(&lua,
-"%sprocess_key(message, %d)\n",
-                             lua,
-                             currentJoin->count)  == -1) {
-                    return ERR_OUT_OF_MEMORY;
+                if (currentNode->value.c.span > 0)
+                {
+                    if (asprintf(&lua,
+"%sprocess_key(message, nil, %d)\n",
+                                 lua,
+                                 currentNode->value.c.span)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
+                } else {
+                    if (asprintf(&lua,
+"%sprocess_key(message, %d, nil)\n",
+                                 lua,
+                                 currentNode->value.c.count)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
                 }
+
                 free(oldLua);
             }
 
@@ -587,7 +598,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    end\n"
 "    return result\n"
 "end\n"
-"local process_key = function(message, window)\n"
+"local process_key = function(message, window, span)\n"
 "    local index = directory[key]\n"
 "    if index then\n"
 "        local count = 0\n"
@@ -598,15 +609,32 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        end\n"
 "        if count > 0 then\n"
 "            local length = redis.call(\"llen\", results_key)\n"
-"            local prev_count, prev_remain = math.modf((length - count) / window)\n"
-"            local new_count, prev_remain = math.modf(length / window)\n"
-"            local diff = new_count - prev_count\n"
-"            if diff > 0 then\n"
-"                for i = 0, diff - 1, 1 do\n"
-"                    redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
-"                    redis.call(\"rpush\", actions_key .. \"!\" .. sid, window)\n"
+"            if window then\n"
+"                local prev_count, prev_remain = math.modf((length - count) / window)\n"
+"                local new_count, prev_remain = math.modf(length / window)\n"
+"                local diff = new_count - prev_count\n"
+"                if diff > 0 then\n"
+"                    for i = 0, diff - 1, 1 do\n"
+"                        redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
+"                        redis.call(\"rpush\", actions_key .. \"!\" .. sid, window)\n"
+"                    end\n"
+"                    redis.call(\"zadd\", actions_key , score, sid)\n"
 "                end\n"
-"                redis.call(\"zadd\", actions_key , score, sid)\n"
+"            else\n"
+"                local last_score = redis.call(\"get\", results_key .. \"!d\")\n"
+"                if not last_score then\n"
+"                    last_score = score\n"
+"                else\n"
+"                    local new_score = last_score + span\n"
+"                    if score > new_score then\n"
+"                        redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
+"                        redis.call(\"rpush\", actions_key .. \"!\" .. sid, count - length)\n"
+"                        redis.call(\"zadd\", actions_key , score, sid)\n"
+"                        local span_count, span_remain = math.modf((score - new_score) / span)\n"
+"                        last_score = new_score + span_count * span\n"
+"                    end\n"    
+"                end\n"
+"                redis.call(\"set\", results_key .. \"!d\", last_score)\n"
 "            end\n"
 "        end\n"
 "    end\n"
@@ -707,6 +735,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        for name, message in pairs(frame) do\n"
 "            if message == 1 then\n"
 "                table.insert(indexes, tonumber(string.sub(name, 2)))\n"
+"                frame[name] = nil\n"
 "            else\n"
 "                if message[\"$f\"] ~= 1 then\n"
 "                    table.insert(events_to_cancel, message)\n"
@@ -714,6 +743,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "                    if not redis.call(\"hget\", facts_hashset, message[\"id\"]) then\n"
 "                        result = false\n"
 "                    end\n"
+"                    message[\"$f\"] = nil\n"
 "                end\n"
 "            end\n"
 "        end\n"
@@ -741,31 +771,41 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local load_frame_from_rule = function(rule_action_key, count, sid, max_score)\n"
 "    local frames = {}\n"
 "    local packed_frames = {}\n"
-"    while count > 0 do\n"
-"        local packed_frame = redis.call(\"lpop\", rule_action_key)\n"
-"        if not packed_frame then\n"
-"            break\n"
-"        else\n"
+"    if count < 0 then\n"
+"        for i = count + 1, 0, 1 do\n"
+"            local packed_frame = redis.call(\"lpop\", rule_action_key)\n"
 "            local frame = cmsgpack.unpack(packed_frame)\n"
 "            if review_frame(frame, rule_action_key, sid, max_score) then\n"
 "                table.insert(frames, frame)\n"
 "                table.insert(packed_frames, packed_frame)\n"
-"                count = count - 1\n"
+"            end\n"
+"        end\n"
+"    elseif count > 0 then\n"
+"        while count > 0 do\n"
+"            local packed_frame = redis.call(\"lpop\", rule_action_key)\n"
+"            if not packed_frame then\n"
+"                break\n"
+"            else\n"
+"                local frame = cmsgpack.unpack(packed_frame)\n"
+"                if review_frame(frame, rule_action_key, sid, max_score) then\n"
+"                    table.insert(frames, frame)\n"
+"                    table.insert(packed_frames, packed_frame)\n"
+"                    count = count - 1\n"
+"                end\n"
 "            end\n"
 "        end\n"
 "    end\n"
 "    for i = #packed_frames, 1, -1 do\n"
-"       redis.call(\"lpush\", rule_action_key, packed_frames[i])\n"
+"        redis.call(\"lpush\", rule_action_key, packed_frames[i])\n"
 "    end\n"
-"    if count ~= 0 then\n"
+"    if #packed_frames == 0 then\n"
 "        return nil, nil\n"
+"    end\n"
+"    local last_name = string.find(rule_action_key, \"!\") - 1\n"
+"    if #frames == 1 and count == 0 then\n"
+"        return string.sub(rule_action_key, 1, last_name), frames[1]\n"
 "    else\n"
-"        local last_name = string.find(rule_action_key, \"!\") - 1\n"
-"        if #frames == 1 then\n"
-"            return string.sub(rule_action_key, 1, last_name), frames[1]\n"
-"        else\n"
-"            return string.sub(rule_action_key, 1, last_name), frames\n"
-"        end\n"
+"        return string.sub(rule_action_key, 1, last_name), frames\n"
 "    end\n"
 "end\n"
 "local load_frame_from_sid = function(sid, max_score)\n"
@@ -895,9 +935,15 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     if (asprintf(&lua, 
 "local delete_frame = function(key)\n"
 "    local rule_action_key = redis.call(\"lpop\", key)\n"
-"    local count = redis.call(\"lpop\", key)\n"
-"    for i = 0, count - 1, 1 do\n"
-"        redis.call(\"lpop\", rule_action_key)\n"
+"    local count = tonumber(redis.call(\"lpop\", key))\n"
+"    if count < 0 then\n"
+"        for i = count + 1, 0, 1 do\n"
+"            redis.call(\"lpop\", rule_action_key)\n"
+"        end\n"
+"    elseif count > 0 then\n"
+"        for i = 0, count - 1, 1 do\n"
+"            redis.call(\"lpop\", rule_action_key)\n"
+"        end\n"
 "    end\n"
 "    return (redis.call(\"llen\", key) > 0)\n"
 "end\n"
@@ -915,6 +961,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
     redisGetReply(reContext, (void**)&reply);
     if (reply->type == REDIS_REPLY_ERROR) {
+        printf("%s\n", reply->str);
         freeReplyObject(reply);
         free(lua);
         return ERR_REDIS_ERROR;
@@ -940,6 +987,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     redisAppendCommand(reContext, "SCRIPT LOAD %s", lua); 
     redisGetReply(reContext, (void**)&reply);
     if (reply->type == REDIS_REPLY_ERROR) {
+        printf("%s\n", reply->str);
         freeReplyObject(reply);
         return ERR_REDIS_ERROR;
     }
@@ -966,6 +1014,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
     redisGetReply(reContext, (void**)&reply);
     if (reply->type == REDIS_REPLY_ERROR) {
+        printf("%s\n", reply->str);
         freeReplyObject(reply);
         return ERR_REDIS_ERROR;
     }

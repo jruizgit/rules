@@ -352,7 +352,7 @@ exports = module.exports = durableEngine = function () {
                 var timerName = names[index];
                 var duration = timers[timerName];
                 try {
-                    r.startTimer(handle, c.s.sid, duration, JSON.stringify({ sid: c.s.sid, id:timerName, $t:timerName }));
+                    r.startTimer(handle, c.s.sid, duration, JSON.stringify({sid: c.s.sid, id: Math.random() * 10000000 + 1, $t: timerName}));
                     startTimers(timers, names, ++index, c, complete);
                 } catch (reason) {
                     complete(reason, c);

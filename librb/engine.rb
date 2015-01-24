@@ -350,7 +350,7 @@ module Engine
               end
 
               for timer_name, timer_duration in c._timers do
-                timer = {:sid => c.s.sid, :id => timer_name, :$t => timer_name}
+                timer = {:sid => c.s.sid, :id => rand(1000000), :$t => timer_name}
                 Rules.start_timer @handle, c.s.sid.to_s, timer_duration, JSON.generate(timer)
               end
 
@@ -787,7 +787,7 @@ module Engine
         end
       }
 
-      timers.after 0.1, &dispatch_ruleset
+      timers.after 0.001, &dispatch_ruleset
       Thread.new do
         loop { timers.wait }
       end

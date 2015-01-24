@@ -62,7 +62,6 @@ typedef struct expression {
 } expression;
 
 typedef struct join {
-    unsigned short count;
     unsigned int expressionsOffset;
     unsigned short expressionsLength;
 } join;
@@ -83,6 +82,8 @@ typedef struct betaConnector {
 
 typedef struct action {
     unsigned int index;
+    unsigned short span;
+    unsigned short count;
     unsigned short priority;
     unsigned int joinsOffset;
     unsigned short joinsLength;

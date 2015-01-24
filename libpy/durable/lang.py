@@ -190,6 +190,7 @@ class rule(object):
 
         self.count = None
         self.pri = None
+        self.span = None
         self.func = []
         new_args = []
         for arg in args:
@@ -198,6 +199,8 @@ class rule(object):
                     self.count = arg['count']
                 elif 'pri' in arg:
                     self.pri = arg['pri']
+                elif 'span' in arg:
+                    self.span = arg['span']
                 else:
                     self.func = arg
             elif isinstance(arg, value) or isinstance(arg, rule):
@@ -269,6 +272,9 @@ class rule(object):
 
         if self.pri:
             defined_expression['pri'] = self.pri
+
+        if self.span:
+            defined_expression['span'] = self.span
 
         return defined_expression
 
@@ -569,6 +575,9 @@ def count(value):
 
 def pri(value):
     return {'pri': value}
+
+def span(value):
+    return {'span': value}
 
 m = value('m')
 s = value('$s')

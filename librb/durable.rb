@@ -149,7 +149,6 @@ module Durable
     end
 
     def default(name, value=nil)
-      puts("setting #{name}")
       @left = name
       self
     end
@@ -410,6 +409,10 @@ module Durable
       {:pri => value}
     end
 
+    def span(value)
+      {:span => value}
+    end
+
     def timeout(name)
       expression = Expression.new(:$m)
       expression.left = :$t
@@ -455,6 +458,10 @@ module Durable
 
       if options.key? :pri
         rule["pri"] = options[:pri]
+      end
+
+      if options.key? :span
+        rule["span"] = options[:span]
       end
 
       @rules[rule_name] = rule

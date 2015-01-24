@@ -1294,3 +1294,57 @@ console.log(JSON.parse(result[2]));
 r.completeAction(handle, result[0], result[1]);
 
 r.deleteRuleset(handle);
+
+console.log('span0');
+
+handle = r.createRuleset('span0',  
+    JSON.stringify({
+        suspect: {
+            span: 2,
+            all: [{first: {t: 'purchase'}}]
+        }
+    })
+, 100);
+
+r.bindRuleset(handle, '/tmp/redis.sock', 0, null);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 1,
+        sid: 1,
+        t: 'purchase'
+    })
+);
+
+r.assertEvent(handle, 
+    JSON.stringify({
+        id: 2,
+        sid: 1,
+        t: 'purchase'
+    })
+);
+
+setTimeout(function() {
+    r.assertEvent(handle, 
+        JSON.stringify({
+            id: 3,
+            sid: 1,
+            t: 'purchase'
+        })
+    );  
+
+    setTimeout(function() {
+        r.assertEvent(handle, 
+            JSON.stringify({
+                id: 4,
+                sid: 1,
+                t: 'purchase'
+            })
+        );
+        result = r.startAction(handle);
+        console.log(JSON.parse(result[1]));
+        console.log(JSON.parse(result[2]));
+        r.completeAction(handle, result[0], result[1]);
+        r.deleteRuleset(handle);
+    }, 2000);
+}, 1000);

@@ -504,6 +504,20 @@ with (d.flowchart('p3')) {
     });
 }
 
+with (d.ruleset('t0')) {
+    whenAll(or(m.start.eq('yes'), timeout('myTimer')), function (c) {
+        c.s.count = !c.s.count ? 1 : c.s.count + 1;
+        c.post('t0', {id: c.s.count, sid: 1, t: 'purchase'});
+        c.startTimer('myTimer', Math.random() * 3 + 1);
+    });
+    whenAll(span(5), m.t.eq('purchase'), function (c) {
+        console.log('t0 pulse ->' + c.m.length);
+    });
+    whenStart(function (host) {
+        host.post('t0', {id: 1, sid: 1, start: 'yes'});
+    });
+}
+
 with (d.ruleset('t1')) {
     whenAll(m.start.eq('yes'), function (c) {
         c.s.start = new Date();
