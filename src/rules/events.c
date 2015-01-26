@@ -10,7 +10,7 @@
 #define MAX_RESULT_NODES 32
 #define MAX_NODE_RESULTS 16
 #define MAX_STACK_SIZE 64
-#define MAX_STATE_PROPERTY_TIME 120
+#define MAX_STATE_PROPERTY_TIME 2
 #define MAX_COMMAND_COUNT 512
 
 #define OP_BOOL_BOOL 0x0404
@@ -506,7 +506,6 @@ static unsigned int reduceProperties(unsigned char operator,
                                      char *rightState,
                                      jsonProperty *targetValue,
                                      char **state) {
-
     *state = NULL;
     unsigned short type = leftProperty->type << 8;
     type = type + rightProperty->type;
@@ -1076,7 +1075,6 @@ static unsigned int handleMessageCore(ruleset *tree,
                           commandPriorities,
                           commandCount,
                           rulesBinding);
-
     if (result == RULES_OK) {
         if (state) {
             result = formatStoreSessionFact(*rulesBinding, sid, message, 0, &storeCommand);
@@ -1534,8 +1532,7 @@ unsigned int completeAction(void *handle, void *actionHandle, char *state) {
                                              reply->element[0]->str, 
                                              &commands[commandCount]);
     if (result != RULES_OK) {
-        freeReplyObject(reply);
-        free(actionHandle);
+        //reply object should be freed by the app during abandonAction
         return result;
     }
 
@@ -1550,9 +1547,8 @@ unsigned int completeAction(void *handle, void *actionHandle, char *state) {
                                &commandCount,
                                &rulesBinding);
         if (result != RULES_OK) {
+            //reply object should be freed by the app during abandonAction
             freeCommands(commands, commandCount);
-            freeReplyObject(reply);
-            free(actionHandle);
             return result;
         }
     }
@@ -1564,9 +1560,8 @@ unsigned int completeAction(void *handle, void *actionHandle, char *state) {
                          &commandCount,
                          &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+        //reply object should be freed by the app during abandonAction
         freeCommands(commands, commandCount);
-        freeReplyObject(reply);
-        free(actionHandle);
         return result;
     }
 

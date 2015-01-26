@@ -70,6 +70,7 @@ unsigned int readNextName(char *start, char **first, char **last, unsigned int *
 unsigned int readNextValue(char *start, char **first, char **last, unsigned char *type) {
     unsigned char state = ST_OBJECT_PROP_PARSE;
     ++start;
+    
     while(start[0] != '\0') {
         switch(state) {
             case ST_OBJECT_PROP_PARSE:
@@ -116,7 +117,6 @@ unsigned int readNextArrayValue(char *start, char **first, char **last, unsigned
     if (start[0] == '[') {
         state = ST_OBJECT_PROP_VAL;
     } 
-
     ++start;
     while(start[0] != '\0') {
         switch(state) {
@@ -150,6 +150,33 @@ static unsigned int getValue(char *start, char **first, char **last, unsigned ch
             return getString(start, first, last);
         } else if (start[0] >= '0' && start[0] <= '9') {
             return getNumber(start, first, last, type);
+        } else if (start[0] == 'f') {
+            if (strncmp(start, "false", 5) == 0) {
+                *first = start;
+                *last = start + 4;
+                *type = JSON_BOOL;
+                return PARSE_OK;
+            } else {
+                return ERR_PARSE_STRING;
+            }
+        } else if (start[0] == 't') {
+            if (strncmp(start, "true", 4) == 0) {
+                *first = start;
+                *last = start + 3;
+                *type = JSON_BOOL;
+                return PARSE_OK;
+            } else {
+                return ERR_PARSE_STRING;
+            }
+        } else if (start[0] == 'N') {
+            if (strncmp(start, "NaN", 3) == 0) {
+                *first = start;
+                *last = start + 2;
+                *type = JSON_NIL;
+                return PARSE_OK;
+            } else {
+                return ERR_PARSE_STRING;
+            }
         } else if (start[0] == '{') {
             *type = JSON_OBJECT;
             unsigned int result = getObject(start, first, last);
@@ -254,7 +281,7 @@ static unsigned int getArray(char *start, char** first, char **last) {
                     return ERR_PARSE_ARRAY;
                 }
                 break;
-            case ST_OBJECT_PROP_NAME: 
+            case ST_ARRAY_VAL_PARSE: 
                 if (start[0] == ']') {
                     *last = start;
                     return PARSE_OK;

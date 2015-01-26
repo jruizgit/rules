@@ -1248,6 +1248,12 @@ unsigned int formatEvalMessage(void *rulesBinding,
             case JSON_BOOL:
                 argv[8 + i * 3 + 2] = "4";
                 break;
+            case JSON_ARRAY:
+                argv[8 + i * 3 + 2] = "5";
+                break;
+            case JSON_NIL:
+                argv[8 + i * 3 + 2] = "7";
+                break;
         }
         argvl[8 + i * 3 + 2] = 1; 
     }

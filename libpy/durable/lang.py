@@ -76,8 +76,8 @@ class closure(object):
 
 class value(object):
 
-    def __init__(self, vtype = None, left = None, op = None, right = None):
-        self.alias = None
+    def __init__(self, vtype = None, left = None, op = None, right = None, alias = None):
+        self.alias = alias
         self._type = vtype
         self._left = left
         self._op = op
@@ -122,10 +122,10 @@ class value(object):
         return self
 
     def __and__(self, other):
-        return value(self._type, self, '$and', other)
+        return value(self._type, self, '$and', other, self.alias)
     
     def __or__(self, other):
-        return value(self._type, self, '$or', other)
+        return value(self._type, self, '$or', other, self.alias)
 
     def __getattr__(self, name):
         if self._type:

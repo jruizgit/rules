@@ -96,7 +96,7 @@ class Content(object):
     def __contains__(self, key):
         return key in self._d
 
-    def __getattr__(self, name):   
+    def __getattr__(self, name):  
         return self.__getitem__(name)
 
     def __setattr__(self, name, value):
@@ -212,6 +212,7 @@ class Ruleset(object):
             else:
                 self._actions[rule_name] = Fork(host.register_rulesets(name, action))
 
+        print(json.dumps(ruleset_definition))
         self._handle = rules.create_ruleset(state_cache_size, name, json.dumps(ruleset_definition))
         self._definition = ruleset_definition
         
@@ -234,6 +235,10 @@ class Ruleset(object):
     def retract_fact(self, fact):
         rules.retract_fact(self._handle, json.dumps(fact))
 
+    def start_timer(self, sid, timer_name, timer_duration):
+        timer = {'sid':sid, 'id':random.randint(100000, 10000000), '$t':timer_name}
+        rules.start_timer(self._handle, str(sid), timer_duration, json.dumps(timer))
+        
     def assert_state(self, state):
         rules.assert_state(self._handle, json.dumps(state))
         
@@ -311,9 +316,8 @@ class Ruleset(object):
                                 self._host.post_batch(rule_name, messages)
 
                         for timer_name, timer_duration in c.get_timers().iteritems():
-                            timer = {'sid':c.s['sid'], 'id':random.randint(100000, 10000000), '$t':timer_name}
-                            rules.start_timer(self._handle, str(c.s['sid']), timer_duration, json.dumps(timer))
-
+                            self.start_timer(c.s['sid'], timer_name, timer_duration)                            
+                            
                         rules.complete_action(self._handle, c._handle, json.dumps(c.s._d))
                         complete(None)
                     except Exception as error:
@@ -576,6 +580,9 @@ class Host(object):
 
     def retract_fact(self, ruleset_name, fact):
         self.get_ruleset(ruleset_name).retract_fact(fact)
+
+    def start_timer(self, ruleset_name, sid, timer_name, timer_duration):
+        self.get_ruleset(ruleset_name).start_timer(sid, timer_name, timer_duration)
 
     def patch_state(self, ruleset_name, state):
         self.get_ruleset(ruleset_name).assert_state(state)

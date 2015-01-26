@@ -274,7 +274,7 @@ void rehydrateProperty(jsonProperty *property, char *state) {
             case JSON_DOUBLE:
                 temp = propertyFirst[propertyLength];
                 propertyFirst[propertyLength] = '\0';
-                property->value.i = atof(propertyFirst);
+                property->value.d = atof(propertyFirst);
                 propertyFirst[propertyLength] = temp;
                 break;
             case JSON_BOOL:
@@ -337,6 +337,7 @@ unsigned int refreshState(void *handle,
     }
 
     memset(entry->properties, 0, MAX_STATE_PROPERTIES * sizeof(jsonProperty));
+    entry->propertiesLength = 0;
     char *next;
     unsigned int midIndex = UNDEFINED_INDEX;
     unsigned int sidIndex = UNDEFINED_INDEX;
