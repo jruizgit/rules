@@ -1,29 +1,28 @@
 from durable.lang import *
-import pandas as pd
 import random
 import time
 
 with ruleset('fraud_detection'):
-    @when_all((m.t == 'debit_cleared') | (m.t == 'credit_cleared'))
+    @when_all(span(10),
+             (m.t == 'debit_cleared') | (m.t == 'credit_cleared'))
     def handle_balance(c):
-        balance_sheet = pd.DataFrame(c.s.balance_sheet, columns=['stamp', 'debit', 'credit', 'balance'])
-        if c.s.balance_sheet:
-            balance = balance_sheet.iloc[-1, -1]
-        else:
-            balance = 0
+        debit_total = 0
+        credit_total = 0
+        if c.s.balance == None:
+            c.s.balance = 0
+            c.s.avg_balance = 0
+            c.s.avg_withdraw = 0
 
-        new_row = None
-        if c.m.t == 'debit_cleared':
-            new_row = {'stamp': c.m.stamp, 'debit': c.m.amount, 'balance': balance - c.m.amount}
-        else:
-            new_row = {'stamp': c.m.stamp, 'credit': c.m.amount, 'balance': balance + c.m.amount}
+        for tx in c.m:
+            if tx.t == 'debit_cleared':
+                debit_total += tx.amount
+            else:
+                credit_total += tx.amount
 
-        balance_sheet = balance_sheet.append(new_row, ignore_index=True)
-        balance_sheet = balance_sheet[balance_sheet.stamp > c.m.stamp - 30 * 24 * 3600]
-        c.s.balance_sheet = balance_sheet.values.tolist()
-        c.s.avg_withdraw = balance_sheet.debit.mean()
-        c.s.avg_deposit = balance_sheet.credit.mean()
-        c.s.avg_balance = balance_sheet.balance.mean()
+        c.s.balance = c.s.balance - debit_total + credit_total
+        c.s.avg_balance = (c.s.avg_balance * 29 + c.s.balance) / 30
+        c.s.avg_withdraw = (c.s.avg_withdraw * 29 + debit_total) / 30
+        print('balance {0}, average balance {1}, average withdraw {2}'.format(c.s.balance, c.s.avg_balance, c.s.avg_withdraw))
         
     @when_all(c.first << (m.t == 'debit_request') & 
                          (m.amount > c.s.avg_withdraw * 3),
@@ -45,23 +44,31 @@ with ruleset('fraud_detection'):
     def second_rule(c):
         print('High Risk {0}, {1}, {2}'.format(c.first.amount, c.second.amount, c.third.amount))
 
-    @when_all(timeout('my_timer'))
+    @when_all(timeout('customer'))
     def start_timer(c):
-        if not c.s.count:
-            c.s.count = 1000
+        if not c.s.c_count:
+            c.s.c_count = 100
         else:
-            c.s.count += 1
+            c.s.c_count += 2
 
-        c.post('fraud_detection', {'id': c.s.count, 'sid': 1, 't': 'debit_request', 'amount': c.s.count - 850, 'stamp': time.time()})
-        c.start_timer('my_timer', 3)
+        c.post('fraud_detection', {'id': c.s.c_count, 'sid': 1, 't': 'debit_cleared', 'amount': c.s.c_count})
+        c.post('fraud_detection', {'id': c.s.c_count + 1, 'sid': 1, 't': 'credit_cleared', 'amount': (c.s.c_count - 100) * 2 + 100})
+        c.start_timer('customer', 1)
+
+    @when_all(timeout('fraudster'))
+    def start_timer(c):
+        if not c.s.f_count:
+            c.s.f_count = 1000
+        else:
+            c.s.f_count += 1
+
+        c.post('fraud_detection', {'id': c.s.f_count, 'sid': 1, 't': 'debit_request', 'amount': c.s.f_count - 800, 'stamp': time.time()})
+        c.start_timer('fraudster', 2)
 
     @when_start
     def start(host):
-        host.post('fraud_detection', {'id': 1, 'sid': 1, 't': 'credit_cleared', 'amount': 500, 'stamp': time.time()})
-        host.post('fraud_detection', {'id': 2, 'sid': 1, 't': 'debit_cleared', 'amount': 100, 'stamp': time.time()})
-        host.post('fraud_detection', {'id': 3, 'sid': 1, 't': 'debit_cleared', 'amount': 100, 'stamp': time.time()})
-        host.post('fraud_detection', {'id': 4, 'sid': 1, 't': 'debit_cleared', 'amount': 100, 'stamp': time.time()})
-        host.start_timer('fraud_detection', 1, 'my_timer', 3)
+        host.start_timer('fraud_detection', 1, 'customer', 1)
+        host.start_timer('fraud_detection', 1, 'fraudster', 15)
 
 run_all()
                           

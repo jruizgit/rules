@@ -312,7 +312,7 @@ class Ruleset(object):
                             if len(messages) == 1:
                                 self._host.post(ruleset_name, messages[0])
                             else:
-                                self._host.post_batch(rule_name, messages)
+                                self._host.post_batch(ruleset_name, messages)
 
                         for timer_name, timer_duration in c.get_timers().iteritems():
                             self.start_timer(c.s['sid'], timer_name, timer_duration)                            

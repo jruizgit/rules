@@ -148,7 +148,7 @@ static unsigned int getValue(char *start, char **first, char **last, unsigned ch
         if (start[0] == '"' || start[0] == '\'') {
             *type = JSON_STRING;
             return getString(start, first, last);
-        } else if (start[0] >= '0' && start[0] <= '9') {
+        } else if ((start[0] >= '0' && start[0] <= '9') || start[0] == '-') {
             return getNumber(start, first, last, type);
         } else if (start[0] == 'f') {
             if (strncmp(start, "false", 5) == 0) {
@@ -308,7 +308,7 @@ static unsigned int getNumber(char *start, char **first, char **last, unsigned c
     while(start[0] != '\0') {
         switch(state) {
             case ST_NUMBER_SEEK:
-                if (start[0] >= '0' && start[0] <= '9') {
+                if ((start[0] >= '0' && start[0] <= '9') || start[0] == '-') {
                     state = ST_NUMBER_INT;
                     *first = start;
                 } else if (!IS_WHITESPACE(start[0])) {
