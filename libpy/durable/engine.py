@@ -212,7 +212,6 @@ class Ruleset(object):
             else:
                 self._actions[rule_name] = Fork(host.register_rulesets(name, action))
 
-        print(json.dumps(ruleset_definition))
         self._handle = rules.create_ruleset(state_cache_size, name, json.dumps(ruleset_definition))
         self._definition = ruleset_definition
         
