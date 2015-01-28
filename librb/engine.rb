@@ -259,6 +259,11 @@ module Engine
       Rules.retract_event @handle, JSON.generate(message)
     end
 
+    def start_timer(sid, timer_name, timer_duration)
+      timer = {:sid => sid, :id => rand(1000000), :$t => timer_name}
+      Rules.start_timer @handle, sid.to_s, timer_duration, JSON.generate(timer)
+    end
+
     def assert_fact(message)
       Rules.assert_fact @handle, JSON.generate(message)
     end
@@ -350,8 +355,7 @@ module Engine
               end
 
               for timer_name, timer_duration in c._timers do
-                timer = {:sid => c.s.sid, :id => rand(1000000), :$t => timer_name}
-                Rules.start_timer @handle, c.s.sid.to_s, timer_duration, JSON.generate(timer)
+                start_timer c.s.sid, timer_name, timer_duration
               end
 
               Rules.complete_action @handle, c.handle, JSON.generate(c.s._d)
@@ -732,6 +736,10 @@ module Engine
 
     def retract(ruleset_name, fact)
       get_ruleset(ruleset_name).retract_fact fact
+    end
+
+    def start_timer(ruleset_name, sid, timer_name, timer_duration)
+      get_ruleset(ruleset_name).start_timer sid, timer_name, timer_duration
     end
 
     def patch_state(ruleset_name, state)
