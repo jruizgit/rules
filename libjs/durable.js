@@ -329,17 +329,23 @@ exports = module.exports = durableEngine = function () {
 
     var dispatcher = function(func) {
         return function(c) {
-            delete(c.m['$s']);
-            var results = 0;
-            for (var name in c.m) {
-                c[name] = c.m[name];
-                ++results;
-            }
-
-            if (results === 1 && c.m['m_0']) {
-                c.m = c.m['m_0'];
-            }
-
+            if (c.m.constructor !== Array) {
+                var results = 0;
+                for (var name in c.m) {
+                    c[name] = c.m[name];
+                    ++results;
+                }
+            } else {
+                for (var i = 0; i < c.m.length; ++i) {
+                    if (Object.keys(c.m[i]).length === 1) {
+                        for (var name in c.m[i]) {
+                            if (name.indexOf('m', 0) === 0) {
+                                c.m[i] = c.m[i][name];
+                            }
+                        }
+                    }
+                }
+            }            
             return func(c);
         }
     }
@@ -389,9 +395,8 @@ exports = module.exports = durableEngine = function () {
             var innerDefinition = [];
             var refName;
             var expObject;
+            var newArray = [];
             for (var i = 0; i < lexp.length; ++i) {
-                refName = 'm_' + i;
-                expObject = {};
                 expDefinition = lexp[i].define(refName);
                 if (expDefinition['count']) {
                     newDefinition['count'] = expDefinition['count'];
@@ -400,18 +405,30 @@ exports = module.exports = durableEngine = function () {
                 } else if (expDefinition['span']) {
                     newDefinition['span'] = expDefinition['span'];
                 } else {
-                    if (expDefinition[refName + '$all']) {
-                        expObject[refName + '$all'] = expDefinition[refName + '$all'];
-                    } else if (expDefinition[refName + '$any']) {
-                        expObject[refName + '$any'] = expDefinition[refName + '$any'];
-                    } else if (expDefinition[refName + '$not']) {
-                        expObject[refName + '$not'] = expDefinition[refName + '$not'][0]['m_0'];
-                    } else {
-                        expObject = expDefinition;
-                    }
-
-                    innerDefinition.push(expObject);
+                    newArray.push(lexp[i]);
                 }
+            }
+
+            for (var i = 0; i < newArray.length; ++i) {
+                if (newArray.length > 1) {
+                    refName = 'm_' + i;
+                } else {
+                    refName = 'm';
+                }
+
+                expObject = {};
+                expDefinition = newArray[i].define(refName);   
+                if (expDefinition[refName + '$all']) {
+                    expObject[refName + '$all'] = expDefinition[refName + '$all'];
+                } else if (expDefinition[refName + '$any']) {
+                    expObject[refName + '$any'] = expDefinition[refName + '$any'];
+                } else if (expDefinition[refName + '$not']) {
+                    expObject[refName + '$not'] = expDefinition[refName + '$not'][0]['m'];
+                } else {
+                    expObject = expDefinition;
+                }
+
+                innerDefinition.push(expObject);
             }
             
             if (name !== undefined) {
@@ -830,7 +847,7 @@ exports = module.exports = durableEngine = function () {
         var definitions = {};
         for (var i = 0; i < rulesets.length; ++ i) {
             definitions[rulesets[i].getName()] = rulesets[i].define(); 
-            //console.log(JSON.stringify(definitions[rulesets[i].getName()]))
+            //console.log(rulesets[i].getName() + ' ***** ' + JSON.stringify(definitions[rulesets[i].getName()]))
         }
 
         var rulesHost = d.host(databases, stateCacheSize);

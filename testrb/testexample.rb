@@ -2,19 +2,19 @@ require_relative "../librb/durable"
 
 Durable.ruleset :fraud_detection do
   when_all span(10), (m.t == "debit_cleared") | (m.t == "credit_cleared") do
-  	debit_total = 0
+    debit_total = 0
     credit_total = 0
     if not s.balance
       s.balance = 0
       s.avg_balance = 0
       s.avg_withdraw = 0
-		end    
+    end    
 
     for tx in m do
       if tx.t == "debit_cleared"
-      	debit_total += tx.amount
+        debit_total += tx.amount
       else
-      	credit_total += tx.amount
+        credit_total += tx.amount
       end
     end
 
@@ -29,7 +29,7 @@ Durable.ruleset :fraud_detection do
                       (m.amount > s.avg_withdraw * 3) & 
                       (m.stamp > first.stamp) &
                       (m.stamp < first.stamp + 90) do
-  	puts "Medium risk #{first.amount}, #{second.amount}"
+    puts "Medium risk #{first.amount}, #{second.amount}"
   end
 
   when_all c.first = m.t == "debit_request",
@@ -67,7 +67,7 @@ Durable.ruleset :fraud_detection do
   end
 
   when_start do
-  	start_timer "fraud_detection", 1, "customer", 1
+    start_timer "fraud_detection", 1, "customer", 1
     start_timer "fraud_detection", 1, "fraudster", 15
   end
 end

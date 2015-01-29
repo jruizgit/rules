@@ -287,6 +287,20 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
+        that.startTimer = function (sid, timerName, timerDuration, complete) {
+            var timer = {sid: sid, id: Math.random() * 10000000 + 1, $t: timerName};
+            if (complete) {
+                try {
+                    complete(null, r.startTimer(handle, sid, timerDuration, JSON.stringify(timer)));
+                } catch(err) {
+                    complete(err);
+                }
+            } else {
+                r.startTimer(handle, sid, timerDuration, JSON.stringify(timer));
+            }
+        };
+
+
         that.getState = function (sid, complete) {
             try {
                 complete(null, JSON.parse(r.getState(handle, sid)));
@@ -351,12 +365,13 @@ exports = module.exports = durableEngine = function () {
             } else {
                 var timerName = names[index];
                 var duration = timers[timerName];
-                try {
-                    r.startTimer(handle, c.s.sid, duration, JSON.stringify({sid: c.s.sid, id: Math.random() * 10000000 + 1, $t: timerName}));
-                    startTimers(timers, names, ++index, c, complete);
-                } catch (reason) {
-                    complete(reason, c);
-                }
+                that.startTimer(c.s.sid, timerName, duration, function (err) {
+                    if (err) {
+                        complete(err, c);
+                    } else {
+                        startTimers(timers, names, ++index, c, complete);
+                    }
+                });
             }
         }
 
@@ -878,7 +893,7 @@ exports = module.exports = durableEngine = function () {
             var rulesetName = arguments[0];
             var messages = [];
             var complete;
-            if (Array.isArray(arguments[1])) {
+            if (arguments[1].constructor === Array) {
                 messages = arguments[1];
                 if (arguments.length === 3) {
                     complete = arguments[2];
@@ -961,6 +976,25 @@ exports = module.exports = durableEngine = function () {
                     }
                 } else {
                     rules.retractFact(message, complete);
+                }
+            });
+
+            if (lastError) {
+                throw lastError;
+            }
+        };
+
+        that.startTimer = function (rulesetName, sid, timerName, timerDuration, complete) {
+            var lastError;
+            that.getRuleset(rulesetName, function (err, rules) {
+                if (err) {
+                    if (complete) {
+                        complete(err);
+                    } else {
+                        lastError = err;
+                    }
+                } else {
+                    rules.startTimer(sid, timerName, timerDuration, complete);
                 }
             });
 
