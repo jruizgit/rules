@@ -4,7 +4,7 @@ import rules
 import threading
 import inspect
 import random
-
+import time
 
 class Closure(object):
 
@@ -15,6 +15,8 @@ class Closure(object):
         self._timer_directory = {}
         self._message_directory = {}
         self._branch_directory = {}
+        self._fact_directory = {}
+        self._retract_directory = {}
         if isinstance(message, dict): 
             self._m = message
         else:
@@ -34,7 +36,16 @@ class Closure(object):
     def get_messages(self):
         return self._message_directory
 
+    def get_facts(self):
+        return self._fact_directory
+
+    def get_retract_facts(self):
+        return self._retract_directory
+
     def signal(self, message):
+        if isinstance(message, Content):
+            message = message._d
+
         name_index = self.ruleset_name.rindex('.')
         parent_ruleset_name = self.ruleset_name[:name_index]
         name = self.ruleset_name[name_index + 1:]
@@ -42,7 +53,17 @@ class Closure(object):
         message['id'] = '{0}.{1}'.format(name, message['id'])
         self.post(parent_ruleset_name, message)
 
-    def post(self, ruleset_name, message):
+    def post(self, ruleset_name, message = None):
+        if not message: 
+            message = ruleset_name
+            ruleset_name = self.ruleset_name
+
+        if not 'sid' in message:
+            message['sid'] = self.s['sid']
+
+        if isinstance(message, Content):
+            message = message._d
+
         message_list = []
         if  ruleset_name in self._message_directory:
             message_list = self._message_directory[ruleset_name]
@@ -56,6 +77,44 @@ class Closure(object):
             raise Exception('Timer with name {0} already added'.format(timer_name))
         else:
             self._timer_directory[timer_name] = duration
+
+    def assert_fact(self, ruleset_name, fact = None):
+        if not fact: 
+            fact = ruleset_name
+            ruleset_name = self.ruleset_name
+
+        if not 'sid' in fact:
+            fact['sid'] = self.s['sid']
+
+        if isinstance(fact, Content):
+            fact = copy.deepcopy(fact._d)
+
+        fact_list = []
+        if  ruleset_name in self._fact_directory:
+            fact_list = self._fact_directory[ruleset_name]
+        else:
+            self._fact_directory[ruleset_name] = fact_list
+
+        fact_list.append(fact)
+
+    def retract_fact(self, ruleset_name, fact = None):
+        if not fact: 
+            fact = ruleset_name
+            ruleset_name = self.ruleset_name
+
+        if not 'sid' in fact:
+            fact['sid'] = self.s['sid']
+
+        if isinstance(fact, Content):
+            fact = copy.deepcopy(fact._d)
+
+        retract_list = []
+        if  ruleset_name in self._retract_directory:
+            retract_list = self._retract_directory[ruleset_name]
+        else:
+            self._retract_directory[ruleset_name] = retract_list
+
+        retract_list.append(fact)
 
     def fork(self, branch_name, branch_state):
         if branch_name in self._branch_directory:
@@ -231,8 +290,14 @@ class Ruleset(object):
     def assert_fact(self, fact):
         rules.assert_fact(self._handle, json.dumps(fact))
 
+    def assert_facts(self, facts):
+        rules.assert_facts(self._handle, json.dumps(facts))
+
     def retract_fact(self, fact):
         rules.retract_fact(self._handle, json.dumps(fact))
+
+    def retract_facts(self, facts):
+        rules.retract_facts(self._handle, json.dumps(facts))
 
     def start_timer(self, sid, timer_name, timer_duration):
         timer = {'sid':sid, 'id':random.randint(100000, 10000000), '$t':timer_name}
@@ -296,7 +361,6 @@ class Ruleset(object):
             action_name = None
             for action_name, message in message.iteritems():
                 break
-
             c = Closure(state, message, result[2], self._name)
             
             def action_callback(e):
@@ -313,6 +377,18 @@ class Ruleset(object):
                                 self._host.post(ruleset_name, messages[0])
                             else:
                                 self._host.post_batch(ruleset_name, messages)
+
+                        for ruleset_name, facts in c.get_facts().iteritems():
+                            if len(facts) == 1:
+                                self._host.assert_fact(ruleset_name, facts[0])
+                            else:
+                                self._host.assert_facts(ruleset_name, facts)
+
+                        for ruleset_name, facts in c.get_retract_facts().iteritems():
+                            if len(facts) == 1:
+                                self._host.retract_fact(ruleset_name, facts[0])
+                            else:
+                                self._host.retract_facts(ruleset_name, facts)
 
                         for timer_name, timer_duration in c.get_timers().iteritems():
                             self.start_timer(c.s['sid'], timer_name, timer_duration)                            
@@ -577,8 +653,14 @@ class Host(object):
     def assert_fact(self, ruleset_name, fact):
         self.get_ruleset(ruleset_name).assert_fact(fact)
 
+    def assert_facts(self, ruleset_name, facts):
+        self.get_ruleset(ruleset_name).assert_facts(facts)
+
     def retract_fact(self, ruleset_name, fact):
         self.get_ruleset(ruleset_name).retract_fact(fact)
+
+    def retract_facts(self, ruleset_name, facts):
+        self.get_ruleset(ruleset_name).retract_fact(facts)
 
     def start_timer(self, ruleset_name, sid, timer_name, timer_duration):
         self.get_ruleset(ruleset_name).start_timer(sid, timer_name, timer_duration)
@@ -626,5 +708,5 @@ class Host(object):
             else:
                 timers_callback(None)
 
-        self._timer = threading.Timer(0.01, dispatch_ruleset, (0,))
+        self._timer = threading.Timer(0.001, dispatch_ruleset, (0,))
         self._timer.start()

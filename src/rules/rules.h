@@ -54,6 +54,7 @@ unsigned int retractEvent(void *handle, char *message);
 unsigned int assertFact(void *handle, char *message);
 unsigned int assertFacts(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results);
 unsigned int retractFact(void *handle, char *message);
+unsigned int retractFacts(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results);
 unsigned int assertState(void *handle, char *state);
 unsigned int startAction(void *handle, char **state, char **messages, void **actionHandle);
 unsigned int completeAction(void *handle, void *actionHandle, char *state);

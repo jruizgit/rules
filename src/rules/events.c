@@ -1461,6 +1461,13 @@ unsigned int retractFact(void *handle, char *message) {
     return executeHandleMessage(handle, message, ACTION_REMOVE_FACT);
 }
 
+unsigned int retractFacts(void *handle, 
+                          char *messages, 
+                          unsigned int *resultsLength, 
+                          unsigned int **results) {
+    return executeHandleMessages(handle, messages, ACTION_REMOVE_FACT, resultsLength, results);
+}
+
 unsigned int assertState(void *handle, char *state) {
     char *commands[MAX_COMMAND_COUNT];
     unsigned short commandPriorities[MAX_COMMAND_COUNT];
