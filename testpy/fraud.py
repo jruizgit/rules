@@ -70,3 +70,5 @@ with ruleset('fraud_detection'):
     def start(host):
         host.start_timer('fraud_detection', 1, 'customer', 1)
         host.start_timer('fraud_detection', 1, 'fraudster', 15)
+
+run_all()

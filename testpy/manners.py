@@ -123,3 +123,7 @@ with statechart('miss_manners'):
         host.assert_fact('miss_manners', {'id': 18, 'sid': 1, 't': 'guest', 'name': 'n8', 'sex': 'm', 'hobby': 'h3'})
         host.assert_fact('miss_manners', {'id': 19, 'sid': 1, 't': 'guest', 'name': 'n8', 'sex': 'm', 'hobby': 'h1'})
         host.assert_fact('miss_manners', {'id': 20, 'sid': 1, 't': 'last_seat', 'seat': 8})
+        host.patch_state('miss_manners', {'sid': 1, 'label': 'start', 'count': 0, 'g_count': 1000})
+
+run_all()
+
