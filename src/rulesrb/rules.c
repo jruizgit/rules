@@ -165,7 +165,7 @@ static VALUE rbAssertFacts(VALUE self, VALUE handle, VALUE facts) {
             if (results) {
                 free(results);
             }
-            rb_raise(rb_eException, "Could not assert events, error code: %d", result);
+            rb_raise(rb_eException, "Could not assert facts, error code: %d", result);
         }
     }
 
@@ -186,6 +186,32 @@ static VALUE rbRetractFact(VALUE self, VALUE handle, VALUE fact) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
             rb_raise(rb_eException, "Could not retract fact, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
+static VALUE rbRetractFacts(VALUE self, VALUE handle, VALUE facts) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(facts, T_STRING);
+
+    unsigned int *results = NULL;
+    unsigned int resultsLength = 0;
+    unsigned int result = retractFacts((void *)FIX2LONG(handle), RSTRING_PTR(facts), &resultsLength, &results);
+    if (result == RULES_OK) {
+        if (results) {
+            free(results);
+        }
+        return INT2FIX(resultsLength);   
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            if (results) {
+                free(results);
+            }
+            rb_raise(rb_eException, "Could not retract facts, error code: %d", result);
         }
     }
 
@@ -336,6 +362,7 @@ void Init_rules() {
     rb_define_singleton_method(rulesModule, "assert_fact", rbAssertFact, 2);
     rb_define_singleton_method(rulesModule, "assert_facts", rbAssertFacts, 2);
     rb_define_singleton_method(rulesModule, "retract_fact", rbRetractFact, 2);
+    rb_define_singleton_method(rulesModule, "retract_facts", rbRetractFacts, 2);
     rb_define_singleton_method(rulesModule, "assert_state", rbAssertState, 2);
     rb_define_singleton_method(rulesModule, "start_action", rbStartAction, 1);
     rb_define_singleton_method(rulesModule, "complete_action", rbCompleteAction, 3);

@@ -158,38 +158,38 @@ module Durable
   end
 
   class Expression
-    attr_reader :type, :op
-    attr_accessor :left, :name
+    attr_reader :__type, :__op
+    attr_accessor :__name
 
     def initialize(type, left = nil)
-      @type = type
+      @__type = type
       @left = left
       @right = nil
       @definitions = nil
-      @name = nil
+      @__name = nil
     end
     
     def definition
       new_definition = nil
-      if @op == :$or || @op == :$and
-        new_definition = {@op => @definitions}
+      if @__op == :$or || @__op == :$and
+        new_definition = {@__op => @definitions}
       else
         if not @left
-          raise ArgumentError, "Property for #{@op} not defined"
+          raise ArgumentError, "Property for #{@__op} not defined"
         end 
         righ_definition = @right
         if (@right.kind_of? Expression) || (@right.kind_of? Arithmetic)
           righ_definition = @right.definition
         end
 
-        if @op == :$eq
+        if @__op == :$eq
           new_definition = {@left => righ_definition}
         else
-          new_definition = {@op => {@left => righ_definition}}
+          new_definition = {@__op => {@left => righ_definition}}
         end
       end
 
-      if @type == :$s
+      if @__type == :$s
         {:$and => [new_definition, {:$s => 1}]}
       else
         new_definition
@@ -197,49 +197,49 @@ module Durable
     end
 
     def ==(other)
-      @op = :$eq
+      @__op = :$eq
       @right = other
       self
     end
 
     def !=(other)
-      @op = :$neq
+      @__op = :$neq
       @right = other
       self
     end
 
     def <(other)
-      @op = :$lt
+      @__op = :$lt
       @right = other
       self
     end
 
     def <=(other)
-      @op = :$lte
+      @__op = :$lte
       @right = other
       self
     end
 
     def >(other)
-      @op = :$gt
+      @__op = :$gt
       @right = other
       self
     end
 
     def >=(other)
-      @op = :$gte
+      @__op = :$gte
       @right = other
       self
     end
 
     def -@
-      @op = :$nex
+      @__op = :$nex
       @right = 1
       self
     end
 
     def +@
-      @op = :$ex
+      @__op = :$ex
       @right = 1
       self
     end
@@ -262,11 +262,11 @@ module Durable
     end
 
     def merge(other, op)
-      raise ArgumentError, "Right type doesn't match" if other.type != @type
+      raise ArgumentError, "Right type doesn't match" if other.__type != @__type
       @definitions = [self.definition] if !@definitions
-      @op = op
-      if other.op && (other.op == @op)
-        @definitions + other.definition[@op] 
+      @__op = op
+      if other.__op && (other.__op == @__op)
+        @definitions + other.definition[@__op] 
       else 
         @definitions << other.definition
       end
@@ -277,10 +277,10 @@ module Durable
   end
 
   class Expressions
-    attr_reader :type
+    attr_reader :__type
 
     def initialize(type, expressions)
-      @type = type
+      @__type = type
       @expressions = expressions
     end
 
@@ -288,18 +288,18 @@ module Durable
       index = 0
       new_definition = []
       for expression in @expressions do
-        if (expression.kind_of? Expression) && expression.name
-          expression_name = expression.name
+        if (expression.kind_of? Expression) && expression.__name
+          expression_name = expression.__name
         elsif @expressions.length == 1 
           expression_name = "m"
         else
           expression_name = "m_#{index}"
         end
-        if expression.type == :$all
+        if expression.__type == :$all
           new_definition << {expression_name + "$all" => expression.definition()}
-        elsif expression.type == :$any
+        elsif expression.__type == :$any
           new_definition << {expression_name + "$any" => expression.definition()}
-        elsif  expression.type == :$not
+        elsif  expression.__type == :$not
           new_definition << {expression_name + "$not" => expression.definition()[0]["m"]}
         else
           new_definition << {expression_name => expression.definition()}
@@ -323,7 +323,7 @@ module Durable
       name = name.to_s
       if name.end_with? '='
         name = name[0..-2] 
-        value.name = name
+        value.__name = name
         return value        
       else
         Arithmetic.new(name)

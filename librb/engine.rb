@@ -5,7 +5,7 @@ require_relative "../src/rulesrb/rules"
 module Engine
   
   class Closure
-    attr_reader :handle, :ruleset_name, :_timers, :_branches, :_messages
+    attr_reader :handle, :ruleset_name, :_timers, :_branches, :_messages, :_facts, :_retract
     attr_accessor :s
 
     def initialize(state, message, handle, ruleset_name)
@@ -15,6 +15,8 @@ module Engine
       @_timers = {}
       @_messages = {}
       @_branches = {}
+      @_facts = {}
+      @_retract = {}
       if message.kind_of? Hash
         @m = message
       else
@@ -29,6 +31,10 @@ module Engine
     end
 
     def signal(message)
+      if message.kind_of? Content
+        message = message._d
+      end
+
       name_index = @ruleset_name.rindex "."
       parent_ruleset_name = ruleset_name[0, name_index]
       name = ruleset_name[name_index + 1..-1]
@@ -38,7 +44,20 @@ module Engine
       post parent_ruleset_name, message
     end
 
-    def post(ruleset_name, message)
+    def post(ruleset_name, message = nil)
+      if !message
+        message = ruleset_name
+        ruleset_name = @ruleset_name
+      end
+
+      if message.kind_of? Content
+        message = message._d
+      end
+
+      if !(message.key? :sid) && !(message.key? "sid")
+        mesage[:sid] = @s.sid
+      end
+
       message_list = []
       if @_messages.key? ruleset_name
         message_list = @_messages[ruleset_name]
@@ -54,6 +73,52 @@ module Engine
       else
         @_timers[timer_name] = duration
       end
+    end
+
+    def assert(ruleset_name, fact = nil)
+      if !fact
+        fact = ruleset_name
+        ruleset_name = @ruleset_name
+      end
+
+      if fact.kind_of? Content
+        fact = fact._d.dup
+      end
+
+      if !(fact.key? :sid) && !(fact.key? "sid")
+        fact[:sid] = @s.sid
+      end
+
+      fact_list = []
+      if @_facts.key? ruleset_name
+        fact_list = @_facts[ruleset_name]
+      else
+        @_facts[ruleset_name] = fact_list
+      end
+      fact_list << fact
+    end
+
+    def retract(ruleset_name, fact = nil)
+      if !fact
+        fact = ruleset_name
+        ruleset_name = @ruleset_name
+      end
+
+      if fact.kind_of? Content
+        fact = fact._d.dup
+      end
+
+      if !(fact.key? :sid) && !(fact.key? "sid")
+        fact[:sid] = @s.sid
+      end
+
+      fact_list = []
+      if @_retract.key? ruleset_name
+        fact_list = @_retract[ruleset_name]
+      else
+        @_retract[ruleset_name] = fact_list
+      end
+      fact_list << fact
     end
 
     def fork(branch_name, branch_state)
@@ -85,6 +150,7 @@ module Engine
     alias method_missing handle_property
 
   end
+
 
   class Content
     attr_reader :_d
@@ -119,6 +185,7 @@ module Engine
     alias method_missing handle_property
 
   end
+
 
   class Promise
     attr_accessor :root
@@ -264,16 +331,20 @@ module Engine
       Rules.start_timer @handle, sid.to_s, timer_duration, JSON.generate(timer)
     end
 
-    def assert_fact(message)
-      Rules.assert_fact @handle, JSON.generate(message)
+    def assert_fact(fact)
+      Rules.assert_fact @handle, JSON.generate(fact)
     end
 
-    def assert_facts(messages)
-      Rules.assert_facts @handle, JSON.generate(messages)
+    def assert_facts(facts)
+      Rules.assert_facts @handle, JSON.generate(facts)
     end
 
-    def retract_fact(message)
-      Rules.retract_fact @handle, JSON.generate(message)
+    def retract_fact(fact)
+      Rules.retract_fact @handle, JSON.generate(fact)
+    end
+
+    def retract_facts(facts)
+      Rules.assert_facts @handle, JSON.generate(facts)
     end
 
     def assert_state(state)
@@ -351,6 +422,22 @@ module Engine
                   @host.post ruleset_name, messages[0]
                 else
                   @host.post_batch ruleset_name, messages
+                end
+              end
+
+              for ruleset_name, facts in c._facts do
+                if facts.length == 1
+                  @host.assert ruleset_name, facts[0]
+                else
+                  @host.assert_facts ruleset_name, facts
+                end
+              end
+
+              for ruleset_name, facts in c._retract do
+                if facts.length == 1
+                  @host.retract ruleset_name, facts[0]
+                else
+                  @host.retract_facts ruleset_name, facts
                 end
               end
 
@@ -734,8 +821,16 @@ module Engine
       get_ruleset(ruleset_name).assert_fact fact
     end
 
+    def assert_facts(ruleset_name, *facts)
+      get_ruleset(ruleset_name).assert_facts facts
+    end
+
     def retract(ruleset_name, fact)
       get_ruleset(ruleset_name).retract_fact fact
+    end
+
+    def retract_facts(ruleset_name, *facts)
+      get_ruleset(ruleset_name).retract_facts facts
     end
 
     def start_timer(ruleset_name, sid, timer_name, timer_duration)
