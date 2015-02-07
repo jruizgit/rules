@@ -10,7 +10,7 @@ with statechart('miss_manners'):
                            'id': c.s.g_count,
                            's_id': c.s.count, 
                            'p_id': 0, 
-                           'path': 1, 
+                           'path': True, 
                            'left_seat': 1, 
                            'left_guest_name': c.m.name,
                            'right_seat': 1,
@@ -27,7 +27,7 @@ with statechart('miss_manners'):
     with state('assign'):
         @to('make')
         @when_all(c.seating << (m.t == 'seating') & 
-                               (m.path == 1),
+                               (m.path == True),
                   c.right_guest << (m.t == 'guest') & 
                                    (m.name == c.seating.right_guest_name),
                   c.left_guest << (m.t == 'guest') & 
@@ -45,7 +45,7 @@ with statechart('miss_manners'):
                            'id': c.s.g_count,
                            's_id': c.s.count, 
                            'p_id': c.seating.s_id, 
-                           'path': 0, 
+                           'path': False, 
                            'left_seat': c.seating.right_seat, 
                            'left_guest_name': c.seating.right_guest_name,
                            'right_seat': c.seating.right_seat + 1,
@@ -66,7 +66,7 @@ with statechart('miss_manners'):
     with state('make'):
         @to('make')
         @when_all(c.seating << (m.t == 'seating') & 
-                               (m.path == 0),
+                               (m.path == False),
                   c.path << (m.t == 'path') & 
                             (m.p_id == c.seating.p_id),
                   none((m.t == 'path') & 
@@ -81,11 +81,11 @@ with statechart('miss_manners'):
             c.s.g_count += 1
 
         @to('check')
-        @when_all(pri(1), (m.t == 'seating') & (m.path == 0))
+        @when_all(pri(1), (m.t == 'seating') & (m.path == False))
         def path_done(c):
             c.retract_fact(c.m)
             c.m.id = c.s.g_count
-            c.m.path = 1
+            c.m.path = True
             c.assert_fact(c.m)
             c.s.g_count += 1
             print('path sid: {0}, pid: {1}, left guest: {2}, right guest {3}, {4}'.format(c.m.s_id, c.m.p_id, c.m.left_guest_name, c.m.right_guest_name, datetime.datetime.now().strftime('%I:%M:%S%p')))

@@ -261,7 +261,7 @@ void rehydrateProperty(jsonProperty *property, char *state) {
         unsigned short propertyLength = property->valueLength + 1;
         char *propertyFirst = state + property->valueOffset;
         unsigned char propertyType = property->type;
-        unsigned char b = 1;
+        unsigned char b = 0;
         char temp;
 
         switch(propertyType) {
@@ -278,9 +278,10 @@ void rehydrateProperty(jsonProperty *property, char *state) {
                 propertyFirst[propertyLength] = temp;
                 break;
             case JSON_BOOL:
-                if (propertyLength == 5 && strncmp("false", propertyFirst, 5)) {
-                    b = 0;
+                if (propertyLength == 4 && strncmp("true", propertyFirst, 4) == 0) {
+                    b = 1;
                 }
+
                 property->value.b = b;
                 break;
         }

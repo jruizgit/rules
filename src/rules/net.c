@@ -72,6 +72,17 @@ static unsigned int createIdiom(ruleset *tree, jsonValue *newValue, char **idiom
             if (asprintf(idiomString, "%g", newValue->value.d) == -1) {
                 return ERR_OUT_OF_MEMORY;
             }
+        case JSON_BOOL:
+            if (newValue->value.b == 0) {
+                if (asprintf(idiomString, "false") == -1) {
+                    return ERR_OUT_OF_MEMORY;
+                }
+            }
+            else {
+                if (asprintf(idiomString, "true") == -1) {
+                    return ERR_OUT_OF_MEMORY;
+                }
+            }
             break;
     }
 
@@ -704,7 +715,11 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        elseif ARGV[index + 2] == \"2\" or  ARGV[index + 2] == \"3\" then\n"
 "            message[ARGV[index]] = tonumber(ARGV[index + 1])\n"
 "        elseif ARGV[index + 2] == \"4\" then\n"
-"            message[ARGV[index]] = toboolean(ARGV[index + 1])\n"
+"            if ARGV[index + 1] == \"true\" then\n"
+"                message[ARGV[index]] = true\n"
+"            else\n"
+"                message[ARGV[index]] = false\n"
+"            end\n"
 "        end\n"
 "    end\n"
 "    if assert_fact == 1 then\n"
@@ -956,7 +971,11 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    elseif ARGV[index + 2] == \"2\" or  ARGV[index + 2] == \"3\" then\n"
 "        message[ARGV[index]] = tonumber(ARGV[index + 1])\n"
 "    elseif ARGV[index + 2] == \"4\" then\n"
-"        message[ARGV[index]] = toboolean(ARGV[index + 1])\n"
+"        if ARGV[index + 1] == \"true\" then\n"
+"            message[ARGV[index]] = true\n"
+"        else\n"
+"            message[ARGV[index]] = false\n"
+"        end\n"
 "    end\n"
 "end\n"
 "local mid = message[\"id\"]\n"

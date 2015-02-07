@@ -7,7 +7,7 @@ Durable.statechart :miss_manners do
              :id => s.g_count,
              :s_id => s.count,
              :p_id => 0,
-             :path => 1, 
+             :path => true, 
              :left_seat => 1,
              :left_guest_name => m.name,
              :right_seat => 1,
@@ -24,7 +24,7 @@ Durable.statechart :miss_manners do
   end
   state :assign do
     to :make, when_all(c.seating = (m.t == "seating") & 
-                                   (m.path == 1), 
+                                   (m.path == true), 
                        c.right_guest = (m.t == "guest") & 
                                        (m.name == seating.right_guest_name), 
                        c.left_guest = (m.t == "guest") & 
@@ -41,7 +41,7 @@ Durable.statechart :miss_manners do
              :id => s.g_count,
              :s_id => s.count,
              :p_id => seating.s_id,
-             :path => 0,
+             :path => false,
              :left_seat => seating.right_seat,
              :left_guest_name => seating.right_guest_name,
              :right_seat => seating.right_seat + 1,
@@ -62,7 +62,7 @@ Durable.statechart :miss_manners do
   end
   state :make do
     to :make, when_all(c.seating = (m.t == "seating") &
-                                   (m.path == 0),
+                                   (m.path == false),
                        c.path = (m.t == "path") &
                                 (m.p_id == seating.p_id),
                        none((m.t == "path") &
@@ -75,10 +75,10 @@ Durable.statechart :miss_manners do
              :guest_name => path.guest_name)
       s.g_count += 1
     end
-    to :check, when_all(pri(1), (m.t == "seating") & (m.path == 0)) do
+    to :check, when_all(pri(1), (m.t == "seating") & (m.path == false)) do
       retract(m)
       m.id = s.g_count
-      m.path = 1
+      m.path = true
       assert(m)
       s.g_count += 1
       puts("path sid: #{m.s_id}, pid: #{m.p_id}, left guest: #{m.left_guest_name}, right guest: #{m.right_guest_name}, #{Time.now}")

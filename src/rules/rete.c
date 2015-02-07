@@ -326,7 +326,7 @@ static void copyValue(ruleset *tree,
         case JSON_BOOL:
             leftLength = last - first + 1;
             unsigned char leftb = 1;
-            if (leftLength == 5 && strncmp("false", first, 5)) {
+            if (leftLength == 5 && strncmp("false", first, 5) == 0) {
                 leftb = 0;
             }
             right->value.b = leftb;
@@ -379,8 +379,7 @@ static unsigned char compareValue(ruleset *tree,
         case JSON_BOOL:
             leftLength = last - first + 1;
             unsigned char leftb = 1;
-            if ((leftLength == 5 && strncmp("false", first, 5)) ||
-                (leftLength == 1 && first[0] == '0')) {
+            if (leftLength == 5 && strncmp("false", first, 5) == 0) {
                 leftb = 0;
             } 
             return (right->value.b == leftb);     
