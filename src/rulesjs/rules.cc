@@ -287,6 +287,44 @@ Handle<Value> jsRetractFact(const Arguments& args) {
     return scope.Close(Undefined());
 }
 
+Handle<Value> jsRetractFacts(const Arguments& args) {
+    HandleScope scope;
+
+    if (args.Length() < 2) {
+        ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+        ThrowException(Exception::TypeError(String::New("Wrong argument type")));
+    } else {
+        unsigned int *results = NULL;
+        unsigned int resultsLength;
+        unsigned int result = retractFacts((void *)args[0]->IntegerValue(), 
+                                           *v8::String::Utf8Value(args[1]->ToString()), 
+                                           &resultsLength, 
+                                           &results);
+        
+        if (result == RULES_OK) {
+            Handle<Array> array = Array::New(resultsLength);
+            for (unsigned int i = 0; i < resultsLength; ++i) {
+                array->Set(i, Number::New(results[i]));
+            }
+            if (results) {
+                free(results);
+            }
+            return scope.Close(array);
+        } else {
+            char * message;
+            asprintf(&message, "Could not retract facts, error code: %d", result);
+            ThrowException(Exception::TypeError(String::New(message)));
+            if (results) {
+                free(results);
+            }   
+            free(message);
+        } 
+    }
+
+    return scope.Close(Undefined());
+}
+
 Handle<Value> jsAssertState(const Arguments& args) {
     HandleScope scope;
 
@@ -552,6 +590,9 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewSymbol("retractFact"),
         FunctionTemplate::New(jsRetractFact)->GetFunction());
+
+    exports->Set(String::NewSymbol("retractFacts"),
+        FunctionTemplate::New(jsRetractFacts)->GetFunction());
 
     exports->Set(String::NewSymbol("assertTimers"),
         FunctionTemplate::New(jsAssertTimers)->GetFunction());

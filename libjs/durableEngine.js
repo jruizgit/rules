@@ -6,8 +6,12 @@ exports = module.exports = durableEngine = function () {
 
     var closure = function (document, output, handle, rulesetName) {
         var that = {};
-        var messageRulesets = [];
-        var messageDirectory = {};
+        var eventsRulesets = [];
+        var eventsDirectory = {};
+        var factsRulesets = [];
+        var factsDirectory = {};
+        var retractRulesets = [];
+        var retractDirectory = {};
         var timerNames = [];
         var timerDirectory = {};
         var branchNames = [];
@@ -27,12 +31,28 @@ exports = module.exports = durableEngine = function () {
             return output;
         };
 
-        that.getMessageRulesets = function () {
-            return messageRulesets;
+        that.getEventsRulesets = function () {
+            return eventsRulesets;
         };
 
-        that.getMessages = function () {
-            return messageDirectory;
+        that.getEvents = function () {
+            return eventsDirectory;
+        };
+
+        that.getFactsRulesets = function () {
+            return factsRulesets;
+        };
+
+        that.getFacts = function () {
+            return factsDirectory;
+        };
+
+        that.getRetractRulesets = function () {
+            return retractRulesets;
+        };
+
+        that.getRetract = function () {
+            return retractDirectory;
         };
 
         that.getTimerNames = function () {
@@ -52,6 +72,10 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.signal = function (message) {
+            if (that.m === message) {
+                message = copy(message);
+            }
+
             var nameIndex = rulesetName.lastIndexOf('.');
             var parentNamespace = rulesetName.slice(0, nameIndex);
             var name = rulesetName.slice(nameIndex + 1);
@@ -71,16 +95,81 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.post = function (rules, message) {
-            var messageList;
-            if (messageDirectory[rules]) {
-                messageList = messageDirectory[rules];
-            } else {
-                messageList = [];
-                messageRulesets.push(rules);
-                messageDirectory[rules] = messageList;
+            if (!message) {
+                message = rules;
+                rules = rulesetName;
             }
 
-            messageList.push(message);
+            if (that.m === message) {
+                message = copy(message);
+            }
+
+            if (!message.sid) {
+                message.sid = that.s.sid;
+            }
+
+            var eventsList;
+            if (eventsDirectory[rules]) {
+                eventsList = eventsDirectory[rules];
+            } else {
+                eventsList = [];
+                eventsRulesets.push(rules);
+                eventsDirectory[rules] = eventsList;
+            }
+
+            eventsList.push(message);
+        };
+
+        that.assert = function (rules, fact) {
+            if (!fact) {
+                fact = rules;
+                rules = rulesetName;
+            }
+
+            if (that.m === fact) {
+                fact = copy(fact);
+            }
+
+            if (!fact.sid) {
+                fact.sid = that.s.sid;
+            }
+            
+            var factsList;
+            if (factsDirectory[rules]) {
+                factsList = factsDirectory[rules];
+            } else {
+                factsList = [];
+                factsRulesets.push(rules);
+                factsDirectory[rules] = factsList;
+            }
+
+            factsList.push(fact);
+        };
+
+        that.retract = function (rules, fact) {
+            if (!fact) {
+                fact = rules;
+                rules = rulesetName;
+            }
+
+            if (that.m === fact) {
+                fact = copy(fact);
+            }
+
+            if (!fact.sid) {
+                fact.sid = that.s.sid;
+            }
+            
+            var retractList;
+            if (retractDirectory[rules]) {
+                retractList = retractDirectory[rules];
+            } else {
+                retractList = [];
+                retractRulesets.push(rules);
+                retractDirectory[rules] = retractList;
+            }
+
+            retractList.push(fact);
         };
 
         that.startTimer = function (name, duration) {
@@ -180,30 +269,29 @@ exports = module.exports = durableEngine = function () {
         return that;
     };
 
-    var fork = function (branchNames, filter) {
-
-        var copy = function (object) {
-            var newObject = {};
-            for (var pName in object) {
-                if (!filter || filter(pName)) {
-                    var propertyType = typeof(object[pName]);
-                    if (propertyType !== 'function') {
-                        if (propertyType === 'object') {
-                            newObject[pName] = copy(object[pName]);
-                        }
-                        else {
-                            newObject[pName] = object[pName];
-                        }
+    var copy = function (object, filter) {
+        var newObject = {};
+        for (var pName in object) {
+            if (!filter || filter(pName)) {
+                var propertyType = typeof(object[pName]);
+                if (propertyType !== 'function') {
+                    if (propertyType === 'object') {
+                        newObject[pName] = copy(object[pName]);
+                    }
+                    else {
+                        newObject[pName] = object[pName];
                     }
                 }
             }
+        }
 
-            return newObject;
-        };
+        return newObject;
+    };
 
+    var fork = function (branchNames, filter) {  
         var execute = function (c) {
             for (var i = 0; i < branchNames.length; ++i) {
-                c.fork(branchNames[i], c.s.sid, copy(c.s));
+                c.fork(branchNames[i], c.s.sid, copy(c.s, filter));
             }
         };
 
@@ -251,27 +339,51 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
-        that.assertFact = function (message, complete) {
+        that.assertFact = function (fact, complete) {
             if (complete) {
                 try {
-                    complete(null, r.assertFact(handle, JSON.stringify(message)));
+                    complete(null, r.assertFact(handle, JSON.stringify(fact)));
                 } catch(err) {
                     complete(err);
                 }
             } else {
-                r.assertFact(handle, JSON.stringify(message));
+                r.assertFact(handle, JSON.stringify(fact));
             }
         };
 
-         that.retractFact = function (message, complete) {
+        that.assertFacts = function (facts, complete) {
             if (complete) {
                 try {
-                    complete(null, r.retractFact(handle, JSON.stringify(message)));
+                    complete(null, r.assertFacts(handle, JSON.stringify(facts)));
                 } catch(err) {
                     complete(err);
                 }
             } else {
-                r.retractFact(handle, JSON.stringify(message));
+                r.assertFacts(handle, JSON.stringify(facts));
+            }
+        };
+
+        that.retractFact = function (fact, complete) {
+            if (complete) {
+                try {
+                    complete(null, r.retractFact(handle, JSON.stringify(fact)));
+                } catch(err) {
+                    complete(err);
+                }
+            } else {
+                r.retractFact(handle, JSON.stringify(fact));
+            }
+        };
+
+        that.retractFacts = function (facts, complete) {
+            if (complete) {
+                try {
+                    complete(null, r.retractFacts(handle, JSON.stringify(facts)));
+                } catch(err) {
+                    complete(err);
+                }
+            } else {
+                r.retractFacts(handle, JSON.stringify(facts));
             }
         };
 
@@ -314,6 +426,58 @@ exports = module.exports = durableEngine = function () {
                 complete(null, JSON.parse(r.getRulesetState(handle)));
             } catch(err) {
                 complete(err);
+            }
+        }
+
+        var retract = function (facts, names, index, c, complete) {
+            if (index == names.length) {
+                complete(null, c);
+            } else {
+                var rules = names[index];
+                var factsList = facts[rules];
+                if (factsList.length == 1) {
+                    host.retract(rules, factsList[0], function (err) {
+                        if (err) {
+                            complete(err, c);
+                        } else {
+                            retract(facts, names, ++index, c, complete);
+                        }
+                    });
+                } else {
+                    host.retractFacts(rules, factsList, function (err) {
+                        if (err) {
+                            complete(err, c);
+                        } else {
+                            retract(facts, names, ++index, c, complete);
+                        }
+                    });
+                }
+            }
+        }
+
+        var assert = function (facts, names, index, c, complete) {
+            if (index == names.length) {
+                complete(null, c);
+            } else {
+                var rules = names[index];
+                var factsList = facts[rules];
+                if (factsList.length == 1) {
+                    host.assert(rules, factsList[0], function (err) {
+                        if (err) {
+                            complete(err, c);
+                        } else {
+                            assert(facts, names, ++index, c, complete);
+                        }
+                    });
+                } else {
+                    host.assertFacts(rules, factsList, function (err) {
+                        if (err) {
+                            complete(err, c);
+                        } else {
+                            assert(facts, names, ++index, c, complete);
+                        }
+                    });
+                }
             }
         }
 
@@ -419,8 +583,8 @@ exports = module.exports = durableEngine = function () {
                         }
                         complete(err);
                     } else {
-                        var messages = c.getMessages();
-                        var rulesets = c.getMessageRulesets();
+                        var messages = c.getEvents();
+                        var rulesets = c.getEventsRulesets();
                         postMessages(messages, rulesets, 0, c, function (err, c) {
                             if (err) {
                                 try {
@@ -431,9 +595,9 @@ exports = module.exports = durableEngine = function () {
                                 }
                                 complete(err);
                             } else {
-                                var branches = c.getBranches();
-                                var branchNames = c.getBranchNames();
-                                startBranches(branches, branchNames, 0, c, function (err, c) {
+                                var facts = c.getFacts();
+                                var rulesets = c.getFactsRulesets();
+                                assert(facts, rulesets, 0, c, function (err, c) {
                                     if (err) {
                                         try {
                                             r.abandonAction(handle, c.getHandle());
@@ -443,9 +607,9 @@ exports = module.exports = durableEngine = function () {
                                         }
                                         complete(err);
                                     } else {
-                                        var timers = c.getTimers();
-                                        var timerNames = c.getTimerNames();
-                                        startTimers(timers, timerNames, 0, c, function (err, c) {
+                                        var facts = c.getRetract();
+                                        var rulesets = c.getRetractRulesets();
+                                        retract(facts, rulesets, 0, c, function (err, c) {
                                             if (err) {
                                                 try {
                                                     r.abandonAction(handle, c.getHandle());
@@ -455,17 +619,45 @@ exports = module.exports = durableEngine = function () {
                                                 }
                                                 complete(err);
                                             } else {
-                                                try {
-                                                    r.completeAction(handle, c.getHandle(), JSON.stringify(c.s));   
-                                                } catch (reason) {
-                                                    complete(reason);
-                                                    return;
-                                                }
+                                                var branches = c.getBranches();
+                                                var branchNames = c.getBranchNames();
+                                                startBranches(branches, branchNames, 0, c, function (err, c) {
+                                                    if (err) {
+                                                        try {
+                                                            r.abandonAction(handle, c.getHandle());
+                                                        } catch (reason) {
+                                                            complete(reason);
+                                                            return;
+                                                        }
+                                                        complete(err);
+                                                    } else {
+                                                        var timers = c.getTimers();
+                                                        var timerNames = c.getTimerNames();
+                                                        startTimers(timers, timerNames, 0, c, function (err, c) {
+                                                            if (err) {
+                                                                try {
+                                                                    r.abandonAction(handle, c.getHandle());
+                                                                } catch (reason) {
+                                                                    complete(reason);
+                                                                    return;
+                                                                }
+                                                                complete(err);
+                                                            } else {
+                                                                try {
+                                                                    r.completeAction(handle, c.getHandle(), JSON.stringify(c.s));   
+                                                                } catch (reason) {
+                                                                    complete(reason);
+                                                                    return;
+                                                                }
+                                                                complete();
+                                                            }
+                                                        });
+                                                    }
+                                                });
                                             }
                                         });
                                     }
                                 });
-                                complete();
                             }
                         }); 
                     }
@@ -946,7 +1138,7 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
-         that.assert = function (rulesetName, message, complete) {
+        that.assert = function (rulesetName, fact, complete) {
             var lastError;
             that.getRuleset(rulesetName, function (err, rules) {
                 if (err) {
@@ -956,7 +1148,7 @@ exports = module.exports = durableEngine = function () {
                         lastError = err;
                     }
                 } else {
-                    rules.assertFact(message, complete);
+                    rules.assertFact(fact, complete);
                 }
             });
 
@@ -965,7 +1157,7 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
-        that.retract = function (rulesetName, message, complete) {
+        that.assertFacts = function (rulesetName, facts, complete) {
             var lastError;
             that.getRuleset(rulesetName, function (err, rules) {
                 if (err) {
@@ -975,7 +1167,45 @@ exports = module.exports = durableEngine = function () {
                         lastError = err;
                     }
                 } else {
-                    rules.retractFact(message, complete);
+                    rules.assertFacts(facts, complete);
+                }
+            });
+
+            if (lastError) {
+                throw lastError;
+            }
+        };
+
+        that.retract = function (rulesetName, fact, complete) {
+            var lastError;
+            that.getRuleset(rulesetName, function (err, rules) {
+                if (err) {
+                    if (complete) {
+                        complete(err);
+                    } else {
+                        lastError = err;
+                    }
+                } else {
+                    rules.retractFact(fact, complete);
+                }
+            });
+
+            if (lastError) {
+                throw lastError;
+            }
+        };
+
+        that.retractFacts = function (rulesetName, facts, complete) {
+            var lastError;
+            that.getRuleset(rulesetName, function (err, rules) {
+                if (err) {
+                    if (complete) {
+                        complete(err);
+                    } else {
+                        lastError = err;
+                    }
+                } else {
+                    rules.retractFacts(facts, complete);
                 }
             });
 
