@@ -23,6 +23,9 @@
             }],
         ['OS=="solaris"', {
             'cflags+': [ '-std=c99' ]
+        }],
+        ['OS=="linux"', {
+            'cflags+': [ '-std=c99' ]
         }]
       ]
     }
