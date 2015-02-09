@@ -351,7 +351,7 @@ static unsigned int getNumber(char *start, char **first, char **last, unsigned c
 
 static unsigned int getString(char *start, char **first, char **last) {
     unsigned char state = ST_STRING_SEEK;
-    char delimiter;
+    char delimiter = '\0';
     while(start[0] != '\0') {
         switch (state) {
             case ST_STRING_SEEK:
@@ -385,7 +385,7 @@ static unsigned int getString(char *start, char **first, char **last) {
 
 static unsigned int getStringAndHash(char *start, char **first, char **last, unsigned int *hash) {
     unsigned char state = ST_STRING_SEEK;
-    char delimiter;
+    char delimiter = '\0';
     unsigned int currentHash = 5381;
     while(start[0] != '\0') {
         switch (state) {

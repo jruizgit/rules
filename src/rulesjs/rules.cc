@@ -2,6 +2,7 @@
 #include <node.h>
 #include <v8.h>
 #include <rules.h>
+#include <stdio.h>
 
 using namespace v8;
 
@@ -39,10 +40,13 @@ Handle<Value> jsCreateRuleset(const Arguments& args) {
                                             *v8::String::Utf8Value(args[1]->ToString()),
                                             args[2]->IntegerValue());
         if (result != RULES_OK) {
-            char * message;
-            asprintf(&message, "Could not create ruleset, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
+            char *message = NULL;
+            if (asprintf(&message, "Could not create ruleset, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
         } else {
             return scope.Close(Number::New((long)output));
         }
@@ -61,10 +65,13 @@ Handle<Value> jsDeleteRuleset(const Arguments& args) {
     } else {
         unsigned int result = deleteRuleset((void *)args[0]->IntegerValue()); 
         if (result != RULES_OK) {
-            char * message;
-            asprintf(&message, "Could not delete ruleset, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
+            char *message = NULL;
+            if (asprintf(&message, "Could not delete ruleset, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
         }
     }
 
@@ -93,10 +100,13 @@ Handle<Value> jsBindRuleset(const Arguments& args) {
         }
 
         if (result != RULES_OK) {
-            char * message;
-            asprintf(&message, "Could not create connection, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
+            char *message = NULL;
+            if (asprintf(&message, "Could not create connection, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
         } 
     }
 
@@ -120,10 +130,13 @@ Handle<Value> jsAssertEvent(const Arguments& args) {
         else if (result == ERR_EVENT_NOT_HANDLED) {
             return scope.Close(Number::New(0));
         } else {
-            char * message;
-            asprintf(&message, "Could not assert event, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
+            char *message = NULL;
+            if (asprintf(&message, "Could not assert event, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
         } 
     }
 
@@ -155,13 +168,17 @@ Handle<Value> jsAssertEvents(const Arguments& args) {
             }
             return scope.Close(array);
         } else {
-            char * message;
-            asprintf(&message, "Could not assert events, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
+            char *message = NULL;
+            if (asprintf(&message, "Could not assert events, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
+
             if (results) {
                 free(results);
             }   
-            free(message);
         } 
     }
 
@@ -185,10 +202,13 @@ Handle<Value> jsRetractEvent(const Arguments& args) {
         else if (result == ERR_EVENT_NOT_HANDLED) {
             return scope.Close(Number::New(0));
         } else {
-            char * message;
-            asprintf(&message, "Could not retract event, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
+            char *message = NULL;
+            if (asprintf(&message, "Could not retract event, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
         } 
     }
 
@@ -212,10 +232,13 @@ Handle<Value> jsAssertFact(const Arguments& args) {
         else if (result == ERR_EVENT_NOT_HANDLED) {
             return scope.Close(Number::New(0));
         } else {
-            char * message;
-            asprintf(&message, "Could not assert fact, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
+            char *message = NULL;
+            if (asprintf(&message, "Could not assert fact, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
         } 
     }
 
@@ -247,13 +270,16 @@ Handle<Value> jsAssertFacts(const Arguments& args) {
             }
             return scope.Close(array);
         } else {
-            char * message;
-            asprintf(&message, "Could not assert facts, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
+            char *message = NULL;
+            if (asprintf(&message, "Could not assert facts, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
             if (results) {
                 free(results);
             }   
-            free(message);
         } 
     }
 
@@ -278,9 +304,12 @@ Handle<Value> jsRetractFact(const Arguments& args) {
             return scope.Close(Number::New(0));
         } else {
             char * message;
-            asprintf(&message, "Could not retract fact, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
+            if (asprintf(&message, "Could not retract fact, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
         } 
     }
 
@@ -312,13 +341,16 @@ Handle<Value> jsRetractFacts(const Arguments& args) {
             }
             return scope.Close(array);
         } else {
-            char * message;
-            asprintf(&message, "Could not retract facts, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
+            char *message = NULL;
+            if (asprintf(&message, "Could not retract facts, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
             if (results) {
                 free(results);
             }   
-            free(message);
         } 
     }
 
@@ -342,10 +374,13 @@ Handle<Value> jsAssertState(const Arguments& args) {
         else if (result == ERR_EVENT_NOT_HANDLED) {
             return scope.Close(Number::New(0));
         } else {
-            char * message;
-            asprintf(&message, "Could not assert state, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
+            char *message = NULL;
+            if (asprintf(&message, "Could not assert state, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
         } 
     }
 
@@ -374,10 +409,13 @@ Handle<Value> jsStartAction(const Arguments& args) {
             array->Set(2, String::New(messages));
             return scope.Close(array);
         } else if (result != ERR_NO_ACTION_AVAILABLE) {
-            char * message;
-            asprintf(&message, "Could not start action, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
+            char *message = NULL;
+            if (asprintf(&message, "Could not start action, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
         }
     }
 
@@ -397,10 +435,13 @@ Handle<Value> jsCompleteAction(const Arguments& args) {
                                             *v8::String::Utf8Value(args[2]->ToString()));
         
         if (result != RULES_OK) {
-            char * message;
-            asprintf(&message, "Could not complete action, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
+            char *message = NULL;
+            if (asprintf(&message, "Could not complete action, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
         } 
     }
 
@@ -419,10 +460,13 @@ Handle<Value> jsAbandonAction(const Arguments& args) {
                                             (void *)args[1]->IntegerValue());
         
         if (result != RULES_OK) {
-            char * message;
-            asprintf(&message, "Could not abandon action, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
+            char *message = NULL;
+            if (asprintf(&message, "Could not abandon action, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
         } 
     }
 
@@ -443,10 +487,13 @@ Handle<Value> jsStartTimer(const Arguments& args) {
                                          *v8::String::Utf8Value(args[3]->ToString()));
         
         if (result != RULES_OK) {
-            char * message;
-            asprintf(&message, "Could not start timer, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
+            char *message = NULL;
+            if (asprintf(&message, "Could not start timer, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
         } 
     }
 
@@ -468,10 +515,13 @@ Handle<Value> jsAssertTimers(const Arguments& args) {
         } else if (result == ERR_NO_TIMERS_AVAILABLE) {
             return scope.Close(Number::New(0));
         } else {
-            char * message;
-            asprintf(&message, "Could not assert timers, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
+            char *message = NULL;
+            if (asprintf(&message, "Could not assert timers, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
         } 
     }
 
@@ -495,10 +545,13 @@ Handle<Value> jsGetState(const Arguments& args) {
             free(state);
             return ret;
         } else if (result != ERR_NEW_SESSION) {
-            char * message;
-            asprintf(&message, "Could not get ruleset state, error code: %d", result);
-            ThrowException(Exception::TypeError(String::New(message)));
-            free(message);
+            char *message = NULL;
+            if (asprintf(&message, "Could not get state, error code: %d", result) == -1) {
+                ThrowException(Exception::Error(String::New("Out of memory")));
+            } else {
+                ThrowException(Exception::Error(String::New(message)));
+                free(message);
+            }
         }
     }
 

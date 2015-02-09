@@ -273,7 +273,7 @@ static unsigned int handleAction(ruleset *tree,
                                  unsigned short *commandCount,
                                  void **rulesBinding) {
     char *newCommand = NULL;
-    unsigned int result;
+    unsigned int result = ERR_UNEXPECTED_VALUE;
     if (*rulesBinding == NULL) {
         result = resolveBinding(tree, 
                                 sid, 
@@ -395,7 +395,7 @@ static unsigned int handleBeta(ruleset *tree,
         }
     }
 
-    node *actionNode;
+    node *actionNode = NULL;
     char prefix[prefixLength];
     char *currentPrefix = prefix;
     currentNode = betaNode;

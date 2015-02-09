@@ -22,7 +22,7 @@ static unsigned int createIdiom(ruleset *tree, jsonValue *newValue, char **idiom
             break;
         case JSON_EVENT_IDIOM:
             newIdiom = &tree->idiomPool[newValue->value.idiomOffset];
-            char *op;
+            char *op = "";
             switch (newIdiom->operator) {
                 case OP_ADD:
                     op = "+";
@@ -146,7 +146,7 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test) {
             free(oldTest);            
         } else {
             char *leftProperty = &tree->stringPool[currentNode->nameOffset];
-            char *op;
+            char *op = "";
             switch (currentNode->value.a.operator) {
                 case OP_LT:
                     op = "<";
@@ -1370,7 +1370,7 @@ unsigned int formatStoreMessage(void *rulesBinding,
     argvl[3] = strlen(key);
     argv[4] = sid;
     argvl[4] = strlen(sid);
-    argv[5] = assertFact ? "1" : "0";
+    argv[5] = storeFact ? "1" : "0";
     argvl[5] = 1;
 
     for (unsigned int i = 0; i < propertiesLength; ++i) {
@@ -1529,7 +1529,7 @@ unsigned int executeBatch(void *rulesBinding,
         return RULES_OK;
     }
 
-    unsigned int result;
+    unsigned int result = RULES_OK;
     unsigned short replyCount = commandCount;
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;
