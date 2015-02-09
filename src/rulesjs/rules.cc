@@ -2,7 +2,7 @@
 #include <node.h>
 #include <v8.h>
 #include <rules.h>
-#include <stdio.h>
+#include <stdlib.h>
 
 using namespace v8;
 

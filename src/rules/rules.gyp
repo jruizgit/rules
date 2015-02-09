@@ -4,6 +4,7 @@
         'target_name': 'rules',
         'type': 'static_library',
         'include_dirs': [ '.' ],
+        'defines': [ '_GNU_SOURCE' ],
         'direct_dependent_settings': {
             'include_dirs': [ '.' ]
         },
