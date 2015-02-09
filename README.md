@@ -11,16 +11,15 @@ The Durable Rules core engine is implemented in C, which enables ultra fast rule
 * A web client based on [D3.js](http://www.d3js.org) provides powerful data visualization and test tools.
 
 As an example let’s consider a couple of fictitious fraud rules used in bank account management. 
-Note: I’m paraphrasing the example presented in this [article](https://www.packtpub.com/books/content/drools-jboss-rules-50complex-event-processing).
-1. If there are two debit requests greater than 200% the average monthly withdrawal amount in a span of 2 minutes, flag the account as medium risk.
-2. If there are three consecutive increasing debit requests, withdrawing more than 70% the average monthly balance in a span of three minutes, flag the account as high risk.
+Note: I’m paraphrasing the example presented in this [article](https://www.packtpub.com/books/content/drools-jboss-rules-50complex-event-processing).  
+* If there are two debit requests greater than 200% the average monthly withdrawal amount in a span of 2 minutes, flag the account as medium risk.
+* If there are three consecutive increasing debit requests, withdrawing more than 70% the average monthly balance in a span of three minutes, flag the account as high risk.
 
 ####Ruby
 ```ruby
 require 'durable'
 
 Durable.ruleset :fraud_detection do
-
   # compute monthly averages
   when_all span(86400), (m.t == "debit_cleared") | (m.t == "credit_cleared") do
     debit_total = 0
@@ -69,10 +68,8 @@ from durable.lang import *
 import time
 
 with ruleset('fraud_detection'):
-
     # compute monthly averages
-    @when_all(span(86400),
-             (m.t == 'debit_cleared') | (m.t == 'credit_cleared'))
+    @when_all(span(86400), (m.t == 'debit_cleared') | (m.t == 'credit_cleared'))
     def handle_balance(c):
         debit_total = 0
         credit_total = 0
@@ -115,12 +112,10 @@ run_all()
 with (d.ruleset('fraudDetection')) {
 
     // compute monthly averages
-    whenAll(span(86400), 
-            or(m.t.eq('debitCleared'), m.t.eq('creditCleared')), 
+    whenAll(span(86400), or(m.t.eq('debitCleared'), m.t.eq('creditCleared')), 
     function(c) {
         var debitTotal = 0;
         var creditTotal = 0;
-        if (c.s.balance == null) {
         for (var i = 0; i < c.m.length; ++i) {
             if (c.m[i].t === 'debitCleared') {
                 debitTotal += c.m[i].amount;
