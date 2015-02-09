@@ -1,6 +1,6 @@
 exports = module.exports = durableEngine = function () {
     var d = require('./durableEngine');
-    var r = require('../build/release/rules.node');
+    var r = require('bindings')('rules.node');
 
     var argsToArray = function(args, array) {
         array = array || [];
