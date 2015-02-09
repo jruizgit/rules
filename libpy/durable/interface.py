@@ -13,9 +13,7 @@ class Application(object):
     def __init__(self, host, routing_rules = []):
         self._host = host
         routing_rules.append(Rule('/<ruleset_name>', endpoint=self._ruleset_definition_request))
-        routing_rules.append(Rule('/durableVisual.js', endpoint=self._visual_request))
         routing_rules.append(Rule('/<ruleset_name>/<sid>', endpoint=self._state_request))
-        routing_rules.append(Rule('/<ruleset_name>/<sid>/admin.html', endpoint=self._admin_request))
         self._url_map = Map(routing_rules)
 
     def _ruleset_definition_request(self, environ, start_response, ruleset_name):
@@ -52,18 +50,6 @@ class Application(object):
 
     def _not_found(self, environ, start_response):
         return Exception('File not found')
-
-    def _visual_request(self, environ, start_response):
-        middleware = SharedDataMiddleware(self._not_found, {
-            '/': os.path.join(os.path.dirname(__file__), 'ux')
-        })
-        return middleware(environ, start_response)
-
-    def _admin_request(self, environ, start_response, ruleset_name, sid):
-        middleware = SharedDataMiddleware(self._not_found, {
-            '/{0}/{1}/'.format(ruleset_name, sid): os.path.join(os.path.dirname(__file__), 'ux')
-        })
-        return middleware(environ, start_response)
 
     def __call__(self, environ, start_response):
         request = Request(environ)

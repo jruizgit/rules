@@ -32,6 +32,5 @@ setup (
     install_requires=['werkzeug'],
     packages = ['durable'],
     package_dir = {'': 'libpy'},
-    package_data={'': ['ux/*']},
     ext_modules = [rules]
 )

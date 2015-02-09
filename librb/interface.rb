@@ -9,10 +9,6 @@ module Interface
       @@host = value
     end
 
-    get "/durableVisual.js" do
-      send_file File.dirname(__FILE__) << "/ux/durableVisual.js"  
-    end
-
     get "/:ruleset_name/:sid" do
       begin
         JSON.generate @@host.get_state(params["ruleset_name"], params["sid"])
@@ -20,10 +16,6 @@ module Interface
         status 404
         e.to_s
       end
-    end
-
-    get "/:ruleset_name/:sid/admin.html" do
-      send_file File.dirname(__FILE__) << "/ux/admin.html"  
     end
 
     post "/:ruleset_name/:sid" do
