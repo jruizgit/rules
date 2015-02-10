@@ -1,6 +1,6 @@
 {
   "name": "durable",
-  "version": "0.30.6",
+  "version": "0.30.7",
   "description": "A lightweight library for real-time, consistent and scalable coordination of events.",
   "keywords": ["business rules", "rules engine", "rete", "forward chaining", "streaming analytics", "complex event processing", "state machine", "workflow"],
   "dependencies": { "express": "3.4.x" , "node-static": "0.7.x", "connect": "2.19.x", "hiredis": "0.1.x", "bindings": "*", "nan": "~1.1.0"},
