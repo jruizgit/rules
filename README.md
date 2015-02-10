@@ -18,7 +18,6 @@ Note: I'm paraphrasing the example presented in this [article](https://www.packt
 1. If there are two debit requests greater than 200% the average monthly withdrawal amount in a span of 2 minutes, flag the account as medium risk.
 2. If there are three consecutive increasing debit requests, withdrawing more than 70% the average monthly balance in a span of three minutes, flag the account as high risk.
 
-Remarks: The first rule uses a tumbling time window to calculate averages `span(86400)`. The second rule uses arithmetic and logical event correlation. The third rule leverages an eventually consistent context reference `s.avg_balance < `.
 
 ####Ruby
 ```ruby
