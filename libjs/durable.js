@@ -843,7 +843,7 @@ exports = module.exports = durableEngine = function () {
 
     var rulesets = [];
 
-    var runAll = function(databases, basePath, stateCacheSize) {
+    var runAll = function(databases, port, basePath, stateCacheSize) {
         var definitions = {};
         for (var i = 0; i < rulesets.length; ++ i) {
             definitions[rulesets[i].getName()] = rulesets[i].define(); 
@@ -852,7 +852,7 @@ exports = module.exports = durableEngine = function () {
 
         var rulesHost = d.host(databases, stateCacheSize);
         rulesHost.registerRulesets(null, definitions);
-        var app = d.application(rulesHost, basePath);
+        var app = d.application(rulesHost, port, basePath);
         for (var i = 0; i < rulesets.length; ++ i) {
             if (rulesets[i].getStart()) {
                 rulesets[i].getStart()(rulesHost);
@@ -862,11 +862,11 @@ exports = module.exports = durableEngine = function () {
         app.run(); 
     } 
 
-    var run = function (rulesetDefinitions, basePath, databases, start, stateCacheSize) {
+    var run = function (rulesetDefinitions, start, databases, port, basePath, stateCacheSize) {
         var rulesHost = d.host(databases, stateCacheSize);
         rulesHost.registerRulesets(null, rulesetDefinitions);
         
-        var app = d.application(rulesHost, basePath);
+        var app = d.application(rulesHost, port, basePath);
         if (start) {
             start(rulesHost, app);
         }

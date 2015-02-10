@@ -1276,11 +1276,11 @@ exports = module.exports = durableEngine = function () {
         return that;
     }
 
-    var application = function (host, basePath) {
+    var application = function (host, port, basePath) {
         var that = express();
-        var port = 5000;
         var fileServer = new stat.Server(__dirname);
         basePath = basePath || '';
+        port = port || 5000;
         if (basePath !== '' && basePath.indexOf('/') !== 0) {
             basePath = '/' + basePath;
         }
