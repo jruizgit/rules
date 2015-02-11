@@ -117,7 +117,6 @@ Durable.statechart :a2 do
     end
     to :pending, when_all((m.subject == 'approve') & (m.amount <= 1000)) do
       puts "a2 state request approval from: #{s.sid}"
-      s.status? ? s.status = "approved": s.status = "pending"
     end
   end  
   state :pending do
@@ -196,10 +195,96 @@ with (d.statechart('a2')) {
 }
 ```
 
-
 [top](concepts.md#table-of-contents)  
 
 #### Flowchart
+
+#####Ruby
+```ruby
+Durable.flowchart :a3 do
+  stage :input
+  to :request, when_all((m.subject == 'approve') & (m.amount <= 1000))
+  to :deny, when_all((m.subject == 'approve') & (m.amount > 1000))
+  
+  stage :request do
+    puts "a3 flow requesting approval for: #{s.sid}"
+    s.status? ? s.status = "approved": s.status = "pending"
+  end
+  to :approve, when_all(s.status == 'approved')
+  to :deny, when_all(m.subject == 'denied')
+  to :request, when_any(m.subject == 'approved', m.subject == 'ok')
+  
+  stage :approve do
+    puts "a3 flow aprroved: #{s.sid}"
+  end
+
+  stage :deny do
+    puts "a3 flow denied: #{s.sid}"
+  end
+end
+```
+#####Python
+```python
+with flowchart('a3'):
+    with stage('input'): 
+        to('request').when_all((m.subject == 'approve') & (m.amount <= 1000))
+        to('deny').when_all((m.subject == 'approve') & (m.amount > 1000))
+    
+    with stage('request'):
+        @run
+        def request(c):
+            print ('a3 request approval from: {0}'.format(c.s.sid))
+            if c.s.status:
+                c.s.status = 'approved'
+            else:
+                c.s.status = 'pending'
+
+        to('approve').when_all(s.status == 'approved')
+        to('deny').when_all(m.subject == 'denied')
+        to('request').when_any(m.subject == 'approved', m.subject == 'ok')
+    
+    with stage('approve'):
+        @run 
+        def approved(c):
+            print ('a3 approved from: {0}'.format(c.s.sid))
+
+    with stage('deny'):
+        @run
+        def denied(c):
+            print ('a3 denied from: {0}'.format(c.s.sid))
+```
+#####JavaScript
+```javascript
+with (d.flowchart('a3')) {
+    with (stage('input')) {
+        to('request').whenAll(m.subject.eq('approve').and(m.amount.lte(1000)));
+        to('deny').whenAll(m.subject.eq('approve').and(m.amount.gt(1000)));
+    }
+    with (stage('request')) {
+        run(function (c) {
+            console.log('a3 request approval from: ' + c.s.sid);
+            if (c.s.status) 
+                c.s.status = 'approved';
+            else
+                c.s.status = 'pending';
+        });
+        to('approve').whenAll(s.status.eq('approved'));
+        to('deny').whenAll(m.subject.eq('denied'));
+        to('request').whenAny(m.subject.eq('approved'), m.subject.eq('ok'));
+    }
+    with (stage('approve')) {
+        run(function (c) {
+            console.log('a3 approved from: ' + c.s.sid);
+        });
+    }
+    with (stage('deny')) {
+        run(function (c) {
+            console.log('a3 denied from: ' + c.s.sid);
+        });
+    }
+}
+```
+
 [top](concepts.md#table-of-contents)  
 
 #### Parallel
