@@ -4,22 +4,12 @@ Concepts
 ------
 * [Rules](reference.md#rules)
   * [Expressions](reference.md#expressions)
-  * [Actions](concepts.md#actions)
-  * [Algebra](concepts.md#algebra)
-  * [References](concepts.md#references) 
-  * [Attributes](concepts.md#references) 
-* [Data Model](concepts.md#data-model)
-  * [Events](concepts.md#events)
-  * [Facts](concepts.md#facts)
-  * [Context](concepts.md#context)
-  * [Timers](concepts.md#timers)
-* [Flow Structures](concepts.md#flow-structures)
-  * [Statechart](concepts.md#statechart)
-  * [Flowchart](concepts.md#flowchart)
-  * [Parallel](concepts.md#parallel)
-* [Extensions](concepts.md#extensions)
-  * [Host](concepts.md#host)
-  * [Application](concepts.md#application)
+* [Data Model](reference.md#data-model)
+* [Flow Structures](reference.md#flow-structures)
+  * [Statechart](reference.md#statechart)
+  * [Flowchart](reference.md#flowchart)
+  * [Parallel](reference.md#parallel)
+* [Extensions](reference.md#extensions)
 
 ### Rules
 ------
@@ -48,61 +38,21 @@ with (d.ruleset('a0')) {
     });
 }
 ```  
-
-
-
 [top](reference.md#table-of-contents)  
 
-Logical  
->, <, ==, !=, <=, >=, not, and, or
-
-Arithmetic  
-+, -, /, *  
-
-#### Actions
-
-Synchronous  
-Asynchronous  
-Post  
-Assert  
-Retract  
-Start Timer  
-
-[top](concepts.md#table-of-contents)  
-
-#### Algebra
-
-when all
-when any
-none
-
-[top](concepts.md#table-of-contents)  
-
-#### References
-
-context  
-message  
-
-#### Attributes
-
-pri  
-count  
-scope  
-
-[top](concepts.md#table-of-contents)  
 ### Data Model
 ------
 #### Events
-[top](concepts.md#table-of-contents)  
+[top](reference.md#table-of-contents)  
 
 #### Facts
-[top](concepts.md#table-of-contents)  
+[top](reference.md#table-of-contents)  
 
 #### Context
-[top](concepts.md#table-of-contents)  
+[top](reference.md#table-of-contents)  
 
 #### Timers
-[top](concepts.md#table-of-contents)  
+[top](reference.md#table-of-contents)  
 
 ### Flow Structures
 -------
@@ -195,7 +145,7 @@ with (d.statechart('a2')) {
 }
 ```
 
-[top](concepts.md#table-of-contents)  
+[top](reference.md#table-of-contents)  
 
 #### Flowchart
 
@@ -285,15 +235,15 @@ with (d.flowchart('a3')) {
 }
 ```
 
-[top](concepts.md#table-of-contents)  
+[top](reference.md#table-of-contents)  
 
 #### Parallel
-[top](concepts.md#table-of-contents)  
+[top](reference.md#table-of-contents)  
 ### Extensions
 -------
 #### Host
-[top](concepts.md#table-of-contents)  
+[top](reference.md#table-of-contents)  
 
 #### Application
-[top](concepts.md#table-of-contents)  
+[top](reference.md#table-of-contents)  
 
