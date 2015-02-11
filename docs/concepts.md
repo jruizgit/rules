@@ -20,57 +20,54 @@ Concepts
   * [Host](concepts.md#host)
   * [Application](concepts.md#application)
 
-### Introduction
+### Rules
 ------
 
 [top](concepts.md#table-of-contents)  
 
-### Abstraction
+### Expressions
 -----
 
-#### Rules
-
-[top](concepts.md#table-of-contents)  
-
-#### Statechart
-
-[top](concepts.md#table-of-contents)  
-
-#### Flowchart
-
-[top](concepts.md#table-of-contents)  
-#### Parallel
-
-[top](concepts.md#table-of-contents)  
-
-#### Expressions 
-[top](concepts.md#table-of-contents)  
-#### Event Algebra  
-[top](concepts.md#table-of-contents)  
 #### Actions
+
 [top](concepts.md#table-of-contents)  
-### Event Sources
+
+#### Algebra
+
+[top](concepts.md#table-of-contents)  
+
+#### References
+
+[top](concepts.md#table-of-contents)  
+### Data Model
 ------
-#### Web Messages
+#### Events
 [top](concepts.md#table-of-contents)  
 
-#### Internal Messages
+#### Facts
 [top](concepts.md#table-of-contents)  
 
-#### Signals
+#### Context
 [top](concepts.md#table-of-contents)  
 
 #### Timers
 [top](concepts.md#table-of-contents)  
 
-### Advanced Topics
+### Flow Structures
 -------
-#### Inference  
+#### Statechart
 [top](concepts.md#table-of-contents)  
 
-#### Scale
+#### Flowchart
 [top](concepts.md#table-of-contents)  
 
-#### Consistency
+#### Parallel
+[top](concepts.md#table-of-contents)  
+### Extensions
+-------
+#### Host
+[top](concepts.md#table-of-contents)  
+
+#### Application
 [top](concepts.md#table-of-contents)  
 
