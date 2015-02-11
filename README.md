@@ -162,6 +162,8 @@ with (d.ruleset('fraudDetection')) {
 d.runAll();
 ```
 
+Please read the [Reference Manual]() to learn more
+
 Blog:
 * [Boosting Performance with C (08/2014)](http://jruizblog.com/2014/08/19/boosting-performance-with-c/)
 * [Rete Meets Redis (02/2014)](http://jruizblog.com/2014/02/02/rete-meets-redis/)
