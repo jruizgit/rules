@@ -25,7 +25,32 @@ Concepts
 ------
 Rules are the basic building block and consist of antecedent (expression) and consequent (action)
 
-#### Expressions
+#####Ruby
+```ruby
+Durable.ruleset :a0 do
+  when_all (m.amount < 100) | (m.subject == "approve") | (m.subject == "ok") do
+    puts "a0 approved"
+  end
+end
+```
+#####Python
+```python
+with ruleset('a0'):
+    @when_all((m.subject == 'go') | (m.subject == 'approve') | (m.subject == 'ok'))
+    def approved(c):
+        print ('a0 approved ->{0}'.format(c.m.subject))
+```
+#####JavaScript
+```javascript
+with (d.ruleset('a0')) {
+    whenAll(or(m.amount.lt(100), m.subject.eq('approve'), m.subject.eq('ok')), function (c) {
+        console.log('a0 approved from ' + c.s.sid);
+    });
+}
+```  
+
+
+
 [top](concepts.md#table-of-contents)  
 
 Logical  
