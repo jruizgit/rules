@@ -3,10 +3,11 @@ Concepts
 ### Table of contents
 ------
 * [Rules](concepts.md#rules)
-  * [Algebra](concepts.md#algebra)
   * [Expressions](concepts.md#expressions)
-  * [References](concepts.md#references) 
   * [Actions](concepts.md#actions)
+  * [Algebra](concepts.md#algebra)
+  * [References](concepts.md#references) 
+  * [Attributes](concepts.md#references) 
 * [Data Model](concepts.md#data-model)
   * [Events](concepts.md#events)
   * [Facts](concepts.md#facts)
@@ -22,21 +23,46 @@ Concepts
 
 ### Rules
 ------
+Rules are the basic building block and consist of antecedent (expression) and consequent (action)
 
+#### Expressions
 [top](concepts.md#table-of-contents)  
 
-### Expressions
------
+Logical  
+>, <, ==, !=, <=, >=, not, and, or
+
+Arithmetic  
++, -, /, *  
 
 #### Actions
+
+Synchronous  
+Asynchronous  
+Post  
+Assert  
+Retract  
+Start Timer  
 
 [top](concepts.md#table-of-contents)  
 
 #### Algebra
 
+when all
+when any
+none
+
 [top](concepts.md#table-of-contents)  
 
 #### References
+
+context  
+message  
+
+#### Attributes
+
+pri  
+count  
+scope  
 
 [top](concepts.md#table-of-contents)  
 ### Data Model
