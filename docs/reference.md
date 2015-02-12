@@ -5,6 +5,7 @@ Reference Manual
 * [Rules](reference.md#rules)
   * [Simple Filter](reference.md#simple-filter)
   * [Correlated Sequence](reference.md#correlated-sequence)
+  * [Choice of Sequences](reference.md#choice-of-sequences)
 * [Data Model](reference.md#data-model)
 * [Flow Structures](reference.md#flow-structures)
   * [Statechart](reference.md#statechart)
@@ -107,6 +108,7 @@ with (d.ruleset('fraudDetection')) {
 ```
 [top](reference.md#table-of-contents)  
 #### Choice Of Sequences
+#####Ruby
 ```ruby
 Durable.ruleset :a4 do
   when_any all(m.subject == "approve", m.amount == 1000),
@@ -119,6 +121,7 @@ Durable.ruleset :a4 do
   end
 end
 ```
+#####Python
 ```python
 with ruleset('a4'):
     @when_any(all(m.subject == 'approve', m.amount == 1000), 
@@ -131,6 +134,7 @@ with ruleset('a4'):
         host.post('a4', {'id': 1, 'sid': 2, 'subject': 'jumbo'})
         host.post('a4', {'id': 2, 'sid': 2, 'amount': 10000})
 ```
+#####JavaScript
 ```javascript
 with (d.ruleset('a4')) {
     whenAny(all(m.subject.eq('approve'), m.amount.eq(1000)), 
@@ -143,7 +147,7 @@ with (d.ruleset('a4')) {
     });
 }
 ```
-
+[top](reference.md#table-of-contents) 
 ### Data Model
 ------
 #### Events
