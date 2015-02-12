@@ -106,6 +106,43 @@ with (d.ruleset('fraudDetection')) {
 }
 ```
 [top](reference.md#table-of-contents)  
+#### Choice Of Sequences
+```ruby
+Durable.ruleset :a4 do
+  when_any all(m.subject == "approve", m.amount == 1000),
+           all(m.subject == "jumbo", m.amount == 10000) do
+    puts "a4 action #{s.sid}"
+  end
+  when_start do
+    post :a4, {:id => 1, :sid => 2, :subject => "jumbo"}
+    post :a4, {:id => 2, :sid => 2, :amount => 10000}
+  end
+end
+```
+```python
+with ruleset('a4'):
+    @when_any(all(m.subject == 'approve', m.amount == 1000), 
+              all(m.subject == 'jumbo', m.amount == 10000))
+    def action(c):
+        print ('a4 action {0}'.format(c.s.sid))
+    
+    @when_start
+    def start(host):
+        host.post('a4', {'id': 1, 'sid': 2, 'subject': 'jumbo'})
+        host.post('a4', {'id': 2, 'sid': 2, 'amount': 10000})
+```
+```javascript
+with (d.ruleset('a4')) {
+    whenAny(all(m.subject.eq('approve'), m.amount.eq(1000)), 
+            all(m.subject.eq('jumbo'), m.amount.eq(10000)), function (c) {
+        console.log('a4 action from: ' + c.s.sid);
+    });
+    whenStart(function (host) {
+        host.post('a4', {id: 1, sid: 2, subject: 'jumbo'});
+        host.post('a4', {id: 2, sid: 2, amount: 10000});
+    });
+}
+```
 
 ### Data Model
 ------
