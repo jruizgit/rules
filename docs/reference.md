@@ -3,7 +3,8 @@ Reference Manual
 ### Table of contents
 ------
 * [Rules](reference.md#rules)
-  * [Expressions](reference.md#expressions)
+  * [Simple Filter](reference.md#simple-filter)
+  * [Correlated Sequence](reference.md#correlated-sequence)
 * [Data Model](reference.md#data-model)
 * [Flow Structures](reference.md#flow-structures)
   * [Statechart](reference.md#statechart)
@@ -14,6 +15,8 @@ Reference Manual
 ### Rules
 ------
 Rules are the basic building block and consist of antecedent (expression) and consequent (action)
+
+#### Simple Filter
 
 #####Ruby
 ```ruby
@@ -38,6 +41,7 @@ with (d.ruleset('a0')) {
     });
 }
 ```  
+#### Correlated Sequence
 #####Ruby
 ```ruby
 Durable.ruleset :fraud_detection do
