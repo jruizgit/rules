@@ -24,20 +24,30 @@ Durable.ruleset :a0 do
   when_all (m.amount < 100) | (m.subject == "approve") | (m.subject == "ok") do
     puts "a0 approved"
   end
+  when_start do
+    post :a0, {:id => 1, :sid => 1, :amount => 10}
+  end
 end
 ```
 #####Python
 ```python
 with ruleset('a0'):
-    @when_all((m.subject == 'go') | (m.subject == 'approve') | (m.subject == 'ok'))
+    @when_all((m.subject < 100) | (m.subject == 'approve') | (m.subject == 'ok'))
     def approved(c):
         print ('a0 approved ->{0}'.format(c.m.subject))
+        
+    @when_start
+    def start(host):
+        host.post('a0', {'id': 1, 'sid': 1, 'amount': 10})
 ```
 #####JavaScript
 ```javascript
 with (d.ruleset('a0')) {
     whenAll(or(m.amount.lt(100), m.subject.eq('approve'), m.subject.eq('ok')), function (c) {
         console.log('a0 approved from ' + c.s.sid);
+    });
+    whenStart(function (host) {
+        host.post('a0', {id: 1, sid: 1, amount: 10});
     });
 }
 ```  
