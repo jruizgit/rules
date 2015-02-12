@@ -42,8 +42,8 @@ with (d.ruleset('a0')) {
 ```ruby
 Durable.ruleset :fraud_detection do
   when_all c.first = m.t == "purchase",
-           c.second = m.amount > first.amount,
-           c.third = m.amount > second.amount,
+           c.second = m.amount > first.amount * 2,
+           c.third = m.amount > second.amount + first.amount,
            c.fourth = m.amount > (first.amount + second.amount + third.amount) / 3 do
     puts "fraud4 detected -> " + first.amount.to_s 
     puts "                -> " + second.amount.to_s
@@ -56,8 +56,8 @@ end
 ```python
 with ruleset('fraud_detection'):
     @when_all(c.first << m.amount > 100,
-              c.second << m.amount > c.first.amount,
-              c.third << m.amount > c.second.amount,
+              c.second << m.amount > c.first.amount * 2,
+              c.third << m.amount > c.second.amount + c.first.amount,
               c.fourth << m.amount > (c.first.amount + c.second.amount + c.third.amount) / 3)
     def detected(c):
         print('fraud3 detected -> {0}'.format(c.first.amount))
