@@ -152,6 +152,73 @@ with (d.ruleset('a4')) {
 }
 ```
 [top](reference.md#table-of-contents) 
+```ruby
+Durable.ruleset :attributes do
+  when_all pri(3), count(3), m.amount < 300 do
+    puts "attributes ->" + m[0].amount.to_s
+    puts "           ->" + m[1].amount.to_s
+    puts "           ->" + m[2].amount.to_s
+  end
+  when_all pri(2), count(2), m.amount < 200 do
+    puts "attributes ->" + m[0].amount.to_s
+    puts "           ->" + m[1].amount.to_s
+  end
+  when_all pri(1), m.amount < 100  do
+    puts "attributes ->" + m.amount.to_s
+  end
+  when_start do
+    assert :attributes, {:id => 1, :sid => 1, :amount => 50}
+    assert :attributes, {:id => 2, :sid => 1, :amount => 150}
+    assert :attributes, {:id => 3, :sid => 1, :amount => 250}
+  end
+end
+```
+```python
+with ruleset('attributes'):
+    @when_all(pri(3), count(3), m.amount < 300)
+    def first_detect(c):
+        print('attributes ->{0}'.format(c.m[0].amount))
+        print('           ->{0}'.format(c.m[1].amount))
+        print('           ->{0}'.format(c.m[2].amount))
+
+    @when_all(pri(2), count(2), m.amount < 200)
+    def second_detect(c):
+        print('attributes ->{0}'.format(c.m[0].amount))
+        print('           ->{0}'.format(c.m[1].amount))
+
+    @when_all(pri(1), m.amount < 100)
+    def third_detect(c):
+        print('attributes ->{0}'.format(c.m.amount))
+        
+    @when_start
+    def start(host):
+        host.assert_fact('attributes', {'id': 1, 'sid': 1, 'amount': 50})
+        host.assert_fact('attributes', {'id': 2, 'sid': 1, 'amount': 150})
+        host.assert_fact('attributes', {'id': 3, 'sid': 1, 'amount': 250})
+```
+```javascript
+with (d.ruleset('attributes')) {
+    whenAll(pri(3), count(3), m.amount.gt(300),
+        function(c) {
+            console.log('attributes first ' + c.m[0].amount);
+        }
+    );
+    whenAll(pri(2), count(2), m.amount.gt(200),
+        function(c) {
+            console.log('attributes second ' + c.m.amount);
+        }
+    );
+    whenAll(pri(1), m.amount.gt(300),
+        function(c) {
+            console.log('attributes third ' + c.m.amount);
+        }
+    );
+    whenStart(function (host) {
+        host.assert('fraud5', {id: 4, sid: 1, amount: 250});
+        host.assert('fraud5', {id: 5, sid: 1, amount: 500});
+    });
+}
+```
 ### Data Model
 ------
 #### Events
