@@ -154,6 +154,7 @@ with (d.ruleset('a4')) {
 [top](reference.md#table-of-contents)  
 
 #### Facts
+#####Ruby
 ```ruby
 Durable.ruleset :fraud_detection do
   when_all c.first = m.t == "purchase",
@@ -168,6 +169,7 @@ Durable.ruleset :fraud_detection do
   end
 end
 ```
+#####Python
 ```python
 with ruleset('fraud_detection'):
     @when_all(c.first << m.t == 'purchase',
@@ -182,6 +184,7 @@ with ruleset('fraud_detection'):
         host.assert_fact('fraud_detection', {'id': 1, 'sid': 1, 't': 'purchase', 'location': 'US'})
         host.assert_fact('fraud_detection', {'id': 2, 'sid': 1, 't': 'purchase', 'location': 'CA'})
 ```
+#####JavaScript
 ```javascript
 with (d.ruleset('fraudDetection')) {
     whenAll(c.first = m.t.eq('purchase'),
