@@ -6,6 +6,7 @@ Reference Manual
   * [Simple Filter](reference.md#simple-filter)
   * [Correlated Sequence](reference.md#correlated-sequence)
   * [Choice of Sequences](reference.md#choice-of-sequences)
+  * [Attributes](reference.md#attributes)
 * [Data Model](reference.md#data-model)
   * [Events](reference.md#events)
   * [Facts](reference.md#facts)
@@ -152,6 +153,7 @@ with (d.ruleset('a4')) {
 }
 ```
 [top](reference.md#table-of-contents) 
+#### Attributes
 ```ruby
 Durable.ruleset :attributes do
   when_all pri(3), count(3), m.amount < 300 do
@@ -198,27 +200,32 @@ with ruleset('attributes'):
 ```
 ```javascript
 with (d.ruleset('attributes')) {
-    whenAll(pri(3), count(3), m.amount.gt(300),
+    whenAll(pri(3), count(3), m.amount.lt(300),
         function(c) {
-            console.log('attributes first ' + c.m[0].amount);
+            console.log('attributes ->' + c.m[0].amount);
+            console.log('           ->' + c.m[1].amount);
+            console.log('           ->' + c.m[2].amount);
         }
     );
-    whenAll(pri(2), count(2), m.amount.gt(200),
+    whenAll(pri(2), count(2), m.amount.lt(200),
         function(c) {
-            console.log('attributes second ' + c.m.amount);
+            console.log('attributes ->' + c.m[0].amount);
+            console.log('           ->' + c.m[1].amount);
         }
     );
-    whenAll(pri(1), m.amount.gt(300),
+    whenAll(pri(1), m.amount.lt(100),
         function(c) {
-            console.log('attributes third ' + c.m.amount);
+            console.log('attributes ->' + c.m.amount);
         }
     );
     whenStart(function (host) {
-        host.assert('fraud5', {id: 4, sid: 1, amount: 250});
-        host.assert('fraud5', {id: 5, sid: 1, amount: 500});
+        host.assert('attributes', {id: 1, sid: 1, amount: 50});
+        host.assert('attributes', {id: 2, sid: 1, amount: 150});
+        host.assert('attributes', {id: 3, sid: 1, amount: 250});
     });
 }
 ```
+[top](reference.md#table-of-contents) 
 ### Data Model
 ------
 #### Events
