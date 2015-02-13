@@ -154,6 +154,50 @@ with (d.ruleset('a4')) {
 [top](reference.md#table-of-contents)  
 
 #### Facts
+```ruby
+Durable.ruleset :fraud_detection do
+  when_all c.first = m.t == "purchase",
+           c.second = m.location != first.location,
+           count(2) do
+    puts "fraud detected ->" + m[0].first.location + ", " + m[0].second.location
+    puts "               ->" + m[1].first.location + ", " + m[1].second.location
+  end
+  when_start do
+    assert :fraud_detection, {:id => 1, :sid => 1, :t => "purchase", :location => "US"}
+    assert :fraud_detection, {:id => 2, :sid => 1, :t => "purchase", :location => "CA"}
+  end
+end
+```
+```python
+with ruleset('fraud_detection'):
+    @when_all(c.first << m.t == 'purchase',
+              c.second << m.location != c.first.location,
+              count(2))
+    def detected(c):
+        print ('fraud detected ->{0}, {1}'.format(c.m[0].first.location, c.m[0].second.location))
+        print ('               ->{0}, {1}'.format(c.m[1].first.location, c.m[1].second.location))
+
+    @when_start
+    def start(host):
+        host.assert_fact('fraud_detection', {'id': 1, 'sid': 1, 't': 'purchase', 'location': 'US'})
+        host.assert_fact('fraud_detection', {'id': 2, 'sid': 1, 't': 'purchase', 'location': 'CA'})
+```
+```javascript
+with (d.ruleset('fraudDetection')) {
+    whenAll(c.first = m.t.eq('purchase'),
+            c.second = m.location.neq(c.first.location), 
+            count(2), 
+        function(c) {
+            console.log('fraud detected ->' + c.m[0].first.location + ', ' + c.m[0].second.location);
+            console.log('               ->' + c.m[1].first.location + ', ' + c.m[1].second.location);
+        }
+    );
+    whenStart(function (host) {
+        host.assert('fraudDetection', {id: 1, sid: 1, t: 'purchase', location: 'US'});
+        host.assert('fraudDetection', {id: 2, sid: 1, t: 'purchase', location: 'CA'});
+    });
+}
+```
 [top](reference.md#table-of-contents)  
 
 #### Context
