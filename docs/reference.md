@@ -12,6 +12,7 @@ Reference Manual
   * [Context](reference.md#context)
 * [Flow Structures](reference.md#flow-structures)
   * [Statechart](reference.md#statechart)
+  * [Nested States](reference.md#nested-states)
   * [Flowchart](reference.md#flowchart)
   * [Parallel](reference.md#parallel)
 * [Extensions](reference.md#extensions)
@@ -341,9 +342,103 @@ with (d.statechart('a2')) {
     state('approved');
 }
 ```
-
 [top](reference.md#table-of-contents)  
+### Nested States
+```ruby
+Durable.statechart :a6 do
+  state :start do
+    to :work
+  end
+  state :work do   
+    state :enter do
+      to :process, when_all(m.subject == "enter") do
+        puts "a6 continue process"
+      end
+    end
+    state :process do
+      to :process, when_all(m.subject == "continue") do
+        puts "a6 processing"
+      end
+    end
+    to :work, when_all(m.subject == "reset") do
+      puts "a6 resetting"
+    end
+    to :canceled, when_all(m.subject == "cancel") do
+      puts "a6 canceling"
+    end
+  end
+  state :canceled
+  when_start do
+    post :a6, {:id => 1, :sid => 1, :subject => "enter"}
+    post :a6, {:id => 2, :sid => 1, :subject => "continue"}
+    post :a6, {:id => 3, :sid => 1, :subject => "continue"}
+  end
+end
+```
+```python
+with statechart('a6'):
+    with state('work'):
+        with state('enter'):
+            @to('process')
+            @when_all(m.subject == 'enter')
+            def continue_process(c):
+                print('a6 continue_process')
+    
+        with state('process'):
+            @to('process')
+            @when_all(m.subject == 'continue')
+            def continue_process(c):
+                print('a6 processing')
 
+        @to('work')
+        @when_all(m.subject == 'reset')
+        def reset(c):
+            print('a6 resetting')
+
+        @to('canceled')
+        @when_all(m.subject == 'cancel')
+        def cancel(c):
+            print('a6 canceling')
+
+    state('canceled')
+    @when_start
+    def start(host):
+        host.post('a6', {'id': 1, 'sid': 1, 'subject': 'enter'})
+        host.post('a6', {'id': 2, 'sid': 1, 'subject': 'continue'})
+        host.post('a6', {'id': 3, 'sid': 1, 'subject': 'continue'})
+```
+```javascript
+with (d.statechart('a6')) {
+    with (state('start')) {
+        to('work');
+    }
+    with (state('work')) {
+        with (state('enter')) {
+            to('process').whenAll(m.subject.eq('enter'), function (c) {
+                console.log('a6 continue process');
+            });
+        }
+        with (state('process')) {
+            to('process').whenAll(m.subject.eq('continue'), function (c) {
+                console.log('a6 processing');
+            });
+        }
+        to('work').whenAll(m.subject.eq('reset'), function (c) {
+            console.log('a6 resetting');
+        });
+        to('canceled').whenAll(m.subject.eq('cancel'), function (c) {
+            console.log('a6 canceling');
+        });
+    }
+    state('canceled');
+    whenStart(function (host) {
+        host.post('a6', {id: 1, sid: 1, subject: 'enter'});
+        host.post('a6', {id: 2, sid: 1, subject: 'continue'});
+        host.post('a6', {id: 3, sid: 1, subject: 'continue'});
+    });
+}
+```
+[top](reference.md#table-of-contents)
 #### Flowchart
 
 #####Ruby
