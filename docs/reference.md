@@ -154,6 +154,7 @@ with (d.ruleset('a4')) {
 ```
 [top](reference.md#table-of-contents) 
 #### Attributes
+#####Ruby
 ```ruby
 Durable.ruleset :attributes do
   when_all pri(3), count(3), m.amount < 300 do
@@ -175,6 +176,7 @@ Durable.ruleset :attributes do
   end
 end
 ```
+#####Python
 ```python
 with ruleset('attributes'):
     @when_all(pri(3), count(3), m.amount < 300)
@@ -198,6 +200,7 @@ with ruleset('attributes'):
         host.assert_fact('attributes', {'id': 2, 'sid': 1, 'amount': 150})
         host.assert_fact('attributes', {'id': 3, 'sid': 1, 'amount': 250})
 ```
+#####JavaScript
 ```javascript
 with (d.ruleset('attributes')) {
     whenAll(pri(3), count(3), m.amount.lt(300),
@@ -418,6 +421,7 @@ with (d.statechart('a2')) {
 ```
 [top](reference.md#table-of-contents)  
 ### Nested States
+#####Ruby
 ```ruby
 Durable.statechart :a6 do
   state :start do
@@ -449,6 +453,7 @@ Durable.statechart :a6 do
   end
 end
 ```
+#####Python
 ```python
 with statechart('a6'):
     with state('work'):
@@ -481,6 +486,7 @@ with statechart('a6'):
         host.post('a6', {'id': 2, 'sid': 1, 'subject': 'continue'})
         host.post('a6', {'id': 3, 'sid': 1, 'subject': 'continue'})
 ```
+#####JavaScript
 ```javascript
 with (d.statechart('a6')) {
     with (state('start')) {
