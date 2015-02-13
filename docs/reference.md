@@ -7,6 +7,9 @@ Reference Manual
   * [Correlated Sequence](reference.md#correlated-sequence)
   * [Choice of Sequences](reference.md#choice-of-sequences)
 * [Data Model](reference.md#data-model)
+  * [Events](reference.md#events)
+  * [Facts](reference.md#facts)
+  * [Context](reference.md#context)
 * [Flow Structures](reference.md#flow-structures)
   * [Statechart](reference.md#statechart)
   * [Flowchart](reference.md#flowchart)
@@ -204,6 +207,45 @@ with (d.ruleset('fraudDetection')) {
 [top](reference.md#table-of-contents)  
 
 #### Context
+#####Ruby
+```ruby
+Durable.ruleset :a8 do
+  when_all m.amount < s.max_amount + s.id(:global).min_amount do
+    puts "a8 approved " + m.amount.to_s
+  end
+  when_start do
+    patch_state :a8, {:sid => 1, :max_amount => 500}
+    patch_state :a8, {:sid => :global, :min_amount => 100}
+    post :a8, {:id => 1, :sid => 1, :amount => 10}
+  end
+end
+```
+#####Python
+```python
+with ruleset('a8'):
+    @when_all(m.amount < c.s.max_amount + c.s.id('global').min_amount)
+    def approved(c):
+        print ('a8 approved {0}'.format(c.m.amount))
+
+    @when_start
+    def start(host):
+        host.patch_state('a8', {'sid': 1, 'max_amount': 500})
+        host.patch_state('a8', {'sid': 'global', 'min_amount': 100})
+        host.post('a8', {'id': 1, 'sid': 1, 'amount': 10})
+```
+#####JavaScript
+```javascript
+with (d.ruleset('a8')) {
+    whenAll(m.amount.lt(add(c.s.maxAmount, c.s.id('global').minAmount)), function (c) {
+        console.log('a8 approved ' +  c.m.amount);
+    });
+    whenStart(function (host) {
+        host.patchState('a8', {sid: 1, maxAmount: 500});
+        host.patchState('a8', {sid: 'global', minAmount: 100});
+        host.post('a8', {id: 1, sid: 1, amount: 10});
+    });
+}
+```
 [top](reference.md#table-of-contents)  
 
 #### Timers
@@ -389,7 +431,6 @@ with (d.flowchart('a3')) {
     }
 }
 ```
-
 [top](reference.md#table-of-contents)  
 
 #### Parallel
