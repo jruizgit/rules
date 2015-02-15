@@ -672,4 +672,4 @@ void init(Handle<Object> exports) {
         FunctionTemplate::New(jsCreateProxy)->GetFunction());
 }
 
-NODE_MODULE(rules, init)
+NODE_MODULE(rulesjs, init)

@@ -8,7 +8,6 @@
         'direct_dependent_settings': {
             'include_dirs': [ '.' ]
         },
-        'dependencies': [ '../../deps/hiredis.gyp:hiredis' ],
         'sources': [
             'json.c',
             'rete.c',
@@ -17,11 +16,17 @@
             'state.c'
         ],
         'conditions': [
-            ['OS=="mac"', {
-                'xcode_settings': {
-                    'GCC_C_LANGUAGE_STANDARD': 'c99'
-                }
-            }],
+        ['OS=="win"', {
+            'dependencies': [ '../../deps/hiredis_win.gyp:hiredis' ],
+        }],
+        ['OS!="win"', {
+            'dependencies': [ '../../deps/hiredis.gyp:hiredis' ],
+        }],
+        ['OS=="mac"', {
+            'xcode_settings': {
+                'GCC_C_LANGUAGE_STANDARD': 'c99'
+            }
+        }],
         ['OS=="solaris"', {
             'cflags+': [ '-std=c99' ]
         }],

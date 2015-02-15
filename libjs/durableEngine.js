@@ -2,7 +2,7 @@ exports = module.exports = durableEngine = function () {
     var connect = require('connect');
     var express = require('express');
     var stat = require('node-static');
-    var r = require('bindings')('rules.node');
+    var r = require('bindings')('rulesjs.node');
 
     var closure = function (document, output, handle, rulesetName) {
         var that = {};

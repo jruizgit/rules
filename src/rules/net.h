@@ -1,7 +1,12 @@
 
 #include "rete.h"
+#ifdef _WIN32
+#include "../../deps/hiredis_win/hiredis.h"
+#include "../../deps/hiredis_win/sds.h"
+#else
 #include "../../deps/hiredis/hiredis.h"
 #include "../../deps/hiredis/sds.h"
+#endif
 
 #define HASH_LENGTH 40
 #define MAX_MESSAGE_BATCH 64

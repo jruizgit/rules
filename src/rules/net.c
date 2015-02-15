@@ -7,6 +7,33 @@
 #include "rules.h"
 #include "json.h"
 
+#ifdef _WIN32
+int asprintf(char** ret, char* format, ...){
+	va_list args;
+	*ret = NULL;
+	if (!format) return 0;
+	va_start(args, format);
+	int size = _vscprintf(format, args);
+	if (size == 0) {
+		*ret = (char*)malloc(1);
+		**ret = 0;
+	}
+	else {
+		size++; //for null
+		*ret = (char*)malloc(size + 2);
+		if (*ret) {
+			sprintf_s(*ret, size, format, args);
+		}
+		else {
+			return -1;
+		}
+	}
+
+	va_end(args);
+	return size;
+}
+#endif
+
 static unsigned int createIdiom(ruleset *tree, jsonValue *newValue, char **idiomString) {
     char *rightProperty;
     char *rightAlias;
@@ -207,8 +234,13 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     rulesBinding->hashArray = malloc(tree->actionCount * sizeof(functionHash));
     char *name = &tree->stringPool[tree->nameOffset];
     int nameLength = strlen(name);
+#ifdef _WIN32
+	char *actionKey = (char *)_alloca(sizeof(char)*(nameLength + 3));
+	sprintf_s(actionKey, nameLength + 3, "%s!a", name);
+#else
     char actionKey[nameLength + 3];
-    snprintf(actionKey, nameLength + 3, "%s!a", name);
+	snprintf(actionKey, nameLength + 3, "%s!a", name);
+#endif
     char *lua = NULL;
     char *peekActionLua = NULL;
     if (asprintf(&peekActionLua, "")  == -1) {
@@ -226,7 +258,12 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
         if (currentNode->type == NODE_ACTION) {
             char *actionName = &tree->stringPool[currentNode->nameOffset];
             char *actionLastName = strchr(actionName, '!');
-            char actionAlias[actionLastName - actionName + 1];
+#ifdef _WIN32
+			char *actionAlias = (char *)_alloca(sizeof(char)*(actionLastName - actionName + 1));
+#else
+			char actionAlias[actionLastName - actionName + 1];
+#endif
+            
             strncpy(actionAlias, actionName, actionLastName - actionName);
             actionAlias[actionLastName - actionName] = '\0';
 
@@ -1287,9 +1324,15 @@ unsigned int formatEvalMessage(void *rulesBinding,
     functionHash *currentAssertHash = &bindingContext->hashArray[actionIndex];
     time_t currentTime = time(NULL);
     char score[11];
-    snprintf(score, 11, "%ld", currentTime);
-    char *argv[8 + propertiesLength * 3];
-    size_t argvl[8 + propertiesLength * 3];
+#ifdef _WIN32
+	sprintf_s(score, 11, "%ld", currentTime);
+	char **argv = (char **)_alloca(sizeof(char*)*(8 + propertiesLength * 3));
+	size_t *argvl = (size_t *)_alloca(sizeof(size_t)*(8 + propertiesLength * 3));
+#else
+	snprintf(score, 11, "%ld", currentTime);
+	char *argv[8 + propertiesLength * 3];
+	size_t argvl[8 + propertiesLength * 3];
+#endif
 
     argv[0] = "evalsha";
     argvl[0] = 7;
@@ -1357,8 +1400,13 @@ unsigned int formatStoreMessage(void *rulesBinding,
                                 unsigned char storeFact,
                                 char **command) {
     binding *bindingContext = (binding*)rulesBinding;
-    char *argv[6 + propertiesLength * 3];
-    size_t argvl[6 + propertiesLength * 3];
+#ifdef _WIN32
+	char **argv = (char **)_alloca(sizeof(char*)*(6 + propertiesLength * 3));
+	size_t *argvl = (size_t *)_alloca(sizeof(size_t)*(6 + propertiesLength * 3));
+#else
+	char *argv[6 + propertiesLength * 3];
+	size_t argvl[6 + propertiesLength * 3];
+#endif
 
     argv[0] = "evalsha";
     argvl[0] = 7;

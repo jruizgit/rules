@@ -63,6 +63,10 @@ unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *ti
 unsigned int assertTimers(void *handle);
 unsigned int getState(void *handle, char *sid, char **state);
 
+#ifdef _WIN32
+int asprintf(char** ret, char* format, ...);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

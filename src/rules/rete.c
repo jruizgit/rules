@@ -1399,7 +1399,11 @@ static unsigned int createQueries(ruleset *tree,
 
         char *name = &tree->stringPool[expr->nameOffset];
         int nameLength = strlen(name);
-        char nextPostfix[strlen(postfix) + nameLength + 2];
+#ifdef _WIN32
+		char *nextPostfix = (char *)_alloca(sizeof(char)*(strlen(postfix) + nameLength + 2));
+#else
+		char nextPostfix[strlen(postfix) + nameLength + 2];
+#endif
         strcpy(nextPostfix, name);
         nextPostfix[nameLength] = '!';
         strcpy(&nextPostfix[nameLength + 1], postfix);
@@ -1444,7 +1448,12 @@ static unsigned int createQueries(ruleset *tree,
 
 static unsigned int fixupQueries(ruleset *tree, unsigned int actionOffset, char* postfix, path *betaPath) {
     node *actionNode = &tree->nodePool[actionOffset];
-    char copyPostfix[strlen(postfix) + 1];
+#ifdef _WIN32
+	char *copyPostfix = (char *)_alloca(sizeof(char)*(strlen(postfix) + 1));
+#else
+	char copyPostfix[strlen(postfix) + 1];
+#endif
+   
     strcpy(copyPostfix, postfix);
     
     any *query;
@@ -1513,7 +1522,12 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         // need to resolve namespace every time it is used.
         char *namespace = &tree->stringPool[tree->nameOffset];
         int namespaceLength = strlen(namespace); 
-        char runtimeActionName[namespaceLength + lastName - firstName + 2];
+#ifdef _WIN32
+		char *runtimeActionName = (char *)_alloca(sizeof(char)*(namespaceLength + lastName - firstName + 2));
+#else
+		char runtimeActionName[namespaceLength + lastName - firstName + 2];
+#endif
+        
         strncpy(runtimeActionName, firstName, lastName - firstName);
         runtimeActionName[lastName - firstName] = '!';
         strncpy(&runtimeActionName[lastName - firstName + 1], namespace, namespaceLength);

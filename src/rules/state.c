@@ -175,7 +175,11 @@ unsigned int constructObject(char *parentName,
         if (!parentName) {
             if (type == JSON_OBJECT) {
                 int nameLength = lastName - firstName;
-                char newParent[nameLength + 1];
+#ifdef _WIN32
+				char *newParent = (char *)_alloca(sizeof(char)*(nameLength + 1));
+#else
+				char newParent[nameLength + 1];
+#endif
                 strncpy(newParent, firstName, nameLength);
                 newParent[nameLength] = '\0';
                 return constructObject(newParent, 
@@ -190,8 +194,12 @@ unsigned int constructObject(char *parentName,
             }
         } else {
             int nameLength = lastName - firstName;
-            int fullNameLength = nameLength + parentNameLength + 1; 
-            char fullName[fullNameLength + 1];
+            int fullNameLength = nameLength + parentNameLength + 1;
+#ifdef _WIN32
+			char *fullName = (char *)_alloca(sizeof(char)*(fullNameLength + 1));
+#else
+			char fullName[fullNameLength + 1];
+#endif
             strncpy(fullName, firstName, nameLength);
             fullName[nameLength] = '.';
             strncpy(&fullName[nameLength + 1], parentName, parentNameLength);

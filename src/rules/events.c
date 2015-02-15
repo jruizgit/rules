@@ -396,7 +396,11 @@ static unsigned int handleBeta(ruleset *tree,
     }
 
     node *actionNode = NULL;
-    char prefix[prefixLength];
+#ifdef _WIN32
+	char *prefix = (char *)_alloca(sizeof(char)*(prefixLength));
+#else
+	char prefix[prefixLength];
+#endif
     char *currentPrefix = prefix;
     currentNode = betaNode;
     while (currentNode != NULL) {
@@ -786,8 +790,13 @@ static unsigned int isMatch(ruleset *tree,
         case OP_INT_STRING:
             {
                 rightLength = rightProperty->valueLength + 1;
-                char leftStringInt[rightLength];
-                snprintf(leftStringInt, rightLength, "%ld", currentProperty->value.i);
+#ifdef _WIN32
+				char *leftStringInt = (char *)_alloca(sizeof(char)*(rightLength));
+				sprintf_s(leftStringInt, rightLength, "%ld", currentProperty->value.i);
+#else
+				char leftStringInt[rightLength];
+				snprintf(leftStringInt, rightLength, "%ld", currentProperty->value.i);
+#endif         
                 *propertyMatch = compareStringProperty(leftStringInt, 
                                                        rightState + rightProperty->valueOffset,
                                                        rightProperty->valueLength, 
@@ -806,8 +815,13 @@ static unsigned int isMatch(ruleset *tree,
         case OP_DOUBLE_STRING:
             {
                 rightLength = rightProperty->valueLength + 1;
-                char leftStringDouble[rightLength];
-                snprintf(leftStringDouble, rightLength, "%f", currentProperty->value.d);
+#ifdef _WIN32
+				char *leftStringDouble = (char *)_alloca(sizeof(char)*(rightLength));
+				sprintf_s(leftStringDouble, rightLength, "%f", currentProperty->value.d);
+#else
+				char leftStringDouble[rightLength];
+				snprintf(leftStringDouble, rightLength, "%f", currentProperty->value.d);
+#endif         
                 *propertyMatch = compareStringProperty(leftStringDouble,
                                                        rightState + rightProperty->valueOffset,
                                                        rightProperty->valueLength, 
@@ -831,8 +845,13 @@ static unsigned int isMatch(ruleset *tree,
         case OP_STRING_INT: 
             {
                 leftLength = currentProperty->valueLength + 1;
-                char rightStringInt[leftLength];
-                snprintf(rightStringInt, leftLength, "%ld", rightProperty->value.i);
+#ifdef _WIN32
+				char *rightStringInt = (char *)_alloca(sizeof(char)*(leftLength));
+				sprintf_s(rightStringInt, leftLength, "%ld", rightProperty->value.i);
+#else
+				char rightStringInt[leftLength];
+				snprintf(rightStringInt, leftLength, "%ld", rightProperty->value.i);
+#endif
                 *propertyMatch = compareString(message + currentProperty->valueOffset, 
                                                currentProperty->valueLength, 
                                                rightStringInt, 
@@ -842,8 +861,13 @@ static unsigned int isMatch(ruleset *tree,
         case OP_STRING_DOUBLE: 
             {
                 leftLength = currentProperty->valueLength + 1;
-                char rightStringDouble[leftLength];
-                snprintf(rightStringDouble, leftLength, "%f", rightProperty->value.d);
+#ifdef _WIN32
+				char *rightStringDouble = (char *)_alloca(sizeof(char)*(leftLength));
+				sprintf_s(rightStringDouble, leftLength, "%f", rightProperty->value.d);
+#else
+				char rightStringDouble[leftLength];
+				snprintf(rightStringDouble, leftLength, "%f", rightProperty->value.d);
+#endif              
                 *propertyMatch = compareString(message + currentProperty->valueOffset, 
                                                currentProperty->valueLength, 
                                                rightStringDouble, 
@@ -1025,8 +1049,11 @@ static unsigned int handleMessageCore(ruleset *tree,
     if (result != RULES_OK) {
         return result;
     }
-
-    char sid[sidLength + 1];
+#ifdef _WIN32
+	char *sid = (char *)_alloca(sizeof(char)*(sidLength + 1));
+#else
+	char sid[sidLength + 1];
+#endif  
     strncpy(sid, message + sidProperty->valueOffset, sidLength);
     sid[sidLength] = '\0';
 
@@ -1034,8 +1061,11 @@ static unsigned int handleMessageCore(ruleset *tree,
     if (result != RULES_OK) {
         return result;
     }
-
-    char mid[midLength + 1];
+#ifdef _WIN32
+	char *mid = (char *)_alloca(sizeof(char)*(midLength + 1));
+#else
+	char mid[midLength + 1];
+#endif  
     strncpy(mid, message + midProperty->valueOffset, midLength);
     mid[midLength] = '\0';
     if (*commandCount == MAX_COMMAND_COUNT) {
@@ -1108,17 +1138,29 @@ static unsigned int handleMessageCore(ruleset *tree,
             if (result != ERR_NEW_SESSION) {
                 return result;
             }            
-            
-            char stateMessage[36 + sidLength];
-            char newState[12 + sidLength];
-            if (sidProperty->type == JSON_STRING) {
-                snprintf(stateMessage, 36 + sidLength, "{\"id\":\"$s\", \"sid\":\"%s\", \"$s\":1}", sid);
-                snprintf(newState, 12 + sidLength, "{\"sid\":\"%s\"}", sid);
-            }
-            else {
-                snprintf(stateMessage, 36 + sidLength, "{\"id\":\"$s\", \"sid\":%s, \"$s\":1}", sid);
-                snprintf(newState, 12 + sidLength, "{\"sid\":%s}", sid);
-            }
+#ifdef _WIN32
+			char *stateMessage = (char *)_alloca(sizeof(char)*(36 + sidLength));
+			char *newState = (char *)_alloca(sizeof(char)*(12 + sidLength));
+			if (sidProperty->type == JSON_STRING) {
+				sprintf_s(stateMessage, 36 + sidLength, "{\"id\":\"$s\", \"sid\":\"%s\", \"$s\":1}", sid);
+				sprintf_s(newState, 12 + sidLength, "{\"sid\":\"%s\"}", sid);
+			}
+			else {
+				sprintf_s(stateMessage, 36 + sidLength, "{\"id\":\"$s\", \"sid\":%s, \"$s\":1}", sid);
+				sprintf_s(newState, 12 + sidLength, "{\"sid\":%s}", sid);
+			}
+#else
+			char stateMessage[36 + sidLength];
+			char newState[12 + sidLength];
+			if (sidProperty->type == JSON_STRING) {
+				snprintf(stateMessage, 36 + sidLength, "{\"id\":\"$s\", \"sid\":\"%s\", \"$s\":1}", sid);
+				snprintf(newState, 12 + sidLength, "{\"sid\":\"%s\"}", sid);
+			}
+			else {
+				snprintf(stateMessage, 36 + sidLength, "{\"id\":\"$s\", \"sid\":%s, \"$s\":1}", sid);
+				snprintf(newState, 12 + sidLength, "{\"sid\":%s}", sid);
+			}
+#endif
 
             if (*commandCount == MAX_COMMAND_COUNT) {
                 return ERR_MAX_COMMAND_COUNT;
@@ -1313,9 +1355,17 @@ static unsigned int handleState(ruleset *tree,
     }
 
     char *stateMessagePostfix = state + 1;
-    char stateMessage[30 + stateLength - 1];
+#ifdef _WIN32
+	char *stateMessage = (char *)_alloca(sizeof(char)*(30 + stateLength - 1));
+#else
+	char stateMessage[30 + stateLength - 1];
+#endif
     int randomMid = rand();
-    snprintf(stateMessage, 30 + stateLength - 1, "{\"id\":%d, \"$s\":1, %s", randomMid, stateMessagePostfix);
+#ifdef _WIN32
+    sprintf_s(stateMessage, 30 + stateLength - 1, "{\"id\":%d, \"$s\":1, %s", randomMid, stateMessagePostfix);
+#else
+	snprintf(stateMessage, 30 + stateLength - 1, "{\"id\":%d, \"$s\":1, %s", randomMid, stateMessagePostfix);
+#endif
     unsigned int result = handleMessage(tree, 
                                         state,
                                         stateMessage,  
