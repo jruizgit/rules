@@ -22,7 +22,7 @@ int asprintf(char** ret, char* format, ...){
 		size++; //for null
 		*ret = (char*)malloc(size + 2);
 		if (*ret) {
-			sprintf_s(*ret, size, format, args);
+			_vsnprintf(*ret, size, format, args);
 		}
 		else {
 			return -1;

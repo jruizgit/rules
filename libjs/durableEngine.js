@@ -1,5 +1,5 @@
 exports = module.exports = durableEngine = function () {
-    var connect = require('connect');
+    var bodyParser = require('body-parser');
     var express = require('express');
     var stat = require('node-static');
     var r = require('bindings')('rulesjs.node');
@@ -1285,7 +1285,7 @@ exports = module.exports = durableEngine = function () {
             basePath = '/' + basePath;
         }
 
-        that.use(connect.json());           
+        that.use(bodyParser.json());
 
         that.get('/durableVisual.js', function (request, response) {
             request.addListener('end',function () {
