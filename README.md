@@ -4,11 +4,7 @@ Durable Rules is a polyglot micro-framework for real-time, consistent and scalab
 
 A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts and massive streams of events in real time. A simple, yet powerful meta-liguistic abstraction lets you define simple and complex rulesets, such as flowcharts, statecharts, nested statecharts, paralel and time driven flows. 
 
-The Durable Rules core engine is implemented in C, which enables ultra fast rule evaluation and inference as well as muti-language support. Durable Rules relies on state of the art technologies:
-
-* [Node.js](http://www.nodejs.org), [Werkzeug](http://werkzeug.pocoo.org/), [Sinatra](http://www.sinatrarb.com/) are used to host rulesets written in JavaScript, Python and Ruby respectively.
-* Inference state is cached using [Redis](http://www.redis.io), which lets scaling out without giving up performance.
-* A web client based on [D3.js](http://www.d3js.org) provides powerful data visualization and test tools.  
+The Durable Rules core engine is implemented in C, which enables ultra fast rule evaluation and inference as well as muti-language support. Durable Rules relies on state of the art technologies: [Node.js](http://www.nodejs.org), [Werkzeug](http://werkzeug.pocoo.org/), [Sinatra](http://www.sinatrarb.com/) are used to host rulesets written in JavaScript, Python and Ruby respectively. Inference state is cached using [Redis](http://www.redis.io), which lets scaling out without giving up performance.
 
 ###Example #1  
 
@@ -48,7 +44,7 @@ Durable.ruleset :fraud_detection do
                       (m.amount > s.avg_withdraw * 2) & 
                       (m.stamp > first.stamp) &
                       (m.stamp < first.stamp + 120) do
-    puts "Medium risk #{first.amount}, #{second.amount}"
+    puts "Medium risk"
   end
 
   # high risk rule
@@ -60,7 +56,7 @@ Durable.ruleset :fraud_detection do
                      (m.amount > second.amount) & 
                      (m.stamp < first.stamp + 180),
            s.avg_balance < (first.amount + second.amount + third.amount) / 0.7 do
-    puts "High risk #{first.amount}, #{second.amount}, #{third.amount}"
+    puts "High risk"
   end
 end
 
@@ -95,7 +91,7 @@ with ruleset('fraud_detection'):
                           (m.stamp > c.first.stamp) &
                           (m.stamp < c.first.stamp + 120))
     def first_rule(c):
-        print('Medium Risk {0}, {1}'.format(c.first.amount, c.second.amount))
+        print('Medium Risk')
 
     # high risk rule
     @when_all(c.first << m.t == 'debit_request',
@@ -107,7 +103,7 @@ with ruleset('fraud_detection'):
                          (m.stamp < c.first.stamp + 180),
               s.avg_balance < (c.first.amount + c.second.amount + c.third.amount) / 0.7)
     def second_rule(c):
-        print('High Risk {0}, {1}, {2}'.format(c.first.amount, c.second.amount, c.third.amount))
+        print('High Risk')
 
 run_all()
 ```
@@ -142,7 +138,7 @@ with (d.ruleset('fraudDetection')) {
                            m.stamp.gt(c.first.stamp),
                            m.stamp.lt(c.first.stamp.add(120))),
     function(c) {
-        console.log('Medium risk ' + c.first.amount + ' ,' + c.second.amount);
+        console.log('Medium risk');
     });
 
     // high risk rule 
@@ -155,16 +151,18 @@ with (d.ruleset('fraudDetection')) {
                           m.stamp.lt(c.first.stamp.add(180))),
             s.avgBalance.lt(add(c.first.amount, c.second.amount, c.third.amount).div(0.7)),
     function(c) {
-        console.log('High risk ' + c.first.amount + ' ,' + c.second.amount + ' ,' + c.third.amount);
+        console.log('High risk');
     });
 }
 
 d.runAll();
 ```
 
-#####Resources to learn more:  
-[Reference Manual](https://github.com/jruizgit/rules/blob/master/docs/reference.md)  
-Blog post:
+#####Resources  
+To learn more:  
+* [Reference Manual](https://github.com/jruizgit/rules/blob/master/docs/reference.md)  
+
+Blog post:  
 * [Boosting Performance with C (08/2014)](http://jruizblog.com/2014/08/19/boosting-performance-with-c/)
 * [Rete Meets Redis (02/2014)](http://jruizblog.com/2014/02/02/rete-meets-redis/)
 * [Inference: From Expert Systems to Cloud Scale Event Processing (01/2014)](http://jruizblog.com/2014/01/27/event-processing/)
