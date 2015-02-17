@@ -610,6 +610,109 @@ with (d.flowchart('a3')) {
 [top](reference.md#table-of-contents)  
 
 #### Parallel
+
+#####Ruby
+```ruby
+Durable.ruleset :p1 do
+  when_all m.start == "yes", paralel do 
+    ruleset :one do 
+      when_all -s.start do
+        s.start = 1
+      end
+      when_all s.start == 1 do
+        puts "p1 finish one"
+        signal :id => 1, :end => "one"
+        s.start = 2
+      end 
+    end
+    ruleset :two do 
+      when_all -s.start do
+        s.start = 1
+      end
+      when_all s.start == 1 do
+        puts "p1 finish two"
+        signal :id => 1, :end => "two"
+        s.start = 2
+      end 
+    end
+  end
+  when_all m.end == "one", m.end == "two" do
+    puts 'p1 approved'
+    s.status = 'approved'
+  end
+  when_start do
+    post :p1, {:id => 1, :sid => 1, :start => "yes"}
+  end
+end
+```
+#####Python
+```python
+with ruleset('p1'):
+    with when_all(m.start == 'yes'): 
+        with ruleset('one'):
+            @when_all(-s.start)
+            def continue_flow(c):
+                c.s.start = 1
+
+            @when_all(s.start == 1)
+            def finish_one(c):
+                print('p1 finish one {0}'.format(c.s.sid))
+                c.signal({'id': 1, 'end': 'one'})
+                c.s.start = 2
+
+        with ruleset('two'): 
+            @when_all(-s.start)
+            def continue_flow(c):
+                c.s.start = 1
+
+            @when_all(s.start == 1)
+            def finish_two(c):
+                print('p1 finish two {0}'.format(c.s.sid))
+                c.signal({'id': 1, 'end': 'two'})
+                c.s.start = 2
+
+    @when_all(m.end == 'one', m.end == 'two')
+    def done(c):
+        print('p1 done {0}'.format(c.s.sid))
+
+    @when_start
+    def start(host):
+        host.post('p1', {'id': 1, 'sid': 1, 'start': 'yes'})
+```
+#####JavaScript
+```javascript
+with (d.ruleset('p1')) {
+    with (whenAll(m.start.eq('yes'))) {
+        with (ruleset('one')) {
+            whenAll(s.start.nex(), function (c) {
+                c.s.start = 1;
+            });
+            whenAll(s.start.eq(1), function (c) {
+                console.log('p1 finish one');
+                c.signal({id: 1, end: 'one'});
+                c.s.start  = 2;
+            });
+        }
+        with (ruleset('two')) {
+            whenAll(s.start.nex(), function (c) {
+                c.s.start = 1;
+            });
+            whenAll(s.start.eq(1), function (c) {
+                console.log('p1 finish two');
+                c.signal({id: 1, end: 'two'});
+                c.s.start  = 2;
+            });
+        }
+    }
+    whenAll(m.end.eq('one'), m.end.eq('two'), function (c) {
+        console.log('p1 approved');
+        s.status = 'approved';
+    });
+    whenStart(function (host) {
+        host.post('p1', {id: 1, sid: 1, start: 'yes'});
+    });
+}
+```
 [top](reference.md#table-of-contents)  
 ### Extensions
 -------
