@@ -232,6 +232,23 @@ with (d.ruleset('attributes')) {
 ```
 [top](reference.md#table-of-contents) 
 #### Time Window
+#####Ruby
+```ruby
+Durable.ruleset :t0 do
+  when_all (timeout :my_timer) | (m.count == 0) do
+    s.count += 1
+    post :t0, {:id => s.count, :sid => 1, :t => "purchase"}
+    start_timer(:my_timer, rand(3))
+  end
+  when_all span(5), m.t == "purchase" do 
+    puts("t0 pulse -> #{m.count}")
+  end 
+  when_start do
+    patch_state :sid => 1, :count => 0
+  end
+end
+```
+#####Python
 ```python
 with ruleset('t0'):
     @when_all(timeout('my_timer') | (s.count == 0))
@@ -247,6 +264,22 @@ with ruleset('t0'):
     @when_start
     def start(host):
         host.patch_state({'sid': 1, 'count': 0})
+```
+#####JavaScript
+```javascript
+with (d.ruleset('t0')) {
+    whenAll(or(m.count.eq(0), timeout('myTimer')), function (c) {
+        c.s.count += 1;
+        c.post('t0', {id: c.s.count, sid: 1, t: 'purchase'});
+        c.startTimer('myTimer', Math.random() * 3 + 1);
+    });
+    whenAll(span(5), m.t.eq('purchase'), function (c) {
+        console.log('t0 pulse ->' + c.m.length);
+    });
+    whenStart(function (host) {
+        host.patchState({sid: 1, count: 0});
+    });
+}
 ```
 [top](reference.md#table-of-contents)  
 ### Data Model
