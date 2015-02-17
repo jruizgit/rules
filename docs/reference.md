@@ -6,7 +6,7 @@ Reference Manual
   * [Simple Filter](reference.md#simple-filter)
   * [Correlated Sequence](reference.md#correlated-sequence)
   * [Choice of Sequences](reference.md#choice-of-sequences)
-  * [Attributes](reference.md#attributes)
+  * [Conflict Resolution](reference.md#conflict-resolution)
 * [Data Model](reference.md#data-model)
   * [Events](reference.md#events)
   * [Facts](reference.md#facts)
@@ -154,7 +154,7 @@ with (d.ruleset('a4')) {
 }
 ```
 [top](reference.md#table-of-contents) 
-#### Attributes
+#### Conflict Resolution
 #####Ruby
 ```ruby
 Durable.ruleset :attributes do
@@ -638,7 +638,6 @@ Durable.ruleset :p1 do
   end
   when_all m.end == "one", m.end == "two" do
     puts 'p1 approved'
-    s.status = 'approved'
   end
   when_start do
     post :p1, {:id => 1, :sid => 1, :start => "yes"}
@@ -706,7 +705,6 @@ with (d.ruleset('p1')) {
     }
     whenAll(m.end.eq('one'), m.end.eq('two'), function (c) {
         console.log('p1 approved');
-        s.status = 'approved';
     });
     whenStart(function (host) {
         host.post('p1', {id: 1, sid: 1, start: 'yes'});
