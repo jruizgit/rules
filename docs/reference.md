@@ -12,6 +12,7 @@ Reference Manual
   * [Events](reference.md#events)
   * [Facts](reference.md#facts)
   * [Context](reference.md#context)
+  * [Timers](reference.md#timers) 
 * [Flow Structures](reference.md#flow-structures)
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
@@ -378,10 +379,59 @@ with (d.ruleset('a8')) {
 }
 ```
 [top](reference.md#table-of-contents)  
-
 #### Timers
-[top](reference.md#table-of-contents)  
+#####Ruby
+```ruby
+Durable.ruleset :t1 do
+  when_all m.start == "yes" do
+    s.start = Time.now
+    start_timer(:my_timer, 5)
+  end
+  when_all timeout :my_timer do
+    puts "t1 End"
+    puts "t1 Started #{s.start}"
+    puts "t1 Ended #{Time.now}"
+  end
+  when_start do
+    post :t1, {:id => 1, :sid => 1, :start => "yes"}
+  end
+end
+```
+#####Python
+```python
+with ruleset('t1'): 
+    @when_all(m.start == 'yes')
+    def start_timer(c):
+        c.s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
+        c.start_timer('my_timer', 5)
 
+    @when_all(timeout('my_timer'))
+    def end_timer(c):
+        print('t1 started @%s' % c.s.start)
+        print('t1 ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
+
+    @when_start
+    def start(host):
+        host.post('t1', {'id': 1, 'sid': 1, 'start': 'yes'})
+```
+#####JavaScript
+```javascript
+with (d.ruleset('t1')) {
+    whenAll(m.start.eq('yes'), function (c) {
+        c.s.start = new Date();
+        c.startTimer('myTimer', 5);
+    });
+    whenAll(timeout('myTimer'), function (c) {
+        console.log('t1 end');
+        console.log('t1 started ' + c.s.start);
+        console.log('t1 ended ' + new Date());
+    });
+    whenStart(function (host) {
+        host.post('t1', {id: 1, sid: 1, start: 'yes'});
+    });
+}
+```
+[top](reference.md#table-of-contents)  
 ### Flow Structures
 -------
 #### Statechart
