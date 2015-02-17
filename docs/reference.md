@@ -2,6 +2,9 @@ Reference Manual
 =====
 ### Table of contents
 ------
+* [Setup](reference.md#setup)
+  * [Local](reference.md#local)
+  * [Cloud](reference.md#cloud)
 * [Rules](reference.md#rules)
   * [Simple Filter](reference.md#simple-filter)
   * [Correlated Sequence](reference.md#correlated-sequence)
@@ -20,6 +23,12 @@ Reference Manual
   * [Parallel](reference.md#parallel)
 * [Extensions](reference.md#extensions)
 
+### Setup
+------
+#### Local
+[top](reference.md#table-of-contents) 
+#### Cloud
+[top](reference.md#table-of-contents) 
 ### Rules
 ------
 Rules are the basic building block and consist of antecedent (expression) and consequent (action)
