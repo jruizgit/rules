@@ -34,13 +34,13 @@ Mac
 For more information go to: http://redis.io/download  
 
 Windows  
-1. Download redis binaries from [MSTechOpen](https://github.com/MSOpenTech/redis/releases)
-2. Extract binaries and start Redis
+1. Download redis binaries from [MSTechOpen](https://github.com/MSOpenTech/redis/releases)  
+2. Extract binaries and start Redis  
 
 For more information go to: https://github.com/MSOpenTech/redis  
 
 #### Node.js install
-durable.js uses Node.js version  0.10.15.   
+durable.js uses Node.js version  0.10.15.    
 
 1. Download [Node.js](http://nodejs.org/dist/v0.10.15)  
 2. Run the installer and follow the instructions  
@@ -56,7 +56,7 @@ Now that your cache and web server are ready, let's write a simple rule:
 2. Create a directory for your app: `mkdir firstapp` `cd firstapp`  
 3. In the new directory `npm install durable` (this will download durable.js and its dependencies)  
 4. In that same directory create a test.js file using your favorite editor  
-5. Copy/Paste and save the following code:  
+5. Copy/Paste and save the following code:
 ```javascript
 var d = require('durable');
 
@@ -69,7 +69,7 @@ with (d.ruleset('a0')) {
     });
 } 
 d.runAll();
-```  
+```
 7. In the terminal type `node test.js`  
 8. You should see the message: `a0 approved from 1`  
 
@@ -82,15 +82,46 @@ d.runAll([{host: 'hostName', port: port, password: 'password'}]);
 ### Cloud Setup
 #### Redis install
 [Redis To Go](https://redistogo.com) has worked well for me and is very fast if you are deploying an app using Heroku or AWS.   
-1. Go to: [Redis To Go](https://redistogo.com)
-2. Create an account (the free instance with 5MB has enough space for you to evaluate durable_rules)
-3. Make sure you write down the host, port and password, which represents your new account
+1. Go to: [Redis To Go](https://redistogo.com)  
+2. Create an account (the free instance with 5MB has enough space for you to evaluate durable_rules)  
+3. Make sure you write down the host, port and password, which represents your new account  
 #### Heroku install
-[Heroku](https://www.heroku.com) is a good platform to create a cloud application in just a few minutes.
-1. Go to: [Heroku](https://www.heroku.com)
-2. Create an account (the free instance with 1 dyno works well for evaluating durable_rules)
-3. Install the Heroku [toolbelt](https://www.heroku.com) in your machine
+[Heroku](https://www.heroku.com) is a good platform to create a cloud application in just a few minutes.  
+1. Go to: [Heroku](https://www.heroku.com)  
+2. Create an account (the free instance with 1 dyno works well for evaluating durable_rules)  
+3. Install the Heroku [toolbelt](https://www.heroku.com) in your machine  
+#### First app
+Follow the instructions in the tutorial  
+* procfile  
+`web: node test.js`
+* package.json  
+```javascript
+{
+  "name": "test",
+  "version": "0.0.6",
+  "dependencies": {
+    "durable": "0.30.x"
+  },
+  "engines": {
+    "node": "0.10.x",
+    "npm": "1.3.x"
+  }
+}
+```
+* test.js
+```javascript
+var d = require('durable');
 
+with (d.ruleset('a0')) {
+    whenAll(m.amount.lt(100), function (c) {
+        console.log('a0 approved from ' + c.s.sid);
+    });
+    whenStart(function (host) {
+        host.post('a0', {id: 1, sid: 1, amount: 10});
+    });
+} 
+d.runAll([{host: 'hostName', port: port, password: 'password'}]);
+```
 [top](reference.md#table-of-contents) 
 ### Rules
 ------
