@@ -27,17 +27,17 @@ Reference Manual
 #### Redis install
 durable.js relies on Redis version 2.8  
  
-Mac 
+Mac  
 1. Download [Redis](http://download.redis.io/releases/redis-2.8.4.tar.gz)   
 2. Extract code, compile and start Redis
 
-For more information go to: http://redis.io/download
+For more information go to: http://redis.io/download  
 
-Windows
+Windows  
 1. Download redis binaries from [MSTechOpen](https://github.com/MSOpenTech/redis/releases)
 2. Extract binaries and start Redis
 
-For more information go to: https://github.com/MSOpenTech/redis
+For more information go to: https://github.com/MSOpenTech/redis  
 
 #### Node.js install
 durable.js uses Node.js version  0.10.15.   
