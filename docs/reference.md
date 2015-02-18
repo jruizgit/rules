@@ -82,50 +82,50 @@ d.runAll([{host: 'hostName', port: port, password: 'password'}]);
 ### Cloud Setup
 --------
 #### Redis install
-[Redis To Go](https://redistogo.com) has worked well for me and is very fast if you are deploying an app using Heroku or AWS.   
+Redis To Go has worked well for me and is very fast if you are deploying an app using Heroku or AWS.   
 1. Go to: [Redis To Go](https://redistogo.com)  
 2. Create an account (the free instance with 5MB has enough space for you to evaluate durable_rules)  
 3. Make sure you write down the host, port and password, which represents your new account  
 #### Heroku install
-[Heroku](https://www.heroku.com) is a good platform to create a cloud application in just a few minutes.  
+Heroku is a good platform to create a cloud application in just a few minutes.  
 1. Go to: [Heroku](https://www.heroku.com)  
 2. Create an account (the free instance with 1 dyno works well for evaluating durable_rules)  
-3. Install the Heroku [toolbelt](https://www.heroku.com) in your machine  
 #### First app
 1. Follow the instructions in the [tutorial](https://devcenter.heroku.com/articles/getting-started-with-nodejs#introduction), with the following changes:
   * procfile  
-`web: node test.js`
+  `web: node test.js`
   * package.json  
-```javascript
-{
-  "name": "test",
-  "version": "0.0.6",
-  "dependencies": {
-    "durable": "0.30.x"
-  },
-  "engines": {
-    "node": "0.10.x",
-    "npm": "1.3.x"
+  ```javascript
+  {
+    "name": "test",
+    "version": "0.0.6",
+    "dependencies": {
+      "durable": "0.30.x"
+    },
+    "engines": {
+      "node": "0.10.x",
+      "npm": "1.3.x"
+    }
   }
-}
-```
+  ```
   * test.js
-```javascript
-var d = require('durable');
+  ```javascript
+  var d = require('durable');
 
-with (d.ruleset('a0')) {
-    whenAll(m.amount.lt(100), function (c) {
-        console.log('a0 approved from ' + c.s.sid);
-    });
-    whenStart(function (host) {
-        host.post('a0', {id: 1, sid: 1, amount: 10});
-    });
-} 
-d.runAll([{host: 'hostName', port: port, password: 'password'}]);
-```
+  with (d.ruleset('a0')) {
+      whenAll(m.amount.lt(100), function (c) {
+          console.log('a0 approved from ' + c.s.sid);
+      });
+      whenStart(function (host) {
+          host.post('a0', {id: 1, sid: 1, amount: 10});
+      });
+  } 
+  d.runAll([{host: 'hostName', port: port, password: 'password'}]);
+  ```  
 2. Deploy and scale the App
 3. Run `heroku logs`, you should see the message: `a0 approved from 1`  
-[top](reference.md#table-of-contents) 
+[top](reference.md#table-of-contents)  
+
 ### Rules
 ------
 Rules are the basic building block and consist of antecedent (expression) and consequent (action)
