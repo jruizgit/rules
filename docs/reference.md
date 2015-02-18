@@ -24,6 +24,7 @@ Reference Manual
 
 ### Local Setup
 ------
+durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
 #### Redis install
 durable.js relies on Redis version 2.8  
  
@@ -57,26 +58,27 @@ Now that your cache and web server are ready, let's write a simple rule:
 3. In the new directory `npm install durable` (this will download durable.js and its dependencies)  
 4. In that same directory create a test.js file using your favorite editor  
 5. Copy/Paste and save the following code:
-```javascript
-var d = require('durable');
+  ```javascript
+  var d = require('durable');
 
-with (d.ruleset('a0')) {
-    whenAll(m.amount.lt(100), function (c) {
-        console.log('a0 approved from ' + c.s.sid);
-    });
-    whenStart(function (host) {
-        host.post('a0', {id: 1, sid: 1, amount: 10});
-    });
-} 
-d.runAll();
-```
+  with (d.ruleset('a0')) {
+      whenAll(m.amount.lt(100), function (c) {
+          console.log('a0 approved from ' + c.s.sid);
+      });
+      whenStart(function (host) {
+          host.post('a0', {id: 1, sid: 1, amount: 10});
+      });
+  } 
+  d.runAll();
+  ```
 7. In the terminal type `node test.js`  
 8. You should see the message: `a0 approved from 1`  
 
-Note: If you are using [Redis To Go](https://redistogo.com), replace the last line.
-```javascript
-d.runAll([{host: 'hostName', port: port, password: 'password'}]);
-```
+Note 1: If you are using [Redis To Go](https://redistogo.com), replace the last line.
+  ```javascript
+  d.runAll([{host: 'hostName', port: port, password: 'password'}]);
+  ```
+Note 2: If you are running in Windows, you will need VS2013 express edition and Python 2.7, make sure both the VS build tools and the python directory are in your path.  
 
 [top](reference.md#table-of-contents) 
 ### Cloud Setup
