@@ -27,13 +27,13 @@ Reference Manual
 #### Redis install
 durable.js relies on Redis version 2.8  
  
-Mac  
+_Mac_  
 1. Download [Redis](http://download.redis.io/releases/redis-2.8.4.tar.gz)   
 2. Extract code, compile and start Redis
 
 For more information go to: http://redis.io/download  
 
-Windows  
+_Windows_  
 1. Download redis binaries from [MSTechOpen](https://github.com/MSOpenTech/redis/releases)  
 2. Extract binaries and start Redis  
 
@@ -80,6 +80,7 @@ d.runAll([{host: 'hostName', port: port, password: 'password'}]);
 
 [top](reference.md#table-of-contents) 
 ### Cloud Setup
+--------
 #### Redis install
 [Redis To Go](https://redistogo.com) has worked well for me and is very fast if you are deploying an app using Heroku or AWS.   
 1. Go to: [Redis To Go](https://redistogo.com)  
@@ -91,10 +92,10 @@ d.runAll([{host: 'hostName', port: port, password: 'password'}]);
 2. Create an account (the free instance with 1 dyno works well for evaluating durable_rules)  
 3. Install the Heroku [toolbelt](https://www.heroku.com) in your machine  
 #### First app
-Follow the instructions in the tutorial  
-* procfile  
+1. Follow the instructions in the [tutorial](https://devcenter.heroku.com/articles/getting-started-with-nodejs#introduction), with the following changes:
+  * procfile  
 `web: node test.js`
-* package.json  
+  * package.json  
 ```javascript
 {
   "name": "test",
@@ -108,7 +109,7 @@ Follow the instructions in the tutorial
   }
 }
 ```
-* test.js
+  * test.js
 ```javascript
 var d = require('durable');
 
@@ -122,6 +123,8 @@ with (d.ruleset('a0')) {
 } 
 d.runAll([{host: 'hostName', port: port, password: 'password'}]);
 ```
+2. Deploy and scale the App
+3. Run `heroku logs`, you should see the message: `a0 approved from 1`  
 [top](reference.md#table-of-contents) 
 ### Rules
 ------
