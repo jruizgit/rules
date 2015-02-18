@@ -2,9 +2,8 @@ Reference Manual
 =====
 ### Table of contents
 ------
-* [Setup](reference.md#setup)
-  * [Local](reference.md#local)
-  * [Cloud](reference.md#cloud)
+* [Local Setup](reference.md#setup)
+* [Cloud Setup](reference.md#setup)
 * [Rules](reference.md#rules)
   * [Simple Filter](reference.md#simple-filter)
   * [Correlated Sequence](reference.md#correlated-sequence)
@@ -23,36 +22,22 @@ Reference Manual
   * [Parallel](reference.md#parallel)
 * [Extensions](reference.md#extensions)
 
-### Setup
+### Local Setup
 ------
 #### Redis install
 durable.js relies on Redis version 2.8  
  
-#####Mac 
-1. Make sure you have XCode installed, you can get this from App Store
-2. Download command line tools (File->Preferences->Downloads)
-3. Download [Redis](http://download.redis.io/releases/redis-2.8.4.tar.gz)   
-4. Extract the tar.gz package into a directory (for example, library\redis)  
-5. Compile Redis:
-  1. Start a terminal
-  2. cd documents\redis\src
-  3. make
-6. Start Redis: 
-  1. Start a terminal
-  2. cd library/redis
-  3. src/redis-server redis.conf
-  
+Mac 
+1. Download [Redis](http://download.redis.io/releases/redis-2.8.4.tar.gz)   
+2. Extract code, compile and start Redis
+
 For more information go to: http://redis.io/download
 
-#####Windows
+Windows
 1. Download redis binaries from [MSTechOpen](https://github.com/MSOpenTech/redis/releases)
-2. If you prefer compiling the source code, follow the instructions in [MSTechOpen](https://github.com/MSOpenTech/redis)
+2. Extract binaries and start Redis
 
-#####Redis To Go
-[Redis To Go](https://redistogo.com) has worked well for me and is very fast if you are deploying an app using Heroku or AWS. Please be aware this recommendation is not based on exhaustive evaluation of Redis cloud offerings.
-1. Go to: [Redis To Go](https://redistogo.com)
-2. Create an account (the free instance with 5MB has enough space for you to evaluate durable_rules)
-3. Make sure you take down the host, port and password, which represents your new account
+For more information go to: https://github.com/MSOpenTech/redis
 
 #### Node.js install
 durable.js uses Node.js version  0.10.15.   
@@ -62,16 +47,16 @@ durable.js uses Node.js version  0.10.15.
 3. The installer will set all the necessary environment variables, so you are ready to go  
 
 For more information go to: http://nodejs.org/download  
-#### First rules
+
+#### First flight
 Now that your cache and web server are ready, let's write a simple rule:  
 
 #####JavaScript
-
 1. Start a terminal  
 2. Create a directory for your app: `mkdir firstapp` `cd firstapp`  
 3. In the new directory `npm install durable` (this will download durable.js and its dependencies)  
 4. In that same directory create a test.js file using your favorite editor  
-5. Copy/Paste and save the following code:
+5. Copy/Paste and save the following code:  
 ```javascript
 var d = require('durable');
 
@@ -84,17 +69,28 @@ with (d.ruleset('a0')) {
     });
 } 
 d.runAll();
-```
-6. If you are using [Redis To Go](https://redistogo.com), replace the last line with:
+```  
+7. In the terminal type `node test.js`  
+8. You should see the message: `a0 approved from 1`  
+
+Note: If you are using [Redis To Go](https://redistogo.com), replace the last line.
 ```javascript
 d.runAll([{host: 'hostName', port: port, password: 'password'}]);
 ```
-7. In the terminal type `node test.js`  
-8. You should see the message: `a0 approved from 1`
 
-#### Local
 [top](reference.md#table-of-contents) 
-#### Cloud
+### Cloud Setup
+#### Redis install
+[Redis To Go](https://redistogo.com) has worked well for me and is very fast if you are deploying an app using Heroku or AWS.   
+1. Go to: [Redis To Go](https://redistogo.com)
+2. Create an account (the free instance with 5MB has enough space for you to evaluate durable_rules)
+3. Make sure you write down the host, port and password, which represents your new account
+#### Heroku install
+[Heroku](https://www.heroku.com) is a good platform to create a cloud application in just a few minutes.
+1. Go to: [Heroku](https://www.heroku.com)
+2. Create an account (the free instance with 1 dyno works well for evaluating durable_rules)
+3. Install the Heroku [toolbelt](https://www.heroku.com) in your machine
+
 [top](reference.md#table-of-contents) 
 ### Rules
 ------
