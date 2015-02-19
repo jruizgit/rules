@@ -137,12 +137,11 @@ Rules are the basic building blocks. All rules have a condition, which defines t
 
 Below is an example of the typical rule structure. 
 
+#####Ruby
 Rule operator precedence:
 1. Unary: `-` (not exists), `+` (exists)   
 2. Boolean operators: `|` (or) , `&` (and)   
 3. Pattern matching: >, <, >=, <=, ==, !=   
-
-#####Ruby
 ```ruby
 require 'durable'
 Durable.ruleset :a0 do
@@ -155,12 +154,11 @@ Durable.ruleset :a0 do
 end
 Durable.run_all
 ```
+#####Python
 Rule operator precedence:
 1. Unary: `-` (not exists), `+` (exists)  
 2. Boolean operators: `|` (or) , `&` (and)  
 3. Pattern matching: >, <, >=, <=, ==, !=  
-
-#####Python
 ```python
 from durable.lang import *
 with ruleset('a0'):
@@ -174,12 +172,11 @@ with ruleset('a0'):
         
 run_all()
 ```
+#####JavaScript
 Rule operators:
 * Unary: `nex` (not exists), `ex` (exists)  
 * Boolean operators: `and`, `or`  
 * Pattern matching: `lt`, `gt`, `lte`, `gte`, `eq`, `neq`  
-
-#####JavaScript
 ```javascript
 var d = require('durable');
 with (d.ruleset('a0')) {
