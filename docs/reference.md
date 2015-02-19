@@ -130,18 +130,21 @@ Heroku is a good platform to create a cloud application in just a few minutes.
 
 ### Rules
 ------
+#### Simple Filter
 Rules are the basic building blocks. All rules have a condition, which defines the events and facts that trigger an action.  
 * The rule condition is an expression. Its left side represents an event or fact property, followed by a logical operator and its right side defines a pattern to be matched. By convention events or facts originated by calling post or assert are represented with the `m` name; events or facts originated by changing the context state are represented with the `s` name.  
 * The rule action is a function to which the context is passed as a parameter. Actions can be synchronous and asynchronous. Asynchonous actions take a completion function as a paremeter.  
 
-#### Simple Filter
-Operator precedence  
+Below is an example of the typical rule structure. 
+
+Rule operator precedence:
 1. Unary: `-` (not exists), `+` (exists)   
 2. Boolean operators: `|` (or) , `&` (and)   
 3. Pattern matching: >, <, >=, <=, ==, !=   
 
 #####Ruby
 ```ruby
+require 'durable'
 Durable.ruleset :a0 do
   when_all (m.subject < 100) | (m.subject == "approve") | (m.subject == "ok") do
     puts "a0 approved ->#{m.subject}"
@@ -150,14 +153,16 @@ Durable.ruleset :a0 do
     post :a0, {:id => 1, :sid => 1, :subject => 10}
   end
 end
+Durable.run_all
 ```
-Operator precedence
+Rule operator precedence:
 1. Unary: `-` (not exists), `+` (exists)  
 2. Boolean operators: `|` (or) , `&` (and)  
 3. Pattern matching: >, <, >=, <=, ==, !=  
 
 #####Python
 ```python
+from durable.lang import *
 with ruleset('a0'):
     @when_all((m.subject < 100) | (m.subject == 'approve') | (m.subject == 'ok'))
     def approved(c):
@@ -166,14 +171,17 @@ with ruleset('a0'):
     @when_start
     def start(host):
         host.post('a0', {'id': 1, 'sid': 1, 'subject': 10})
+        
+run_all()
 ```
-Operators
+Rule operators:
 * Unary: `nex` (not exists), `ex` (exists)  
 * Boolean operators: `and`, `or`  
 * Pattern matching: `lt`, `gt`, `lte`, `gte`, `eq`, `neq`  
 
 #####JavaScript
 ```javascript
+var d = require('durable');
 with (d.ruleset('a0')) {
     whenAll(or(m.subject.lt(100), m.subject.eq('approve'), m.subject.eq('ok')), function (c) {
         console.log('a0 approved ->' + c.m.subject);
@@ -182,6 +190,7 @@ with (d.ruleset('a0')) {
         host.post('a0', {id: 1, sid: 1, subject: 10});
     });
 }
+d.runAll();
 ```  
 [top](reference.md#table-of-contents) 
 #### Correlated Sequence
@@ -239,7 +248,7 @@ with (d.ruleset('fraudDetection')) {
 }
 ```
 [top](reference.md#table-of-contents)  
-#### Choice Of Sequences
+#### Choice of Sequences
 #####Ruby
 ```ruby
 Durable.ruleset :a4 do
