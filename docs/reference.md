@@ -191,15 +191,14 @@ d.runAll();
 ```  
 [top](reference.md#table-of-contents) 
 #### Correlated Sequence
-The ability to express and efficiently evaluate a sequence of correlated events or facts represents the forward inference hallmark. The fraud detection rule in the below example shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
+The ability to express and efficiently evaluate sequences of correlated events or facts represents the forward inference hallmark. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
+#####Ruby
 The `when_all` function expresses a sequence of events or facts separated by `,`. The assignment operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
 
 Arithmetic operator precedence:  
 1. `*`, `/`  
 2. `+`, `-`  
-
-#####Ruby
 ```ruby
 Durable.ruleset :fraud_detection do
   when_all c.first = m.t == "purchase",
@@ -217,6 +216,11 @@ Durable.ruleset :fraud_detection do
 end
 ```
 #####Python
+The `when_all` decorator expresses a sequence of events or facts separated by `,`. The `<<` operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
+
+Arithmetic operator precedence:  
+1. `*`, `/`  
+2. `+`, `-`  
 ```python
 with ruleset('fraud_detection'):
     @when_all(c.first << m.amount > 100,
@@ -234,6 +238,9 @@ with ruleset('fraud_detection'):
         host.post('fraud_detection', {'id': 3, 'sid': 1, 'amount': 300})
 ```
 #####JavaScript
+The `whenAll` function expresses a sequence of events or facts separated by `,`. The assignment operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
+
+Arithmetic operators: `add`, `sub`, `mul`, `div`
 ```javascript
 with (d.ruleset('fraudDetection')) {
     whenAll(c.first = m.amount.gt(100),
