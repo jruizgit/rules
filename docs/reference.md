@@ -138,7 +138,7 @@ Rules are the basic building blocks. All rules have a condition, which defines t
 Below is an example of the typical rule structure. 
 
 #####Ruby
-Rule operator precedence:
+Rule operator precedence:  
 1. Unary: `-` (not exists), `+` (exists)   
 2. Boolean operators: `|` (or) , `&` (and)   
 3. Pattern matching: >, <, >=, <=, ==, !=   
@@ -155,7 +155,7 @@ end
 Durable.run_all
 ```
 #####Python
-Rule operator precedence:
+Rule operator precedence:  
 1. Unary: `-` (not exists), `+` (exists)  
 2. Boolean operators: `|` (or) , `&` (and)  
 3. Pattern matching: >, <, >=, <=, ==, !=  
@@ -173,7 +173,7 @@ with ruleset('a0'):
 run_all()
 ```
 #####JavaScript
-Rule operators:
+Rule operators:  
 * Unary: `nex` (not exists), `ex` (exists)  
 * Boolean operators: `and`, `or`  
 * Pattern matching: `lt`, `gt`, `lte`, `gte`, `eq`, `neq`  
@@ -191,6 +191,14 @@ d.runAll();
 ```  
 [top](reference.md#table-of-contents) 
 #### Correlated Sequence
+The ability to express and efficiently evaluate a sequence of correlated events or facts represents the forward inference hallmark. The fraud detection rule in the below example shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
+
+The `when_all` function expresses a sequence of events or facts separated by `,`. The assignment operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
+
+Arithmetic operator precedence:  
+1. `*`, `/`  
+2. `+`, `-`  
+
 #####Ruby
 ```ruby
 Durable.ruleset :fraud_detection do
