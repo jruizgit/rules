@@ -130,7 +130,10 @@ Heroku is a good platform to create a cloud application in just a few minutes.
 
 ### Rules
 ------
-Rules are the basic building block and consist of antecedent (expression) and consequent (action)
+Rules are the basic building blocks. All rules have a condition, which defines the events and facts that trigger an action. 
+The rule condition is an expression. Its left side represents an event property, followed by a logical operator and its right side defines a pattern to be matched. 
+The rule action is a function with a context  
+
 
 #### Simple Filter
 
