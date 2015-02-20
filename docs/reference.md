@@ -40,6 +40,7 @@ _Windows_
 
 For more information go to: https://github.com/MSOpenTech/redis  
 
+Note: To test applications locally you can also use a redis [cloud service](reference.md#cloud-setup) 
 #### Node.js install
 durable.js uses Node.js version  0.10.15.    
 
@@ -49,7 +50,7 @@ durable.js uses Node.js version  0.10.15.
 
 For more information go to: http://nodejs.org/download  
 
-#### First flight
+#### First App
 Now that your cache and web server are ready, let's write a simple rule:  
 
 #####JavaScript
@@ -267,6 +268,7 @@ durable_rules allows expressing and efficiently evaluating richer events sequenc
 The following two functions can be used to define a rule:  
 * when_all: a set of event or fact patterns separated by `,`. All of them are required to match to trigger an action.  
 * when_any: a set of event or fact patterns separated by `,`. Any one match will trigger an action.  
+
 The following functions can be combined to form richer sequences:
 * all: patterns separated by `,`, all of them are required to match.
 * any: patterns separated by `,`, any of the patterns can match.    
@@ -287,6 +289,7 @@ end
 The following two decorators can be used for the rule definition:  
 * when_all: a set of event or fact patterns separated by `,`. All of them are required to match to trigger an action.  
 * when_any: a set of event or fact patterns separated by `,`. Any one match will trigger an action.  
+
 The following functions can be combined to form richer sequences:
 * all: patterns separated by `,`, all of them are required to match.
 * any: patterns separated by `,`, any of the patterns can match.    
@@ -307,6 +310,7 @@ with ruleset('a4'):
 The following two functions can be used to define a rule:  
 * whenAll: a set of event or fact patterns separated by `,`. All of them are required to match to trigger an action.  
 * whenAny: a set of event or fact patterns separated by `,`. Any one match will trigger an action.  
+
 The following functions can be combined to form richer sequences:
 * all: patterns separated by `,`, all of them are required to match.
 * any: patterns separated by `,`, any of the patterns can match.    
