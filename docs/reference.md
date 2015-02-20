@@ -138,7 +138,7 @@ Rules are the basic building blocks. All rules have a condition, which defines t
 Below is an example of the typical rule structure. 
 
 #####Ruby
-Rule operator precedence:  
+Logical operator precedence:  
 1. Unary: `-` (not exists), `+` (exists)   
 2. Boolean operators: `|` (or) , `&` (and)   
 3. Pattern matching: >, <, >=, <=, ==, !=   
@@ -155,7 +155,7 @@ end
 Durable.run_all
 ```
 #####Python
-Rule operator precedence:  
+Logical operator precedence:  
 1. Unary: `-` (not exists), `+` (exists)  
 2. Boolean operators: `|` (or) , `&` (and)  
 3. Pattern matching: >, <, >=, <=, ==, !=  
@@ -173,7 +173,7 @@ with ruleset('a0'):
 run_all()
 ```
 #####JavaScript
-Rule operators:  
+Logical operators:  
 * Unary: `nex` (not exists), `ex` (exists)  
 * Boolean operators: `and`, `or`  
 * Pattern matching: `lt`, `gt`, `lte`, `gte`, `eq`, `neq`  
@@ -261,14 +261,16 @@ with (d.ruleset('fraudDetection')) {
 ```
 [top](reference.md#table-of-contents)  
 #### Choice of Sequences
-durable_rules allows expressing and efficiently evaluating richer events sequences leveraging forward inference.  
+durable_rules allows expressing and efficiently evaluating richer events sequences leveraging forward inference. In the example below any of the two event\fact sequences will trigger the `a4` action. 
 
-The following two operators can be used to start the rule definition:  
-* when_any: a set of event or fact patterns separated by `,`. Any one match will trigger an action.  
-* when_all: a set of event or fact patterns separated by `,`. All of them are required to match to trigger an action.  
-
-all, any, none
 #####Ruby
+The following two functions can be used to define a rule:  
+* when_all: a set of event or fact patterns separated by `,`. All of them are required to match to trigger an action.  
+* when_any: a set of event or fact patterns separated by `,`. Any one match will trigger an action.  
+The following functions can be combined to form richer sequences:
+* all: patterns separated by `,`, all of them are required to match.
+* any: patterns separated by `,`, any of the patterns can match.    
+* none: no event or fact matching the pattern.  
 ```ruby
 Durable.ruleset :a4 do
   when_any all(m.subject == "approve", m.amount == 1000),
@@ -282,6 +284,13 @@ Durable.ruleset :a4 do
 end
 ```
 #####Python
+The following two decorators can be used for the rule definition:  
+* when_all: a set of event or fact patterns separated by `,`. All of them are required to match to trigger an action.  
+* when_any: a set of event or fact patterns separated by `,`. Any one match will trigger an action.  
+The following functions can be combined to form richer sequences:
+* all: patterns separated by `,`, all of them are required to match.
+* any: patterns separated by `,`, any of the patterns can match.    
+* none: no event or fact matching the pattern.  
 ```python
 with ruleset('a4'):
     @when_any(all(m.subject == 'approve', m.amount == 1000), 
@@ -295,6 +304,13 @@ with ruleset('a4'):
         host.post('a4', {'id': 2, 'sid': 2, 'amount': 10000})
 ```
 #####JavaScript
+The following two functions can be used to define a rule:  
+* whenAll: a set of event or fact patterns separated by `,`. All of them are required to match to trigger an action.  
+* whenAny: a set of event or fact patterns separated by `,`. Any one match will trigger an action.  
+The following functions can be combined to form richer sequences:
+* all: patterns separated by `,`, all of them are required to match.
+* any: patterns separated by `,`, any of the patterns can match.    
+* none: no event or fact matching the pattern. 
 ```javascript
 with (d.ruleset('a4')) {
     whenAny(all(m.subject.eq('approve'), m.amount.eq(1000)), 
