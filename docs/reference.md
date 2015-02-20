@@ -329,6 +329,7 @@ with (d.ruleset('a4')) {
 ```
 [top](reference.md#table-of-contents) 
 #### Conflict Resolution
+In some cases several events or facts can lead
 #####Ruby
 ```ruby
 Durable.ruleset :attributes do
