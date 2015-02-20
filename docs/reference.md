@@ -261,6 +261,13 @@ with (d.ruleset('fraudDetection')) {
 ```
 [top](reference.md#table-of-contents)  
 #### Choice of Sequences
+durable_rules allows expressing and efficiently evaluating richer events sequences leveraging forward inference.  
+
+The following two operators can be used to start the rule definition:  
+* when_any: a set of event or fact patterns separated by `,`. Any one match will trigger an action.  
+* when_all: a set of event or fact patterns separated by `,`. All of them are required to match to trigger an action.  
+
+all, any, none
 #####Ruby
 ```ruby
 Durable.ruleset :a4 do
