@@ -408,7 +408,13 @@ with (d.ruleset('attributes')) {
 ```
 [top](reference.md#table-of-contents) 
 #### Tumbling Window
-durable_rules enables aggregating events or observed facts over time with tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.
+durable_rules enables aggregating events or observed facts over time with tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
+
+Summary of rule attributes:  
+* count: defines the number of events or facts, wich need to be matched when scheduling an action.   
+* span: defines the tumbling time between scheduled actions.  
+* pri: defines the scheduled action order in case of conflict.  
+
 #####Ruby
 ```ruby
 Durable.ruleset :t0 do
