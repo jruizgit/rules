@@ -9,7 +9,7 @@ Reference Manual
   * [Correlated Sequence](reference.md#correlated-sequence)
   * [Choice of Sequences](reference.md#choice-of-sequences)
   * [Conflict Resolution](reference.md#conflict-resolution)
-  * [Time Window](reference.md#time-window)
+  * [Tumbling Window](reference.md#time-window)
 * [Data Model](reference.md#data-model)
   * [Events](reference.md#events)
   * [Facts](reference.md#facts)
@@ -407,7 +407,8 @@ with (d.ruleset('attributes')) {
 }
 ```
 [top](reference.md#table-of-contents) 
-#### Time Window
+#### Tumbling Window
+durable_rules enables aggregating events or observed facts over time with a tumbling window. 
 #####Ruby
 ```ruby
 Durable.ruleset :t0 do
