@@ -408,7 +408,7 @@ with (d.ruleset('attributes')) {
 ```
 [top](reference.md#table-of-contents) 
 #### Tumbling Window
-durable_rules enables aggregating events or observed facts over time with a tumbling window. 
+durable_rules enables aggregating events or observed facts over time with tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.
 #####Ruby
 ```ruby
 Durable.ruleset :t0 do
