@@ -329,7 +329,9 @@ with (d.ruleset('a4')) {
 ```
 [top](reference.md#table-of-contents) 
 #### Conflict Resolution
-In some cases several events or facts can lead
+Events or facts can produce multiple results in a single fact, in which case durable_rules will choose the result with the most recent events or facts. In addition events or facts can trigger more than one action simultaneously, the triggering order can be defined by setting the priority (salience) attribute on the rule.
+
+In this example, notice how the last rule is triggered first, as it has the highest priority. In the last rule result facts are ordered starting with the most recent.
 #####Ruby
 ```ruby
 Durable.ruleset :attributes do
