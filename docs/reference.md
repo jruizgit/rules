@@ -9,7 +9,7 @@ Reference Manual
   * [Correlated Sequence](reference.md#correlated-sequence)
   * [Choice of Sequences](reference.md#choice-of-sequences)
   * [Conflict Resolution](reference.md#conflict-resolution)
-  * [Tumbling Window](reference.md#time-window)
+  * [Tumbling Window](reference.md#tumbling-window)
 * [Data Model](reference.md#data-model)
   * [Events](reference.md#events)
   * [Facts](reference.md#facts)
