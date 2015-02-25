@@ -468,6 +468,71 @@ with (d.ruleset('t0')) {
 ### Data Model
 ------
 #### Events
+Inference based on events is the main purpose of `durable_rules`. What makes events unique is they can only be consumed once by an action. Events are removed from inference sets as soon as they are scheduled for dispatch. The join combinatorics are significantly reduced, thus improving the rule evaluation performance, in some cases, by orders of magnitude.  
+
+Event rules:  
+* Events can be posted from the `start` handler via the host parameter.   
+* Evetns be posted inside an `action` handler using the context parameter.   
+* Events can be posted one at a time or in batches.  
+* Events don't need to be retracted.  
+* Events can co-exist with facts.   
+
+The example below shows how two events will cause only one action to be scheduled, as a given event can only be observed once. You can contrast this with the example in the facts section, which will schedule two actions.
+#####Ruby
+API usage:  
+* `post ruleset_name, {event}`  
+* `post_batch ruleset_name, {event}, {event}...`  
+```ruby
+Durable.ruleset :fraud_detection do
+  when_all c.first = m.t == "purchase",
+           c.second = m.location != first.location do
+    puts "fraud detected ->" + m.first.location + ", " + m.second.location
+  end
+  when_start do
+    post :fraud_detection, {:id => 1, :sid => 1, :t => "purchase", :location => "US"}
+    post :fraud_detection, {:id => 2, :sid => 1, :t => "purchase", :location => "CA"}
+  end
+end
+```
+#####Python
+API usage:  
+* `c.post(ruleset_name, {event})`
+* `c.post_batch(ruleset_name, {event}, {event}...)`
+* `host.post(ruleset_name, {event})`
+* `host.post_batch(ruleset_name, {event}, {event}...)`
+```python
+with ruleset('fraud_detection'):
+    @when_all(c.first << m.t == 'purchase',
+              c.second << m.location != c.first.location)
+    def detected(c):
+        print ('fraud detected ->{0}, {1}'.format(c.m.first.location, c.m.second.location))
+
+    @when_start
+    def start(host):
+        host.post('fraud_detection', {'id': 1, 'sid': 1, 't': 'purchase', 'location': 'US'})
+        host.post('fraud_detection', {'id': 2, 'sid': 1, 't': 'purchase', 'location': 'CA'})
+```
+#####JavaScript
+API usage:  
+* `c.post(rulesetName, {event})`  
+* `c.post_batch(rulesetName, {event}, {event}...)`  
+* `host.post(rulesetName, {event})`  
+* `host.post_batch(rulesetName, {event}, {event}...)`  
+```javascript
+with (d.ruleset('fraudDetection')) {
+    whenAll(c.first = m.t.eq('purchase'),
+            c.second = m.location.neq(c.first.location), 
+        function(c) {
+            console.log('fraud detected ->' + c.m.first.location + ', ' + c.m.second.location);
+        }
+    );
+    whenStart(function (host) {
+        host.post('fraudDetection', {id: 1, sid: 1, t: 'purchase', location: 'US'});
+        host.post('fraudDetection', {id: 2, sid: 1, t: 'purchase', location: 'CA'});
+    });
+}
+```
+
 [top](reference.md#table-of-contents)  
 
 #### Facts
