@@ -163,6 +163,7 @@ To learn more:
 * [Reference Manual](https://github.com/jruizgit/rules/blob/master/docs/reference.md)  
 
 Blog post:  
+* [Rete_D (02/2015)](http://jruizblog.com/2015/02/23/rete_d/)
 * [Boosting Performance with C (08/2014)](http://jruizblog.com/2014/08/19/boosting-performance-with-c/)
 * [Rete Meets Redis (02/2014)](http://jruizblog.com/2014/02/02/rete-meets-redis/)
 * [Inference: From Expert Systems to Cloud Scale Event Processing (01/2014)](http://jruizblog.com/2014/01/27/event-processing/)
