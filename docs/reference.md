@@ -471,8 +471,8 @@ with (d.ruleset('t0')) {
 Inference based on events is the main purpose of `durable_rules`. What makes events unique is they can only be consumed once by an action. Events are removed from inference sets as soon as they are scheduled for dispatch. The join combinatorics are significantly reduced, thus improving the rule evaluation performance, in some cases, by orders of magnitude.  
 
 Event rules:  
-* Events can be posted from the `start` handler via the host parameter.   
-* Evetns be posted inside an `action` handler using the context parameter.   
+* Events can be posted in the `start` handler via the host parameter.   
+* Evetns be posted in an `action` handler using the context parameter.   
 * Events can be posted one at a time or in batches.  
 * Events don't need to be retracted.  
 * Events can co-exist with facts.  
@@ -480,7 +480,7 @@ Event rules:
 
 The example below shows how two events will cause only one action to be scheduled, as a given event can only be observed once. You can contrast this with the example in the facts section, which will schedule two actions.
 #####Ruby
-API usage:  
+API:  
 * `post ruleset_name, {event}`  
 * `post_batch ruleset_name, {event}, {event}...`  
 ```ruby
@@ -496,7 +496,7 @@ Durable.ruleset :fraud_detection do
 end
 ```
 #####Python
-API usage:  
+API:  
 * `c.post(ruleset_name, {event})`
 * `c.post_batch(ruleset_name, {event}, {event}...)`
 * `host.post(ruleset_name, {event})`
@@ -514,7 +514,7 @@ with ruleset('fraud_detection'):
         host.post('fraud_detection', {'id': 2, 'sid': 1, 't': 'purchase', 'location': 'CA'})
 ```
 #####JavaScript
-API usage:  
+API:  
 * `c.post(rulesetName, {event})`  
 * `c.post_batch(rulesetName, {event}, {event}...)`  
 * `host.post(rulesetName, {event})`  
@@ -540,8 +540,8 @@ with (d.ruleset('fraudDetection')) {
 Facts are used for defining more permanent state, which lifetime spans at least more than one action execution.
 
 Fact rules:  
-* Facts can be asserted from the `start` handler via the host parameter.   
-* Facts can asserted inside an `action` handler using the context parameter.   
+* Facts can be asserted in the `start` handler via the host parameter.   
+* Facts can asserted in an `action` handler using the context parameter.   
 * Facts have to be explicitely retracted.  
 * Once retracted all related scheduled actions are cancelled.  
 * Facts can co-exist with events.  
@@ -549,7 +549,7 @@ Fact rules:
 
 This example shows how asserting two facts lead to scheduling two actions: one for each combination.  
 #####Ruby
-API usage:  
+API:  
 * `assert ruleset_name, {fact}`  
 * `assert_facts ruleset_name, {fact}, {fact}...`
 * `retract ruleset_name, {fact}`  
@@ -568,7 +568,7 @@ Durable.ruleset :fraud_detection do
 end
 ```
 #####Python
-API usage:  
+API:  
 * `host.assert_fact(ruleset_name, {fact})`  
 * `host.assert_facts(ruleset_name, {fact}, {fact}...)`  
 * `host.retract_fact(ruleset_name, {fact})`  
@@ -590,7 +590,7 @@ with ruleset('fraud_detection'):
         host.assert_fact('fraud_detection', {'id': 2, 'sid': 1, 't': 'purchase', 'location': 'CA'})
 ```
 #####JavaScript
-API usage:  
+API:  
 * `host.assert(ruleset_name, {fact})`
 * `host.assertFacts(ruleset_name, {fact}, {fact}...)`  
 * `host.retract(ruleset_name, {fact})`  
@@ -616,7 +616,19 @@ with (d.ruleset('fraudDetection')) {
 [top](reference.md#table-of-contents)  
 
 #### Context
+Context state is permanent. It is used for controlling the ruleset flow or for storing configuration information. `durable_rules` implements a client cache with LRU eviction policy to reference contexts by id, this helps reducing the combinatorics in joins which otherwise would be used for configuration facts.  
+
+Context rules:
+* Context state can be modified in the `start` handler via the host parameter.   
+* Context state can modified in an `action` handler simply by modifying the context state object.  
+* All events and facts are addressed to a context id.  
+* Rules can be written for context changes. By convention the `s` name is used for naming the context state.  
+* The right side of a rule can reference a context, the references will be resolved in the Rete tree alpha nodes.  
+
 #####Ruby
+API:  
+* `patch_state ruleset_name, {state}`  
+* `state.property = ...`  
 ```ruby
 Durable.ruleset :a8 do
   when_all m.amount < s.max_amount + s.id(:global).min_amount do
@@ -630,6 +642,9 @@ Durable.ruleset :a8 do
 end
 ```
 #####Python
+API:  
+* `host.patch_state(ruleset_name, {state})`  
+* `c.state.property = ...`  
 ```python
 with ruleset('a8'):
     @when_all(m.amount < c.s.max_amount + c.s.id('global').min_amount)
@@ -643,6 +658,9 @@ with ruleset('a8'):
         host.post('a8', {'id': 1, 'sid': 1, 'amount': 10})
 ```
 #####JavaScript
+API:  
+* `host.patchState(ruleset_name, {state})`  
+* `c.state.property = ...`  
 ```javascript
 with (d.ruleset('a8')) {
     whenAll(m.amount.lt(add(c.s.maxAmount, c.s.id('global').minAmount)), function (c) {
