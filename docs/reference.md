@@ -475,7 +475,8 @@ Event rules:
 * Evetns be posted inside an `action` handler using the context parameter.   
 * Events can be posted one at a time or in batches.  
 * Events don't need to be retracted.  
-* Events can co-exist with facts.   
+* Events can co-exist with facts.  
+* The post event operation is idempotent.    
 
 The example below shows how two events will cause only one action to be scheduled, as a given event can only be observed once. You can contrast this with the example in the facts section, which will schedule two actions.
 #####Ruby
@@ -536,7 +537,22 @@ with (d.ruleset('fraudDetection')) {
 [top](reference.md#table-of-contents)  
 
 #### Facts
+Facts are used for defining more permanent state, which lifetime spans at least more than one action execution.
+
+Fact rules:  
+* Facts can be asserted from the `start` handler via the host parameter.   
+* Facts can asserted inside an `action` handler using the context parameter.   
+* Facts have to be explicitely retracted.  
+* Once retracted all related scheduled actions are cancelled.  
+* Facts can co-exist with events.  
+* The assert and retract fact operations are idempotent.  
+
+This example shows how asserting two facts lead to scheduling two actions: one for each combination.  
 #####Ruby
+API usage:  
+* `assert ruleset_name, {fact}`  
+* `assert_facts ruleset_name, {fact}, {fact}...`
+* `retract ruleset_name, {fact}`  
 ```ruby
 Durable.ruleset :fraud_detection do
   when_all c.first = m.t == "purchase",
@@ -552,6 +568,13 @@ Durable.ruleset :fraud_detection do
 end
 ```
 #####Python
+API usage:  
+* `host.assert_fact(ruleset_name, {fact})`  
+* `host.assert_facts(ruleset_name, {fact}, {fact}...)`  
+* `host.retract_fact(ruleset_name, {fact})`  
+* `c.assert_fact(ruleset_name, {fact})`  
+* `c.assert_facts(ruleset_name, {fact}. {fact}...)`  
+* `c.retract_fact(ruleset_name, {fact})`  
 ```python
 with ruleset('fraud_detection'):
     @when_all(c.first << m.t == 'purchase',
@@ -567,6 +590,13 @@ with ruleset('fraud_detection'):
         host.assert_fact('fraud_detection', {'id': 2, 'sid': 1, 't': 'purchase', 'location': 'CA'})
 ```
 #####JavaScript
+API usage:  
+* `host.assert(ruleset_name, {fact})`
+* `host.assertFacts(ruleset_name, {fact}, {fact}...)`  
+* `host.retract(ruleset_name, {fact})`  
+* `c.assert(ruleset_name, {fact})`  
+* `c.assertFacts(ruleset_name, {fact}, {fact}...)`  
+* `c.retract(ruleset_name, {fact})`  
 ```javascript
 with (d.ruleset('fraudDetection')) {
     whenAll(c.first = m.t.eq('purchase'),
