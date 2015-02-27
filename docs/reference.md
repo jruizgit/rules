@@ -412,7 +412,7 @@ durable_rules enables aggregating events or observed facts over time with tumbli
 
 Summary of rule attributes:  
 * count: defines the number of events or facts, wich need to be matched when scheduling an action.   
-* span: defines the tumbling time between scheduled actions.  
+* span: defines the tumbling time in seconds between scheduled actions.  
 * pri: defines the scheduled action order in case of conflict.  
 
 #####Ruby
@@ -516,9 +516,9 @@ with ruleset('fraud_detection'):
 #####JavaScript
 API:  
 * `c.post(rulesetName, {event})`  
-* `c.post_batch(rulesetName, {event}, {event}...)`  
+* `c.postBatch(rulesetName, {event}, {event}...)`  
 * `host.post(rulesetName, {event})`  
-* `host.post_batch(rulesetName, {event}, {event}...)`  
+* `host.postBatch(rulesetName, {event}, {event}...)`  
 ```javascript
 with (d.ruleset('fraudDetection')) {
     whenAll(c.first = m.t.eq('purchase'),
@@ -591,12 +591,12 @@ with ruleset('fraud_detection'):
 ```
 #####JavaScript
 API:  
-* `host.assert(ruleset_name, {fact})`
-* `host.assertFacts(ruleset_name, {fact}, {fact}...)`  
-* `host.retract(ruleset_name, {fact})`  
-* `c.assert(ruleset_name, {fact})`  
-* `c.assertFacts(ruleset_name, {fact}, {fact}...)`  
-* `c.retract(ruleset_name, {fact})`  
+* `host.assert(rulesetName, {fact})`
+* `host.assertFacts(rulesetName, {fact}, {fact}...)`  
+* `host.retract(rulesetName, {fact})`  
+* `c.assert(rulesetName, {fact})`  
+* `c.assertFacts(rulesetName, {fact}, {fact}...)`  
+* `c.retract(rulesetName, {fact})`  
 ```javascript
 with (d.ruleset('fraudDetection')) {
     whenAll(c.first = m.t.eq('purchase'),
@@ -659,7 +659,7 @@ with ruleset('a8'):
 ```
 #####JavaScript
 API:  
-* `host.patchState(ruleset_name, {state})`  
+* `host.patchState(rulesetName, {state})`  
 * `c.state.property = ...`  
 ```javascript
 with (d.ruleset('a8')) {
@@ -675,7 +675,21 @@ with (d.ruleset('a8')) {
 ```
 [top](reference.md#table-of-contents)  
 #### Timers
+`durable_rules` supports scheduling timeout events and writing rules, which observe such events.  
+
+Timer rules:  
+* Timers can be started in the `start` handler via the host parameter.   
+* Timers can started in an `action` handler using the context parameter.   
+* A timeout is an event. 
+* A timeout is raised only once.  
+* Timeouts can be observed in rules given the timer name.  
+* The start timer operation is idempotent.  
+
+The example shows an event scheduled to be raised after 5 seconds and a rule which reacts to such an event.
 #####Ruby
+API:  
+* `start_timer timer_name, seconds`  
+* `when... timeout(timer_name)`  
 ```ruby
 Durable.ruleset :t1 do
   when_all m.start == "yes" do
@@ -693,6 +707,10 @@ Durable.ruleset :t1 do
 end
 ```
 #####Python
+API:  
+* `host.start_timer(timer_name, seconds)`
+* `c.start_timer(timer_name, seconds)`  
+* `when... timeout(timer_name)`  
 ```python
 with ruleset('t1'): 
     @when_all(m.start == 'yes')
@@ -710,6 +728,10 @@ with ruleset('t1'):
         host.post('t1', {'id': 1, 'sid': 1, 'start': 'yes'})
 ```
 #####JavaScript
+API:  
+* `host.startTimer(timerName, seconds)`
+* `c.startTimer(timerName, seconds)`  
+* `when... timeout(timerName)`  
 ```javascript
 with (d.ruleset('t1')) {
     whenAll(m.start.eq('yes'), function (c) {
