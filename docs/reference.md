@@ -755,9 +755,9 @@ with (d.ruleset('t1')) {
 `durable_rules` lets you organize the ruleset flow such that its context is always in exactly one of a number of possible states with well-defined conditional transitions between these states. Actions depend on the state of the context and a triggering event.  
 
 Statechart rules:  
-* A statechart can have on or more state.  
+* A statechart can have one or more states.  
 * A statechart requires an initial state.  
-* An initial state is defined as a vertice without incoming edges.  
+* An initial state is defined as a vertex without incoming edges.  
 * A state can have zero or more triggers.  
 * A state can have zero or more states (see [nested states](reference.md#nested-states)).  
 * A trigger has a destination state.  
@@ -799,7 +799,7 @@ end
 API:  
 * `with statechart(ruleset_name): states_block`  
 * `with state(state_name): [triggers_and_states_block]` 
-Action decorators: 
+Action decorators:  
 * `@to(state_name)`  
 * `@rule`  
 ```python
@@ -837,9 +837,9 @@ with statechart('a2'):
 ```
 #####JavaScript
 API:  
-* `with (statechart(ruleset_name)) states_block`  
-* `with (state(state_name)) triggers_and_states_block`  
-* `to(state_name, [action_block]).[rule_antecedent, action_block]`   
+* `with (statechart(rulesetName)) statesBlock`  
+* `with (state(stateName)) triggersAndStatesBlock`  
+* `to(stateName, [actionBlock]).[ruleAntecedent, actionBlock]`   
 ```javascript
 with (d.statechart('a2')) {
     with (state('input')) {
@@ -970,8 +970,22 @@ with (d.statechart('a6')) {
 ```
 [top](reference.md#table-of-contents)
 #### Flowchart
+In addition to [statechart](reference.md#statechart), flowchart is another way for organizing a ruleset flow. In a flowchart each stage represents an action to be executed. So (unlike the statechart state), when applied to the context state, it results in a transition to another stage.  
+
+Flowchart rules:  
+* A flowchart can have one or more stages.  
+* A flowchart requires an initial stage.  
+* An initial stage is defined as a vertex without incoming edges.  
+* A stage can have an action.  
+* A stage can have zero or more conditions.  
+* A condition has a rule and a destination stage.  
 
 #####Ruby
+API:  
+* flowchart ruleset_name do stage_condition_block  
+* stage stage_name [do action_block]  
+* to stage_name, [rule]  
+Note: conditions have to be defined immediately after the stage definition  
 ```ruby
 Durable.flowchart :a3 do
   stage :input
@@ -996,6 +1010,13 @@ Durable.flowchart :a3 do
 end
 ```
 #####Python
+API:  
+* flowchart(ruleset_name): stage_condition_block  
+* with stage(stage_name): [action_condition_block]  
+* to(stage_name).[rule]
+Decorators:  
+* @run  
+Note: conditions have to be defined immediately after the stage definition  
 ```python
 with flowchart('a3'):
     with stage('input'): 
@@ -1026,6 +1047,12 @@ with flowchart('a3'):
             print ('a3 denied from: {0}'.format(c.s.sid))
 ```
 #####JavaScript
+API:  
+* flowchart(rulesetName) stageConditionBlock  
+* with (stage(stageName)) [actionConditionbBlock] 
+* run(actionFunction)  
+* to(stageName).[rule]  
+Note: conditions have to be defined immediately after the stage definition  
 ```javascript
 with (d.flowchart('a3')) {
     with (stage('input')) {
