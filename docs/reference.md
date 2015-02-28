@@ -763,13 +763,14 @@ Statechart rules:
 * A trigger has a destination state.  
 * A trigger can have a rule (absence means state enter).  
 * A trigger can have an action.  
-#####Ruby
+
+The example shows an approval state machine, which waits for two consecutive events (`subect = "approve"` and `subject = "approved"`) to reach the `approved` state.  
+#####Ruby  
 API:  
 * `statechart ruleset_name do states_block`  
 * `state state_name [do triggers_and_states_block]`  
 * `to state_name, [rule] [do action_block]`  
 
-The example shows an approval state machine, which waits for two consecutive events (`subect = "approve"` and `subject = "approved"`) to reach the `approved` state.
 ```ruby
 Durable.statechart :a2 do
   state :input do
