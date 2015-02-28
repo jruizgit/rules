@@ -752,8 +752,24 @@ with (d.ruleset('t1')) {
 ### Flow Structures
 -------
 #### Statechart
+`durable_rules` lets you organize the ruleset flow such that its context is always in exactly one of a number of possible states with well-defined conditional transitions between these states. Actions depend on the state of the context and a triggering event.  
 
+Statechart rules:  
+* A statechart can have on or more state.  
+* A statechart requires an initial state.  
+* An initial state is defined as a vertice without incoming edges.  
+* A state can have zero or more triggers.  
+* A state can have zero or more states (see [nested states](reference.md#nested-states)).  
+* A trigger has a destination state.  
+* A trigger can have a rule (absence means state enter).  
+* A trigger can have an action.  
 #####Ruby
+API:  
+* `statechart ruleset_name do states_block`  
+* `state state_name [do triggers_and_states_block]`  
+* `to state_name, [rule] [do action_block]`  
+
+The example shows an approval state machine, which waits for two consecutive events (`subect = "approve"` and `subject = "approved"`) to reach the `approved` state.
 ```ruby
 Durable.statechart :a2 do
   state :input do
@@ -779,6 +795,12 @@ Durable.statechart :a2 do
 end
 ```
 #####Python
+API:  
+* `with statechart(ruleset_name): states_block`  
+* `with state(state_name): [triggers_and_states_block]` 
+Action decorators: 
+* `@to(state_name)`  
+* `@rule`  
 ```python
 with statechart('a2'):
     with state('input'):
@@ -813,6 +835,10 @@ with statechart('a2'):
     state('approved')
 ```
 #####JavaScript
+API:  
+* `with (statechart(ruleset_name)) states_block`  
+* `with (state(state_name)) triggers_and_states_block`  
+* `to(state_name, [action_block]).[rule_antecedent, action_block]`   
 ```javascript
 with (d.statechart('a2')) {
     with (state('input')) {
@@ -841,6 +867,9 @@ with (d.statechart('a2')) {
 ```
 [top](reference.md#table-of-contents)  
 ### Nested States
+`durable_rules` supports nested states. Which implies that, along with the [statechart](reference.md#statechart) description from the previous section, most of the [UML statechart](http://en.wikipedia.org/wiki/UML_state_machine) semantics is supported. If a context is in the nested state, it also (implicitly) is in the surrounding state. The state machine will attempt to handle any event in the context of the substate, which conceptually is at the lower level of the hierarchy. However, if the substate does not prescribe how to handle the event, the event is not discarded, but it is automatically handled at the higher level context of the superstate.
+
+The example below shows a statechart, where the `canceled` and reflective `work` transitions are reused for both the `enter` and the `process` states. 
 #####Ruby
 ```ruby
 Durable.statechart :a6 do
