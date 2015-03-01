@@ -19,8 +19,7 @@ Reference Manual
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
   * [Flowchart](reference.md#flowchart)
-  * [Parallel](reference.md#parallel)
-* [Extensions](reference.md#extensions)
+  * [Parallel](reference.md#parallel)  
 
 ### Local Setup
 ------
@@ -201,6 +200,7 @@ Arithmetic operator precedence:
 1. `*`, `/`  
 2. `+`, `-`  
 ```ruby
+require 'durable'
 Durable.ruleset :fraud_detection do
   when_all c.first = m.t == "purchase",
            c.second = m.amount > first.amount * 2,
@@ -223,6 +223,7 @@ Arithmetic operator precedence:
 1. `*`, `/`  
 2. `+`, `-`  
 ```python
+from durable.lang import *
 with ruleset('fraud_detection'):
     @when_all(c.first << m.amount > 100,
               c.second << m.amount > c.first.amount * 2,
@@ -237,12 +238,15 @@ with ruleset('fraud_detection'):
         host.post('fraud_detection', {'id': 1, 'sid': 1, 'amount': 50})
         host.post('fraud_detection', {'id': 2, 'sid': 1, 'amount': 200})
         host.post('fraud_detection', {'id': 3, 'sid': 1, 'amount': 300})
+
+run_all()
 ```
 #####JavaScript
 The `whenAll` function expresses a sequence of events or facts separated by `,`. The assignment operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
 
 Arithmetic operators: `add`, `sub`, `mul`, `div`
 ```javascript
+var d = require('durable');
 with (d.ruleset('fraudDetection')) {
     whenAll(c.first = m.amount.gt(100),
             c.second = m.amount.gt(c.first.amount.mul(2)), 
@@ -259,6 +263,7 @@ with (d.ruleset('fraudDetection')) {
         host.post('fraudDetection', {id: 3, sid: 1, amount: 1000});
     });
 }
+d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 #### Choice of Sequences
@@ -274,6 +279,7 @@ The following functions can be combined to form richer sequences:
 * any: patterns separated by `,`, any of the patterns can match.    
 * none: no event or fact matching the pattern.  
 ```ruby
+require 'durable'
 Durable.ruleset :a4 do
   when_any all(m.subject == "approve", m.amount == 1000),
            all(m.subject == "jumbo", m.amount == 10000) do
@@ -284,6 +290,7 @@ Durable.ruleset :a4 do
     post :a4, {:id => 2, :sid => 2, :amount => 10000}
   end
 end
+Durable.run_all
 ```
 #####Python
 The following two decorators can be used for the rule definition:  
@@ -295,6 +302,7 @@ The following functions can be combined to form richer sequences:
 * any: patterns separated by `,`, any of the patterns can match.    
 * none: no event or fact matching the pattern.  
 ```python
+from durable.lang import *
 with ruleset('a4'):
     @when_any(all(m.subject == 'approve', m.amount == 1000), 
               all(m.subject == 'jumbo', m.amount == 10000))
@@ -305,6 +313,8 @@ with ruleset('a4'):
     def start(host):
         host.post('a4', {'id': 1, 'sid': 2, 'subject': 'jumbo'})
         host.post('a4', {'id': 2, 'sid': 2, 'amount': 10000})
+
+run_all()
 ```
 #####JavaScript
 The following two functions can be used to define a rule:  
@@ -316,6 +326,7 @@ The following functions can be combined to form richer sequences:
 * any: patterns separated by `,`, any of the patterns can match.    
 * none: no event or fact matching the pattern. 
 ```javascript
+var d = require('durable');
 with (d.ruleset('a4')) {
     whenAny(all(m.subject.eq('approve'), m.amount.eq(1000)), 
             all(m.subject.eq('jumbo'), m.amount.eq(10000)), function (c) {
@@ -326,6 +337,7 @@ with (d.ruleset('a4')) {
         host.post('a4', {id: 2, sid: 2, amount: 10000});
     });
 }
+d.runAll();
 ```
 [top](reference.md#table-of-contents) 
 #### Conflict Resolution
@@ -334,6 +346,7 @@ Events or facts can produce multiple results in a single fact, in which case dur
 In this example, notice how the last rule is triggered first, as it has the highest priority. In the last rule result facts are ordered starting with the most recent.
 #####Ruby
 ```ruby
+require 'durable'
 Durable.ruleset :attributes do
   when_all pri(3), count(3), m.amount < 300 do
     puts "attributes ->" + m[0].amount.to_s
@@ -353,9 +366,11 @@ Durable.ruleset :attributes do
     assert :attributes, {:id => 3, :sid => 1, :amount => 250}
   end
 end
+Durable.run_all
 ```
 #####Python
 ```python
+from durable.lang import *
 with ruleset('attributes'):
     @when_all(pri(3), count(3), m.amount < 300)
     def first_detect(c):
@@ -377,9 +392,12 @@ with ruleset('attributes'):
         host.assert_fact('attributes', {'id': 1, 'sid': 1, 'amount': 50})
         host.assert_fact('attributes', {'id': 2, 'sid': 1, 'amount': 150})
         host.assert_fact('attributes', {'id': 3, 'sid': 1, 'amount': 250})
+
+run_all()
 ```
 #####JavaScript
 ```javascript
+var d = require('durable');
 with (d.ruleset('attributes')) {
     whenAll(pri(3), count(3), m.amount.lt(300),
         function(c) {
@@ -405,6 +423,7 @@ with (d.ruleset('attributes')) {
         host.assert('attributes', {id: 3, sid: 1, amount: 250});
     });
 }
+d.runAll();
 ```
 [top](reference.md#table-of-contents) 
 #### Tumbling Window
@@ -417,6 +436,7 @@ Summary of rule attributes:
 
 #####Ruby
 ```ruby
+require 'durable'
 Durable.ruleset :t0 do
   when_all (timeout :my_timer) | (m.count == 0) do
     s.count += 1
@@ -430,9 +450,11 @@ Durable.ruleset :t0 do
     patch_state :sid => 1, :count => 0
   end
 end
+Durable.run_all
 ```
 #####Python
 ```python
+from durable.lang import *
 with ruleset('t0'):
     @when_all(timeout('my_timer') | (s.count == 0))
     def start_timer(c):
@@ -447,9 +469,12 @@ with ruleset('t0'):
     @when_start
     def start(host):
         host.patch_state({'sid': 1, 'count': 0})
+
+run_all()
 ```
 #####JavaScript
 ```javascript
+var d = require('durable');
 with (d.ruleset('t0')) {
     whenAll(or(m.count.eq(0), timeout('myTimer')), function (c) {
         c.s.count += 1;
@@ -463,6 +488,7 @@ with (d.ruleset('t0')) {
         host.patchState({sid: 1, count: 0});
     });
 }
+d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 ### Data Model
@@ -484,6 +510,7 @@ API:
 * `post ruleset_name, {event}`  
 * `post_batch ruleset_name, {event}, {event}...`  
 ```ruby
+require 'durable'
 Durable.ruleset :fraud_detection do
   when_all c.first = m.t == "purchase",
            c.second = m.location != first.location do
@@ -494,6 +521,7 @@ Durable.ruleset :fraud_detection do
     post :fraud_detection, {:id => 2, :sid => 1, :t => "purchase", :location => "CA"}
   end
 end
+Durable.run_all
 ```
 #####Python
 API:  
@@ -502,6 +530,7 @@ API:
 * `host.post(ruleset_name, {event})`
 * `host.post_batch(ruleset_name, {event}, {event}...)`
 ```python
+from durable.lang import *
 with ruleset('fraud_detection'):
     @when_all(c.first << m.t == 'purchase',
               c.second << m.location != c.first.location)
@@ -512,6 +541,8 @@ with ruleset('fraud_detection'):
     def start(host):
         host.post('fraud_detection', {'id': 1, 'sid': 1, 't': 'purchase', 'location': 'US'})
         host.post('fraud_detection', {'id': 2, 'sid': 1, 't': 'purchase', 'location': 'CA'})
+
+run_all()
 ```
 #####JavaScript
 API:  
@@ -520,6 +551,7 @@ API:
 * `host.post(rulesetName, {event})`  
 * `host.postBatch(rulesetName, {event}, {event}...)`  
 ```javascript
+var d = require('durable');
 with (d.ruleset('fraudDetection')) {
     whenAll(c.first = m.t.eq('purchase'),
             c.second = m.location.neq(c.first.location), 
@@ -532,6 +564,7 @@ with (d.ruleset('fraudDetection')) {
         host.post('fraudDetection', {id: 2, sid: 1, t: 'purchase', location: 'CA'});
     });
 }
+d.runAll();
 ```
 
 [top](reference.md#table-of-contents)  
@@ -554,6 +587,7 @@ API:
 * `assert_facts ruleset_name, {fact}, {fact}...`
 * `retract ruleset_name, {fact}`  
 ```ruby
+require 'durable'
 Durable.ruleset :fraud_detection do
   when_all c.first = m.t == "purchase",
            c.second = m.location != first.location,
@@ -566,6 +600,7 @@ Durable.ruleset :fraud_detection do
     assert :fraud_detection, {:id => 2, :sid => 1, :t => "purchase", :location => "CA"}
   end
 end
+Durable.run_all
 ```
 #####Python
 API:  
@@ -576,6 +611,7 @@ API:
 * `c.assert_facts(ruleset_name, {fact}. {fact}...)`  
 * `c.retract_fact(ruleset_name, {fact})`  
 ```python
+from durable.lang import *
 with ruleset('fraud_detection'):
     @when_all(c.first << m.t == 'purchase',
               c.second << m.location != c.first.location,
@@ -588,6 +624,8 @@ with ruleset('fraud_detection'):
     def start(host):
         host.assert_fact('fraud_detection', {'id': 1, 'sid': 1, 't': 'purchase', 'location': 'US'})
         host.assert_fact('fraud_detection', {'id': 2, 'sid': 1, 't': 'purchase', 'location': 'CA'})
+
+run_all()
 ```
 #####JavaScript
 API:  
@@ -598,6 +636,7 @@ API:
 * `c.assertFacts(rulesetName, {fact}, {fact}...)`  
 * `c.retract(rulesetName, {fact})`  
 ```javascript
+var d = require('durable');
 with (d.ruleset('fraudDetection')) {
     whenAll(c.first = m.t.eq('purchase'),
             c.second = m.location.neq(c.first.location), 
@@ -612,6 +651,7 @@ with (d.ruleset('fraudDetection')) {
         host.assert('fraudDetection', {id: 2, sid: 1, t: 'purchase', location: 'CA'});
     });
 }
+d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 
@@ -630,6 +670,7 @@ API:
 * `patch_state ruleset_name, {state}`  
 * `state.property = ...`  
 ```ruby
+require 'durable'
 Durable.ruleset :a8 do
   when_all m.amount < s.max_amount + s.id(:global).min_amount do
     puts "a8 approved " + m.amount.to_s
@@ -640,12 +681,14 @@ Durable.ruleset :a8 do
     post :a8, {:id => 1, :sid => 1, :amount => 10}
   end
 end
+Durable.run_all
 ```
 #####Python
 API:  
 * `host.patch_state(ruleset_name, {state})`  
 * `c.state.property = ...`  
 ```python
+from durable.lang import *
 with ruleset('a8'):
     @when_all(m.amount < c.s.max_amount + c.s.id('global').min_amount)
     def approved(c):
@@ -656,12 +699,15 @@ with ruleset('a8'):
         host.patch_state('a8', {'sid': 1, 'max_amount': 500})
         host.patch_state('a8', {'sid': 'global', 'min_amount': 100})
         host.post('a8', {'id': 1, 'sid': 1, 'amount': 10})
+
+run_all()
 ```
 #####JavaScript
 API:  
 * `host.patchState(rulesetName, {state})`  
 * `c.state.property = ...`  
 ```javascript
+var d = require('durable');
 with (d.ruleset('a8')) {
     whenAll(m.amount.lt(add(c.s.maxAmount, c.s.id('global').minAmount)), function (c) {
         console.log('a8 approved ' +  c.m.amount);
@@ -672,6 +718,7 @@ with (d.ruleset('a8')) {
         host.post('a8', {id: 1, sid: 1, amount: 10});
     });
 }
+d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 #### Timers
@@ -691,6 +738,7 @@ API:
 * `start_timer timer_name, seconds`  
 * `when... timeout(timer_name)`  
 ```ruby
+require 'durable'
 Durable.ruleset :t1 do
   when_all m.start == "yes" do
     s.start = Time.now
@@ -705,6 +753,7 @@ Durable.ruleset :t1 do
     post :t1, {:id => 1, :sid => 1, :start => "yes"}
   end
 end
+Durable.run_all
 ```
 #####Python
 API:  
@@ -712,6 +761,7 @@ API:
 * `c.start_timer(timer_name, seconds)`  
 * `when... timeout(timer_name)`  
 ```python
+from durable.lang import *
 with ruleset('t1'): 
     @when_all(m.start == 'yes')
     def start_timer(c):
@@ -726,6 +776,8 @@ with ruleset('t1'):
     @when_start
     def start(host):
         host.post('t1', {'id': 1, 'sid': 1, 'start': 'yes'})
+
+run_all()
 ```
 #####JavaScript
 API:  
@@ -733,6 +785,7 @@ API:
 * `c.startTimer(timerName, seconds)`  
 * `when... timeout(timerName)`  
 ```javascript
+var d = require('durable');
 with (d.ruleset('t1')) {
     whenAll(m.start.eq('yes'), function (c) {
         c.s.start = new Date();
@@ -747,6 +800,7 @@ with (d.ruleset('t1')) {
         host.post('t1', {id: 1, sid: 1, start: 'yes'});
     });
 }
+d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 ### Flow Structures
@@ -772,6 +826,7 @@ API:
 * `to state_name, [rule] [do action_block]`  
 
 ```ruby
+require 'durable'
 Durable.statechart :a2 do
   state :input do
     to :denied, when_all((m.subject == 'approve') & (m.amount > 1000)) do
@@ -794,15 +849,18 @@ Durable.statechart :a2 do
   state :approved
   state :denied
 end
+Durable.run_all
 ```
 #####Python
 API:  
 * `with statechart(ruleset_name): states_block`  
-* `with state(state_name): [triggers_and_states_block]` 
+* `with state(state_name): [triggers_and_states_block]`  
+
 Action decorators:  
 * `@to(state_name)`  
 * `@rule`  
 ```python
+from durable.lang import *
 with statechart('a2'):
     with state('input'):
         @to('denied')
@@ -834,6 +892,8 @@ with statechart('a2'):
         
     state('denied')
     state('approved')
+
+run_all()
 ```
 #####JavaScript
 API:  
@@ -841,6 +901,7 @@ API:
 * `with (state(stateName)) triggersAndStatesBlock`  
 * `to(stateName, [actionBlock]).[ruleAntecedent, actionBlock]`   
 ```javascript
+var d = require('durable');
 with (d.statechart('a2')) {
     with (state('input')) {
         to('denied').whenAll(m.subject.eq('approve').and(m.amount.gt(1000)), function (c) {
@@ -865,6 +926,7 @@ with (d.statechart('a2')) {
     state('denied');
     state('approved');
 }
+d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 ### Nested States
@@ -873,6 +935,7 @@ with (d.statechart('a2')) {
 The example below shows a statechart, where the `canceled` and reflective `work` transitions are reused for both the `enter` and the `process` states. 
 #####Ruby
 ```ruby
+require 'durable'
 Durable.statechart :a6 do
   state :start do
     to :work
@@ -902,9 +965,11 @@ Durable.statechart :a6 do
     post :a6, {:id => 3, :sid => 1, :subject => "continue"}
   end
 end
+Durable.run_all
 ```
 #####Python
 ```python
+from durable.lang import *
 with statechart('a6'):
     with state('work'):
         with state('enter'):
@@ -935,9 +1000,12 @@ with statechart('a6'):
         host.post('a6', {'id': 1, 'sid': 1, 'subject': 'enter'})
         host.post('a6', {'id': 2, 'sid': 1, 'subject': 'continue'})
         host.post('a6', {'id': 3, 'sid': 1, 'subject': 'continue'})
+
+run_all()
 ```
 #####JavaScript
 ```javascript
+var d = require('durable');
 with (d.statechart('a6')) {
     with (state('start')) {
         to('work');
@@ -967,6 +1035,7 @@ with (d.statechart('a6')) {
         host.post('a6', {id: 3, sid: 1, subject: 'continue'});
     });
 }
+d.runAll();
 ```
 [top](reference.md#table-of-contents)
 #### Flowchart
@@ -982,11 +1051,12 @@ Flowchart rules:
 
 #####Ruby
 API:  
-* flowchart ruleset_name do stage_condition_block  
-* stage stage_name [do action_block]  
-* to stage_name, [rule]  
+* `flowchart ruleset_name do stage_condition_block`  
+* `stage stage_name [do action_block]`  
+* `to stage_name, [rule]`  
 Note: conditions have to be defined immediately after the stage definition  
 ```ruby
+require 'durable'
 Durable.flowchart :a3 do
   stage :input
   to :request, when_all((m.subject == 'approve') & (m.amount <= 1000))
@@ -1008,16 +1078,19 @@ Durable.flowchart :a3 do
     puts "a3 flow denied: #{s.sid}"
   end
 end
+Durable.run_all
 ```
 #####Python
 API:  
-* flowchart(ruleset_name): stage_condition_block  
-* with stage(stage_name): [action_condition_block]  
-* to(stage_name).[rule]
+* `flowchart(ruleset_name): stage_condition_block`  
+* `with stage(stage_name): [action_condition_block]`  
+* `to(stage_name).[rule]`  
+
 Decorators:  
-* @run  
+* `@run`  
 Note: conditions have to be defined immediately after the stage definition  
 ```python
+from durable.lang import *
 with flowchart('a3'):
     with stage('input'): 
         to('request').when_all((m.subject == 'approve') & (m.amount <= 1000))
@@ -1045,15 +1118,18 @@ with flowchart('a3'):
         @run
         def denied(c):
             print ('a3 denied from: {0}'.format(c.s.sid))
+
+run_all()
 ```
 #####JavaScript
 API:  
-* flowchart(rulesetName) stageConditionBlock  
-* with (stage(stageName)) [actionConditionbBlock] 
-* run(actionFunction)  
-* to(stageName).[rule]  
+* `flowchart(rulesetName) stageConditionBlock`  
+* `with (stage(stageName)) [actionConditionbBlock]` 
+* `run(actionFunction)`  
+* `to(stageName).[rule]`  
 Note: conditions have to be defined immediately after the stage definition  
 ```javascript
+var d = require('durable');
 with (d.flowchart('a3')) {
     with (stage('input')) {
         to('request').whenAll(m.subject.eq('approve').and(m.amount.lte(1000)));
@@ -1082,13 +1158,25 @@ with (d.flowchart('a3')) {
         });
     }
 }
+d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 
-#### Parallel
+#### Paralel
+Rulesets can be structured for concurrent execution by defining hierarchical rulesets.   
 
-#####Ruby
+Paralel rules:
+* Actions can be defined by using `ruleset`, `statechart` and `flowchart` constructs.   
+* The context used for child rulesets is a deep copy of the parent context at the time of the action execution.  
+* The child context id is qualified with that if its parent ruleset.  
+* Child rulesets can singal events to parent rulesets.  
+
+In this example two child rulesets are created when observing the `start = "yes"` event. When both child rulesets complete, the parent resumes.
+#####Ruby  
+API:  
+* `signal parent_context_id, {event}`  
 ```ruby
+require 'durable'
 Durable.ruleset :p1 do
   when_all m.start == "yes", paralel do 
     ruleset :one do 
@@ -1119,9 +1207,13 @@ Durable.ruleset :p1 do
     post :p1, {:id => 1, :sid => 1, :start => "yes"}
   end
 end
+Durable.run_all
 ```
 #####Python
+API:  
+* `signal(parent_context_id, {event})`  
 ```python
+from durable.lang import *
 with ruleset('p1'):
     with when_all(m.start == 'yes'): 
         with ruleset('one'):
@@ -1153,9 +1245,14 @@ with ruleset('p1'):
     @when_start
     def start(host):
         host.post('p1', {'id': 1, 'sid': 1, 'start': 'yes'})
+
+run_all()
 ```
 #####JavaScript
+API:  
+* `signal(parentContextId, {event})`  
 ```javascript
+var d = require('durable');
 with (d.ruleset('p1')) {
     with (whenAll(m.start.eq('yes'))) {
         with (ruleset('one')) {
@@ -1186,13 +1283,8 @@ with (d.ruleset('p1')) {
         host.post('p1', {id: 1, sid: 1, start: 'yes'});
     });
 }
+d.runAll();
 ```
 [top](reference.md#table-of-contents)  
-### Extensions
--------
-#### Host
-[top](reference.md#table-of-contents)  
-
-#### Application
-[top](reference.md#table-of-contents)  
+ 
 
