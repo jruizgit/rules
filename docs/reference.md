@@ -34,12 +34,12 @@ _Mac_
 For more information go to: http://redis.io/download  
 
 _Windows_  
-1. Download redis binaries from [MSTechOpen](https://github.com/MSOpenTech/redis/releases)  
+1. Download Redis binaries from [MSTechOpen](https://github.com/MSOpenTech/redis/releases)  
 2. Extract binaries and start Redis  
 
 For more information go to: https://github.com/MSOpenTech/redis  
 
-Note: To test applications locally you can also use a redis [cloud service](reference.md#cloud-setup) 
+Note: To test applications locally you can also use a Redis [cloud service](reference.md#cloud-setup) 
 #### Node.js install
 durable.js uses Node.js version  0.10.15.    
 
@@ -133,7 +133,7 @@ Heroku is a good platform to create a cloud application in just a few minutes.
 #### Simple Filter
 Rules are the basic building blocks. All rules have a condition, which defines the events and facts that trigger an action.  
 * The rule condition is an expression. Its left side represents an event or fact property, followed by a logical operator and its right side defines a pattern to be matched. By convention events or facts originated by calling post or assert are represented with the `m` name; events or facts originated by changing the context state are represented with the `s` name.  
-* The rule action is a function to which the context is passed as a parameter. Actions can be synchronous and asynchronous. Asynchonous actions take a completion function as a paremeter.  
+* The rule action is a function to which the context is passed as a parameter. Actions can be synchronous and asynchronous. Asynchronous actions take a completion function as a parameter.  
 
 Below is an example of the typical rule structure. 
 
@@ -430,7 +430,7 @@ d.runAll();
 durable_rules enables aggregating events or observed facts over time with tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
 
 Summary of rule attributes:  
-* count: defines the number of events or facts, wich need to be matched when scheduling an action.   
+* count: defines the number of events or facts, which need to be matched when scheduling an action.   
 * span: defines the tumbling time in seconds between scheduled actions.  
 * pri: defines the scheduled action order in case of conflict.  
 
@@ -498,7 +498,7 @@ Inference based on events is the main purpose of `durable_rules`. What makes eve
 
 Event rules:  
 * Events can be posted in the `start` handler via the host parameter.   
-* Evetns be posted in an `action` handler using the context parameter.   
+* Events be posted in an `action` handler using the context parameter.   
 * Events can be posted one at a time or in batches.  
 * Events don't need to be retracted.  
 * Events can co-exist with facts.  
@@ -575,7 +575,7 @@ Facts are used for defining more permanent state, which lifetime spans at least 
 Fact rules:  
 * Facts can be asserted in the `start` handler via the host parameter.   
 * Facts can asserted in an `action` handler using the context parameter.   
-* Facts have to be explicitely retracted.  
+* Facts have to be explicitly retracted.  
 * Once retracted all related scheduled actions are cancelled.  
 * Facts can co-exist with events.  
 * The assert and retract fact operations are idempotent.  
@@ -818,7 +818,7 @@ Statechart rules:
 * A trigger can have a rule (absence means state enter).  
 * A trigger can have an action.  
 
-The example shows an approval state machine, which waits for two consecutive events (`subect = "approve"` and `subject = "approved"`) to reach the `approved` state.  
+The example shows an approval state machine, which waits for two consecutive events (`subject = "approve"` and `subject = "approved"`) to reach the `approved` state.  
 #####Ruby  
 API:  
 * `statechart ruleset_name do states_block`  
@@ -1071,7 +1071,7 @@ Durable.flowchart :a3 do
   to :request, when_any(m.subject == 'approved', m.subject == 'ok')
   
   stage :approve do
-    puts "a3 flow aprroved: #{s.sid}"
+    puts "a3 flow approved: #{s.sid}"
   end
 
   stage :deny do
@@ -1162,14 +1162,14 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 
-#### Paralel
+#### Parallel
 Rulesets can be structured for concurrent execution by defining hierarchical rulesets.   
 
-Paralel rules:
+Parallel rules:
 * Actions can be defined by using `ruleset`, `statechart` and `flowchart` constructs.   
 * The context used for child rulesets is a deep copy of the parent context at the time of the action execution.  
 * The child context id is qualified with that if its parent ruleset.  
-* Child rulesets can singal events to parent rulesets.  
+* Child rulesets can signal events to parent rulesets.  
 
 In this example two child rulesets are created when observing the `start = "yes"` event. When both child rulesets complete, the parent resumes.
 #####Ruby  
