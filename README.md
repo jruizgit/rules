@@ -1,6 +1,6 @@
-#durable_rules  
-####for real time analytics
-=====
+# durable_rules  
+#### for real time analytics
+---
 durable_rules is a polyglot micro-framework for real-time, consistent and scalable coordination of events. With durable_rules you can track and analyze information about things that happen (events) by combining data from multiple sources to infer more complicated circumstances.
 
 A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts and massive streams of events in real time. A simple, yet powerful meta-liguistic abstraction lets you define simple and complex rulesets, such as flowcharts, statecharts, nested statecharts, paralel and time driven flows. 
@@ -16,7 +16,7 @@ Note: I'm paraphrasing the example presented in this [article](https://www.packt
 2. If there are three consecutive increasing debit requests, withdrawing more than 70% the average monthly balance in a span of three minutes, flag the account as high risk.
 
 
-###Ruby
+### Ruby
 ```ruby
 require "durable"
 
@@ -63,7 +63,7 @@ end
 
 Durable.run_all
 ```
-###Python
+### Python
 ```python
 from durable.lang import *
 import time
@@ -108,7 +108,7 @@ with ruleset('fraud_detection'):
 
 run_all()
 ```
-###JavaScript
+### JavaScript
 ```javascript
 var d = require('durable');
 
@@ -159,7 +159,7 @@ with (d.ruleset('fraudDetection')) {
 d.runAll();
 ```
 
-###To Learn More  
+### To Learn More  
 Reference Manual:  
 * [Ruby](https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md)  
 * [Python](https://github.com/jruizgit/rules/blob/master/docs/py/reference.md)  
