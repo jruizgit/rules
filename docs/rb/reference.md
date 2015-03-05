@@ -208,7 +208,8 @@ Event rules:
 * Events can co-exist with facts.  
 * The post event operation is idempotent.    
 
-The example below shows how two events will cause only one action to be scheduled, as a given event can only be observed once. You can contrast this with the example in the facts section, which will schedule two actions.
+The example below shows how two events will cause only one action to be scheduled, as a given event can only be observed once. You can contrast this with the example in the facts section, which will schedule two actions.  
+
 API:  
 * `post ruleset_name, {event}`  
 * `post_batch ruleset_name, {event}, {event}...`  
@@ -240,6 +241,7 @@ Fact rules:
 * The assert and retract fact operations are idempotent.  
 
 This example shows how asserting two facts lead to scheduling two actions: one for each combination.  
+
 API:  
 * `assert ruleset_name, {fact}`  
 * `assert_facts ruleset_name, {fact}, {fact}...`
@@ -301,7 +303,8 @@ Timer rules:
 * Timeouts can be observed in rules given the timer name.  
 * The start timer operation is idempotent.  
 
-The example shows an event scheduled to be raised after 5 seconds and a rule which reacts to such an event.
+The example shows an event scheduled to be raised after 5 seconds and a rule which reacts to such an event.  
+
 API:  
 * `start_timer timer_name, seconds`  
 * `when... timeout(timer_name)`  
@@ -340,6 +343,7 @@ Statechart rules:
 * A trigger can have an action.  
 
 The example shows an approval state machine, which waits for two consecutive events (`subject = "approve"` and `subject = "approved"`) to reach the `approved` state.  
+
 API:  
 * `statechart ruleset_name do states_block`  
 * `state state_name [do triggers_and_states_block]`  
@@ -419,7 +423,7 @@ Flowchart rules:
 * An initial stage is defined as a vertex without incoming edges.  
 * A stage can have an action.  
 * A stage can have zero or more conditions.  
-* A condition has a rule and a destination stage.  
+* A condition has a rule and a destination stage.   
 
 API:  
 * `flowchart ruleset_name do stage_condition_block`  
@@ -462,7 +466,8 @@ Parallel rules:
 * The child context id is qualified with that if its parent ruleset.  
 * Child rulesets can signal events to parent rulesets.  
 
-In this example two child rulesets are created when observing the `start = "yes"` event. When both child rulesets complete, the parent resumes.
+In this example two child rulesets are created when observing the `start = "yes"` event. When both child rulesets complete, the parent resumes.  
+
 API:  
 * `signal parent_context_id, {event}`  
 ```ruby
