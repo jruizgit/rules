@@ -318,6 +318,7 @@ Fact rules:
 * The assert and retract fact operations are idempotent.  
 
 This example shows how asserting two facts lead to scheduling two actions: one for each combination.  
+
 API:  
 * `host.assert(rulesetName, {fact})`
 * `host.assertFacts(rulesetName, {fact}, {fact}...)`  
@@ -384,7 +385,7 @@ Timer rules:
 * Timeouts can be observed in rules given the timer name.  
 * The start timer operation is idempotent.  
 
-The example shows an event scheduled to be raised after 5 seconds and a rule which reacts to such an event.
+The example shows an event scheduled to be raised after 5 seconds and a rule which reacts to such an event.  
 
 API:  
 * `host.startTimer(timerName, seconds)`
@@ -558,7 +559,7 @@ Parallel rules:
 * The child context id is qualified with that if its parent ruleset.  
 * Child rulesets can signal events to parent rulesets.  
 
-In this example two child rulesets are created when observing the `start = "yes"` event. When both child rulesets complete, the parent resumes.
+In this example two child rulesets are created when observing the `start = "yes"` event. When both child rulesets complete, the parent resumes.  
 
 API:  
 * `signal(parentContextId, {event})`  
