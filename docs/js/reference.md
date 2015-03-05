@@ -156,7 +156,6 @@ d.runAll();
 #### Correlated Sequence
 The ability to express and efficiently evaluate sequences of correlated events or facts represents the forward inference hallmark. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
-#####JavaScript
 The `whenAll` function expresses a sequence of events or facts separated by `,`. The assignment operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
 
 Arithmetic operators: `add`, `sub`, `mul`, `div`
@@ -460,7 +459,7 @@ with (d.statechart('a2')) {
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
-### Nested States
+#### Nested States
 `durable_rules` supports nested states. Which implies that, along with the [statechart](reference.md#statechart) description from the previous section, most of the [UML statechart](http://en.wikipedia.org/wiki/UML_state_machine) semantics is supported. If a context is in the nested state, it also (implicitly) is in the surrounding state. The state machine will attempt to handle any event in the context of the substate, which conceptually is at the lower level of the hierarchy. However, if the substate does not prescribe how to handle the event, the event is not discarded, but it is automatically handled at the higher level context of the superstate.
 
 The example below shows a statechart, where the `canceled` and reflective `work` transitions are reused for both the `enter` and the `process` states. 
