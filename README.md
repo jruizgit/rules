@@ -1,4 +1,5 @@
-# durable_rules  
+  
+# durable_rules    
 #### for real time analytics
 ---
 durable_rules is a polyglot micro-framework for real-time, consistent and scalable coordination of events. With durable_rules you can track and analyze information about things that happen (events) by combining data from multiple sources to infer more complicated circumstances.
@@ -7,7 +8,7 @@ A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts a
 
 The Durable Rules core engine is implemented in C, which enables ultra fast rule evaluation and inference as well as muti-language support. Durable Rules relies on state of the art technologies: [Node.js](http://www.nodejs.org), [Werkzeug](http://werkzeug.pocoo.org/), [Sinatra](http://www.sinatrarb.com/) are used to host rulesets written in JavaScript, Python and Ruby respectively. Inference state is cached using [Redis](http://www.redis.io), which lets scaling out without giving up performance.
 
-###Example #1  
+### Example
 
 Let’s consider a couple of fictitious fraud rules used in bank account management.  
 Note: I'm paraphrasing the example presented in this [article](https://www.packtpub.com/books/content/drools-jboss-rules-50complex-event-processing).  
