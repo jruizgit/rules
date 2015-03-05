@@ -217,7 +217,8 @@ Event rules:
 * Events can co-exist with facts.  
 * The post event operation is idempotent.    
 
-The example below shows how two events will cause only one action to be scheduled, as a given event can only be observed once. You can contrast this with the example in the facts section, which will schedule two actions.
+The example below shows how two events will cause only one action to be scheduled, as a given event can only be observed once. You can contrast this with the example in the facts section, which will schedule two actions.  
+
 API:  
 * `c.post(ruleset_name, {event})`
 * `c.post_batch(ruleset_name, {event}, {event}...)`
@@ -252,6 +253,7 @@ Fact rules:
 * The assert and retract fact operations are idempotent.  
 
 This example shows how asserting two facts lead to scheduling two actions: one for each combination.  
+
 API:  
 * `host.assert_fact(ruleset_name, {fact})`  
 * `host.assert_facts(ruleset_name, {fact}, {fact}...)`  
@@ -306,7 +308,6 @@ with ruleset('a8'):
 
 run_all()
 ```
-```
 [top](reference.md#table-of-contents)  
 #### Timers
 `durable_rules` supports scheduling timeout events and writing rules, which observe such events.  
@@ -319,7 +320,8 @@ Timer rules:
 * Timeouts can be observed in rules given the timer name.  
 * The start timer operation is idempotent.  
 
-The example shows an event scheduled to be raised after 5 seconds and a rule which reacts to such an event.
+The example shows an event scheduled to be raised after 5 seconds and a rule which reacts to such an event.  
+
 API:  
 * `host.start_timer(timer_name, seconds)`
 * `c.start_timer(timer_name, seconds)`  
@@ -360,6 +362,7 @@ Statechart rules:
 * A trigger can have an action.  
 
 The example shows an approval state machine, which waits for two consecutive events (`subject = "approve"` and `subject = "approved"`) to reach the `approved` state.  
+
 API:  
 * `with statechart(ruleset_name): states_block`  
 * `with state(state_name): [triggers_and_states_block]`  
