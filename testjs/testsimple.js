@@ -505,8 +505,8 @@ with (d.flowchart('p3')) {
 }
 
 with (d.ruleset('t0')) {
-    whenAll(or(m.start.eq('yes'), timeout('myTimer')), function (c) {
-        c.s.count = !c.s.count ? 1 : c.s.count + 1;
+    whenAll(or(m.count.eq(0), timeout('myTimer')), function (c) {
+        c.s.count += 1;
         c.post('t0', {id: c.s.count, sid: 1, t: 'purchase'});
         c.startTimer('myTimer', Math.random() * 3 + 1);
     });
@@ -514,7 +514,7 @@ with (d.ruleset('t0')) {
         console.log('t0 pulse ->' + c.m.length);
     });
     whenStart(function (host) {
-        host.post('t0', {id: 1, sid: 1, start: 'yes'});
+        host.patchState('t0', {sid: 1, count: 0});
     });
 }
 

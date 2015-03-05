@@ -10,6 +10,6 @@
   "license": "MIT",
   "gypfile": true,
   "readmeFilename": "README.md",
-  "engines": { "node": "0.10.x", "npm": "1.4.x" },
+  "engines": { "node": "0.12.x", "npm": "2.5.x" },
   "author": { "name": "Jesus Ruiz", "email": "jr3791@live.com"}
 }

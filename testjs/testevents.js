@@ -1,5 +1,19 @@
-r = require('../build/release/rules.node');
+var r = require('bindings')('rulesjs.node');
 var cluster = require('cluster');
+
+console.log('proxy');
+
+var pr = r.createProxy(
+    function(name) {
+        return 'get ' + name;
+    },
+    function(name, value) {
+        console.log('set ' + name + ' ' + value);
+    }
+);
+
+console.log(pr.hello);
+pr.hello = 'world';
 
 console.log('fact0');
 

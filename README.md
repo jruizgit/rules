@@ -1,5 +1,5 @@
 #durable_rules  
-####For Real Time Analytics
+####for real time analytics
 =====
 durable_rules is a polyglot micro-framework for real-time, consistent and scalable coordination of events. With durable_rules you can track and analyze information about things that happen (events) by combining data from multiple sources to infer more complicated circumstances.
 
@@ -159,11 +159,14 @@ with (d.ruleset('fraudDetection')) {
 d.runAll();
 ```
 
-#####Resources  
-To learn more:  
-* [Reference Manual](https://github.com/jruizgit/rules/blob/master/docs/reference.md)  
+####To Learn More
+=====  
+Reference Manual:  
+* [Ruby](https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md)  
+* [Python](https://github.com/jruizgit/rules/blob/master/docs/py/reference.md)  
+* [JavaScript](https://github.com/jruizgit/rules/blob/master/docs/js/reference.md)  
 
-Blog post:  
+Blog:  
 * [Polyglot (03/2015)](http://jruizblog.com/2015/03/02/polyglot/)  
 * [Rete_D (02/2015)](http://jruizblog.com/2015/02/23/rete_d/)
 * [Boosting Performance with C (08/2014)](http://jruizblog.com/2014/08/19/boosting-performance-with-c/)
