@@ -553,13 +553,9 @@ with flowchart('p3'):
 
 
 with ruleset('t0'):
-    @when_all(timeout('my_timer') | (m.start == "yes"))
+    @when_all(timeout('my_timer') | (s.count == 0))
     def start_timer(c):
-        if not c.s.count:
-            c.s.count = 1
-        else:
-            c.s.count += 1
-
+        c.s.count += 1
         c.post('t0', {'id': c.s.count, 'sid': 1, 't': 'purchase'})
         c.start_timer('my_timer', random.randint(1, 3))
 
@@ -569,7 +565,7 @@ with ruleset('t0'):
 
     @when_start
     def start(host):
-        host.post('t0', {'id': 1, 'sid': 1, 'start': 'yes'})
+        host.patch_state('t0', {'sid': 1, 'count': 0})
 
 
 with ruleset('t1'): 

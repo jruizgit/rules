@@ -241,6 +241,14 @@ Durable.ruleset :fraud1 do
   when_start do
     post :fraud1, {:id => 1, :sid => 1, :t => "purchase", :location => "US"}
     post :fraud1, {:id => 2, :sid => 1, :t => "purchase", :location => "CA"}
+    post :fraud1, {:id => 3, :sid => 1, :t => "purchase", :location => "UK"}
+    post :fraud1, {:id => 4, :sid => 1, :t => "purchase", :location => "GE"}
+    post :fraud1, {:id => 5, :sid => 1, :t => "purchase", :location => "AU"}
+    post :fraud1, {:id => 6, :sid => 1, :t => "purchase", :location => "MX"}
+    post :fraud1, {:id => 7, :sid => 1, :t => "purchase", :location => "FR"}
+    post :fraud1, {:id => 8, :sid => 1, :t => "purchase", :location => "ES"}
+    post :fraud1, {:id => 9, :sid => 1, :t => "purchase", :location => "BR"}
+    post :fraud1, {:id => 10, :sid => 1, :t => "purchase", :location => "IT"}
   end
 end
 
@@ -472,12 +480,8 @@ Durable.flowchart :p3 do
 end
 
 Durable.ruleset :t0 do
-  when_all (timeout :my_timer) | (m.start == "yes") do
-    if not s.count
-      s.count = 1
-    else
-      s.count += 1
-    end
+  when_all (timeout :my_timer) | (m.count == 0) do
+    s.count += 1
     post :t0, {:id => s.count, :sid => 1, :t => "purchase"}
     start_timer(:my_timer, rand(3))
   end
@@ -485,7 +489,7 @@ Durable.ruleset :t0 do
     puts("t0 pulse -> #{m.count}")
   end 
   when_start do
-    post :t0, {:id => 0, :sid => 1, :start => "yes"}
+    patch_state :t0, {:sid => 1, :count => 0}
   end
 end
 

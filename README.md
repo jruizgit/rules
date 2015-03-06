@@ -67,7 +67,6 @@ Durable.run_all
 ### Python
 ```python
 from durable.lang import *
-import time
 
 with ruleset('fraud_detection'):
     # compute monthly averages
