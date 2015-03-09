@@ -660,7 +660,7 @@ class Host(object):
         self.get_ruleset(ruleset_name).retract_fact(fact)
 
     def retract_facts(self, ruleset_name, facts):
-        self.get_ruleset(ruleset_name).retract_fact(facts)
+        self.get_ruleset(ruleset_name).retract_facts(facts)
 
     def start_timer(self, ruleset_name, sid, timer_name, timer_duration):
         self.get_ruleset(ruleset_name).start_timer(sid, timer_name, timer_duration)
@@ -689,7 +689,7 @@ class Host(object):
                 if index % 10:
                     dispatch_ruleset(index + 1)
                 else:
-                    self._ruleset_timer = threading.Timer(0.01, dispatch_ruleset, (index + 1, ))
+                    self._ruleset_timer = threading.Timer(0.001, dispatch_ruleset, (index + 1, ))
                     self._ruleset_timer.start()
 
             def timers_callback(e):
