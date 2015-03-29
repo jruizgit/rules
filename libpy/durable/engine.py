@@ -287,6 +287,9 @@ class Ruleset(object):
     def assert_events(self, messages):
         rules.assert_events(self._handle, json.dumps(messages))
         
+    def start_assert_fact(self, fact):
+        return rules.start_assert_fact(self._handle, json.dumps(fact))
+
     def assert_fact(self, fact):
         rules.assert_fact(self._handle, json.dumps(fact))
 
@@ -378,11 +381,16 @@ class Ruleset(object):
                             else:
                                 self._host.post_batch(ruleset_name, messages)
 
+                        pending = []
                         for ruleset_name, facts in c.get_facts().iteritems():
                             if len(facts) == 1:
-                                self._host.assert_fact(ruleset_name, facts[0])
+                                pending.append(self._host.start_assert_fact(ruleset_name, facts[0]))
                             else:
                                 self._host.assert_facts(ruleset_name, facts)
+
+                        for item in pending:
+                            if item[0] > 0:
+                                rules.complete(item[0], item[1])
 
                         for ruleset_name, facts in c.get_retract_facts().iteritems():
                             if len(facts) == 1:
@@ -650,6 +658,9 @@ class Host(object):
     def post(self, ruleset_name, message):
         self.get_ruleset(ruleset_name).assert_event(message)
         
+    def start_assert_fact(self, ruleset_name, fact):
+        return self.get_ruleset(ruleset_name).start_assert_fact(fact)
+
     def assert_fact(self, ruleset_name, fact):
         self.get_ruleset(ruleset_name).assert_fact(fact)
 

@@ -80,6 +80,32 @@ static PyObject *pyBindRuleset(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+static PyObject *pyComplete(PyObject *self, PyObject *args) {
+    void *rulesBinding = NULL;
+    unsigned int replyCount = 0;
+    unsigned int result;
+    if (PyArg_ParseTuple(args, "li", &rulesBinding, &replyCount)) {
+        result = complete(rulesBinding, replyCount);
+    } else {
+        PyErr_SetString(RulesError, "pyComplete Invalid argument");
+        return NULL;
+    }
+
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char * message;
+            asprintf(&message, "Could not complete, error code: %d", result);
+            PyErr_SetString(RulesError, message);
+            free(message);
+        }
+        return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
+
 static PyObject *pyAssertEvent(PyObject *self, PyObject *args) {
     void *handle;
     char *event;
@@ -157,6 +183,34 @@ static PyObject *pyRetractEvent(PyObject *self, PyObject *args) {
         } else { 
             char * message;
             asprintf(&message, "Could not retract event, error code: %d", result);  
+            PyErr_SetString(RulesError, message);
+            free(message);
+        }
+        return NULL;
+    }
+}
+
+static PyObject *pyStartAssertFact(PyObject *self, PyObject *args) {
+    void *handle;
+    char *fact;
+    if (!PyArg_ParseTuple(args, "ls", &handle, &fact)) {
+        PyErr_SetString(RulesError, "pyAssertFact Invalid argument");
+        return NULL;
+    }
+
+    unsigned short replyCount;
+    void *rulesBinding = NULL;
+    unsigned int result = startAssertFact(handle, fact, &rulesBinding, &replyCount);
+    if (result == RULES_OK) {
+        return Py_BuildValue("li", rulesBinding, replyCount);    
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        return Py_BuildValue("li", 0, 0);    
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char * message;
+            asprintf(&message, "Could not assert fact, error code: %d", result);  
             PyErr_SetString(RulesError, message);
             free(message);
         }
@@ -465,9 +519,11 @@ static PyMethodDef myModule_methods[] = {
     {"create_ruleset", pyCreateRuleset, METH_VARARGS},
     {"delete_ruleset", pyDeleteRuleset, METH_VARARGS},
     {"bind_ruleset", pyBindRuleset, METH_VARARGS},
+    {"complete", pyComplete, METH_VARARGS},
     {"assert_event", pyAssertEvent, METH_VARARGS},
     {"assert_events", pyAssertEvents, METH_VARARGS},
     {"retract_event", pyRetractEvent, METH_VARARGS},
+    {"start_assert_fact", pyStartAssertFact, METH_VARARGS},
     {"assert_fact", pyAssertFact, METH_VARARGS},
     {"assert_facts", pyAssertFacts, METH_VARARGS},
     {"retract_fact", pyRetractFact, METH_VARARGS},

@@ -48,10 +48,12 @@ extern "C" {
 unsigned int createRuleset(void **handle, char *name, char *rules, unsigned int stateCaheSize);
 unsigned int deleteRuleset(void *handle);
 unsigned int bindRuleset(void *handle, char *host, unsigned int port, char *password);
+unsigned int complete(void *rulesBinding, unsigned short replyCount);
 unsigned int assertEvent(void *handle, char *message);
 unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results);
 unsigned int retractEvent(void *handle, char *message);
 unsigned int assertFact(void *handle, char *message);
+unsigned int startAssertFact(void *handle, char *message, void **rulesBinding, unsigned short *replyCount);
 unsigned int assertFacts(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results);
 unsigned int retractFact(void *handle, char *message);
 unsigned int retractFacts(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results);

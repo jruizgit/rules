@@ -65,7 +65,8 @@ with statechart('miss_manners'):
 
     with state('make'):
         @to('make')
-        @when_all(c.seating << (m.t == 'seating') & 
+        @when_all(count(1001),
+                  c.seating << (m.t == 'seating') & 
                                (m.path == False),
                   c.path << (m.t == 'path') & 
                             (m.p_id == c.seating.p_id),
@@ -73,12 +74,21 @@ with statechart('miss_manners'):
                        (m.p_id == c.seating.s_id) & 
                        (m.guest_name == c.path.guest_name)))
         def make_path(c):
-            c.assert_fact({'t': 'path',
-                           'id': c.s.g_count,
-                           'p_id': c.seating.s_id, 
-                           'seat': c.path.seat, 
-                           'guest_name': c.path.guest_name})
-            c.s.g_count += 1
+            if (c.m):
+                for frame in c.m):
+                    c.assert_fact({'t': 'path',
+                                   'id': c.s.g_count,
+                                   'p_id': frame.seating.s_id, 
+                                   'seat': frame.path.seat, 
+                                   'guest_name': frame.path.guest_name})
+                    c.s.g_count += 1
+            else:
+                c.assert_fact({'t': 'path',
+                               'id': c.s.g_count,
+                               'p_id': c.seating.s_id, 
+                               'seat': c.path.seat, 
+                               'guest_name': c.path.guest_name})
+                c.s.g_count += 1
 
         @to('check')
         @when_all(pri(1), (m.t == 'seating') & (m.path == False))

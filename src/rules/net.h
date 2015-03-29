@@ -89,6 +89,14 @@ unsigned int executeBatch(void *rulesBinding,
                           char **commands,
                           unsigned short commandCount);
 
+unsigned int startNonBlockingBatch(void *rulesBinding,
+                                   char **commands,
+                                   unsigned short commandCount,
+                                   unsigned short *replyCount); 
+
+unsigned int completeNonBlockingBatch(void *rulesBinding,
+                                      unsigned short replyCount);
+
 unsigned int removeMessage(void *rulesBinding, 
                             char *sid, 
                             char *mid);

@@ -1422,6 +1422,35 @@ static unsigned int handleTimers(void *handle,
     return RULES_OK;
 }
 
+static unsigned int startHandleMessage(void *handle, 
+                                       char *message, 
+                                       unsigned char actionType,
+                                       void **rulesBinding,
+                                       unsigned short *replyCount) {
+    char *commands[MAX_COMMAND_COUNT];
+    unsigned short commandPriorities[MAX_COMMAND_COUNT];
+    unsigned short commandCount = 0;
+    unsigned int result = handleMessage(handle, 
+                                        NULL,
+                                        message, 
+                                        actionType, 
+                                        commands,
+                                        commandPriorities,
+                                        &commandCount,
+                                        rulesBinding);
+    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+        freeCommands(commands, commandCount);
+        return result;
+    }
+
+    unsigned int batchResult = startNonBlockingBatch(*rulesBinding, commands, commandCount, replyCount);
+    if (batchResult != RULES_OK) {
+        return batchResult;
+    }
+
+    return result;
+}
+
 static unsigned int executeHandleMessage(void *handle, 
                                          char *message, 
                                          unsigned char actionType) {
@@ -1481,6 +1510,10 @@ static unsigned int executeHandleMessages(void *handle,
     return result;
 }
 
+unsigned int complete(void *rulesBinding, unsigned short replyCount) {
+    return completeNonBlockingBatch(rulesBinding, replyCount);
+}
+
 unsigned int assertEvent(void *handle, char *message) {
     return executeHandleMessage(handle, message, ACTION_ASSERT_EVENT);
 }
@@ -1498,6 +1531,10 @@ unsigned int retractEvent(void *handle, char *message) {
 
 unsigned int assertFact(void *handle, char *message) {
     return executeHandleMessage(handle, message, ACTION_ASSERT_FACT);
+}
+
+unsigned int startAssertFact(void *handle, char *message, void **rulesBinding, unsigned short *replyCount) {
+    return startHandleMessage(handle, message, ACTION_ASSERT_FACT, rulesBinding, replyCount);
 }
 
 unsigned int assertFacts(void *handle, 

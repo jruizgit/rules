@@ -145,7 +145,7 @@ class value(object):
         if self._op == '$or' or self._op == '$and':
             left_definition = self._left.define()
             if not self._op in left_definition:
-                left_definition = [ left_definition, right_definition ]
+                left_definition = [left_definition, right_definition]
             else:
                 left_definition = left_definition[self._op]
                 left_definition.append(right_definition)

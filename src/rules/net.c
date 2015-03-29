@@ -641,9 +641,14 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        new_mids = {}\n"
 "        for i = 0, packed_message_list_len - 1, 1  do\n"
 "            local new_mid = redis.call(\"rpop\", events_key)\n"
-"            if message_cache[new_mid] or redis.call(\"hexists\", messages_key, new_mid) then\n"
+"            if message_cache[new_mid] then\n"
 "                redis.call(\"lpush\", events_key, new_mid)\n"
 "                table.insert(new_mids, new_mid)\n"
+"            elseif redis.call(\"hexists\", messages_key, new_mid) then\n"
+"                redis.call(\"lpush\", events_key, new_mid)\n"
+"                table.insert(new_mids, new_mid)\n"
+"            else\n"
+"                message_cache[new_mid] = false\n"
 "            end\n"
 "        end\n"
 "        mids_cache[index] = new_mids\n"
@@ -731,7 +736,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "            local message = get_message(new_mids[i], messages_key, message_cache)\n"
 "            if message and not reviewers[index](message, new_frame, index) then\n"
 "                local frame_signature = frame_packers[index - 1](new_frame, false)\n"
-"                redis.call(\"lpush\", blocking_message_key .. new_mids[i], frame_signature)\n"
+//"                redis.call(\"lpush\", blocking_message_key .. new_mids[i], frame_signature)\n"
 "                result = 0\n"
 "                break\n"
 "            end\n"
@@ -799,7 +804,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        local frames_key = blocking_message_key .. mid\n"
 "        local packed_frame_list_len = redis.call(\"llen\", frames_key)\n"
 "        for i = 0, packed_frame_list_len - 1, 1  do\n"
-"            local packed_frame = redis.call(\"lpop\", frames_key)\n"
+"            local packed_frame = redis.call(\"rpop\", frames_key)\n"
 "            local frame = frame_unpackers[index - 1](packed_frame)\n"
 "            if frame then\n"
 "                result = result + process_frame(frame, index, use_facts)\n"    
@@ -820,13 +825,13 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        local frames_key = keys[index] .. \"!c!\" .. sid\n"
 "        local packed_frame_list_len = redis.call(\"llen\", frames_key)\n"
 "        for i = 0, packed_frame_list_len - 1, 1  do\n"
-"            local packed_frame = redis.call(\"lpop\", frames_key)\n"
+"            local packed_frame = redis.call(\"rpop\", frames_key)\n"
 "            local frame = frame_unpackers[index - 1](packed_frame)\n"
 "            if frame then\n"
 "                local count = process_event_and_frame(message, frame, index, use_facts)\n"
 "                result = result + count\n"         
 "                if count == 0 or use_facts then\n"
-"                    redis.call(\"rpush\", frames_key, packed_frame)\n"
+"                    redis.call(\"lpush\", frames_key, packed_frame)\n"
 "                else\n"
 "                    break\n"
 "               end\n" 
@@ -882,10 +887,16 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "                for i = #results, 1, -1 do\n"
 "                    redis.call(\"lpush\", results_key, results[i])\n"
 "                end\n"
-"                local length = redis.call(\"llen\", results_key)\n"
-"                local prev_count, prev_remain = math.modf((length - count) / window)\n"
-"                local new_count, prev_remain = math.modf(length / window)\n"
-"                local diff = new_count - prev_count\n"
+"                local diff\n"
+"                if window < 1000 then"
+"                    local length = redis.call(\"llen\", results_key)\n"
+"                    local prev_count, prev_remain = math.modf((length - count) / window)\n"
+"                    local new_count, prev_remain = math.modf(length / window)\n"
+"                    diff = new_count - prev_count\n"
+"                else\n"
+"                    diff = 1\n"
+"                    window = #results\n"
+"                end\n"
 "                if diff > 0 then\n"
 "                    for i = 0, diff - 1, 1 do\n"
 "                        redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
@@ -1072,7 +1083,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        end\n"
 "    else\n"
 "        while count > 0 do\n"
-"            local packed_frame = redis.call(\"lpop\", rule_action_key)\n"
+"            local packed_frame = redis.call(\"rpop\", rule_action_key)\n"
 "            if not packed_frame then\n"
 "                break\n"
 "            else\n"
@@ -1081,6 +1092,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "                    table.insert(frames, frame)\n"
 "                    table.insert(packed_frames, packed_frame)\n"
 "                    count = count - 1\n"
+"                else\n"
 "                end\n"
 "            end\n"
 "        end\n"
@@ -1743,6 +1755,86 @@ unsigned int formatRemoveMessage(void *rulesBinding,
         return ERR_OUT_OF_MEMORY;
     }
     return RULES_OK;
+}
+
+unsigned int startNonBlockingBatch(void *rulesBinding,
+                                   char **commands,
+                                   unsigned short commandCount,
+                                   unsigned short *replyCount) {
+    *replyCount = commandCount;
+    if (commandCount == 0) {
+        return RULES_OK;
+    }
+
+    unsigned int result = RULES_OK;
+    binding *currentBinding = (binding*)rulesBinding;
+    redisContext *reContext = currentBinding->reContext;
+    if (commandCount > 1) {
+        ++(*replyCount);
+        result = redisAppendCommand(reContext, "multi");
+        if (result != REDIS_OK) {
+            for (unsigned short i = 0; i < commandCount; ++i) {
+                free(commands[i]);
+            }
+
+            return ERR_REDIS_ERROR;
+        }
+    }
+
+    for (unsigned short i = 0; i < commandCount; ++i) {
+        sds newbuf;
+        newbuf = sdscatlen(reContext->obuf, commands[i], strlen(commands[i]));
+        if (newbuf == NULL) {
+            return ERR_OUT_OF_MEMORY;
+        }
+
+        reContext->obuf = newbuf;
+        free(commands[i]);
+    }
+
+    if (commandCount > 1) {
+        ++(*replyCount);
+        unsigned int result = redisAppendCommand(reContext, "exec");
+        if (result != REDIS_OK) {
+            return ERR_REDIS_ERROR;
+        }
+    }
+
+    int wdone = 0;
+    do {
+        if (redisBufferWrite(reContext, &wdone) == REDIS_ERR) {
+            return ERR_REDIS_ERROR;
+        }
+    } while (!wdone);
+
+    return result;
+}
+
+unsigned int completeNonBlockingBatch(void *rulesBinding,
+                                      unsigned short replyCount) {
+    if (replyCount == 0) {
+        return RULES_OK;
+    }
+
+    unsigned int result = RULES_OK;
+    binding *currentBinding = (binding*)rulesBinding;
+    redisContext *reContext = currentBinding->reContext;
+    redisReply *reply;
+    for (unsigned short i = 0; i < replyCount; ++i) {
+        result = redisGetReply(reContext, (void**)&reply);
+        if (result != REDIS_OK) {
+            result = ERR_REDIS_ERROR;
+        } else {
+            if (reply->type == REDIS_REPLY_ERROR) {
+                printf("error %d %s\n", i, reply->str);
+                result = ERR_REDIS_ERROR;
+            }
+
+            freeReplyObject(reply);    
+        } 
+    }
+    
+    return result;
 }
 
 unsigned int executeBatch(void *rulesBinding,
