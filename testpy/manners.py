@@ -75,7 +75,7 @@ with statechart('miss_manners'):
                        (m.guest_name == c.path.guest_name)))
         def make_path(c):
             if (c.m):
-                for frame in c.m):
+                for frame in c.m:
                     c.assert_fact({'t': 'path',
                                    'id': c.s.g_count,
                                    'p_id': frame.seating.s_id, 
