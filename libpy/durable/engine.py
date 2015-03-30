@@ -293,6 +293,9 @@ class Ruleset(object):
     def assert_fact(self, fact):
         rules.assert_fact(self._handle, json.dumps(fact))
 
+    def start_assert_facts(self, facts):
+        return rules.start_assert_facts(self._handle, json.dumps(facts))
+
     def assert_facts(self, facts):
         rules.assert_facts(self._handle, json.dumps(facts))
 
@@ -386,7 +389,7 @@ class Ruleset(object):
                             if len(facts) == 1:
                                 pending.append(self._host.start_assert_fact(ruleset_name, facts[0]))
                             else:
-                                self._host.assert_facts(ruleset_name, facts)
+                                pending.append(self._host.start_assert_facts(ruleset_name, facts))
 
                         for item in pending:
                             if item[0] > 0:
@@ -663,6 +666,9 @@ class Host(object):
 
     def assert_fact(self, ruleset_name, fact):
         self.get_ruleset(ruleset_name).assert_fact(fact)
+
+    def start_assert_facts(self, ruleset_name, facts):
+        return self.get_ruleset(ruleset_name).start_assert_facts(facts)
 
     def assert_facts(self, ruleset_name, facts):
         self.get_ruleset(ruleset_name).assert_facts(facts)

@@ -45,25 +45,85 @@
 extern "C" {
 #endif
 
-unsigned int createRuleset(void **handle, char *name, char *rules, unsigned int stateCaheSize);
+unsigned int createRuleset(void **handle, 
+						   char *name, 
+						   char *rules, 
+						   unsigned int stateCaheSize);
+
 unsigned int deleteRuleset(void *handle);
-unsigned int bindRuleset(void *handle, char *host, unsigned int port, char *password);
-unsigned int complete(void *rulesBinding, unsigned short replyCount);
-unsigned int assertEvent(void *handle, char *message);
-unsigned int assertEvents(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results);
-unsigned int retractEvent(void *handle, char *message);
-unsigned int assertFact(void *handle, char *message);
-unsigned int startAssertFact(void *handle, char *message, void **rulesBinding, unsigned short *replyCount);
-unsigned int assertFacts(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results);
-unsigned int retractFact(void *handle, char *message);
-unsigned int retractFacts(void *handle, char *messages, unsigned int *resultsLength, unsigned int **results);
-unsigned int assertState(void *handle, char *state);
-unsigned int startAction(void *handle, char **state, char **messages, void **actionHandle);
-unsigned int completeAction(void *handle, void *actionHandle, char *state);
-unsigned int abandonAction(void *handle, void *actionHandle);
-unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *timer);
+
+unsigned int bindRuleset(void *handle, 
+	   					 char *host, 
+	   					 unsigned int port, 
+	   					 char *password);
+
+unsigned int complete(void *rulesBinding, 
+	 				  unsigned short replyCount);
+
+unsigned int assertEvent(void *handle, 
+						 char *message);
+
+unsigned int assertEvents(void *handle, 
+						  char *messages, 
+						  unsigned int *resultsLength, 
+						  unsigned int **results);
+
+unsigned int retractEvent(void *handle, 
+						  char *message);
+
+unsigned int startAssertFact(void *handle, 
+							 char *message, 
+							 void **rulesBinding, 
+							 unsigned short *replyCount);
+
+unsigned int assertFact(void *handle, 
+						char *message);
+
+unsigned int startAssertFacts(void *handle, 
+							  char *messages, 
+							  unsigned int *resultsLength, 
+							  unsigned int **results, 
+							  void **rulesBinding, 
+							  unsigned short *replyCount);
+
+unsigned int assertFacts(void *handle, 
+						 char *messages, 
+						 unsigned int *resultsLength, 
+						 unsigned int **results);
+
+unsigned int retractFact(void *handle, 
+						 char *message);
+
+unsigned int retractFacts(void *handle, 
+						  char *messages, 
+						  unsigned int *resultsLength, 
+						  unsigned int **results);
+
+unsigned int assertState(void *handle, 
+	 					 char *state);
+
+unsigned int startAction(void *handle, 
+						 char **state, 
+						 char **messages, 
+						 void **actionHandle);
+
+unsigned int completeAction(void *handle, 
+							void *actionHandle, 
+							char *state);
+
+unsigned int abandonAction(void *handle, 
+						   void *actionHandle);
+
+unsigned int startTimer(void *handle, 
+	 					char *sid, 
+	 					unsigned int duration, 
+	 					char *timer);
+
 unsigned int assertTimers(void *handle);
-unsigned int getState(void *handle, char *sid, char **state);
+
+unsigned int getState(void *handle, 
+					  char *sid, 
+					  char **state);
 
 #ifdef _WIN32
 int asprintf(char** ret, char* format, ...);

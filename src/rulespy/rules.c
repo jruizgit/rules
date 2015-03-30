@@ -244,6 +244,42 @@ static PyObject *pyAssertFact(PyObject *self, PyObject *args) {
     }
 }
 
+static PyObject *pyStartAssertFacts(PyObject *self, PyObject *args) {
+    void *handle;
+    char *facts;
+    if (!PyArg_ParseTuple(args, "ls", &handle, &facts)) {
+        PyErr_SetString(RulesError, "pyAssertFact Invalid argument");
+        return NULL;
+    }
+
+    unsigned short replyCount;
+    void *rulesBinding = NULL;
+    unsigned int *results = NULL;
+    unsigned int resultsLength;
+    unsigned int result = startAssertFacts(handle, facts, &resultsLength, &results, &rulesBinding, &replyCount);
+    if (result == RULES_OK) {  
+        if (results) {
+            free(results);
+        }
+        return Py_BuildValue("li", rulesBinding, replyCount);    
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        return Py_BuildValue("li", 0, 0);    
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            if (results) {
+                free(results);
+            } 
+            char * message;
+            asprintf(&message, "Could not assert facts, error code: %d", result);  
+            PyErr_SetString(RulesError, message);
+            free(message);
+        }
+        return NULL;
+    }
+}
+
 static PyObject *pyAssertFacts(PyObject *self, PyObject *args) {
     void *handle;
     char *facts;
@@ -525,6 +561,7 @@ static PyMethodDef myModule_methods[] = {
     {"retract_event", pyRetractEvent, METH_VARARGS},
     {"start_assert_fact", pyStartAssertFact, METH_VARARGS},
     {"assert_fact", pyAssertFact, METH_VARARGS},
+    {"start_assert_facts", pyStartAssertFacts, METH_VARARGS},
     {"assert_facts", pyAssertFacts, METH_VARARGS},
     {"retract_fact", pyRetractFact, METH_VARARGS},
     {"retract_facts", pyRetractFacts, METH_VARARGS},

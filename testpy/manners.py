@@ -60,6 +60,7 @@ with statechart('miss_manners'):
                            'c_id': c.seating.s_id,
                            'guest_name': c.left_guest.name,
                            'hobby': c.right_guest.hobby})
+
             c.s.count += 1
             c.s.g_count += 3
 
@@ -554,5 +555,5 @@ with statechart('miss_manners'):
         host.assert_fact('miss_manners', {'id': 439, 'sid': 1, 't': 'last_seat', 'seat': 128})
         host.patch_state('miss_manners', {'sid': 1, 'label': 'start', 'count': 0, 'g_count': 1000})
 
-run_all()
+run_all(['/tmp/redis0.sock'])
 
