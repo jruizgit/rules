@@ -10,6 +10,7 @@ with ruleset('miss_manners.make'):
                    (m.p_id == c.seating.s_id) & 
                    (m.guest_name == c.path.guest_name)))
     def make_path(c):
+        seating = None
         if (c.m):
             for frame in c.m:
                 c.assert_fact({'t': 'path',
@@ -25,6 +26,7 @@ with ruleset('miss_manners.make'):
                                'seat': frame.path.seat, 
                                'guest_name': frame.path.guest_name})
                 c.s.g_count += 1
+                seating = frame.seating
         else:
             c.assert_fact({'t': 'path',
                            'id': c.s.g_count,
@@ -40,19 +42,28 @@ with ruleset('miss_manners.make'):
                            'guest_name': c.path.guest_name})
 
             c.s.g_count += 1
+            seating = c.seating
+
+        c.assert_fact('miss_manners',
+                      {'t': 'seating',
+                       'id': c.s.g_count,
+                       's_id': seating.s_id, 
+                       'p_id': seating.p_id, 
+                       'left_seat': seating.left_seat, 
+                       'left_guest_name': seating.left_guest_name,
+                       'right_seat': seating.right_seat,
+                       'right_guest_name': seating.right_guest_name})
+        c.s.g_count += 1
+        print('path sid: {0}, pid: {1}, left guest: {2}, right guest {3}, {4}'.format(seating.s_id, seating.p_id, seating.left_guest_name, seating.right_guest_name, datetime.datetime.now().strftime('%I:%M:%S%p')))
+
 
     @when_all(pri(1),
               c.seating << (m.t == 'seating'))
     def path_done(c):
         c.retract_fact(c.seating)
         c.post('miss_manners',
-               {'t': 'go', 
-                'id': c.s.g_count,
-                'g_count': c.s.g_count, 
-                's_id': c.seating.s_id, 
-                'p_id': c.seating.p_id,
-                'left_guest_name': c.seating.left_guest_name,
-                'right_guest_name': c.seating.right_guest_name})
+               {'id': c.s.g_count,
+                't': 'go'})
 
         c.s.g_count += 1
 
@@ -105,21 +116,13 @@ with statechart('miss_manners'):
                        (m.guest_name == c.left_guest.name) & 
                        (m.hobby == c.right_guest.hobby)))
         def find_seating(c):
-            c.assert_fact({'t': 'seating',
-                           'id': c.s.g_count,
-                           's_id': c.s.count, 
-                           'p_id': c.seating.s_id, 
-                           'left_seat': c.seating.right_seat, 
-                           'left_guest_name': c.seating.right_guest_name,
-                           'right_seat': c.seating.right_seat + 1,
-                           'right_guest_name': c.left_guest.name})
             c.assert_fact({'t': 'path',
-                           'id': c.s.g_count + 1,
+                           'id': c.s.g_count,
                            'p_id': c.s.count, 
                            'seat': c.seating.right_seat + 1, 
                            'guest_name': c.left_guest.name})
             c.assert_fact({'t': 'chosen',
-                           'id': c.s.g_count + 2,
+                           'id': c.s.g_count + 1,
                            'c_id': c.seating.s_id,
                            'guest_name': c.left_guest.name,
                            'hobby': c.right_guest.hobby})
@@ -138,16 +141,15 @@ with statechart('miss_manners'):
                            'p_id': c.s.count, 
                            'seat': c.seating.right_seat + 1, 
                            'guest_name': c.left_guest.name})
-
             c.s.count += 1
-            c.s.g_count += 3
+            c.s.g_count += 2
             
     with state('end_make'):
         @to('check')
         @when_all(m.t == 'go')
         def path_done(c):
-            print('path sid: {0}, pid: {1}, left guest: {2}, right guest {3}, {4}'.format(c.m.s_id, c.m.p_id, c.m.left_guest_name, c.m.right_guest_name, datetime.datetime.now().strftime('%I:%M:%S%p')))
-
+            c.s.g_count += 1
+            
     with state('check'):
         @to('end')
         @when_all(c.last_seat << m.t == 'last_seat', 

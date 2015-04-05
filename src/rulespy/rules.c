@@ -268,9 +268,9 @@ static PyObject *pyStartAssertFacts(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            if (results) {
-                free(results);
-            } 
+            // if (results) {
+            //     free(results);
+            // } 
             char * message;
             asprintf(&message, "Could not assert facts, error code: %d", result);  
             PyErr_SetString(RulesError, message);
