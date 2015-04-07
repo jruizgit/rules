@@ -46,7 +46,7 @@ Now that your cache and web server are ready, let's write a simple rule:
 
 1. Start a terminal  
 2. Create a directory for your app: `mkdir firstapp` `cd firstapp`  
-3. In the new directory `pip install durable_rules` (this will download durable_rules and its dependencies)  
+3. In the new directory `sudo pip install durable_rules` (this will download durable_rules and its dependencies)  
 4. In that same directory create a test.py file using your favorite editor  
 5. Copy/Paste and save the following code:
   ```python
@@ -65,7 +65,7 @@ Now that your cache and web server are ready, let's write a simple rule:
 7. In the terminal type `python test.py`  
 8. You should see the message: `Hello World`  
 
-Note 1: If you are using [Redis To Go](https://redistogo.com), replace the last line.
+Note: If you are using [Redis To Go](https://redistogo.com), replace the last line.
   ```python
   d.runAll([{'host': 'hostName', 'port': port, 'password': 'password'}]);
   ```
