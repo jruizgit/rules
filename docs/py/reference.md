@@ -42,7 +42,7 @@ For more information go to: https://github.com/MSOpenTech/redis
 Note: To test applications locally you can also use a Redis [cloud service](reference.md#cloud-setup) 
 
 #### First App
-Now that your cache and web server are ready, let's write a simple rule:  
+Now that your cache ready, let's write a simple rule:  
 
 1. Start a terminal  
 2. Create a directory for your app: `mkdir firstapp` `cd firstapp`  
