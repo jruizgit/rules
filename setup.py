@@ -1,11 +1,34 @@
-from setuptools import setup, Extension
+try:
+  from setuptools import setup, Extension
+  from setuptools.command import install_lib as _install_lib
+except ImportError:
+  from distutils.core import setup, Extension
+  from distutils.command import install_lib as _install_lib
 from codecs import open
 from os import path
 
+# Patch "install_lib" command to run build_clib before build_ext
+# to properly work with easy_install.
+# See: http://bugs.python.org/issue5243
+class install_lib(_install_lib.install_lib):
+  def build(self):
+    if not self.skip_build:
+      if self.distribution.has_pure_modules():
+        self.run_command('build_py')
+        if self.distribution.has_c_libraries():
+          self.run_command('build_clib')
+        if self.distribution.has_ext_modules():
+          self.run_command('build_ext')
+
+hiredis_lib = ('hiredis_py', 
+               {'sources': ['deps/hiredis/%s.c' % src for src in ('hiredis', 'net', 'sds')]})
+
+rules_lib = ('rules_py', 
+             {'sources': ['src/rules/%s.c' % src for src in ('json', 'net', 'rete', 'state', 'events')]})
+
 rules = Extension('rules',
-                    sources = ['src/rulespy/rules.c'],
-                    include_dirs=['src/rules'],
-                    extra_link_args=['build/release/rules.a', 'build/release/hiredis.a'])
+                  sources = ['src/rulespy/rules.c'],
+                  include_dirs=['src/rules'])
 
 here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.txt'), encoding='utf-8') as f:
@@ -13,7 +36,7 @@ with open(path.join(here, 'README.txt'), encoding='utf-8') as f:
 
 setup (
     name = 'durable_rules',
-    version = '0.31.16',
+    version = '0.31.23',
     description = 'for real time analytics',
     long_description=long_description,
     url='https://github.com/jruizgit/rules',
@@ -21,10 +44,13 @@ setup (
     author_email='jr3791@live.com',
     license='MIT',
     classifiers=[
+        'Operating System :: MacOS',
+        'Operating System :: POSIX',
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Libraries',
         'License :: OSI Approved :: MIT License',
+        'Programming Language :: C',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
     ],
@@ -32,5 +58,8 @@ setup (
     install_requires=['werkzeug'],
     packages = ['durable'],
     package_dir = {'': 'libpy'},
-    ext_modules = [rules]
+    libraries = [hiredis_lib, rules_lib],
+    ext_modules = [rules],
+    # Override 'install_lib' command
+    cmdclass={'install_lib': install_lib},
 )

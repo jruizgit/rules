@@ -588,7 +588,7 @@ _ruleset_stack = []
 _rulesets = []
 _start_functions = []
 
-def run_all(databases = ['/tmp/redis.sock']):
+def run_all(databases = [{'host': 'localhost', 'port': 6379, 'password':None}]):
     ruleset_definitions = {}
     for rset in _rulesets:
         ruleset_name, ruleset_definition = rset.define()
