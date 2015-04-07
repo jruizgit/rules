@@ -42,8 +42,33 @@ For more information go to: https://github.com/MSOpenTech/redis
 Note: To test applications locally you can also use a Redis [cloud service](reference.md#cloud-setup) 
 
 #### First App
-Now that your cache and web server are ready, let's write a simple rule:  
+Now that your cache ready, let's write a simple rule:  
 
+1. Start a terminal  
+2. Create a directory for your app: `mkdir firstapp` `cd firstapp`  
+3. In the new directory `sudo pip install durable_rules` (this will download durable_rules and its dependencies)  
+4. In that same directory create a test.py file using your favorite editor  
+5. Copy/Paste and save the following code:
+  ```python
+  from durable.lang import *
+  with ruleset('test'):
+      @when_all(m.subject == 'World')
+      def say_hello(c):
+          print ('Hello {0}'.format(c.m.subject))
+
+      @when_start
+      def start(host):
+          host.post('test', {'id': 1, 'sid': 1, 'subject': 'World'})
+
+  run_all()
+  ```
+7. In the terminal type `python test.py`  
+8. You should see the message: `Hello World`  
+
+Note: If you are using [Redis To Go](https://redistogo.com), replace the last line.
+  ```python
+  d.runAll([{'host': 'hostName', 'port': port, 'password': 'password'}]);
+  ```
 
 [top](reference.md#table-of-contents) 
 ### Cloud Setup
@@ -57,7 +82,7 @@ Redis To Go has worked well for me and is very fast if you are deploying an app 
 Heroku is a good platform to create a cloud application in just a few minutes.  
 1. Go to: [Heroku](https://www.heroku.com)  
 2. Create an account (the free instance with 1 dyno works well for evaluating durable_rules)  
-#### First app
+#### First app (under construction)
 
 2. Deploy and scale the App
 3. Run `heroku logs`, you should see the message: `a0 approved from 1`  
