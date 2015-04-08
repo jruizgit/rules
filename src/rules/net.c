@@ -121,16 +121,13 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
     char *compStack[32];
     unsigned char compTop = 0;
     unsigned char first = 1;
-    unsigned char setPrimaryKey = 1;
+    unsigned char setPrimaryKey = 0;
+    *primaryKey = NULL;
+    *primaryFrameKey = NULL;
     if (asprintf(test, "") == -1) {
         return ERR_OUT_OF_MEMORY;
     }
-    if (asprintf(primaryKey, "nil") == -1) {
-        return ERR_OUT_OF_MEMORY;
-    }
-    if (asprintf(primaryFrameKey, "nil") == -1) {
-        return ERR_OUT_OF_MEMORY;
-    }
+    
 
     for (unsigned short i = 0; i < expr->termsLength; ++i) {
         unsigned int currentNodeOffset = tree->nextPool[expr->t.termsOffset + i];
@@ -138,6 +135,7 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
         if (currentNode->value.a.operator == OP_AND) {
             char *oldTest = *test;
             if (first) {
+                setPrimaryKey = 1;
                 if (asprintf(test, "%s(", *test) == -1) {
                     return ERR_OUT_OF_MEMORY;
                 }
@@ -152,14 +150,14 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
             ++compTop;
             comp = "and";
             first = 1;
-        } else if (currentNode->value.a.operator == OP_OR) {
+        } else if (currentNode->value.a.operator == OP_OR) {    
             char *oldTest = *test;
             if (first) {
-                setPrimaryKey = 0;
                 if (asprintf(test, "%s(", *test) == -1) {
                     return ERR_OUT_OF_MEMORY;
                 }
             } else {
+                setPrimaryKey = 0;
                 if (asprintf(test, "%s %s (", *test, comp) == -1) {
                     return ERR_OUT_OF_MEMORY;
                 }
@@ -222,16 +220,27 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
             }
 
             if (setPrimaryKey && currentNode->value.a.operator == OP_EQ) {
-                free(*primaryKey);
-                if (asprintf(primaryKey, "message[\"%s\"]", leftProperty)  == -1) {
-                    return ERR_OUT_OF_MEMORY;
-                }
+                if (*primaryKey == NULL) {
+                    if (asprintf(primaryKey, "message[\"%s\"]", leftProperty)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
 
-                free(*primaryFrameKey);
-                if (asprintf(primaryFrameKey, "%s", idiomString)  == -1) {
-                    return ERR_OUT_OF_MEMORY;
+                    if (asprintf(primaryFrameKey, "%s", idiomString)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
                 }
-                setPrimaryKey = 0;
+                else {
+                    char *oldKey = *primaryKey;
+                    if (asprintf(primaryKey, "%s .. message[\"%s\"]", *primaryKey, leftProperty)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
+                    free(oldKey);
+                    oldKey = *primaryFrameKey;
+                    if (asprintf(primaryFrameKey, "%s .. %s", *primaryFrameKey, idiomString)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
+                    free(oldKey);
+                }
             }
 
             free(idiomString);
@@ -242,6 +251,15 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
     if (first) {
         free(*test);
         if (asprintf(test, "1")  == -1) {
+            return ERR_OUT_OF_MEMORY;
+        }
+    }
+
+    if (*primaryKey == NULL) {
+        if (asprintf(primaryKey, "nil") == -1) {
+            return ERR_OUT_OF_MEMORY;
+        }
+        if (asprintf(primaryFrameKey, "nil") == -1) {
             return ERR_OUT_OF_MEMORY;
         }
     }
@@ -1039,11 +1057,16 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "                    redis.call(\"rpush\", results_key, results[i])\n"
 "                end\n"
 "            else\n"
-"                for i = #results, 1, -1 do\n"
-"                    redis.call(\"lpush\", results_key, results[i])\n"
+"                if window == 1 then\n"
+"                    redis.call(\"lpush\", results_key, results[#results])\n"
+"                    count = 1\n"
+"                else\n"
+"                    for i = #results, 1, -1 do\n"
+"                        redis.call(\"lpush\", results_key, results[i])\n"
+"                    end\n"
 "                end\n"
 "                local diff\n"
-"                if window < 1000 then"
+"                if window < 1000 then\n"
 "                    local length = redis.call(\"llen\", results_key)\n"
 "                    local prev_count, prev_remain = math.modf((length - count) / window)\n"
 "                    local new_count, prev_remain = math.modf(length / window)\n"
