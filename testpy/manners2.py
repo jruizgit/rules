@@ -61,10 +61,7 @@ with ruleset('miss_manners.make'):
               c.seating << (m.t == 'seating'))
     def path_done(c):
         c.retract_fact(c.seating)
-        c.post('miss_manners',
-               {'id': c.s.g_count,
-                't': 'go'})
-
+        c.post('miss_manners', {'t': 'context', 'l': 'check', 'id': c.s.g_count})
         c.s.g_count += 1
 
     @when_start
@@ -72,94 +69,90 @@ with ruleset('miss_manners.make'):
         host.patch_state('miss_manners.make', {'sid': 0, 'g_count': 10000})
         host.patch_state('miss_manners.make', {'sid': 1, 'g_count': 10001})
 
-with statechart('miss_manners'):
-    with state('start'):
-        @to('assign')
-        @when_all(m.t == 'guest')
-        def assign_first_seating(c):
-            c.assert_fact({'t': 'seating',
-                           'id': c.s.g_count,
-                           's_id': c.s.count, 
-                           'p_id': 0, 
-                           'left_seat': 1, 
-                           'left_guest_name': c.m.name,
-                           'right_seat': 1,
-                           'right_guest_name': c.m.name})
-            c.assert_fact({'t': 'path',
-                           'id': c.s.g_count + 1,
-                           'p_id': c.s.count, 
-                           'seat': 1, 
-                           'guest_name': c.m.name})
-            c.assert_fact('miss_manners.make',
-                          {'t': 'path',
-                           'id': c.s.g_count + 1,
-                           'p_id': c.s.count, 
-                           'seat': 1, 
-                           'guest_name': c.m.name})
-            c.s.count += 1
-            c.s.g_count += 2
-            print('assign {0}, {1}'.format(c.m.name, datetime.datetime.now().strftime('%I:%M:%S%p')))
+with ruleset('miss_manners'):
+    @when_all(c.guest << m.t == 'guest', 
+             (m.t == 'context') & (m.l == 'start'))
+    def assign_first_seating(c):
+        c.assert_fact({'t': 'seating',
+                       'id': c.s.g_count,
+                       's_id': c.s.count, 
+                       'p_id': 0, 
+                       'left_seat': 1, 
+                       'left_guest_name': c.guest.name,
+                       'right_seat': 1,
+                       'right_guest_name': c.guest.name})
+        c.assert_fact({'t': 'path',
+                       'id': c.s.g_count + 1,
+                       'p_id': c.s.count, 
+                       'seat': 1, 
+                       'guest_name': c.guest.name})
+        c.assert_fact('miss_manners.make',
+                      {'t': 'path',
+                       'id': c.s.g_count + 1,
+                       'p_id': c.s.count, 
+                       'seat': 1, 
+                       'guest_name': c.guest.name})
+        c.post({'t': 'context', 'l': 'assign', 'id': c.s.g_count + 2})
+        c.s.count += 1
+        c.s.g_count += 3
+        c.s.start_time = datetime.datetime.now().strftime('%I:%M:%S:%f')
+        print('assign {0}'.format(c.guest.name))
 
-    with state('assign'):
-        @to('end_make')
-        @when_all(c.seating << (m.t == 'seating'),
-                  c.right_guest << (m.t == 'guest') & 
-                                   (m.name == c.seating.right_guest_name),
-                  c.left_guest << (m.t == 'guest') & 
-                                  (m.sex != c.right_guest.sex) & 
-                                  (m.hobby == c.right_guest.hobby),
-                  none((m.t == 'path') & 
-                       (m.p_id == c.seating.s_id) & 
-                       (m.guest_name == c.left_guest.name)),
-                  none((m.t == 'chosen') & 
-                       (m.c_id == c.seating.s_id) & 
-                       (m.guest_name == c.left_guest.name) & 
-                       (m.hobby == c.right_guest.hobby)))
-        def find_seating(c):
-            c.assert_fact({'t': 'path',
-                           'id': c.s.g_count,
-                           'p_id': c.s.count, 
-                           'seat': c.seating.right_seat + 1, 
-                           'guest_name': c.left_guest.name})
-            c.assert_fact({'t': 'chosen',
-                           'id': c.s.g_count + 1,
-                           'c_id': c.seating.s_id,
-                           'guest_name': c.left_guest.name,
-                           'hobby': c.right_guest.hobby})
-            c.assert_fact('miss_manners.make',
-                          {'t': 'seating',
-                           'id': c.s.g_count,
-                           's_id': c.s.count, 
-                           'p_id': c.seating.s_id, 
-                           'left_seat': c.seating.right_seat, 
-                           'left_guest_name': c.seating.right_guest_name,
-                           'right_seat': c.seating.right_seat + 1,
-                           'right_guest_name': c.left_guest.name})
-            c.assert_fact('miss_manners.make',
-                          {'t': 'path',
-                           'id': c.s.g_count + 1,
-                           'p_id': c.s.count, 
-                           'seat': c.seating.right_seat + 1, 
-                           'guest_name': c.left_guest.name})
-            c.s.count += 1
-            c.s.g_count += 2
+    @when_all(c.seating << (m.t == 'seating'),
+              c.right_guest << (m.t == 'guest') & 
+                               (m.name == c.seating.right_guest_name),
+              c.left_guest << (m.t == 'guest') & 
+                              (m.sex != c.right_guest.sex) & 
+                              (m.hobby == c.right_guest.hobby),
+              none((m.t == 'path') & 
+                   (m.p_id == c.seating.s_id) & 
+                   (m.guest_name == c.left_guest.name)),
+              none((m.t == 'chosen') & 
+                   (m.c_id == c.seating.s_id) & 
+                   (m.guest_name == c.left_guest.name) & 
+                   (m.hobby == c.right_guest.hobby)),
+              (m.t == 'context') & (m.l == 'assign'))
+    def find_seating(c):
+        c.assert_fact({'t': 'path',
+                       'id': c.s.g_count,
+                       'p_id': c.s.count, 
+                       'seat': c.seating.right_seat + 1, 
+                       'guest_name': c.left_guest.name})
+        c.assert_fact({'t': 'chosen',
+                       'id': c.s.g_count + 1,
+                       'c_id': c.seating.s_id,
+                       'guest_name': c.left_guest.name,
+                       'hobby': c.right_guest.hobby})
+        c.assert_fact('miss_manners.make',
+                      {'t': 'seating',
+                       'id': c.s.g_count,
+                       's_id': c.s.count, 
+                       'p_id': c.seating.s_id, 
+                       'left_seat': c.seating.right_seat, 
+                       'left_guest_name': c.seating.right_guest_name,
+                       'right_seat': c.seating.right_seat + 1,
+                       'right_guest_name': c.left_guest.name})
+        c.assert_fact('miss_manners.make',
+                      {'t': 'path',
+                       'id': c.s.g_count + 1,
+                       'p_id': c.s.count, 
+                       'seat': c.seating.right_seat + 1, 
+                       'guest_name': c.left_guest.name})
+        c.assert_fact({'t': 'context', 'l': 'make', 'id': c.s.g_count + 3})
+        c.s.count += 1
+        c.s.g_count += 4
             
-    with state('end_make'):
-        @to('check')
-        @when_all(m.t == 'go')
-        def path_done(c):
-            c.s.g_count += 1
-            
-    with state('check'):
-        @to('end')
-        @when_all(c.last_seat << m.t == 'last_seat', 
-                 (m.t == 'seating') & (m.right_seat == c.last_seat.seat))
-        def done(c):
-            print('end {0}'.format(datetime.datetime.now().strftime('%I:%M:%S%p')))
-        
-        to('assign').when_all(pri(1))
-
-    state('end')
+    @when_all(c.last_seat << m.t == 'last_seat', 
+             (m.t == 'seating') & (m.right_seat == c.last_seat.seat),
+             (m.t == 'context') & (m.l == 'check'))
+    def done(c):
+        print('end {0}, {1}'.format(c.s.start_time, datetime.datetime.now().strftime('%I:%M:%S:%f')))
+    
+    @when_all(pri(1), 
+             (m.t == 'context') & (m.l == 'check'))
+    def assign(c):
+        c.post({'t': 'context', 'l': 'assign', 'id': c.s.g_count})
+        c.s.g_count += 1
 
     @when_start
     def start(host):
@@ -602,7 +595,8 @@ with statechart('miss_manners'):
         host.assert_fact('miss_manners', {'id': 437, 'sid': 1, 't': 'guest', 'name': '128', 'sex': 'f', 'hobby': 'h1'})
         host.assert_fact('miss_manners', {'id': 438, 'sid': 1, 't': 'guest', 'name': '128', 'sex': 'f', 'hobby': 'h3'})
         host.assert_fact('miss_manners', {'id': 439, 'sid': 1, 't': 'last_seat', 'seat': 128})
-        host.patch_state('miss_manners', {'sid': 1, 'label': 'start', 'count': 0, 'g_count': 1000})
+        host.patch_state('miss_manners', {'sid': 1, 'count': 0, 'g_count': 1000})
+        host.post('miss_manners', {'t': 'context', 'l': 'start', 'id': 999, 'sid': 1})
 
 run_all(['/tmp/redis0.sock', '/tmp/redis1.sock'])
 
