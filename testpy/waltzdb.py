@@ -351,7 +351,7 @@ with statechart('waltzdb'):
                   c.e << (m.t == 'edge') & (m.p2 == c.j.base_point),
                   c.junction << (m.t == 'junction') & (m.base_point == c.e.p1) & (m.visited == 'yes'))
         def marking(c):
-            c.retract_fact(c.j); c.j.id = c.s.gid; c.j.visited = 'check'; c.assert_fact(c.j) 
+            c.retract_fact(c.junction); c.junction.id = c.s.gid; c.junction.visited = 'check'; c.assert_fact(c.junction) 
             c.s.gid += 1
 
         @to('marking')
@@ -810,5 +810,5 @@ with statechart('waltzdb'):
         create_and_assert(host, {'t':'line' ,'p1':470008 ,'p2':480008})
         host.patch_state('waltzdb', {'sid': 1, 'label': 'duplicate', 'gid': 1000})
 
-run_all()
+run_all(['/tmp/redis0.sock'])
 

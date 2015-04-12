@@ -60,7 +60,6 @@ with statechart('miss_manners'):
                            'c_id': c.seating.s_id,
                            'guest_name': c.left_guest.name,
                            'hobby': c.right_guest.hobby})
-
             c.s.count += 1
             c.s.g_count += 3
 
