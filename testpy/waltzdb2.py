@@ -139,7 +139,7 @@ with ruleset('waltzdb'):
         c.s.gid += 1
         print('find_initial_boundary')
 
-    @when_all(c.j << (m.t == 'junction') & (m.j_t == '2j'),
+    @when_all(c.j << (m.t == 'junction') & (m.j_t == '2j') & (m.visited == 'no'),
               c.e1 << (m.t == 'edge') & (m.p1 == c.j.base_point) & (m.p2 == c.j.p1),
               c.e2 << (m.t == 'edge') & (m.p1 == c.j.base_point) & (m.p2 == c.j.p2),
               none((m.t == 'junction') & (m.j_t == '2j') & (m.base_point > c.j.base_point)),
@@ -152,7 +152,7 @@ with ruleset('waltzdb'):
         c.s.gid += 4
         print('find_second_boundary')
 
-    @when_all(c.j << (m.t == 'junction') & (m.j_t == '3j') & (m.name == 'arrow'),
+    @when_all(c.j << (m.t == 'junction') & (m.j_t == '3j') & (m.name == 'arrow') & (m.visited == 'no'),
               c.e1 << (m.t == 'edge') & (m.p1 == c.j.base_point) & (m.p2 == c.j.p1),
               c.e2 << (m.t == 'edge') & (m.p1 == c.j.base_point) & (m.p2 == c.j.p2),
               c.e3 << (m.t == 'edge') & (m.p1 == c.j.base_point) & (m.p2 == c.j.p3),
@@ -167,7 +167,7 @@ with ruleset('waltzdb'):
         c.s.gid += 5
         print('find_second_boundary')
 
-    @when_all(c.j << (m.t == 'junction') & (m.j_t == '2j'),
+    @when_all(c.j << (m.t == 'junction') & (m.j_t == '2j') & (m.visited == 'no'),
               c.e1 << (m.t == 'edge') & (m.p1 == c.j.base_point) & (m.p2 == c.j.p1),
               c.e2 << (m.t == 'edge') & (m.p1 == c.j.base_point) & (m.p2 == c.j.p2),
               none((m.t == 'junction') & (m.base_point < c.j.base_point)),
@@ -180,7 +180,7 @@ with ruleset('waltzdb'):
         c.s.gid += 4
         print('labeling')
 
-    @when_all(c.j << (m.t == 'junction') & (m.j_t == '3j') & (m.name == 'arrow'),
+    @when_all(c.j << (m.t == 'junction') & (m.j_t == '3j') & (m.name == 'arrow') & (m.visited == 'no'),
               c.e1 << (m.t == 'edge') & (m.p1 == c.j.base_point) & (m.p2 == c.j.p1),
               c.e2 << (m.t == 'edge') & (m.p1 == c.j.base_point) & (m.p2 == c.j.p2),
               c.e3 << (m.t == 'edge') & (m.p1 == c.j.base_point) & (m.p2 == c.j.p3),
