@@ -6,7 +6,7 @@
 #include "json.h"
 #include "net.h"
 
-static unsigned int djbHash(char *str, unsigned int len) {
+unsigned int djbHash(char *str, unsigned int len) {
    unsigned int hash = 5381;
    unsigned int i = 0;
 

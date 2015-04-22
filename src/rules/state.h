@@ -33,6 +33,7 @@ typedef struct stateEntry {
     char *sid;
 } stateEntry;
 
+unsigned int djbHash(char *str, unsigned int len);
 void rehydrateProperty(jsonProperty *property, char *state);
 unsigned int refreshState(void *tree, char *sid);
 unsigned int constructObject(char *parentName, 

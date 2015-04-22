@@ -25,7 +25,8 @@ with ruleset('miss_manners'):
         c.s.start_time = datetime.datetime.now().strftime('%I:%M:%S%p')
         print('assign {0}'.format(c.guest.name))
 
-    @when_all(c.seating << (m.t == 'seating') & 
+    @when_all(by('right_guest'),
+              c.seating << (m.t == 'seating') & 
                            (m.path == True),
               c.right_guest << (m.t == 'guest') & 
                                (m.name == c.seating.right_guest_name),
@@ -64,7 +65,7 @@ with ruleset('miss_manners'):
         c.s.count += 1
         c.s.g_count += 4
         
-    @when_all(count(1001),
+    @when_all(cap(1000),
               c.seating << (m.t == 'seating') & 
                            (m.path == False),
               c.path << (m.t == 'path') & 
@@ -82,13 +83,6 @@ with ruleset('miss_manners'):
                                'seat': frame.path.seat, 
                                'guest_name': frame.path.guest_name})
                 c.s.g_count += 1
-        else:
-            c.assert_fact({'t': 'path',
-                           'id': c.s.g_count,
-                           'p_id': c.seating.s_id, 
-                           'seat': c.path.seat, 
-                           'guest_name': c.path.guest_name})
-            c.s.g_count += 1
 
     @when_all(pri(1), 
               c.seating << (m.t == 'seating') & 
@@ -104,7 +98,6 @@ with ruleset('miss_manners'):
         c.post({'t': 'context', 'l': 'check', 'id': c.s.g_count + 1})
         c.s.g_count += 2
         print('path sid: {0}, pid: {1}, left guest: {2}, right guest {3}, {4}'.format(c.seating.s_id, c.seating.p_id, c.seating.left_guest_name, c.seating.right_guest_name, datetime.datetime.now().strftime('%I:%M:%S%p')))
-
         
     @when_all(c.last_seat << m.t == 'last_seat', 
              (m.t == 'seating') & (m.right_seat == c.last_seat.seat),
@@ -118,7 +111,6 @@ with ruleset('miss_manners'):
         c.post({'t': 'context', 'l': 'assign', 'id': c.s.g_count})
         c.s.g_count += 1
     
-
     @when_start
     def start(host):
         host.assert_fact('miss_manners', {'id': 1, 'sid': 1, 't': 'guest', 'name': '1', 'sex': 'm', 'hobby': 'h2'})

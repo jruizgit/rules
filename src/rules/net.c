@@ -283,6 +283,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     char *lua = NULL;
     char *peekActionLua = NULL;
     char *addMessageLua = NULL;
+    char *resultWindowLua = NULL;
     if (asprintf(&peekActionLua, "")  == -1) {
         return ERR_OUT_OF_MEMORY;
     }
@@ -714,25 +715,131 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                 }  
                 free(oldPeekActionLua);
 
-                oldLua = lua;
                 if (currentNode->value.c.span > 0)
                 {
-                    if (asprintf(&lua,
-"%sprocess_key(message, nil, %d)\n",
-                                 lua,
+                    if (asprintf(&resultWindowLua,
+"        local span = %d\n"
+"        local last_score = redis.call(\"get\", results_key .. \"!d\")\n"
+"        if not last_score then\n"
+"            redis.call(\"set\", results_key .. \"!d\", score)\n"
+"        else\n"
+"            local new_score = last_score + span\n"
+"            if score > new_score then\n"
+"                redis.call(\"rpush\", results_key, 0)\n"
+"                redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
+"                redis.call(\"rpush\", actions_key .. \"!\" .. sid, 0)\n"
+"                redis.call(\"zadd\", actions_key , score, sid)\n"
+"                local span_count, span_remain = math.modf((score - new_score) / span)\n"
+"                last_score = new_score + span_count * span\n"
+"                redis.call(\"set\", results_key .. \"!d\", last_score)\n"
+"            end\n"    
+"        end\n"
+"        local count = 0\n"
+"        if not message then\n"
+"            if assert_fact == 0 then\n"
+"                count = process_inverse_event(message, index, keys[index] .. \"!e!\" .. sid, false)\n"
+"            else\n"
+"                count = process_inverse_event(message, index, keys[index] .. \"!f!\" .. sid, true)\n"
+"            end\n"
+"        else\n"
+"            if assert_fact == 0 then\n"
+"                count = process_event(message, index, keys[index] .. \"!e!\" .. sid, false)\n"
+"            else\n"
+"                count = process_event(message, index, keys[index] .. \"!f!\" .. sid, true)\n"
+"            end\n"
+"        end\n"
+"        if (count > 0) then\n"
+"            for i = 1, #results, 1 do\n"
+"                redis.call(\"rpush\", results_key, results[i])\n"
+"            end\n"
+"        end\n",
                                  currentNode->value.c.span)  == -1) {
                         return ERR_OUT_OF_MEMORY;
                     }
+
+                } else if (currentNode->value.c.cap > 0) {
+                    if (asprintf(&resultWindowLua,
+"        local window = %d\n"
+"        local count = 0\n"
+"        if not message then\n"
+"            if assert_fact == 0 then\n"
+"                count = process_inverse_event(message, index, keys[index] .. \"!e!\" .. sid, false)\n"
+"            else\n"
+"                count = process_inverse_event(message, index, keys[index] .. \"!f!\" .. sid, true)\n"
+"            end\n"
+"        else\n"
+"            if assert_fact == 0 then\n"
+"                count = process_event(message, index, keys[index] .. \"!e!\" .. sid, false)\n"
+"            else\n"
+"                count = process_event(message, index, keys[index] .. \"!f!\" .. sid, true)\n"
+"            end\n"
+"        end\n"
+"        if (count > 0) then\n"
+"            for i = #results, 1, -1 do\n"
+"                redis.call(\"lpush\", results_key, results[i])\n"
+"            end\n"
+"            local diff\n"
+"            local new_count, new_remain = math.modf(#results / window)\n"
+"            local new_remain = #results %% window\n"
+"            if new_count > 0 then\n"
+"                for i = 1, new_count, 1 do\n"
+"                    redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
+"                    redis.call(\"rpush\", actions_key .. \"!\" .. sid, window)\n"
+"                end\n"
+"            end\n"
+"            if new_remain > 0 then\n"
+"                redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
+"                redis.call(\"rpush\", actions_key .. \"!\" .. sid, new_remain)\n"
+"            end\n"
+"            if new_count > 0 or new_remain > 0 then\n"
+"                redis.call(\"zadd\", actions_key , score, sid)\n"
+"            end\n"
+"        end\n",
+                                 currentNode->value.c.cap)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
                 } else {
-                    if (asprintf(&lua,
-"%sprocess_key(message, %d, nil)\n",
-                                 lua,
+                    if (asprintf(&resultWindowLua,
+"        local window = %d\n"
+"        local count = 0\n"
+"        if not message then\n"
+"            if assert_fact == 0 then\n"
+"                count = process_inverse_event(message, index, keys[index] .. \"!e!\" .. sid, false)\n"
+"            else\n"
+"                count = process_inverse_event(message, index, keys[index] .. \"!f!\" .. sid, true)\n"
+"            end\n"
+"        else\n"
+"            if assert_fact == 0 then\n"
+"                count = process_event(message, index, keys[index] .. \"!e!\" .. sid, false)\n"
+"            else\n"
+"                count = process_event(message, index, keys[index] .. \"!f!\" .. sid, true)\n"
+"            end\n"
+"        end\n"
+"        if (count > 0) then\n"
+"            for i = #results, 1, -1 do\n"
+"                redis.call(\"lpush\", results_key, results[i])\n"
+"            end\n"
+"            local diff\n"
+"            local length = redis.call(\"llen\", results_key)\n"
+"            local prev_count, prev_remain = math.modf((length - count) / window)\n"
+"            local new_count, prev_remain = math.modf(length / window)\n"
+"            diff = new_count - prev_count\n"
+"            if diff > 0 then\n"
+"                for i = 0, diff - 1, 1 do\n"
+"                    redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
+"                    if window == 1 then\n"
+"                        redis.call(\"rpush\", actions_key .. \"!\" .. sid, \"single\")\n"
+"                    else\n"
+"                        redis.call(\"rpush\", actions_key .. \"!\" .. sid, window)\n"
+"                    end\n"
+"                end\n"
+"                redis.call(\"zadd\", actions_key , score, sid)\n"
+"             end\n"
+"        end\n",
                                  currentNode->value.c.count)  == -1) {
                         return ERR_OUT_OF_MEMORY;
                     }
                 }
-
-                free(oldLua);
             }
 
             free(unpackFrameLua);
@@ -809,7 +916,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        end\n"
 "        if packed_message_list then\n"
 "            new_mids = cmsgpack.unpack(packed_message_list)\n"
-"redis.call(\"rpush\", \"debug\", \"load \" .. actions_key .. \" \" .. keys[index] .. \" \" .. #new_mids)\n"
 "        else\n"
 "            new_mids = {}\n"
 "        end\n"
@@ -1044,79 +1150,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "end\n"
 "local process_key = function(message, window, span)\n"
 "    local index = directory[key]\n"
-"    if index then\n"
-"        if span then\n"
-"            local last_score = redis.call(\"get\", results_key .. \"!d\")\n"
-"            if not last_score then\n"
-"                redis.call(\"set\", results_key .. \"!d\", score)\n"
-"            else\n"
-"                local new_score = last_score + span\n"
-"                if score > new_score then\n"
-"                    redis.call(\"rpush\", results_key, 0)\n"
-"                    redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
-"                    redis.call(\"rpush\", actions_key .. \"!\" .. sid, 0)\n"
-"                    redis.call(\"zadd\", actions_key , score, sid)\n"
-"                    local span_count, span_remain = math.modf((score - new_score) / span)\n"
-"                    last_score = new_score + span_count * span\n"
-"                    redis.call(\"set\", results_key .. \"!d\", last_score)\n"
-"                end\n"    
-"            end\n"
-"        end\n"
-"        local count = 0\n"
-"        if not message then\n"
-"            if assert_fact == 0 then\n"
-"                count = process_inverse_event(message, index, keys[index] .. \"!e!\" .. sid, false)\n"
-"            else\n"
-"                count = process_inverse_event(message, index, keys[index] .. \"!f!\" .. sid, true)\n"
-"            end\n"
-"        else\n"
-"            if assert_fact == 0 then\n"
-"                count = process_event(message, index, keys[index] .. \"!e!\" .. sid, false)\n"
-"            else\n"
-"                count = process_event(message, index, keys[index] .. \"!f!\" .. sid, true)\n"
-"            end\n"
-"        end\n"
-"        if (count > 0) then\n"
-"            if span then\n"
-"                for i = 1, #results, 1 do\n"
-"                    redis.call(\"rpush\", results_key, results[i])\n"
-"                end\n"
-"            else\n"
-"                for i = #results, 1, -1 do\n"
-"                    redis.call(\"lpush\", results_key, results[i])\n"
-"                end\n"
-"                local diff\n"
-"                if window < 10 then"
-"                    local length = redis.call(\"llen\", results_key)\n"
-"                    local prev_count, prev_remain = math.modf((length - count) / window)\n"
-"                    local new_count, prev_remain = math.modf(length / window)\n"
-"                    diff = new_count - prev_count\n"
-"                    if diff > 0 then\n"
-"                        for i = 0, diff - 1, 1 do\n"
-"                            redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
-"                            redis.call(\"rpush\", actions_key .. \"!\" .. sid, window)\n"
-"                        end\n"
-"                        redis.call(\"zadd\", actions_key , score, sid)\n"
-"                    end\n"
-"                else\n"
-"                    local new_count, new_remain = math.modf(#results / window)\n"
-"                    local new_remain = #results %% window\n"
-"                    if new_count > 0 then\n"
-"                        for i = 1, new_count, 1 do\n"
-"                            redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
-"                            redis.call(\"rpush\", actions_key .. \"!\" .. sid, window)\n"
-"                        end\n"
-"                    end\n"
-"                    if new_remain > 0 then\n"
-"                        redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
-"                        redis.call(\"rpush\", actions_key .. \"!\" .. sid, new_remain)\n"
-"                    end\n"
-"                    if new_count > 0 or new_remain > 0 then\n"
-"                        redis.call(\"zadd\", actions_key , score, sid)\n"
-"                    end\n"
-"                end\n"
-"            end\n"
-"        end\n"
+"    if index then\n%s"
 "    end\n"
 "end\n"
 "local message = nil\n"
@@ -1150,15 +1184,18 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        end\n"
 "    end\n"
 "end\n%s"
+"process_key(message)\n"
 "return true\n",
                          name,
                          name,
                          name,
                          name,
+                         resultWindowLua,
                          lua)  == -1) {
                 return ERR_OUT_OF_MEMORY;
             }
             free(oldLua);
+            free(resultWindowLua);
             redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
             redisGetReply(reContext, (void**)&reply);
             if (reply->type == REDIS_REPLY_ERROR) {
@@ -1280,6 +1317,14 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        for i = 1, #frame, 1 do\n"
 "            if frame[i] == \"$n\" then\n"
 "                if not validate_frame(full_frame, i, sid) then\n"
+"                    local frames_key\n"
+"                    local primary_key = primary_frame_keys[i](full_frame)\n"
+"                    if primary_key then\n"
+"                        frames_key = keys[i] .. \"!i!\" .. sid .. \"!\" .. primary_key\n"
+"                    else\n"
+"                        frames_key = keys[i] .. \"!i!\" .. sid\n"
+"                    end\n"
+"                    redis.call(\"rpush\", frames_key, frame)\n"
 "                    cancel = true\n"
 "                    break\n"
 "                end\n"
@@ -1297,9 +1342,15 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    end\n"
 "    return full_frame\n"
 "end\n"
-"local load_frame_from_rule = function(rule_action_key, count, sid, max_score)\n"
+"local load_frame_from_rule = function(rule_action_key, raw_count, sid, max_score)\n"
 "    local frames = {}\n"
 "    local packed_frames = {}\n"
+"    local unwrap = true\n"
+"    local count = 1\n"
+"    if raw_count ~= \"single\" then\n"
+"        count = tonumber(raw_count)\n"
+"        unwrap = false\n"
+"    end\n"
 "    if count == 0 then\n"
 "        local packed_frame = redis.call(\"lpop\", rule_action_key)\n"
 "        while packed_frame ~= \"0\" do\n"
@@ -1335,7 +1386,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        return nil, nil\n"
 "    end\n"
 "    local last_name = string.find(rule_action_key, \"!\") - 1\n"
-"    if #frames == 1 and count == 0 then\n"
+"    if unwrap then\n"
 "        return string.sub(rule_action_key, 1, last_name), frames[1]\n"
 "    else\n"
 "        return string.sub(rule_action_key, 1, last_name), frames\n"
@@ -1344,14 +1395,14 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local load_frame_from_sid = function(sid, max_score)\n"
 "    local action_list = action_key .. \"!\" .. sid\n"
 "    local rule_action_key = redis.call(\"lpop\", action_list)\n"
-"    local count = tonumber(redis.call(\"lpop\", action_list))\n"
+"    local count = redis.call(\"lpop\", action_list)\n"
 "    local name, frame = load_frame_from_rule(rule_action_key, count, sid, max_score)\n"
 "    while not frame do\n"
 "        rule_action_key = redis.call(\"lpop\", action_list)\n"
 "        if not rule_action_key then\n"
 "            return nil, nil\n"
 "        end\n"
-"        count = tonumber(redis.call(\"lpop\", action_list))\n"
+"        count = redis.call(\"lpop\", action_list)\n"
 "        name, frame = load_frame_from_rule(rule_action_key, count, sid, max_score)\n"
 "    end\n"
 "    redis.call(\"lpush\", action_list, count)\n"
@@ -1491,7 +1542,11 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     if (asprintf(&lua, 
 "local delete_frame = function(key)\n"
 "    local rule_action_key = redis.call(\"lpop\", key)\n"
-"    local count = tonumber(redis.call(\"lpop\", key))\n"
+"    local raw_count = redis.call(\"lpop\", key)\n"
+"    local count = 1\n"
+"    if raw_count ~= \"single\" then\n"
+"        count = tonumber(raw_count)\n"
+"    end\n"
 "    if count == 0 then\n"
 "        local packed_frame = redis.call(\"lpop\", rule_action_key)\n"
 "        while packed_frame ~= \"0\" do\n"

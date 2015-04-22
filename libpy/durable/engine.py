@@ -352,66 +352,65 @@ class Ruleset(object):
         complete(None)
 
     def dispatch(self, complete):
-        result = None
-        try:
-            result = rules.start_action(self._handle)
-        except Exception as error:
-            complete(error)
-            return
+        for i in range(0, 10):
+            result = None
+            try:
+                result = rules.start_action(self._handle)
+            except Exception as error:
+                complete(error)
+                return
 
-        if not result:
-            complete(None)
-        else:
-            state = json.loads(result[0])
-            message = json.loads(result[1])
-            action_name = None
-            for action_name, message in message.iteritems():
-                break
-            c = Closure(state, message, result[2], self._name)
-            
-            def action_callback(e):
-                if e:
-                    rules.abandon_action(self._handle, c._handle)
-                    complete(e)
-                else:
-                    try:
-                        for branch_name, branch_state in c.get_branches().iteritems():
-                            self._host.patch_state(branch_name, branch_state)  
-
-                        for ruleset_name, messages in c.get_messages().iteritems():
-                            if len(messages) == 1:
-                                self._host.post(ruleset_name, messages[0])
-                            else:
-                                self._host.post_batch(ruleset_name, messages)
-
-                        pending = []
-                        for ruleset_name, facts in c.get_facts().iteritems():
-                            if len(facts) == 1:
-                                pending.append(self._host.start_assert_fact(ruleset_name, facts[0]))
-                            else:
-                                pending.append(self._host.start_assert_facts(ruleset_name, facts))
-
-                        for item in pending:
-                            if item[0] > 0:
-                                rules.complete(item[0], item[1])
-
-                        for ruleset_name, facts in c.get_retract_facts().iteritems():
-                            if len(facts) == 1:
-                                self._host.retract_fact(ruleset_name, facts[0])
-                            else:
-                                self._host.retract_facts(ruleset_name, facts)
-
-                        for timer_name, timer_duration in c.get_timers().iteritems():
-                            self.start_timer(c.s['sid'], timer_name, timer_duration)                            
-                            
-                        rules.complete_action(self._handle, c._handle, json.dumps(c.s._d))
-                        complete(None)
-                    except Exception as error:
+            if result:
+                state = json.loads(result[0])
+                message = json.loads(result[1])
+                action_name = None
+                for action_name, message in message.iteritems():
+                    break
+                c = Closure(state, message, result[2], self._name)
+                
+                def action_callback(e):
+                    if e:
                         rules.abandon_action(self._handle, c._handle)
-                        complete(error)
-            
-            self._actions[action_name].run(c, action_callback)         
+                        complete(e)
+                    else:
+                        try:
+                            for branch_name, branch_state in c.get_branches().iteritems():
+                                self._host.patch_state(branch_name, branch_state)  
 
+                            for ruleset_name, messages in c.get_messages().iteritems():
+                                if len(messages) == 1:
+                                    self._host.post(ruleset_name, messages[0])
+                                else:
+                                    self._host.post_batch(ruleset_name, messages)
+
+                            pending = []
+                            for ruleset_name, facts in c.get_facts().iteritems():
+                                if len(facts) == 1:
+                                    pending.append(self._host.start_assert_fact(ruleset_name, facts[0]))
+                                else:
+                                    pending.append(self._host.start_assert_facts(ruleset_name, facts))
+
+                            for item in pending:
+                                if item[0] > 0:
+                                    rules.complete(item[0], item[1])
+
+                            for ruleset_name, facts in c.get_retract_facts().iteritems():
+                                if len(facts) == 1:
+                                    self._host.retract_fact(ruleset_name, facts[0])
+                                else:
+                                    self._host.retract_facts(ruleset_name, facts)
+
+                            for timer_name, timer_duration in c.get_timers().iteritems():
+                                self.start_timer(c.s['sid'], timer_name, timer_duration)                            
+                                
+                            rules.complete_action(self._handle, c._handle, json.dumps(c.s._d))
+                        except Exception as error:
+                            rules.abandon_action(self._handle, c._handle)
+                            complete(error)
+                
+                self._actions[action_name].run(c, action_callback)         
+
+        complete(None)
 
 class Statechart(Ruleset):
 

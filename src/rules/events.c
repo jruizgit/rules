@@ -268,6 +268,7 @@ static unsigned int handleAction(ruleset *tree,
                                  char *prefix, 
                                  node *node, 
                                  unsigned char actionType, 
+                                 unsigned int partitionHash,
                                  char **commands,
                                  unsigned short *commandPriorities,
                                  unsigned short *commandCount,
@@ -287,6 +288,7 @@ static unsigned int handleAction(ruleset *tree,
         return ERR_MAX_COMMAND_COUNT;
     }
 
+    unsigned short priority = node->value.c.priority + 1;
     switch (actionType) {
         case ACTION_ASSERT_EVENT:
         case ACTION_ASSERT_FACT:
@@ -324,6 +326,7 @@ static unsigned int handleAction(ruleset *tree,
                                         propertiesLength,
                                         actionType == ACTION_ADD_FACT ? 1 : 0,
                                         &newCommand);  
+            priority = 0;
             break;
         case ACTION_REMOVE_EVENT:
         case ACTION_REMOVE_FACT:
@@ -332,6 +335,7 @@ static unsigned int handleAction(ruleset *tree,
                                          mid, 
                                          actionType == ACTION_REMOVE_FACT ? 1 : 0,
                                          &newCommand);  
+            priority = 0;
             break;
 
     }
@@ -340,7 +344,6 @@ static unsigned int handleAction(ruleset *tree,
         return result;
     }
 
-    unsigned short priority = node->value.c.priority;
     unsigned short index = *commandCount;
     while (index > 0 && priority < commandPriorities[index - 1]) {
         commands[index] = commands[index - 1];
@@ -368,6 +371,7 @@ static unsigned int handleBeta(ruleset *tree,
                                void **rulesBinding) {
     int prefixLength = 0;
     node *currentNode = betaNode;
+    unsigned int partitionHash = currentNode->value.b.hash;
     while (currentNode != NULL) {
         int nameLength = strlen(&tree->stringPool[currentNode->nameOffset]);
         prefixLength += nameLength + 1;
@@ -427,7 +431,8 @@ static unsigned int handleBeta(ruleset *tree,
                         propertiesLength,
                         prefix, 
                         actionNode, 
-                        actionType, 
+                        actionType,
+                        partitionHash, 
                         commands,
                         commandPriorities,
                         commandCount,

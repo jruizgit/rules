@@ -191,6 +191,8 @@ class rule(object):
         self.count = None
         self.pri = None
         self.span = None
+        self.cap = None
+        self.by = None
         self.func = []
         new_args = []
         for arg in args:
@@ -201,6 +203,10 @@ class rule(object):
                     self.pri = arg['pri']
                 elif 'span' in arg:
                     self.span = arg['span']
+                elif 'cap' in arg:
+                    self.cap = arg['cap']
+                elif 'by' in arg:
+                    self.by = arg['by']
                 else:
                     self.func = arg
             elif isinstance(arg, value) or isinstance(arg, rule):
@@ -275,6 +281,12 @@ class rule(object):
 
         if self.span:
             defined_expression['span'] = self.span
+
+        if self.cap:
+            defined_expression['cap'] = self.cap
+
+        if self.by:
+            defined_expression['by'] = self.by
 
         return defined_expression
 
@@ -578,6 +590,12 @@ def pri(value):
 
 def span(value):
     return {'span': value}
+
+def cap(value):
+    return {'cap': value}
+
+def by(value):
+    return {'by': value}
 
 m = value('m')
 s = value('$s')

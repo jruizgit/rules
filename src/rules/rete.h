@@ -76,6 +76,7 @@ typedef struct alpha {
 } alpha;
 
 typedef struct betaConnector {
+    unsigned int hash;
     unsigned int nextOffset;
     unsigned char not;
 } betaConnector;
@@ -84,6 +85,8 @@ typedef struct action {
     unsigned int index;
     unsigned short span;
     unsigned short count;
+    unsigned short cap;
+    unsigned int partitionBy;
     unsigned short priority;
     unsigned int joinsOffset;
     unsigned short joinsLength;

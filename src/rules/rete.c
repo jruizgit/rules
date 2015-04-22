@@ -12,6 +12,8 @@
 #define HASH_PRI 193502832 // pri
 #define HASH_COUNT 255678574 // count
 #define HASH_SPAN 2090731639 // span
+#define HASH_CAP 193488121 // cap
+#define HASH_BY 5863264 // by
 #define HASH_LT 193419881 // $lt
 #define HASH_LTE 2087888878 // $lte
 #define HASH_GT 193419716 // $gt
@@ -389,7 +391,7 @@ static unsigned char compareValue(ruleset *tree,
     return 0;
 }
 
-static unsigned int validateSetting(unsigned int settingHash, char *rule) {
+static unsigned int validateSetting(unsigned int settingHash, char *rule, unsigned char targetType) {
     char *first;
     char *last;
     unsigned int hash;
@@ -398,7 +400,7 @@ static unsigned int validateSetting(unsigned int settingHash, char *rule) {
     while (result == PARSE_OK) {
         if (hash == settingHash) {
             result = readNextValue(last, &first, &last, &type);
-            if (type != JSON_INT) {
+            if (type != targetType) {
                 return ERR_UNEXPECTED_TYPE;
             }
 
@@ -691,21 +693,32 @@ static unsigned int validateRuleset(char *rules) {
             return ERR_UNEXPECTED_TYPE;
         }
 
-        unsigned int countResult = validateSetting(HASH_COUNT, first);
+        unsigned int countResult = validateSetting(HASH_COUNT, first, JSON_INT);
         if (countResult != PARSE_OK && countResult != ERR_SETTING_NOT_FOUND) {
             return countResult;
         }
 
-        unsigned int spanResult = validateSetting(HASH_SPAN, first);
+        unsigned int spanResult = validateSetting(HASH_SPAN, first, JSON_INT);
         if (spanResult != PARSE_OK && spanResult != ERR_SETTING_NOT_FOUND) {
             return spanResult;
         }
 
-        if (spanResult == PARSE_OK && countResult == PARSE_OK) {
+        unsigned int capResult = validateSetting(HASH_CAP, first, JSON_INT);
+        if (capResult != PARSE_OK && capResult != ERR_SETTING_NOT_FOUND) {
+            return capResult;
+        }
+
+        if ((spanResult == PARSE_OK && (countResult == PARSE_OK || capResult == PARSE_OK)) ||
+            (countResult == PARSE_OK && capResult == PARSE_OK)) {
             return ERR_UNEXPECTED_NAME;
         }
 
-        result = validateSetting(HASH_PRI, first);
+        result = validateSetting(HASH_BY, first, JSON_STRING);
+        if (result != PARSE_OK && result != ERR_SETTING_NOT_FOUND) {
+            return result;
+        }
+
+        result = validateSetting(HASH_PRI, first, JSON_INT);
         if (result != PARSE_OK && result != ERR_SETTING_NOT_FOUND) {
             return result;
         }
@@ -722,7 +735,7 @@ static unsigned int validateRuleset(char *rules) {
                 if (result != RULES_OK && result != PARSE_END) {
                     return result;
                 }
-            } else if (hash != HASH_COUNT && hash != HASH_PRI && hash != HASH_SPAN) {
+            } else if (hash != HASH_COUNT && hash != HASH_PRI && hash != HASH_SPAN && hash != HASH_CAP && hash != HASH_BY) {
                 return ERR_UNEXPECTED_NAME;
             }
 
@@ -998,6 +1011,23 @@ static unsigned int findAlpha(ruleset *tree,
     return linkAlpha(tree, parentOffset, *resultOffset);
 }
 
+static void getSymbolSetting(unsigned int settingHash, char *rule, unsigned int *symbolHash) {
+    char *first;
+    char *last;
+    unsigned int hash;
+    unsigned char type;
+    unsigned int result = readNextName(rule, &first, &last, &hash);
+    while (result == PARSE_OK) {
+        if (hash == settingHash) {
+            readNextString(last, &first, &last, symbolHash);
+            break;
+        } else {
+            readNextValue(last, &first, &last, &type);
+            result = readNextName(last, &first, &last, &hash);
+        }
+    }
+}
+
 static void getSetting(unsigned int settingHash, char *rule, unsigned short *value) {
     char *first;
     char *last;
@@ -1133,14 +1163,16 @@ static unsigned int createBetaConnector(ruleset *tree,
         unsigned char operator = OP_NOP;
         if (nameLength >= 4) { 
             if (!strncmp("$all", last - 4, 4)) {
-                nameLength = nameLength - 4;
                 operator = OP_ALL;
             } else if (!strncmp("$any", last - 4, 4)) {
-                nameLength = nameLength - 4;
                 operator = OP_ANY;
             } else if (!strncmp("$not", last - 4, 4)) {
-                nameLength = nameLength - 4;
                 operator = OP_NOT;
+            }
+
+            if (operator == OP_ALL || operator == OP_ANY || operator == OP_NOT) {
+                nameLength = nameLength - 4;
+                hash = djbHash(first, nameLength);
             }
         }        
         
@@ -1162,6 +1194,7 @@ static unsigned int createBetaConnector(ruleset *tree,
         connector->type = NODE_BETA_CONNECTOR;
         connector->value.b.nextOffset = nextOffset;
         connector->value.b.not = (operator == OP_NOT) ? 1 : 0;
+        connector->value.b.hash = hash;
         if (betaPath->expressionsLength == 0) {
             betaPath->expressionsLength = 1;
             betaPath->expressions = malloc(sizeof(expression));
@@ -1541,10 +1574,14 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         ruleAction->value.c.priority = 0;
         ruleAction->value.c.count = 0;
         ruleAction->value.c.span = 0;
+        ruleAction->value.c.cap = 0;
+        ruleAction->value.c.partitionBy = 0;
         getSetting(HASH_PRI, first, &ruleAction->value.c.priority);
         getSetting(HASH_COUNT, first, &ruleAction->value.c.count);
         getSetting(HASH_SPAN, first, &ruleAction->value.c.span);
-        if (!ruleAction->value.c.count && !ruleAction->value.c.span) {
+        getSetting(HASH_CAP, first, &ruleAction->value.c.cap);
+        getSymbolSetting(HASH_BY, first, &ruleAction->value.c.partitionBy);
+        if (!ruleAction->value.c.count && !ruleAction->value.c.span && !ruleAction->value.c.cap) {
             ruleAction->value.c.count = 1;
         }
 
