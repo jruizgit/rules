@@ -22,7 +22,7 @@ with ruleset('miss_manners'):
         c.post({'t': 'context', 'l': 'assign', 'id': c.s.g_count + 2})
         c.s.count += 1
         c.s.g_count += 3
-        c.s.start_time = datetime.datetime.now().strftime('%I:%M:%S%p')
+        c.s.start_time = datetime.datetime.now().strftime('%I:%M:%S:%f')
         print('assign {0}'.format(c.guest.name))
 
     @when_all(by('right_guest'),
@@ -97,13 +97,13 @@ with ruleset('miss_manners'):
         c.assert_fact(c.seating)
         c.post({'t': 'context', 'l': 'check', 'id': c.s.g_count + 1})
         c.s.g_count += 2
-        print('path sid: {0}, pid: {1}, left guest: {2}, right guest {3}, {4}'.format(c.seating.s_id, c.seating.p_id, c.seating.left_guest_name, c.seating.right_guest_name, datetime.datetime.now().strftime('%I:%M:%S%p')))
+        print('path sid: {0}, pid: {1}, left guest: {2}, right guest {3}'.format(c.seating.s_id, c.seating.p_id, c.seating.left_guest_name, c.seating.right_guest_name))
         
     @when_all(c.last_seat << m.t == 'last_seat', 
              (m.t == 'seating') & (m.right_seat == c.last_seat.seat),
              (m.t == 'context') & (m.l == 'check'))
     def done(c):
-        print('end {0}, {1}'.format(c.s.start_time, datetime.datetime.now().strftime('%I:%M:%S%p')))
+        print('end {0}, {1}'.format(c.s.start_time, datetime.datetime.now().strftime('%I:%M:%S:%f')))
     
     @when_all(pri(1), 
              (m.t == 'context') & (m.l == 'check'))

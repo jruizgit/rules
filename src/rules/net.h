@@ -85,9 +85,17 @@ unsigned int formatRemoveMessage(void *rulesBinding,
                                  unsigned char removeFact,
                                  char **command);
 
+unsigned int formatPeekAction(void *rulesBinding,
+                              char **command);
+
 unsigned int executeBatch(void *rulesBinding,
                           char **commands,
                           unsigned short commandCount);
+
+unsigned int executeBatchWithReply(void *rulesBinding,
+                                   char **commands,
+                                   unsigned short commandCount,
+                                   redisReply **lastReply);
 
 unsigned int startNonBlockingBatch(void *rulesBinding,
                                    char **commands,

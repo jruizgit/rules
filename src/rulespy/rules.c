@@ -18,7 +18,7 @@ static PyObject *pyCreateRuleset(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not create ruleset, error code: %d", result);
             PyErr_SetString(RulesError, message);
             free(message);
@@ -41,7 +41,7 @@ static PyObject *pyDeleteRuleset(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not delete ruleset, error code: %d", result);
             PyErr_SetString(RulesError, message);
             free(message);
@@ -69,7 +69,7 @@ static PyObject *pyBindRuleset(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not create connection, error code: %d", result);
             PyErr_SetString(RulesError, message);
             free(message);
@@ -95,7 +95,7 @@ static PyObject *pyComplete(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not complete, error code: %d", result);
             PyErr_SetString(RulesError, message);
             free(message);
@@ -123,7 +123,7 @@ static PyObject *pyAssertEvent(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not assert event, error code: %d", result);  
             PyErr_SetString(RulesError, message);
             free(message);
@@ -155,7 +155,7 @@ static PyObject *pyAssertEvents(PyObject *self, PyObject *args) {
             if (results) {
                 free(results);
             }
-            char * message;
+            char *message;
             asprintf(&message, "Could not assert events, error code: %d", result);  
             PyErr_SetString(RulesError, message);
             free(message);
@@ -181,7 +181,7 @@ static PyObject *pyRetractEvent(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not retract event, error code: %d", result);  
             PyErr_SetString(RulesError, message);
             free(message);
@@ -209,7 +209,7 @@ static PyObject *pyStartAssertFact(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not assert fact, error code: %d", result);  
             PyErr_SetString(RulesError, message);
             free(message);
@@ -235,7 +235,7 @@ static PyObject *pyAssertFact(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not assert fact, error code: %d", result);  
             PyErr_SetString(RulesError, message);
             free(message);
@@ -271,7 +271,7 @@ static PyObject *pyStartAssertFacts(PyObject *self, PyObject *args) {
             // if (results) {
             //     free(results);
             // } 
-            char * message;
+            char *message;
             asprintf(&message, "Could not assert facts, error code: %d", result);  
             PyErr_SetString(RulesError, message);
             free(message);
@@ -303,7 +303,7 @@ static PyObject *pyAssertFacts(PyObject *self, PyObject *args) {
             if (results) {
                 free(results);
             } 
-            char * message;
+            char *message;
             asprintf(&message, "Could not assert facts, error code: %d", result);  
             PyErr_SetString(RulesError, message);
             free(message);
@@ -329,7 +329,7 @@ static PyObject *pyRetractFact(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not retract fact, error code: %d", result);  
             PyErr_SetString(RulesError, message);
             free(message);
@@ -361,7 +361,7 @@ static PyObject *pyRetractFacts(PyObject *self, PyObject *args) {
             if (results) {
                 free(results);
             } 
-            char * message;
+            char *message;
             asprintf(&message, "Could not retract facts, error code: %d", result);  
             PyErr_SetString(RulesError, message);
             free(message);
@@ -387,7 +387,7 @@ static PyObject *pyAssertState(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not assert state, error code: %d", result);
             PyErr_SetString(RulesError, message);
             free(message);
@@ -413,7 +413,7 @@ static PyObject *pyStartAction(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not start action, error code: %d", result);
             PyErr_SetString(RulesError, message);
             free(message);
@@ -439,7 +439,7 @@ static PyObject *pyCompleteAction(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not complete action, error code: %d", result);
             PyErr_SetString(RulesError, message);
             free(message);
@@ -448,6 +448,35 @@ static PyObject *pyCompleteAction(PyObject *self, PyObject *args) {
     }
 
     Py_RETURN_NONE;  
+}
+
+static PyObject *pyCompleteAndStartAction(PyObject *self, PyObject *args) {
+    void *handle;
+    void *actionHandle;
+    char *state;
+    if (!PyArg_ParseTuple(args, "lls", &handle, &actionHandle, &state)) {
+        PyErr_SetString(RulesError, "pyCompleteAndStartAction Invalid argument");
+        return NULL;
+    }
+
+    char *messages;
+    unsigned int result = completeAndStartAction(handle, actionHandle, state, &messages);
+    if (result == ERR_NO_ACTION_AVAILABLE) {
+        Py_RETURN_NONE;
+    } if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            asprintf(&message, "Could not complete and start action, error code: %d", result);
+            PyErr_SetString(RulesError, message);
+            free(message);
+        }
+        return NULL;
+    }
+
+    PyObject *returnValue = Py_BuildValue("s", messages);
+    return returnValue;
 }
 
 static PyObject *pyAbandonAction(PyObject *self, PyObject *args) {
@@ -463,7 +492,7 @@ static PyObject *pyAbandonAction(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not abandon action, error code: %d", result);
             PyErr_SetString(RulesError, message);
             free(message);
@@ -489,7 +518,7 @@ static PyObject *pyStartTimer(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not start timer, error code: %d", result);
             PyErr_SetString(RulesError, message);
             free(message);
@@ -516,7 +545,7 @@ static PyObject *pyAssertTimers(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not assert timers, error code: %d", result);
             PyErr_SetString(RulesError, message);
             free(message);
@@ -539,7 +568,7 @@ static PyObject *pyGetState(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            char * message;
+            char *message;
             asprintf(&message, "Could not get state, error code: %d", result);
             PyErr_SetString(RulesError, message);
             free(message);
@@ -568,6 +597,7 @@ static PyMethodDef myModule_methods[] = {
     {"assert_state", pyAssertState, METH_VARARGS},
     {"start_action", pyStartAction, METH_VARARGS},
     {"complete_action", pyCompleteAction, METH_VARARGS},
+    {"complete_and_start_action", pyCompleteAndStartAction, METH_VARARGS},
     {"abandon_action", pyAbandonAction, METH_VARARGS},
     {"start_timer", pyStartTimer, METH_VARARGS},
     {"assert_timers", pyAssertTimers, METH_VARARGS},

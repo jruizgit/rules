@@ -111,6 +111,11 @@ unsigned int completeAction(void *handle,
 							void *actionHandle, 
 							char *state);
 
+unsigned int completeAndStartAction(void *handle, 
+                                    void *actionHandle, 
+                                    char *state, 
+                                    char **messages);
+
 unsigned int abandonAction(void *handle, 
 						   void *actionHandle);
 

@@ -1646,7 +1646,10 @@ unsigned int assertTimers(void *handle) {
     return executeBatch(rulesBinding, commands, commandCount);
 }
 
-unsigned int startAction(void *handle, char **state, char **messages, void **actionHandle) {
+unsigned int startAction(void *handle, 
+                         char **state, 
+                         char **messages, 
+                         void **actionHandle) {
     redisReply *reply;
     void *rulesBinding;
     unsigned int result = peekAction(handle, &rulesBinding, &reply);
@@ -1663,7 +1666,9 @@ unsigned int startAction(void *handle, char **state, char **messages, void **act
     return RULES_OK;
 }
 
-unsigned int completeAction(void *handle, void *actionHandle, char *state) {
+unsigned int completeAction(void *handle, 
+                            void *actionHandle, 
+                            char *state) {
     char *commands[MAX_COMMAND_COUNT];
     unsigned short commandPriorities[MAX_COMMAND_COUNT]; 
     unsigned short commandCount = 0;
@@ -1712,6 +1717,86 @@ unsigned int completeAction(void *handle, void *actionHandle, char *state) {
     freeReplyObject(reply);
     free(actionHandle);
     return result;
+}
+
+unsigned int completeAndStartAction(void *handle, 
+                                    void *actionHandle, 
+                                    char *state, 
+                                    char **messages) {
+    char *commands[MAX_COMMAND_COUNT];
+    unsigned short commandPriorities[MAX_COMMAND_COUNT]; 
+    unsigned short commandCount = 0;
+    actionContext *context = (actionContext*)actionHandle;
+    redisReply *reply = context->reply;
+    void *rulesBinding = context->rulesBinding;
+    
+    unsigned int result = formatRemoveAction(rulesBinding, 
+                                             reply->element[0]->str, 
+                                             &commands[commandCount]);
+    if (result != RULES_OK) {
+        //reply object should be freed by the app during abandonAction
+        return result;
+    }
+
+    ++commandCount;
+    if (reply->element[1]->str != NULL) {
+        result = handleMessage(handle,
+                               NULL,
+                               reply->element[1]->str,
+                               ACTION_REMOVE_FACT,
+                               commands,
+                               commandPriorities,
+                               &commandCount,
+                               &rulesBinding);
+        if (result != RULES_OK) {
+            //reply object should be freed by the app during abandonAction
+            freeCommands(commands, commandCount);
+            return result;
+        }
+    }
+
+    result = handleState(handle, 
+                         state, 
+                         commands,
+                         commandPriorities,
+                         &commandCount,
+                         &rulesBinding);
+    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+        //reply object should be freed by the app during abandonAction
+        freeCommands(commands, commandCount);
+        return result;
+    }
+
+    if (commandCount == MAX_COMMAND_COUNT) {
+        //reply object should be freed by the app during abandonAction
+        freeCommands(commands, commandCount);
+        return ERR_MAX_COMMAND_COUNT;
+    }
+
+    result = formatPeekAction(rulesBinding, &commands[commandCount]);
+    if (result != RULES_OK) {
+        //reply object should be freed by the app during abandonAction
+        freeCommands(commands, commandCount);
+        return result;
+    }
+
+    ++commandCount;
+    freeReplyObject(reply);
+    redisReply *newReply;
+    result = executeBatchWithReply(rulesBinding, commands, commandCount, &newReply);  
+    if (result != RULES_OK) {
+        return result;
+    }
+    
+    if (newReply->type != REDIS_REPLY_ARRAY) {
+        freeReplyObject(newReply);
+        free(actionHandle);
+        return ERR_NO_ACTION_AVAILABLE;
+    }
+
+    *messages = newReply->element[2]->str;
+    context->reply = newReply;
+    return RULES_OK;
 }
 
 unsigned int abandonAction(void *handle, void *actionHandle) {

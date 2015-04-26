@@ -2,7 +2,7 @@ from durable.lang import *
 import datetime
 
 with ruleset('miss_manners.make'):
-    @when_all(count(1001),
+    @when_all(cap(1000),
               c.seating << (m.t == 'seating'),
               c.path << (m.t == 'path') & 
                         (m.p_id == c.seating.p_id),
@@ -27,22 +27,6 @@ with ruleset('miss_manners.make'):
                                'guest_name': frame.path.guest_name})
                 c.s.g_count += 1
                 seating = frame.seating
-        else:
-            c.assert_fact({'t': 'path',
-                           'id': c.s.g_count,
-                           'p_id': c.seating.s_id, 
-                           'seat': c.path.seat, 
-                           'guest_name': c.path.guest_name})
-            c.assert_fact('miss_manners',
-                          {'t': 'path',
-                           'sid': 1, 
-                           'id': c.s.g_count,
-                           'p_id': c.seating.s_id, 
-                           'seat': c.path.seat, 
-                           'guest_name': c.path.guest_name})
-
-            c.s.g_count += 1
-            seating = c.seating
 
         c.assert_fact('miss_manners',
                       {'t': 'seating',
