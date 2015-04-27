@@ -293,8 +293,6 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
             return ERR_OUT_OF_MEMORY;
         }
     }
-    printf("pk %s\n", *primaryKey);
-    printf("pfk %s\n", *primaryFrameKey);
     return RULES_OK;
 }
 
