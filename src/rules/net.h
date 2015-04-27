@@ -93,6 +93,7 @@ unsigned int executeBatch(void *rulesBinding,
                           unsigned short commandCount);
 
 unsigned int executeBatchWithReply(void *rulesBinding,
+                                   unsigned short expectedReplies,
                                    char **commands,
                                    unsigned short commandCount,
                                    redisReply **lastReply);

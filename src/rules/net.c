@@ -221,22 +221,52 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
 
             if (setPrimaryKey && currentNode->value.a.operator == OP_EQ) {
                 if (*primaryKey == NULL) {
-                    if (asprintf(primaryKey, "message[\"%s\"]", leftProperty)  == -1) {
+                    if (asprintf(primaryKey, 
+"    if not message[\"%s\"] then\n"
+"        return \"\"\n"
+"    else\n"
+"        result = result .. message[\"%s\"]\n"
+"    end\n", 
+                                 leftProperty, 
+                                 leftProperty)  == -1) {
                         return ERR_OUT_OF_MEMORY;
                     }
 
-                    if (asprintf(primaryFrameKey, "%s", idiomString)  == -1) {
+                    if (asprintf(primaryFrameKey, 
+"    if not %s then\n"
+"        return \"\"\n"
+"    else\n"
+"        result = result .. %s\n"
+"    end\n",
+                                idiomString,
+                                idiomString)  == -1) {
                         return ERR_OUT_OF_MEMORY;
                     }
                 }
                 else {
                     char *oldKey = *primaryKey;
-                    if (asprintf(primaryKey, "%s .. message[\"%s\"]", *primaryKey, leftProperty)  == -1) {
+                    if (asprintf(primaryKey, 
+"%s    if not message[\"%s\"] then\n"
+"        return \"\"\n"
+"    else\n"
+"        result = result .. message[\"%s\"]\n"
+"    end\n",    
+                                 *primaryKey, 
+                                 leftProperty,
+                                 leftProperty)  == -1) {
                         return ERR_OUT_OF_MEMORY;
                     }
                     free(oldKey);
                     oldKey = *primaryFrameKey;
-                    if (asprintf(primaryFrameKey, "%s .. %s", *primaryFrameKey, idiomString)  == -1) {
+                    if (asprintf(primaryFrameKey, 
+"%s    if not %s then\n"
+"        return \"\"\n"
+"    else\n"
+"        result = result .. %s\n"
+"    end\n", 
+                                 *primaryFrameKey, 
+                                 idiomString,
+                                 idiomString)  == -1) {
                         return ERR_OUT_OF_MEMORY;
                     }
                     free(oldKey);
@@ -256,14 +286,15 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
     }
 
     if (*primaryKey == NULL) {
-        if (asprintf(primaryKey, "nil") == -1) {
+        if (asprintf(primaryKey, "result = nil") == -1) {
             return ERR_OUT_OF_MEMORY;
         }
-        if (asprintf(primaryFrameKey, "nil") == -1) {
+        if (asprintf(primaryFrameKey, "result = nil") == -1) {
             return ERR_OUT_OF_MEMORY;
         }
     }
-   
+    printf("pk %s\n", *primaryKey);
+    printf("pfk %s\n", *primaryFrameKey);
     return RULES_OK;
 }
 
@@ -514,7 +545,8 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                         oldAddMessageLua = addMessageLua;
                         if (asprintf(&addMessageLua, 
 "%sprimary_message_keys[\"%s\"] = function(message)\n"
-"    return %s\n"
+"    local result = \"\"\n%s"
+"    return result\n"
 "end\n",
                                     addMessageLua,
                                     currentKey, 
@@ -565,10 +597,12 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    return result\n"
 "end\n"
 "primary_message_keys[%d] = function(message)\n"
-"    return %s\n"
+"    local result = \"\"\n%s"
+"    return result\n"
 "end\n"
 "primary_frame_keys[%d] = function(frame)\n"
-"    return %s\n"
+"    local result = \"\"\n%s"
+"    return result\n"
 "end\n",
                                          lua,
                                          iii + 1, 
@@ -600,7 +634,8 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    return false\n"
 "end\n"
 "primary_frame_keys[%d] = function(frame)\n"
-"    return %s\n"
+"    local result = \"\"\n%s"
+"    return result\n"
 "end\n",
                                          peekActionLua,
                                          iii + 1, 
@@ -667,10 +702,12 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    return result\n"
 "end\n"
 "primary_message_keys[%d] = function(message)\n"
-"    return %s\n"
+"    local result = \"\"\n%s"
+"    return result\n"
 "end\n"
 "primary_frame_keys[%d] = function(frame)\n"
-"    return %s\n"
+"    local result = \"\"\n%s"
+"    return result\n"
 "end\n",
                                          lua,
                                          iii + 1, 
@@ -2079,17 +2116,17 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
     unsigned int result = RULES_OK;
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;
-    if (commandCount > 1) {
-        ++(*replyCount);
-        result = redisAppendCommand(reContext, "multi");
-        if (result != REDIS_OK) {
-            for (unsigned short i = 0; i < commandCount; ++i) {
-                free(commands[i]);
-            }
+    // if (commandCount > 1) {
+    //     ++(*replyCount);
+    //     result = redisAppendCommand(reContext, "multi");
+    //     if (result != REDIS_OK) {
+    //         for (unsigned short i = 0; i < commandCount; ++i) {
+    //             free(commands[i]);
+    //         }
 
-            return ERR_REDIS_ERROR;
-        }
-    }
+    //         return ERR_REDIS_ERROR;
+    //     }
+    // }
 
     for (unsigned short i = 0; i < commandCount; ++i) {
         sds newbuf;
@@ -2102,13 +2139,13 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
         free(commands[i]);
     }
 
-    if (commandCount > 1) {
-        ++(*replyCount);
-        unsigned int result = redisAppendCommand(reContext, "exec");
-        if (result != REDIS_OK) {
-            return ERR_REDIS_ERROR;
-        }
-    }
+    // if (commandCount > 1) {
+    //     ++(*replyCount);
+    //     unsigned int result = redisAppendCommand(reContext, "exec");
+    //     if (result != REDIS_OK) {
+    //         return ERR_REDIS_ERROR;
+    //     }
+    // }
 
     int wdone = 0;
     do {
@@ -2150,10 +2187,11 @@ unsigned int completeNonBlockingBatch(void *rulesBinding,
 unsigned int executeBatch(void *rulesBinding,
                           char **commands,
                           unsigned short commandCount) {
-    return executeBatchWithReply(rulesBinding, commands, commandCount, NULL);
+    return executeBatchWithReply(rulesBinding, 0, commands, commandCount, NULL);
 }
 
 unsigned int executeBatchWithReply(void *rulesBinding,
+                                   unsigned short expectedReplies,
                                    char **commands,
                                    unsigned short commandCount,
                                    redisReply **lastReply) {
@@ -2162,7 +2200,7 @@ unsigned int executeBatchWithReply(void *rulesBinding,
     }
 
     unsigned int result = RULES_OK;
-    unsigned short replyCount = commandCount;
+    unsigned short replyCount = commandCount + expectedReplies;
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;
     // if (commandCount > 1) {

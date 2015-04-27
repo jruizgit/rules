@@ -1,5 +1,4 @@
 
-
 #define RULES_OK 0
 #define ERR_OUT_OF_MEMORY 1
 #define ERR_UNEXPECTED_TYPE 2
@@ -29,7 +28,7 @@
 #define ERR_REDIS_ERROR 302
 #define ERR_NO_ACTION_AVAILABLE 303
 #define ERR_NO_TIMERS_AVAILABLE 304
-#define ERR_NEW_SESSION 305	
+#define ERR_NEW_SESSION 305 
 #define ERR_STATE_CACHE_FULL 401
 #define ERR_BINDING_NOT_MAPPED 402
 #define ERR_STATE_NOT_LOADED 403
@@ -46,89 +45,115 @@ extern "C" {
 #endif
 
 unsigned int createRuleset(void **handle, 
-						   char *name, 
-						   char *rules, 
-						   unsigned int stateCaheSize);
+                           char *name, 
+                           char *rules, 
+                           unsigned int stateCaheSize);
 
 unsigned int deleteRuleset(void *handle);
 
 unsigned int bindRuleset(void *handle, 
-	   					 char *host, 
-	   					 unsigned int port, 
-	   					 char *password);
+                         char *host, 
+                         unsigned int port, 
+                         char *password);
 
 unsigned int complete(void *rulesBinding, 
-	 				  unsigned short replyCount);
+                      unsigned short replyCount);
 
 unsigned int assertEvent(void *handle, 
-						 char *message);
+                         char *message);
+
+unsigned int startAssertEvent(void *handle, 
+                             char *message, 
+                             void **rulesBinding, 
+                             unsigned short *replyCount);
 
 unsigned int assertEvents(void *handle, 
-						  char *messages, 
-						  unsigned int *resultsLength, 
-						  unsigned int **results);
+                          char *messages, 
+                          unsigned int *resultsLength, 
+                          unsigned int **results);
+
+unsigned int startAssertEvents(void *handle, 
+                              char *messages, 
+                              unsigned int *resultsLength, 
+                              unsigned int **results, 
+                              void **rulesBinding, 
+                              unsigned short *replyCount);
 
 unsigned int retractEvent(void *handle, 
-						  char *message);
+                          char *message);
 
 unsigned int startAssertFact(void *handle, 
-							 char *message, 
-							 void **rulesBinding, 
-							 unsigned short *replyCount);
+                             char *message, 
+                             void **rulesBinding, 
+                             unsigned short *replyCount);
 
 unsigned int assertFact(void *handle, 
-						char *message);
+                        char *message);
 
 unsigned int startAssertFacts(void *handle, 
-							  char *messages, 
-							  unsigned int *resultsLength, 
-							  unsigned int **results, 
-							  void **rulesBinding, 
-							  unsigned short *replyCount);
+                              char *messages, 
+                              unsigned int *resultsLength, 
+                              unsigned int **results, 
+                              void **rulesBinding, 
+                              unsigned short *replyCount);
 
 unsigned int assertFacts(void *handle, 
-						 char *messages, 
-						 unsigned int *resultsLength, 
-						 unsigned int **results);
+                         char *messages, 
+                         unsigned int *resultsLength, 
+                         unsigned int **results);
 
 unsigned int retractFact(void *handle, 
-						 char *message);
+                         char *message);
+
+unsigned int startRetractFact(void *handle, 
+                             char *message, 
+                             void **rulesBinding, 
+                             unsigned short *replyCount);
 
 unsigned int retractFacts(void *handle, 
-						  char *messages, 
-						  unsigned int *resultsLength, 
-						  unsigned int **results);
+                          char *messages, 
+                          unsigned int *resultsLength, 
+                          unsigned int **results);
+
+unsigned int startRetractFacts(void *handle, 
+                              char *messages, 
+                              unsigned int *resultsLength, 
+                              unsigned int **results, 
+                              void **rulesBinding, 
+                              unsigned short *replyCount);
 
 unsigned int assertState(void *handle, 
-	 					 char *state);
+                         char *state);
 
 unsigned int startAction(void *handle, 
-						 char **state, 
-						 char **messages, 
-						 void **actionHandle);
+                         char **state, 
+                         char **messages, 
+                         void **actionHandle,
+                         void **actionBinding);
 
 unsigned int completeAction(void *handle, 
-							void *actionHandle, 
-							char *state);
+                            void *actionHandle, 
+                            char *state);
 
 unsigned int completeAndStartAction(void *handle, 
+                                    unsigned short expectedReplies,
                                     void *actionHandle, 
                                     char *state, 
                                     char **messages);
 
 unsigned int abandonAction(void *handle, 
-						   void *actionHandle);
+                           void *actionHandle);
 
 unsigned int startTimer(void *handle, 
-	 					char *sid, 
-	 					unsigned int duration, 
-	 					char *timer);
+                        char *sid, 
+                        unsigned int duration, 
+                        char *timer);
 
 unsigned int assertTimers(void *handle);
 
 unsigned int getState(void *handle, 
-					  char *sid, 
-					  char **state);
+                      char *sid, 
+                      char **state);
 
 #ifdef _WIN32
 int asprintf(char** ret, char* format, ...);

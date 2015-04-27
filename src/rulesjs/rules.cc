@@ -377,15 +377,18 @@ void jsStartAction(const FunctionCallbackInfo<Value>& args) {
         char *session;
         char *messages;
         void *actionHandle;
+        void *actionBinding;
         unsigned int result = startAction((void *)args[0]->IntegerValue(), 
                                           &session, 
                                           &messages, 
-                                          &actionHandle); 
+                                          &actionHandle,
+                                          &actionBinding); 
         if (result == RULES_OK) {
-            Handle<Array> array = Array::New(isolate, 3);
+            Handle<Array> array = Array::New(isolate, 4);
             array->Set(0, Number::New(isolate, (long)actionHandle));
             array->Set(1, String::NewFromUtf8(isolate, session));
             array->Set(2, String::NewFromUtf8(isolate, messages));
+            array->Set(3, String::NewFromUtf8(isolate, actionBinding));
             args.GetReturnValue().Set(array);
         } else if (result != ERR_NO_ACTION_AVAILABLE) {
             char *message = NULL;

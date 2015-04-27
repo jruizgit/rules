@@ -132,6 +132,34 @@ static PyObject *pyAssertEvent(PyObject *self, PyObject *args) {
     }
 }
 
+static PyObject *pyStartAssertEvent(PyObject *self, PyObject *args) {
+    void *handle;
+    char *event;
+    if (!PyArg_ParseTuple(args, "ls", &handle, &event)) {
+        PyErr_SetString(RulesError, "pyStartAssertEvent Invalid argument");
+        return NULL;
+    }
+
+    unsigned short replyCount;
+    void *rulesBinding = NULL;
+    unsigned int result = startAssertEvent(handle, event, &rulesBinding, &replyCount);
+    if (result == RULES_OK) {
+        return Py_BuildValue("li", rulesBinding, replyCount);    
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        return Py_BuildValue("li", 0, 0);    
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            asprintf(&message, "Could not assert event, error code: %d", result);  
+            PyErr_SetString(RulesError, message);
+            free(message);
+        }
+        return NULL;
+    }
+}
+
 static PyObject *pyAssertEvents(PyObject *self, PyObject *args) {
     void *handle;
     char *events;
@@ -155,6 +183,39 @@ static PyObject *pyAssertEvents(PyObject *self, PyObject *args) {
             if (results) {
                 free(results);
             }
+            char *message;
+            asprintf(&message, "Could not assert events, error code: %d", result);  
+            PyErr_SetString(RulesError, message);
+            free(message);
+        }
+        return NULL;
+    }
+}
+
+static PyObject *pyStartAssertEvents(PyObject *self, PyObject *args) {
+    void *handle;
+    char *events;
+    if (!PyArg_ParseTuple(args, "ls", &handle, &events)) {
+        PyErr_SetString(RulesError, "pyStartAssertEvents Invalid argument");
+        return NULL;
+    }
+
+    unsigned short replyCount;
+    void *rulesBinding = NULL;
+    unsigned int *results = NULL;
+    unsigned int resultsLength;
+    unsigned int result = startAssertEvents(handle, events, &resultsLength, &results, &rulesBinding, &replyCount);
+    if (result == RULES_OK) {  
+        if (results) {
+            free(results);
+        }
+        return Py_BuildValue("li", rulesBinding, replyCount);    
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        return Py_BuildValue("li", 0, 0);    
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
             char *message;
             asprintf(&message, "Could not assert events, error code: %d", result);  
             PyErr_SetString(RulesError, message);
@@ -190,34 +251,6 @@ static PyObject *pyRetractEvent(PyObject *self, PyObject *args) {
     }
 }
 
-static PyObject *pyStartAssertFact(PyObject *self, PyObject *args) {
-    void *handle;
-    char *fact;
-    if (!PyArg_ParseTuple(args, "ls", &handle, &fact)) {
-        PyErr_SetString(RulesError, "pyAssertFact Invalid argument");
-        return NULL;
-    }
-
-    unsigned short replyCount;
-    void *rulesBinding = NULL;
-    unsigned int result = startAssertFact(handle, fact, &rulesBinding, &replyCount);
-    if (result == RULES_OK) {
-        return Py_BuildValue("li", rulesBinding, replyCount);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("li", 0, 0);    
-    } else {
-        if (result == ERR_OUT_OF_MEMORY) {
-            PyErr_NoMemory();
-        } else { 
-            char *message;
-            asprintf(&message, "Could not assert fact, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
-        }
-        return NULL;
-    }
-}
-
 static PyObject *pyAssertFact(PyObject *self, PyObject *args) {
     void *handle;
     char *fact;
@@ -244,23 +277,18 @@ static PyObject *pyAssertFact(PyObject *self, PyObject *args) {
     }
 }
 
-static PyObject *pyStartAssertFacts(PyObject *self, PyObject *args) {
+static PyObject *pyStartAssertFact(PyObject *self, PyObject *args) {
     void *handle;
-    char *facts;
-    if (!PyArg_ParseTuple(args, "ls", &handle, &facts)) {
-        PyErr_SetString(RulesError, "pyAssertFact Invalid argument");
+    char *fact;
+    if (!PyArg_ParseTuple(args, "ls", &handle, &fact)) {
+        PyErr_SetString(RulesError, "pyStartAssertFact Invalid argument");
         return NULL;
     }
 
     unsigned short replyCount;
     void *rulesBinding = NULL;
-    unsigned int *results = NULL;
-    unsigned int resultsLength;
-    unsigned int result = startAssertFacts(handle, facts, &resultsLength, &results, &rulesBinding, &replyCount);
-    if (result == RULES_OK) {  
-        if (results) {
-            free(results);
-        }
+    unsigned int result = startAssertFact(handle, fact, &rulesBinding, &replyCount);
+    if (result == RULES_OK) {
         return Py_BuildValue("li", rulesBinding, replyCount);    
     } else if (result == ERR_EVENT_NOT_HANDLED) {
         return Py_BuildValue("li", 0, 0);    
@@ -268,11 +296,8 @@ static PyObject *pyStartAssertFacts(PyObject *self, PyObject *args) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            // if (results) {
-            //     free(results);
-            // } 
             char *message;
-            asprintf(&message, "Could not assert facts, error code: %d", result);  
+            asprintf(&message, "Could not assert fact, error code: %d", result);  
             PyErr_SetString(RulesError, message);
             free(message);
         }
@@ -312,6 +337,39 @@ static PyObject *pyAssertFacts(PyObject *self, PyObject *args) {
     }
 }
 
+static PyObject *pyStartAssertFacts(PyObject *self, PyObject *args) {
+    void *handle;
+    char *facts;
+    if (!PyArg_ParseTuple(args, "ls", &handle, &facts)) {
+        PyErr_SetString(RulesError, "pyStartAssertFacts Invalid argument");
+        return NULL;
+    }
+
+    unsigned short replyCount;
+    void *rulesBinding = NULL;
+    unsigned int *results = NULL;
+    unsigned int resultsLength;
+    unsigned int result = startAssertFacts(handle, facts, &resultsLength, &results, &rulesBinding, &replyCount);
+    if (result == RULES_OK) {  
+        if (results) {
+            free(results);
+        }
+        return Py_BuildValue("li", rulesBinding, replyCount);    
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        return Py_BuildValue("li", 0, 0);    
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            asprintf(&message, "Could not assert facts, error code: %d", result);  
+            PyErr_SetString(RulesError, message);
+            free(message);
+        }
+        return NULL;
+    }
+}
+
 static PyObject *pyRetractFact(PyObject *self, PyObject *args) {
     void *handle;
     char *fact;
@@ -325,6 +383,34 @@ static PyObject *pyRetractFact(PyObject *self, PyObject *args) {
         return Py_BuildValue("i", 1);    
     } else if (result == ERR_EVENT_NOT_HANDLED) {
         return Py_BuildValue("i", 0);    
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            asprintf(&message, "Could not retract fact, error code: %d", result);  
+            PyErr_SetString(RulesError, message);
+            free(message);
+        }
+        return NULL;
+    }
+}
+
+static PyObject *pyStartRetractFact(PyObject *self, PyObject *args) {
+    void *handle;
+    char *fact;
+    if (!PyArg_ParseTuple(args, "ls", &handle, &fact)) {
+        PyErr_SetString(RulesError, "pyStartRetractFact Invalid argument");
+        return NULL;
+    }
+
+    unsigned short replyCount;
+    void *rulesBinding = NULL;
+    unsigned int result = startRetractFact(handle, fact, &rulesBinding, &replyCount);
+    if (result == RULES_OK) {
+        return Py_BuildValue("li", rulesBinding, replyCount);    
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        return Py_BuildValue("li", 0, 0);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -370,6 +456,39 @@ static PyObject *pyRetractFacts(PyObject *self, PyObject *args) {
     }
 }
 
+static PyObject *pyStartRetractFacts(PyObject *self, PyObject *args) {
+    void *handle;
+    char *facts;
+    if (!PyArg_ParseTuple(args, "ls", &handle, &facts)) {
+        PyErr_SetString(RulesError, "pyStartRetractFacts Invalid argument");
+        return NULL;
+    }
+
+    unsigned short replyCount;
+    void *rulesBinding = NULL;
+    unsigned int *results = NULL;
+    unsigned int resultsLength;
+    unsigned int result = startRetractFacts(handle, facts, &resultsLength, &results, &rulesBinding, &replyCount);
+    if (result == RULES_OK) {  
+        if (results) {
+            free(results);
+        }
+        return Py_BuildValue("li", rulesBinding, replyCount);    
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        return Py_BuildValue("li", 0, 0);    
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            asprintf(&message, "Could not retract facts, error code: %d", result);  
+            PyErr_SetString(RulesError, message);
+            free(message);
+        }
+        return NULL;
+    }
+}
+
 static PyObject *pyAssertState(PyObject *self, PyObject *args) {
     void *handle;
     char *state;
@@ -406,7 +525,8 @@ static PyObject *pyStartAction(PyObject *self, PyObject *args) {
     char *state;
     char *messages;
     void *actionHandle;
-    unsigned int result = startAction(handle, &state, &messages, &actionHandle);
+    void *actionBinding;
+    unsigned int result = startAction(handle, &state, &messages, &actionHandle, &actionBinding);
     if (result == ERR_NO_ACTION_AVAILABLE) {
         Py_RETURN_NONE;
     } else if (result != RULES_OK) {
@@ -421,7 +541,7 @@ static PyObject *pyStartAction(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    PyObject *returnValue = Py_BuildValue("ssl", state, messages, actionHandle);
+    PyObject *returnValue = Py_BuildValue("ssll", state, messages, actionHandle, actionBinding);
     return returnValue;
 }
 
@@ -454,13 +574,14 @@ static PyObject *pyCompleteAndStartAction(PyObject *self, PyObject *args) {
     void *handle;
     void *actionHandle;
     char *state;
-    if (!PyArg_ParseTuple(args, "lls", &handle, &actionHandle, &state)) {
+    unsigned short expectedReplies;
+    if (!PyArg_ParseTuple(args, "llls", &handle, &expectedReplies, &actionHandle, &state)) {
         PyErr_SetString(RulesError, "pyCompleteAndStartAction Invalid argument");
         return NULL;
     }
 
     char *messages;
-    unsigned int result = completeAndStartAction(handle, actionHandle, state, &messages);
+    unsigned int result = completeAndStartAction(handle, expectedReplies, actionHandle, state, &messages);
     if (result == ERR_NO_ACTION_AVAILABLE) {
         Py_RETURN_NONE;
     } if (result != RULES_OK) {
@@ -586,14 +707,18 @@ static PyMethodDef myModule_methods[] = {
     {"bind_ruleset", pyBindRuleset, METH_VARARGS},
     {"complete", pyComplete, METH_VARARGS},
     {"assert_event", pyAssertEvent, METH_VARARGS},
+    {"start_assert_event", pyStartAssertEvent, METH_VARARGS},
     {"assert_events", pyAssertEvents, METH_VARARGS},
+    {"start_assert_events", pyStartAssertEvents, METH_VARARGS},
     {"retract_event", pyRetractEvent, METH_VARARGS},
     {"start_assert_fact", pyStartAssertFact, METH_VARARGS},
     {"assert_fact", pyAssertFact, METH_VARARGS},
     {"start_assert_facts", pyStartAssertFacts, METH_VARARGS},
     {"assert_facts", pyAssertFacts, METH_VARARGS},
     {"retract_fact", pyRetractFact, METH_VARARGS},
+    {"start_retract_fact", pyStartRetractFact, METH_VARARGS},
     {"retract_facts", pyRetractFacts, METH_VARARGS},
+    {"start_retract_facts", pyStartRetractFacts, METH_VARARGS},
     {"assert_state", pyAssertState, METH_VARARGS},
     {"start_action", pyStartAction, METH_VARARGS},
     {"complete_action", pyCompleteAction, METH_VARARGS},

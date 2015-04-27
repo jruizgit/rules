@@ -1555,11 +1555,27 @@ unsigned int assertEvent(void *handle, char *message) {
     return executeHandleMessage(handle, message, ACTION_ASSERT_EVENT);
 }
 
+unsigned int startAssertEvent(void *handle, 
+                             char *message, 
+                             void **rulesBinding, 
+                             unsigned short *replyCount) {
+    return startHandleMessage(handle, message, ACTION_ASSERT_EVENT, rulesBinding, replyCount);
+}
+
 unsigned int assertEvents(void *handle, 
                           char *messages, 
                           unsigned int *resultsLength, 
                           unsigned int **results) {
     return executeHandleMessages(handle, messages, ACTION_ASSERT_EVENT, resultsLength, results);
+}
+
+unsigned int startAssertEvents(void *handle, 
+                              char *messages, 
+                              unsigned int *resultsLength, 
+                              unsigned int **results, 
+                             void **rulesBinding, 
+                             unsigned short *replyCount) {
+    return startHandleMessages(handle, messages, ACTION_ASSERT_EVENT, resultsLength, results, rulesBinding, replyCount);
 }
 
 unsigned int retractEvent(void *handle, char *message) {
@@ -1597,11 +1613,27 @@ unsigned int retractFact(void *handle, char *message) {
     return executeHandleMessage(handle, message, ACTION_REMOVE_FACT);
 }
 
+unsigned int startRetractFact(void *handle, 
+                             char *message, 
+                             void **rulesBinding, 
+                             unsigned short *replyCount) {
+    return startHandleMessage(handle, message, ACTION_REMOVE_FACT, rulesBinding, replyCount);
+}
+
 unsigned int retractFacts(void *handle, 
                           char *messages, 
                           unsigned int *resultsLength, 
                           unsigned int **results) {
     return executeHandleMessages(handle, messages, ACTION_REMOVE_FACT, resultsLength, results);
+}
+
+unsigned int startRetractFacts(void *handle, 
+                              char *messages, 
+                              unsigned int *resultsLength, 
+                              unsigned int **results, 
+                             void **rulesBinding, 
+                             unsigned short *replyCount) {
+    return startHandleMessages(handle, messages, ACTION_REMOVE_FACT, resultsLength, results, rulesBinding, replyCount);
 }
 
 unsigned int assertState(void *handle, char *state) {
@@ -1649,7 +1681,8 @@ unsigned int assertTimers(void *handle) {
 unsigned int startAction(void *handle, 
                          char **state, 
                          char **messages, 
-                         void **actionHandle) {
+                         void **actionHandle,
+                         void **actionBinding) {
     redisReply *reply;
     void *rulesBinding;
     unsigned int result = peekAction(handle, &rulesBinding, &reply);
@@ -1663,6 +1696,7 @@ unsigned int startAction(void *handle,
     context->reply = reply;
     context->rulesBinding = rulesBinding;
     *actionHandle = context;
+    *actionBinding = rulesBinding;
     return RULES_OK;
 }
 
@@ -1720,6 +1754,7 @@ unsigned int completeAction(void *handle,
 }
 
 unsigned int completeAndStartAction(void *handle, 
+                                    unsigned short expectedReplies,
                                     void *actionHandle, 
                                     char *state, 
                                     char **messages) {
@@ -1783,7 +1818,11 @@ unsigned int completeAndStartAction(void *handle,
     ++commandCount;
     freeReplyObject(reply);
     redisReply *newReply;
-    result = executeBatchWithReply(rulesBinding, commands, commandCount, &newReply);  
+    result = executeBatchWithReply(rulesBinding, 
+                                   expectedReplies, 
+                                   commands, 
+                                   commandCount, 
+                                   &newReply);  
     if (result != RULES_OK) {
         return result;
     }

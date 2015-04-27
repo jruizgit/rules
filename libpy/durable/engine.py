@@ -283,27 +283,39 @@ class Ruleset(object):
 
     def assert_event(self, message):
         rules.assert_event(self._handle, json.dumps(message))
-        
+
+    def start_assert_event(self, message):
+        return rules.start_assert_event(self._handle, json.dumps(message))
+
     def assert_events(self, messages):
         rules.assert_events(self._handle, json.dumps(messages))
-        
-    def start_assert_fact(self, fact):
-        return rules.start_assert_fact(self._handle, json.dumps(fact))
+    
+    def start_assert_events(self, messages):
+        return rules.start_assert_events(self._handle, json.dumps(messages))
 
     def assert_fact(self, fact):
         rules.assert_fact(self._handle, json.dumps(fact))
 
-    def start_assert_facts(self, facts):
-        return rules.start_assert_facts(self._handle, json.dumps(facts))
+    def start_assert_fact(self, fact):
+        return rules.start_assert_fact(self._handle, json.dumps(fact))
 
     def assert_facts(self, facts):
         rules.assert_facts(self._handle, json.dumps(facts))
 
+    def start_assert_facts(self, facts):
+        return rules.start_assert_facts(self._handle, json.dumps(facts))
+
     def retract_fact(self, fact):
         rules.retract_fact(self._handle, json.dumps(fact))
 
+    def start_retract_fact(self, fact):
+        return rules.start_retract_fact(self._handle, json.dumps(fact))
+
     def retract_facts(self, facts):
         rules.retract_facts(self._handle, json.dumps(facts))
+
+    def start_retract_facts(self, facts):
+        return rules.start_retract_facts(self._handle, json.dumps(facts))
 
     def start_timer(self, sid, timer_name, timer_duration):
         timer = {'sid':sid, 'id':random.randint(100000, 10000000), '$t':timer_name}
@@ -353,14 +365,16 @@ class Ruleset(object):
 
     def dispatch(self, complete):
         state = None
-        handle = None
+        action_handle = None
+        action_binding = None
         result_container = {}
         try:
             result = rules.start_action(self._handle)
             if result: 
                 state = json.loads(result[0])
                 result_container = {'message': json.loads(result[1])}
-                handle = result[2]
+                action_handle = result[2]
+                action_binding = result[3]
         except Exception as error:
             complete(error)
             return
@@ -371,7 +385,7 @@ class Ruleset(object):
                 break
 
             del(result_container['message'])
-            c = Closure(state, message, handle, self._name)
+            c = Closure(state, message, action_handle, self._name)
             
             def action_callback(e):
                 if e:
@@ -380,37 +394,54 @@ class Ruleset(object):
                 else:
                     try:
                         for branch_name, branch_state in c.get_branches().iteritems():
-                            self._host.patch_state(branch_name, branch_state)  
-
-                        for ruleset_name, messages in c.get_messages().iteritems():
-                            if len(messages) == 1:
-                                self._host.post(ruleset_name, messages[0])
-                            else:
-                                self._host.post_batch(ruleset_name, messages)
-
-                        pending = []
-                        for ruleset_name, facts in c.get_facts().iteritems():
-                            if len(facts) == 1:
-                                pending.append(self._host.start_assert_fact(ruleset_name, facts[0]))
-                            else:
-                                pending.append(self._host.start_assert_facts(ruleset_name, facts))
-
-                        for item in pending:
-                            if item[0] > 0:
-                                rules.complete(item[0], item[1])
-
-                        for ruleset_name, facts in c.get_retract_facts().iteritems():
-                            if len(facts) == 1:
-                                self._host.retract_fact(ruleset_name, facts[0])
-                            else:
-                                self._host.retract_facts(ruleset_name, facts)
+                            self._host.patch_state(branch_name, branch_state)
 
                         for timer_name, timer_duration in c.get_timers().iteritems():
                             self.start_timer(c.s['sid'], timer_name, timer_duration)                            
+  
+                        binding  = 0
+                        replies = 0
+                        pending = {action_binding: 0}
+                        for ruleset_name, messages in c.get_messages().iteritems():
+                            if len(messages) == 1:
+                                binding, replies = self._host.start_post(ruleset_name, messages[0])
+                            else:
+                                binding, replies = self._host.start_post_batch(ruleset_name, messages)
                             
-                        new_result = rules.complete_and_start_action(self._handle, c._handle, json.dumps(c.s._d))
-                        if new_result:
-                            result_container['message'] = json.loads(new_result)
+                            if binding in pending:
+                                pending[binding] = pending[binding] + replies
+                            else:
+                                pending[binding] = replies
+                        
+                        for ruleset_name, facts in c.get_facts().iteritems():
+                            if len(facts) == 1:
+                                binding, replies = self._host.start_assert_fact(ruleset_name, facts[0])
+                            else:
+                                binding, replies = self._host.start_assert_facts(ruleset_name, facts)
+                            
+                            if binding in pending:
+                                pending[binding] = pending[binding] + replies
+                            else:
+                                pending[binding] = replies
+
+                        for ruleset_name, facts in c.get_retract_facts().iteritems():
+                            if len(facts) == 1:
+                                binding, replies = self._host.start_retract_fact(ruleset_name, facts[0])
+                            else:
+                                binding, replies = self._host.start_retract_facts(ruleset_name, facts)
+                            
+                            if binding in pending:
+                                pending[binding] = pending[binding] + replies
+                            else:
+                                pending[binding] = replies
+
+                        for binding, replies in pending.iteritems():
+                            if binding != action_binding:
+                                rules.complete(binding, replies)
+                            else:
+                                new_result = rules.complete_and_start_action(self._handle, replies, c._handle, json.dumps(c.s._d))
+                                if new_result:
+                                    result_container['message'] = json.loads(new_result)
 
                     except Exception as error:
                         rules.abandon_action(self._handle, c._handle)
@@ -664,27 +695,39 @@ class Host(object):
         
     def post_batch(self, ruleset_name, messages):
         self.get_ruleset(ruleset_name).assert_events(messages)
-        
+    
+    def start_post_batch(self, ruleset_name, messages):
+        return self.get_ruleset(ruleset_name).start_assert_events(messages)
+
     def post(self, ruleset_name, message):
         self.get_ruleset(ruleset_name).assert_event(message)
-        
-    def start_assert_fact(self, ruleset_name, fact):
-        return self.get_ruleset(ruleset_name).start_assert_fact(fact)
+    
+    def start_post(self, ruleset_name, message):
+        return self.get_ruleset(ruleset_name).start_assert_event(message)
 
     def assert_fact(self, ruleset_name, fact):
         self.get_ruleset(ruleset_name).assert_fact(fact)
 
-    def start_assert_facts(self, ruleset_name, facts):
-        return self.get_ruleset(ruleset_name).start_assert_facts(facts)
+    def start_assert_fact(self, ruleset_name, fact):
+        return self.get_ruleset(ruleset_name).start_assert_fact(fact)
 
     def assert_facts(self, ruleset_name, facts):
         self.get_ruleset(ruleset_name).assert_facts(facts)
 
+    def start_assert_facts(self, ruleset_name, facts):
+        return self.get_ruleset(ruleset_name).start_assert_facts(facts)
+
     def retract_fact(self, ruleset_name, fact):
         self.get_ruleset(ruleset_name).retract_fact(fact)
 
+    def start_retract_fact(self, ruleset_name, fact):
+        return self.get_ruleset(ruleset_name).start_retract_fact(fact)
+
     def retract_facts(self, ruleset_name, facts):
         self.get_ruleset(ruleset_name).retract_facts(facts)
+
+    def start_retract_facts(self, ruleset_name, facts):
+        return self.get_ruleset(ruleset_name).start_retract_facts(facts)
 
     def start_timer(self, ruleset_name, sid, timer_name, timer_duration):
         self.get_ruleset(ruleset_name).start_timer(sid, timer_name, timer_duration)

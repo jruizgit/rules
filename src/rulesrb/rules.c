@@ -244,7 +244,8 @@ static VALUE rbStartAction(VALUE self, VALUE handle) {
     char *state;
     char *messages;
     void *actionHandle;
-    unsigned int result = startAction((void *)FIX2LONG(handle), &state, &messages, &actionHandle);
+    void *actionBinding;
+    unsigned int result = startAction((void *)FIX2LONG(handle), &state, &messages, &actionHandle, &actionBinding);
     if (result == ERR_NO_ACTION_AVAILABLE) {
         return Qnil;
     } else if (result != RULES_OK) {
@@ -259,6 +260,7 @@ static VALUE rbStartAction(VALUE self, VALUE handle) {
     rb_ary_push(output, rb_str_new2(state));
     rb_ary_push(output, rb_str_new2(messages));
     rb_ary_push(output, INT2FIX(actionHandle));
+    rb_ary_push(output, INT2FIX(actionBinding));
     return output;
 }
 
