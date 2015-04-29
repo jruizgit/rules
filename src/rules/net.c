@@ -1738,7 +1738,7 @@ unsigned int bindRuleset(void *handle,
         redisFree(reContext);
         return ERR_CONNECT_REDIS;
     }
-
+    
     if (password != NULL) {
         int result = redisAppendCommand(reContext, "auth %s", password);
         if (result != REDIS_OK) {
@@ -2104,8 +2104,8 @@ unsigned int formatPeekAction(void *rulesBinding,
 
 unsigned int startNonBlockingBatch(void *rulesBinding,
                                    char **commands,
-                                   unsigned short commandCount,
-                                   unsigned short *replyCount) {
+                                   unsigned int commandCount,
+                                   unsigned int *replyCount) {
     *replyCount = commandCount;
     if (commandCount == 0) {
         return RULES_OK;
@@ -2114,19 +2114,8 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
     unsigned int result = RULES_OK;
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;
-    // if (commandCount > 1) {
-    //     ++(*replyCount);
-    //     result = redisAppendCommand(reContext, "multi");
-    //     if (result != REDIS_OK) {
-    //         for (unsigned short i = 0; i < commandCount; ++i) {
-    //             free(commands[i]);
-    //         }
 
-    //         return ERR_REDIS_ERROR;
-    //     }
-    // }
-
-    for (unsigned short i = 0; i < commandCount; ++i) {
+    for (unsigned int i = 0; i < commandCount; ++i) {
         sds newbuf;
         newbuf = sdscatlen(reContext->obuf, commands[i], strlen(commands[i]));
         if (newbuf == NULL) {
@@ -2136,14 +2125,6 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
         reContext->obuf = newbuf;
         free(commands[i]);
     }
-
-    // if (commandCount > 1) {
-    //     ++(*replyCount);
-    //     unsigned int result = redisAppendCommand(reContext, "exec");
-    //     if (result != REDIS_OK) {
-    //         return ERR_REDIS_ERROR;
-    //     }
-    // }
 
     int wdone = 0;
     do {
@@ -2156,7 +2137,7 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
 }
 
 unsigned int completeNonBlockingBatch(void *rulesBinding,
-                                      unsigned short replyCount) {
+                                      unsigned int replyCount) {
     if (replyCount == 0) {
         return RULES_OK;
     }
@@ -2165,7 +2146,7 @@ unsigned int completeNonBlockingBatch(void *rulesBinding,
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;
     redisReply *reply;
-    for (unsigned short i = 0; i < replyCount; ++i) {
+    for (unsigned int i = 0; i < replyCount; ++i) {
         result = redisGetReply(reContext, (void**)&reply);
         if (result != REDIS_OK) {
             result = ERR_REDIS_ERROR;
@@ -2184,36 +2165,25 @@ unsigned int completeNonBlockingBatch(void *rulesBinding,
 
 unsigned int executeBatch(void *rulesBinding,
                           char **commands,
-                          unsigned short commandCount) {
+                          unsigned int commandCount) {
     return executeBatchWithReply(rulesBinding, 0, commands, commandCount, NULL);
 }
 
 unsigned int executeBatchWithReply(void *rulesBinding,
-                                   unsigned short expectedReplies,
+                                   unsigned int expectedReplies,
                                    char **commands,
-                                   unsigned short commandCount,
+                                   unsigned int commandCount,
                                    redisReply **lastReply) {
     if (commandCount == 0) {
         return RULES_OK;
     }
 
     unsigned int result = RULES_OK;
-    unsigned short replyCount = commandCount + expectedReplies;
+    unsigned int replyCount = commandCount + expectedReplies;
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;
-    // if (commandCount > 1) {
-    //     ++replyCount;
-    //     result = redisAppendCommand(reContext, "multi");
-    //     if (result != REDIS_OK) {
-    //         for (unsigned short i = 0; i < commandCount; ++i) {
-    //             free(commands[i]);
-    //         }
 
-    //         return ERR_REDIS_ERROR;
-    //     }
-    // }
-
-    for (unsigned short i = 0; i < commandCount; ++i) {
+    for (unsigned int i = 0; i < commandCount; ++i) {
         sds newbuf;
         newbuf = sdscatlen(reContext->obuf, commands[i], strlen(commands[i]));
         if (newbuf == NULL) {
@@ -2224,16 +2194,8 @@ unsigned int executeBatchWithReply(void *rulesBinding,
         free(commands[i]);
     }
 
-    // if (commandCount > 1) {
-    //     ++replyCount;
-    //     unsigned int result = redisAppendCommand(reContext, "exec");
-    //     if (result != REDIS_OK) {
-    //         return ERR_REDIS_ERROR;
-    //     }
-    // }
-
     redisReply *reply;
-    for (unsigned short i = 0; i < replyCount; ++i) {
+    for (unsigned int i = 0; i < replyCount; ++i) {
         result = redisGetReply(reContext, (void**)&reply);
         if (result != REDIS_OK) {
             result = ERR_REDIS_ERROR;

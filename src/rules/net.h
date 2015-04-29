@@ -90,21 +90,21 @@ unsigned int formatPeekAction(void *rulesBinding,
 
 unsigned int executeBatch(void *rulesBinding,
                           char **commands,
-                          unsigned short commandCount);
+                          unsigned int commandCount);
 
 unsigned int executeBatchWithReply(void *rulesBinding,
-                                   unsigned short expectedReplies,
+                                   unsigned int expectedReplies,
                                    char **commands,
-                                   unsigned short commandCount,
+                                   unsigned int commandCount,
                                    redisReply **lastReply);
 
 unsigned int startNonBlockingBatch(void *rulesBinding,
                                    char **commands,
-                                   unsigned short commandCount,
-                                   unsigned short *replyCount); 
+                                   unsigned int commandCount,
+                                   unsigned int *replyCount); 
 
 unsigned int completeNonBlockingBatch(void *rulesBinding,
-                                      unsigned short replyCount);
+                                      unsigned int replyCount);
 
 unsigned int removeMessage(void *rulesBinding, 
                             char *sid, 

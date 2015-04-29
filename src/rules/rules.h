@@ -57,7 +57,7 @@ unsigned int bindRuleset(void *handle,
                          char *password);
 
 unsigned int complete(void *rulesBinding, 
-                      unsigned short replyCount);
+                      unsigned int replyCount);
 
 unsigned int assertEvent(void *handle, 
                          char *message);
@@ -65,7 +65,7 @@ unsigned int assertEvent(void *handle,
 unsigned int startAssertEvent(void *handle, 
                              char *message, 
                              void **rulesBinding, 
-                             unsigned short *replyCount);
+                             unsigned int *replyCount);
 
 unsigned int assertEvents(void *handle, 
                           char *messages, 
@@ -77,7 +77,7 @@ unsigned int startAssertEvents(void *handle,
                               unsigned int *resultsLength, 
                               unsigned int **results, 
                               void **rulesBinding, 
-                              unsigned short *replyCount);
+                              unsigned int *replyCount);
 
 unsigned int retractEvent(void *handle, 
                           char *message);
@@ -85,7 +85,7 @@ unsigned int retractEvent(void *handle,
 unsigned int startAssertFact(void *handle, 
                              char *message, 
                              void **rulesBinding, 
-                             unsigned short *replyCount);
+                             unsigned int *replyCount);
 
 unsigned int assertFact(void *handle, 
                         char *message);
@@ -95,7 +95,7 @@ unsigned int startAssertFacts(void *handle,
                               unsigned int *resultsLength, 
                               unsigned int **results, 
                               void **rulesBinding, 
-                              unsigned short *replyCount);
+                              unsigned int *replyCount);
 
 unsigned int assertFacts(void *handle, 
                          char *messages, 
@@ -108,7 +108,7 @@ unsigned int retractFact(void *handle,
 unsigned int startRetractFact(void *handle, 
                              char *message, 
                              void **rulesBinding, 
-                             unsigned short *replyCount);
+                             unsigned int *replyCount);
 
 unsigned int retractFacts(void *handle, 
                           char *messages, 
@@ -120,7 +120,7 @@ unsigned int startRetractFacts(void *handle,
                               unsigned int *resultsLength, 
                               unsigned int **results, 
                               void **rulesBinding, 
-                              unsigned short *replyCount);
+                              unsigned int *replyCount);
 
 unsigned int assertState(void *handle, 
                          char *state);
@@ -136,7 +136,7 @@ unsigned int completeAction(void *handle,
                             char *state);
 
 unsigned int completeAndStartAction(void *handle, 
-                                    unsigned short expectedReplies,
+                                    unsigned int expectedReplies,
                                     void *actionHandle, 
                                     char *state, 
                                     char **messages);

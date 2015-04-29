@@ -140,7 +140,7 @@ static PyObject *pyStartAssertEvent(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    unsigned short replyCount;
+    unsigned int replyCount;
     void *rulesBinding = NULL;
     unsigned int result = startAssertEvent(handle, event, &rulesBinding, &replyCount);
     if (result == RULES_OK) {
@@ -200,7 +200,7 @@ static PyObject *pyStartAssertEvents(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    unsigned short replyCount;
+    unsigned int replyCount;
     void *rulesBinding = NULL;
     unsigned int *results = NULL;
     unsigned int resultsLength;
@@ -285,7 +285,7 @@ static PyObject *pyStartAssertFact(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    unsigned short replyCount;
+    unsigned int replyCount;
     void *rulesBinding = NULL;
     unsigned int result = startAssertFact(handle, fact, &rulesBinding, &replyCount);
     if (result == RULES_OK) {
@@ -345,7 +345,7 @@ static PyObject *pyStartAssertFacts(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    unsigned short replyCount;
+    unsigned int replyCount;
     void *rulesBinding = NULL;
     unsigned int *results = NULL;
     unsigned int resultsLength;
@@ -404,7 +404,7 @@ static PyObject *pyStartRetractFact(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    unsigned short replyCount;
+    unsigned int replyCount;
     void *rulesBinding = NULL;
     unsigned int result = startRetractFact(handle, fact, &rulesBinding, &replyCount);
     if (result == RULES_OK) {
@@ -464,7 +464,7 @@ static PyObject *pyStartRetractFacts(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    unsigned short replyCount;
+    unsigned int replyCount;
     void *rulesBinding = NULL;
     unsigned int *results = NULL;
     unsigned int resultsLength;
@@ -574,7 +574,7 @@ static PyObject *pyCompleteAndStartAction(PyObject *self, PyObject *args) {
     void *handle;
     void *actionHandle;
     char *state;
-    unsigned short expectedReplies;
+    unsigned int expectedReplies;
     if (!PyArg_ParseTuple(args, "llls", &handle, &expectedReplies, &actionHandle, &state)) {
         PyErr_SetString(RulesError, "pyCompleteAndStartAction Invalid argument");
         return NULL;
