@@ -402,6 +402,17 @@ class Ruleset(object):
                         binding  = 0
                         replies = 0
                         pending = {action_binding: 0}
+                        for ruleset_name, facts in c.get_retract_facts().iteritems():
+                            if len(facts) == 1:
+                                binding, replies = self._host.start_retract_fact(ruleset_name, facts[0])
+                            else:
+                                binding, replies = self._host.start_retract_facts(ruleset_name, facts)
+                           
+                            if binding in pending:
+                                pending[binding] = pending[binding] + replies
+                            else:
+                                pending[binding] = replies
+
                         for ruleset_name, messages in c.get_messages().iteritems():
                             if len(messages) == 1:
                                 binding, replies = self._host.start_post(ruleset_name, messages[0])
@@ -418,17 +429,6 @@ class Ruleset(object):
                                 binding, replies = self._host.start_assert_fact(ruleset_name, facts[0])
                             else:
                                 binding, replies = self._host.start_assert_facts(ruleset_name, facts)
-                            
-                            if binding in pending:
-                                pending[binding] = pending[binding] + replies
-                            else:
-                                pending[binding] = replies
-
-                        for ruleset_name, facts in c.get_retract_facts().iteritems():
-                            if len(facts) == 1:
-                                binding, replies = self._host.start_retract_fact(ruleset_name, facts[0])
-                            else:
-                                binding, replies = self._host.start_retract_facts(ruleset_name, facts)
                             
                             if binding in pending:
                                 pending[binding] = pending[binding] + replies

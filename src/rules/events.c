@@ -272,6 +272,7 @@ static unsigned int handleAction(ruleset *tree,
                                  char **commands,
                                  unsigned short *commandPriorities,
                                  unsigned int *commandCount,
+                                 char **removeCommand,
                                  void **rulesBinding) {
     char *newCommand = NULL;
     unsigned int result = ERR_UNEXPECTED_VALUE;
@@ -330,13 +331,18 @@ static unsigned int handleAction(ruleset *tree,
             break;
         case ACTION_REMOVE_EVENT:
         case ACTION_REMOVE_FACT:
-            result = formatRemoveMessage(*rulesBinding, 
+            if (*removeCommand == NULL) {
+                result = formatRemoveMessage(*rulesBinding, 
                                          sid,
                                          mid, 
                                          actionType == ACTION_REMOVE_FACT ? 1 : 0,
-                                         &newCommand);  
-            priority = 0;
-            break;
+                                         removeCommand);  
+
+                if (result != RULES_OK) {
+                    return result;
+                }
+            }
+            return RULES_OK;
 
     }
     
@@ -368,6 +374,7 @@ static unsigned int handleBeta(ruleset *tree,
                                char **commands,
                                unsigned short *commandPriorities,
                                unsigned int *commandCount,
+                               char **removeCommand,
                                void **rulesBinding) {
     int prefixLength = 0;
     node *currentNode = betaNode;
@@ -436,6 +443,7 @@ static unsigned int handleBeta(ruleset *tree,
                         commands,
                         commandPriorities,
                         commandCount,
+                        removeCommand,
                         rulesBinding);
 }
 
@@ -906,6 +914,7 @@ static unsigned int handleAlpha(ruleset *tree,
                                 char **commands,
                                 unsigned short *commandPriorities,
                                 unsigned int *commandCount,
+                                char **removeCommand,
                                 void **rulesBinding) {
     unsigned int result = ERR_EVENT_NOT_HANDLED;
     unsigned short top = 1;
@@ -993,6 +1002,7 @@ static unsigned int handleAlpha(ruleset *tree,
                                     commands,
                                     commandPriorities,
                                     commandCount,
+                                    removeCommand,
                                     rulesBinding);
                 if (bresult != RULES_OK && bresult != ERR_NEW_SESSION) {
                     return result;
@@ -1098,6 +1108,7 @@ static unsigned int handleMessageCore(ruleset *tree,
         ++*commandCount;
     }
 
+    char *removeCommand = NULL;
     result =  handleAlpha(tree, 
                           sid, 
                           mid,
@@ -1109,8 +1120,22 @@ static unsigned int handleMessageCore(ruleset *tree,
                           commands,
                           commandPriorities,
                           commandCount,
+                          &removeCommand,
                           rulesBinding);
     if (result == RULES_OK) {
+        if (removeCommand) {
+            unsigned int index = *commandCount;
+            while (index > 0 && commandPriorities[index - 1] > 0) {
+                commands[index] = commands[index - 1];
+                commandPriorities[index] = commandPriorities[index - 1];
+                --index;
+            }
+
+            commands[index] = removeCommand;
+            commandPriorities[index] = 0;
+            ++*commandCount;
+        }
+
         if (state) {
             result = formatStoreSessionFact(*rulesBinding, sid, message, 0, &storeCommand);
             if (result != RULES_OK) {

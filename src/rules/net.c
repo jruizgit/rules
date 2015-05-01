@@ -1738,7 +1738,7 @@ unsigned int bindRuleset(void *handle,
         redisFree(reContext);
         return ERR_CONNECT_REDIS;
     }
-    
+
     if (password != NULL) {
         int result = redisAppendCommand(reContext, "auth %s", password);
         if (result != REDIS_OK) {
