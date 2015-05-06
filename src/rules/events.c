@@ -11,7 +11,8 @@
 #define MAX_NODE_RESULTS 16
 #define MAX_STACK_SIZE 64
 #define MAX_STATE_PROPERTY_TIME 2
-#define MAX_COMMAND_COUNT 100000
+#define MAX_COMMAND_COUNT 20000
+#define MAX_ADD_COUNT 1000
 
 #define OP_BOOL_BOOL 0x0404
 #define OP_BOOL_INT 0x0402
@@ -273,6 +274,8 @@ static unsigned int handleAction(ruleset *tree,
                                  unsigned short *commandPriorities,
                                  unsigned int *commandCount,
                                  char **removeCommand,
+                                 char **addKeys,
+                                 unsigned int *addCount,
                                  void **rulesBinding) {
     char *newCommand = NULL;
     unsigned int result = ERR_UNEXPECTED_VALUE;
@@ -289,7 +292,6 @@ static unsigned int handleAction(ruleset *tree,
         return ERR_MAX_COMMAND_COUNT;
     }
 
-    unsigned short priority = node->value.c.priority + 1;
     switch (actionType) {
         case ACTION_ASSERT_EVENT:
         case ACTION_ASSERT_FACT:
@@ -319,16 +321,19 @@ static unsigned int handleAction(ruleset *tree,
             break;
         case ACTION_ADD_EVENT:
         case ACTION_ADD_FACT:
-            result = formatStoreMessage(*rulesBinding, 
-                                        prefix, 
-                                        sid, 
-                                        message, 
-                                        allProperties,
-                                        propertiesLength,
-                                        actionType == ACTION_ADD_FACT ? 1 : 0,
-                                        &newCommand);  
-            priority = 0;
-            break;
+            if (*addCount == MAX_ADD_COUNT) {
+                return ERR_MAX_ADD_COUNT;
+            }
+            char *key = malloc((strlen(prefix) + 1) * sizeof(char));
+            if (key == NULL) {
+                return ERR_OUT_OF_MEMORY;
+            }
+
+            strcpy(key, prefix);
+            addKeys[*addCount] = key;
+            *addCount = *addCount + 1; 
+            return RULES_OK; 
+
         case ACTION_REMOVE_EVENT:
         case ACTION_REMOVE_FACT:
             if (*removeCommand == NULL) {
@@ -351,14 +356,14 @@ static unsigned int handleAction(ruleset *tree,
     }
 
     unsigned int index = *commandCount;
-    while (index > 0 && priority < commandPriorities[index - 1]) {
+    while (index > 0 && node->value.c.priority < commandPriorities[index - 1]) {
         commands[index] = commands[index - 1];
         commandPriorities[index] = commandPriorities[index - 1];
         --index;
     }
 
     commands[index] = newCommand;
-    commandPriorities[index] = priority;
+    commandPriorities[index] = node->value.c.priority;
     ++*commandCount;
     return RULES_OK;
 }
@@ -375,6 +380,8 @@ static unsigned int handleBeta(ruleset *tree,
                                unsigned short *commandPriorities,
                                unsigned int *commandCount,
                                char **removeCommand,
+                               char **addKeys,
+                               unsigned int *addCount,
                                void **rulesBinding) {
     int prefixLength = 0;
     node *currentNode = betaNode;
@@ -444,6 +451,8 @@ static unsigned int handleBeta(ruleset *tree,
                         commandPriorities,
                         commandCount,
                         removeCommand,
+                        addKeys,
+                        addCount,
                         rulesBinding);
 }
 
@@ -915,6 +924,8 @@ static unsigned int handleAlpha(ruleset *tree,
                                 unsigned short *commandPriorities,
                                 unsigned int *commandCount,
                                 char **removeCommand,
+                                char **addKeys,
+                                unsigned int *addCount,
                                 void **rulesBinding) {
     unsigned int result = ERR_EVENT_NOT_HANDLED;
     unsigned short top = 1;
@@ -1003,6 +1014,8 @@ static unsigned int handleAlpha(ruleset *tree,
                                     commandPriorities,
                                     commandCount,
                                     removeCommand,
+                                    addKeys,
+                                    addCount,
                                     rulesBinding);
                 if (bresult != RULES_OK && bresult != ERR_NEW_SESSION) {
                     return result;
@@ -1109,30 +1122,61 @@ static unsigned int handleMessageCore(ruleset *tree,
     }
 
     char *removeCommand = NULL;
-    result =  handleAlpha(tree, 
-                          sid, 
-                          mid,
-                          message, 
-                          properties, 
-                          propertiesLength,
-                          &tree->nodePool[NODE_M_OFFSET].value.a, 
-                          actionType, 
-                          commands,
-                          commandPriorities,
-                          commandCount,
-                          &removeCommand,
-                          rulesBinding);
+    char *addKeys[MAX_ADD_COUNT];
+    unsigned int addCount = 0;
+    result = handleAlpha(tree, 
+                         sid, 
+                         mid,
+                         message, 
+                         properties, 
+                         propertiesLength,
+                         &tree->nodePool[NODE_M_OFFSET].value.a, 
+                         actionType, 
+                         commands,
+                         commandPriorities,
+                         commandCount,
+                         &removeCommand,
+                         addKeys,
+                         &addCount,
+                         rulesBinding);
     if (result == RULES_OK) {
         if (removeCommand) {
-            unsigned int index = *commandCount;
-            while (index > 0 && commandPriorities[index - 1] > 0) {
-                commands[index] = commands[index - 1];
-                commandPriorities[index] = commandPriorities[index - 1];
-                --index;
+            if (*commandCount == MAX_COMMAND_COUNT) {
+                return ERR_MAX_COMMAND_COUNT;
             }
 
-            commands[index] = removeCommand;
-            commandPriorities[index] = 0;
+            commands[*commandCount] = removeCommand;
+            ++*commandCount;
+        }
+
+        if (addCount > 0) {
+            if (*commandCount == MAX_COMMAND_COUNT) {
+                for (unsigned int i = 0; i < addCount; ++i) {
+                    free(addKeys[i]);
+                }
+                return ERR_MAX_COMMAND_COUNT;
+            }
+
+            char *addCommand = NULL;
+            result = formatStoreMessage(*rulesBinding,
+                                        sid,
+                                        message,
+                                        properties,
+                                        propertiesLength,
+                                        actionType == ACTION_ASSERT_FACT ? 1 : 0,
+                                        addKeys,
+                                        addCount,
+                                        &addCommand);
+
+            for (unsigned int i = 0; i < addCount; ++i) {
+                free(addKeys[i]);
+            }
+
+            if (result != RULES_OK) {
+                return result;
+            }
+
+            commands[*commandCount] = addCommand;
             ++*commandCount;
         }
 

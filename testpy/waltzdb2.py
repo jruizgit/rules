@@ -198,7 +198,7 @@ with ruleset('waltzdb'):
     @when_all(c.j << (m.t == 'junction') & (m.j_t == '3j') & (m.visited == 'no'),
              (m.t == 'stage') & (m.l == 'labeling'))
     def start_visit_3_junction(c):
-        c.j.id = c.s.gid; c.j.visited = 'now'; c.assert_fact(c.j) 
+        c.retract_fact(c.j); c.j.id = c.s.gid; c.j.visited = 'now'; c.assert_fact(c.j) 
         c.assert_fact({'id': c.s.gid + 1, 't': 'stage', 'l': 'visiting_3j'})
         c.s.gid += 2
         print('visiting_3j')
@@ -206,7 +206,7 @@ with ruleset('waltzdb'):
     @when_all(c.j << (m.t == 'junction') & (m.j_t == '2j') & (m.visited == 'no'),
              (m.t == 'stage') & (m.l == 'labeling'))
     def start_visit_2_junction(c):
-        c.j.id = c.s.gid; c.j.visited = 'now'; c.assert_fact(c.j) 
+        c.retract_fact(c.j); c.j.id = c.s.gid; c.j.visited = 'now'; c.assert_fact(c.j) 
         c.assert_fact({'id': c.s.gid + 1, 't': 'stage', 'l': 'visiting_2j'})
         c.s.gid += 2
         print('visiting_2j')

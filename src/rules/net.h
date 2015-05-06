@@ -51,12 +51,13 @@ unsigned int formatEvalMessage(void *rulesBinding,
                                char **command);
 
 unsigned int formatStoreMessage(void *rulesBinding, 
-                                char *key, 
                                 char *sid, 
                                 char *message, 
                                 jsonProperty *allProperties,
                                 unsigned int propertiesLength,
                                 unsigned char storeFact,
+                                char **keys,
+                                unsigned int keysLength,
                                 char **command);
 
 unsigned int formatStoreSession(void *rulesBinding, 

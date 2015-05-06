@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,28 +8,28 @@
 
 #ifdef _WIN32
 int asprintf(char** ret, char* format, ...){
-	va_list args;
-	*ret = NULL;
-	if (!format) return 0;
-	va_start(args, format);
-	int size = _vscprintf(format, args);
-	if (size == 0) {
-		*ret = (char*)malloc(1);
-		**ret = 0;
-	}
-	else {
-		size++; //for null
-		*ret = (char*)malloc(size + 2);
-		if (*ret) {
-			_vsnprintf(*ret, size, format, args);
-		}
-		else {
-			return -1;
-		}
-	}
+    va_list args;
+    *ret = NULL;
+    if (!format) return 0;
+    va_start(args, format);
+    int size = _vscprintf(format, args);
+    if (size == 0) {
+        *ret = (char*)malloc(1);
+        **ret = 0;
+    }
+    else {
+        size++; //for null
+        *ret = (char*)malloc(size + 2);
+        if (*ret) {
+            _vsnprintf(*ret, size, format, args);
+        }
+        else {
+            return -1;
+        }
+    }
 
-	va_end(args);
-	return size;
+    va_end(args);
+    return size;
 }
 #endif
 
@@ -286,10 +285,10 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
     }
 
     if (*primaryKey == NULL) {
-        if (asprintf(primaryKey, "result = nil") == -1) {
+        if (asprintf(primaryKey, "") == -1) {
             return ERR_OUT_OF_MEMORY;
         }
-        if (asprintf(primaryFrameKey, "result = nil") == -1) {
+        if (asprintf(primaryFrameKey, "") == -1) {
             return ERR_OUT_OF_MEMORY;
         }
     }
@@ -303,11 +302,11 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     char *name = &tree->stringPool[tree->nameOffset];
     int nameLength = strlen(name);
 #ifdef _WIN32
-	char *actionKey = (char *)_alloca(sizeof(char)*(nameLength + 3));
-	sprintf_s(actionKey, nameLength + 3, "%s!a", name);
+    char *actionKey = (char *)_alloca(sizeof(char)*(nameLength + 3));
+    sprintf_s(actionKey, nameLength + 3, "%s!a", name);
 #else
     char actionKey[nameLength + 3];
-	snprintf(actionKey, nameLength + 3, "%s!a", name);
+    snprintf(actionKey, nameLength + 3, "%s!a", name);
 #endif
     char *lua = NULL;
     char *peekActionLua = NULL;
@@ -338,9 +337,9 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
             char *actionName = &tree->stringPool[currentNode->nameOffset];
             char *actionLastName = strchr(actionName, '!');
 #ifdef _WIN32
-			char *actionAlias = (char *)_alloca(sizeof(char)*(actionLastName - actionName + 1));
+            char *actionAlias = (char *)_alloca(sizeof(char)*(actionLastName - actionName + 1));
 #else
-			char actionAlias[actionLastName - actionName + 1];
+            char actionAlias[actionLastName - actionName + 1];
 #endif
             
             strncpy(actionAlias, actionName, actionLastName - actionName);
@@ -379,7 +378,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                         oldAddMessageLua = addMessageLua;
                         if (asprintf(&addMessageLua, 
 "%sprimary_message_keys[\"%s\"] = function(message)\n"
-"    return nil\n"
+"    return \"\"\n"
 "end\n",
                                     addMessageLua,
                                     currentKey)  == -1) {
@@ -428,10 +427,10 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    return result\n"
 "end\n"
 "primary_message_keys[1] = function(message)\n"
-"    return nil\n"
+"    return \"\"\n"
 "end\n"
 "primary_frame_keys[1] = function(frame)\n"
-"    return nil\n"
+"    return \"\"\n"
 "end\n",
                                          lua,
                                          actionName,
@@ -453,7 +452,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    return false\n"
 "end\n"
 "primary_frame_keys[1] = function(frame)\n"
-"    return nil\n"
+"    return \"\"\n"
 "end\n",
                                          peekActionLua,
                                          currentKey)  == -1) {
@@ -514,10 +513,10 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    return result\n"
 "end\n"
 "primary_message_keys[1] = function(message)\n"
-"    return nil\n"
+"    return \"\"\n"
 "end\n"
 "primary_frame_keys[1] = function(frame)\n"
-"    return nil\n"
+"    return \"\"\n"
 "end\n",
                                          lua,
                                          actionName,
@@ -907,25 +906,18 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local cleanup_mids = function(index, frame, events_key, messages_key, mids_cache, message_cache)\n"
 "    local event_mids = mids_cache[events_key]\n"
 "    local primary_key = primary_frame_keys[index](frame)\n"
-"    local new_mids = nil\n"
-"    if not primary_key then\n"
-"        new_mids = event_mids\n"
-"    else\n"
-"        new_mids = event_mids[primary_key]\n"
-"    end\n"
+"    local new_mids = event_mids[primary_key]\n"
 "    local result_mids = {}\n"
 "    for i = 1, #new_mids, 1 do\n"
 "        local new_mid = new_mids[i]\n"
-"        if message_cache[new_mid] then\n"
+"        if message_cache[new_mid] ~= false then\n"
 "            table.insert(result_mids, new_mid)\n"
 "        end\n"
 "    end\n"
-"    if primary_key then\n"
-"        event_mids[primary_key] = result_mids\n"
-"        redis.call(\"hset\", events_key, primary_key, cmsgpack.pack(result_mids))\n"
-"    else\n"
-"        mids_cache[events_key] = result_mids\n"
-"        redis.call(\"set\", events_key, cmsgpack.pack(result_mids))\n"
+"    event_mids[primary_key] = result_mids\n"
+"    redis.call(\"del\", events_key .. \"!m!\" .. primary_key)\n"
+"    for i = 1, #result_mids, 1 do\n"
+"        redis.call(\"rpush\", events_key .. \"!m!\" .. primary_key, result_mids[i])\n"
 "    end\n"
 "end\n"
 "local get_mids = function(index, frame, events_key, messages_key, mids_cache, message_cache)\n"
@@ -935,35 +927,18 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    if not event_mids then\n"
 "        event_mids = {}\n"
 "        mids_cache[events_key] = event_mids\n"
-"    elseif not primary_key then\n"
-"        new_mids = event_mids\n"
 "    else\n"
 "        new_mids = event_mids[primary_key]\n"
 "    end\n"
-"    if new_mids then\n"
-"        return new_mids\n"
-"    else\n"
-"        local packed_message_list\n"
-"        if primary_key then\n"
-"            packed_message_list = redis.call(\"hget\", events_key, primary_key)\n"
-"        else\n"
-"            packed_message_list = redis.call(\"get\", events_key)\n"
-"        end\n"
-"        if packed_message_list then\n"
-"            new_mids = cmsgpack.unpack(packed_message_list)\n"
-"        else\n"
-"            new_mids = {}\n"
-"        end\n"
-"    end\n"
-"    if primary_key then\n"
+"    if not new_mids then\n"
+"        new_mids = redis.call(\"lrange\", events_key .. \"!m!\" .. primary_key, 0, -1)\n"
 "        event_mids[primary_key] = new_mids\n"
-"    else\n"
-"        mids_cache[events_key] = new_mids\n"
 "    end\n"
 "    return new_mids\n"
 "end\n"
 "local get_message = function(new_mid, messages_key, message_cache)\n"
 "    local message = false\n"
+"    new_mid = tostring(new_mid)\n"
 "    if message_cache[new_mid] ~= nil then\n"
 "        message = message_cache[new_mid]\n"
 "    else\n"
@@ -985,29 +960,15 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local save_message = function(index, message, events_key, messages_key)\n"
 "    redis.call(\"hsetnx\", messages_key, message[\"id\"], cmsgpack.pack(message))\n"
 "    local primary_key = primary_message_keys[index](message)\n"
-"    local packed_message_list\n"
-"    if primary_key then\n"
-"        packed_message_list = redis.call(\"hget\", events_key, primary_key)\n"
-"    else\n"
-"        packed_message_list = redis.call(\"get\", events_key)\n"
-"    end\n"
-"    local message_list = {}\n"
-"    if packed_message_list then\n"
-"        message_list = cmsgpack.unpack(packed_message_list)\n"
-"    end\n"
-"    table.insert(message_list, message[\"id\"])\n"
-"    if primary_key then\n"
-"        redis.call(\"hset\", events_key, primary_key, cmsgpack.pack(message_list))\n"
-"    else\n"
-"        redis.call(\"set\", events_key, cmsgpack.pack(message_list))\n"
-"    end\n"
+"    redis.call(\"lpush\", events_key .. \"!m!\" .. primary_key, message[\"id\"])\n"
 "end\n"
 "local save_result = function(frame, index)\n"
 "    table.insert(results, 1, frame_packers[index](frame, true))\n"
 "    for name, message in pairs(frame) do\n"
 "        if message ~= \"$n\" and not message[\"$f\"] then\n"
 "            redis.call(\"hdel\", events_hashset, message[\"id\"])\n"
-"            events_message_cache[message[\"id\"]] = false\n"
+// message cache always looked up using strings
+"            events_message_cache[tostring(message[\"id\"])] = false\n"
 "        end\n"
 "    end\n"
 "end\n"
@@ -1037,11 +998,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "            if result == 0 or use_facts then\n"
 "                local frames_key\n"
 "                local primary_key = primary_frame_keys[index + 1](new_frame)\n"
-"                if primary_key then\n"
-"                    frames_key = keys[index + 1] .. \"!c!\" .. sid .. \"!\" .. primary_key\n"
-"                else\n"
-"                    frames_key = keys[index + 1] .. \"!c!\" .. sid\n"
-"                end\n"
+"                frames_key = keys[index + 1] .. \"!c!\" .. sid .. \"!\" .. primary_key\n"
 "                redis.call(\"rpush\", frames_key, frame_packers[index](new_frame))\n"
 "            end\n"
 "        end\n"
@@ -1263,35 +1220,18 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    if not event_mids then\n"
 "        event_mids = {}\n"
 "        mids_cache[events_key] = event_mids\n"
-"    elseif not primary_key then\n"
-"        new_mids = event_mids\n"
 "    else\n"
 "        new_mids = event_mids[primary_key]\n"
 "    end\n"
-"    if new_mids then\n"
-"        return new_mids\n"
-"    else\n"
-"        local packed_message_list\n"
-"        if primary_key then\n"
-"            packed_message_list = redis.call(\"hget\", events_key, primary_key)\n"
-"        else\n"
-"            packed_message_list = redis.call(\"get\", events_key)\n"
-"        end\n"
-"        if packed_message_list then\n"
-"            new_mids = cmsgpack.unpack(packed_message_list)\n"
-"        else\n"
-"            new_mids = {}\n"
-"        end\n"
-"    end\n"
-"    if primary_key then\n"
+"    if not new_mids then\n"
+"        new_mids = redis.call(\"lrange\", events_key .. \"!m!\" .. primary_key, 0, -1)\n"
 "        event_mids[primary_key] = new_mids\n"
-"    else\n"
-"        mids_cache[events_key] = new_mids\n"
 "    end\n"
 "    return new_mids\n"
 "end\n"
 "local get_message = function(new_mid, messages_key, message_cache)\n"
 "    local message = false\n"
+"    new_mid = tostring(new_mid)\n"
 "    if message_cache[new_mid] ~= nil then\n"
 "        message = message_cache[new_mid]\n"
 "    else\n"
@@ -1480,9 +1420,9 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     free(lua);
 
     if (asprintf(&lua, 
-"local key = ARGV[1]\n"
-"local sid = ARGV[2]\n"
-"local assert_fact = tonumber(ARGV[3])\n"
+"local sid = ARGV[1]\n"
+"local assert_fact = tonumber(ARGV[2])\n"
+"local keys_count = tonumber(ARGV[3])\n"
 "local events_hashset = \"%s!e!\" .. sid\n"
 "local facts_hashset = \"%s!f!\" .. sid\n"
 "local visited_hashset = \"%s!v!\" .. sid\n"
@@ -1491,24 +1431,9 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local save_message = function(current_key, message, events_key, messages_key)\n"
 "    redis.call(\"hsetnx\", messages_key, message[\"id\"], cmsgpack.pack(message))\n"
 "    local primary_key = primary_message_keys[current_key](message)\n"
-"    local packed_message_list\n"
-"    if primary_key then\n"
-"        packed_message_list = redis.call(\"hget\", events_key, primary_key)\n"
-"    else\n"
-"        packed_message_list = redis.call(\"get\", events_key)\n"
-"    end\n"
-"    local message_list = {}\n"
-"    if packed_message_list then\n"
-"        message_list = cmsgpack.unpack(packed_message_list)\n"
-"    end\n"
-"    table.insert(message_list, message[\"id\"])\n"
-"    if primary_key then\n"
-"        redis.call(\"hset\", events_key, primary_key, cmsgpack.pack(message_list))\n"
-"    else\n"
-"        redis.call(\"set\", events_key, cmsgpack.pack(message_list))\n"
-"    end\n"
+"    redis.call(\"lpush\", events_key .. \"!m!\" .. primary_key, message[\"id\"])\n"
 "end\n"
-"for index = 4, #ARGV, 3 do\n"
+"for index = 4 + keys_count, #ARGV, 3 do\n"
 "    if ARGV[index + 2] == \"1\" then\n"
 "        message[ARGV[index]] = ARGV[index + 1]\n"
 "    elseif ARGV[index + 2] == \"2\" or  ARGV[index + 2] == \"3\" then\n"
@@ -1535,9 +1460,15 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "end\n"
 "%sif assert_fact == 1 then\n"
 "    message[\"$f\"] = 1\n"
-"    save_message(key, message, key .. \"!f!\" .. sid, facts_hashset)\n"
+"    for index = 4, 3 + keys_count, 1 do\n"
+"        local key = ARGV[index]\n"
+"        save_message(key, message, key .. \"!f!\" .. sid, facts_hashset)\n"
+"    end\n"
 "else\n"
-"    save_message(key, message, key .. \"!e!\" .. sid, events_hashset)\n"
+"    for index = 4, 3 + keys_count, 1 do\n"
+"        local key = ARGV[index]\n"
+"        save_message(key, message, key .. \"!e!\" .. sid, events_hashset)\n"
+"    end\n"
 "end\n",
                 name,
                 name,
@@ -1839,13 +1770,13 @@ unsigned int formatEvalMessage(void *rulesBinding,
     time_t currentTime = time(NULL);
     char score[11];
 #ifdef _WIN32
-	sprintf_s(score, 11, "%ld", currentTime);
-	char **argv = (char **)_alloca(sizeof(char*)*(8 + propertiesLength * 3));
-	size_t *argvl = (size_t *)_alloca(sizeof(size_t)*(8 + propertiesLength * 3));
+    sprintf_s(score, 11, "%ld", currentTime);
+    char **argv = (char **)_alloca(sizeof(char*)*(8 + propertiesLength * 3));
+    size_t *argvl = (size_t *)_alloca(sizeof(size_t)*(8 + propertiesLength * 3));
 #else
-	snprintf(score, 11, "%ld", currentTime);
-	char *argv[8 + propertiesLength * 3];
-	size_t argvl[8 + propertiesLength * 3];
+    snprintf(score, 11, "%ld", currentTime);
+    char *argv[8 + propertiesLength * 3];
+    size_t argvl[8 + propertiesLength * 3];
 #endif
 
     argv[0] = "evalsha";
@@ -1906,20 +1837,24 @@ unsigned int formatEvalMessage(void *rulesBinding,
 }
 
 unsigned int formatStoreMessage(void *rulesBinding, 
-                                char *key, 
                                 char *sid, 
                                 char *message, 
                                 jsonProperty *allProperties,
                                 unsigned int propertiesLength,
                                 unsigned char storeFact,
+                                char **keys,
+                                unsigned int keysLength,
                                 char **command) {
     binding *bindingContext = (binding*)rulesBinding;
+    char keysLengthString[5];
 #ifdef _WIN32
-	char **argv = (char **)_alloca(sizeof(char*)*(6 + propertiesLength * 3));
-	size_t *argvl = (size_t *)_alloca(sizeof(size_t)*(6 + propertiesLength * 3));
+    sprintf_s(keysLengthString, 5, "%d", keysLength);
+    char **argv = (char **)_alloca(sizeof(char*)*(6 + keysLength + propertiesLength * 3));
+    size_t *argvl = (size_t *)_alloca(sizeof(size_t)*(6 + keysLength + propertiesLength * 3));
 #else
-	char *argv[6 + propertiesLength * 3];
-	size_t argvl[6 + propertiesLength * 3];
+    snprintf(keysLengthString, 5, "%d", keysLength);
+    char *argv[6 + keysLength + propertiesLength * 3];
+    size_t argvl[6 + keysLength + propertiesLength * 3];
 #endif
 
     argv[0] = "evalsha";
@@ -1928,41 +1863,53 @@ unsigned int formatStoreMessage(void *rulesBinding,
     argvl[1] = 40;
     argv[2] = "0";
     argvl[2] = 1;
-    argv[3] = key;
-    argvl[3] = strlen(key);
-    argv[4] = sid;
-    argvl[4] = strlen(sid);
-    argv[5] = storeFact ? "1" : "0";
-    argvl[5] = 1;
+    argv[3] = sid;
+    argvl[3] = strlen(sid);
+    argv[4] = storeFact ? "1" : "0";
+    argvl[4] = 1;
+    argv[5] = keysLengthString;
+    argvl[5] = strlen(keysLengthString);
 
+    for (unsigned int i = 0; i < keysLength; ++i) {
+        argv[6 + i] = keys[i];
+        argvl[6 + i] = strlen(keys[i]);
+    }
+
+    unsigned int offset = 6 + keysLength;
     for (unsigned int i = 0; i < propertiesLength; ++i) {
-        argv[6 + i * 3] = message + allProperties[i].nameOffset;
-        argvl[6 + i * 3] = allProperties[i].nameLength;
-        argv[6 + i * 3 + 1] = message + allProperties[i].valueOffset;
+        argv[offset +  i * 3] = message + allProperties[i].nameOffset;
+        argvl[offset + i * 3] = allProperties[i].nameLength;
+        argv[offset + i * 3 + 1] = message + allProperties[i].valueOffset;
         if (allProperties[i].type == JSON_STRING) {
-            argvl[6 + i * 3 + 1] = allProperties[i].valueLength;
+            argvl[offset + i * 3 + 1] = allProperties[i].valueLength;
         } else {
-            argvl[6 + i * 3 + 1] = allProperties[i].valueLength + 1;
+            argvl[offset + i * 3 + 1] = allProperties[i].valueLength + 1;
         }
 
         switch(allProperties[i].type) {
             case JSON_STRING:
-                argv[6 + i * 3 + 2] = "1";
+                argv[offset + i * 3 + 2] = "1";
                 break;
             case JSON_INT:
-                argv[6 + i * 3 + 2] = "2";
+                argv[offset + i * 3 + 2] = "2";
                 break;
             case JSON_DOUBLE:
-                argv[6 + i * 3 + 2] = "3";
+                argv[offset + i * 3 + 2] = "3";
                 break;
             case JSON_BOOL:
-                argv[6 + i * 3 + 2] = "4";
+                argv[offset + i * 3 + 2] = "4";
+                break;
+            case JSON_ARRAY:
+                argv[offset + i * 3 + 2] = "5";
+                break;
+            case JSON_NIL:
+                argv[offset + i * 3 + 2] = "7";
                 break;
         }
-        argvl[6 + i * 3 + 2] = 1; 
+        argvl[offset + i * 3 + 2] = 1; 
     }
 
-    int result = redisFormatCommandArgv(command, 6 + propertiesLength * 3, (const char**)argv, argvl); 
+    int result = redisFormatCommandArgv(command, offset + propertiesLength * 3, (const char**)argv, argvl); 
     if (result == 0) {
         return ERR_OUT_OF_MEMORY;
     }
@@ -2129,6 +2076,7 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
     int wdone = 0;
     do {
         if (redisBufferWrite(reContext, &wdone) == REDIS_ERR) {
+            printf("error %u %s\n", reContext->err, reContext->errstr);
             return ERR_REDIS_ERROR;
         }
     } while (!wdone);
