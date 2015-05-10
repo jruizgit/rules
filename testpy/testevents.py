@@ -26,7 +26,7 @@ handle = rules.create_ruleset(5, 'books1',  json.dumps({
     }
 }))
 
-rules.bind_ruleset(handle, None , 0 , '/tmp/redis.sock')
+rules.bind_ruleset(handle, None , 0 , '/tmp/redis0.sock')
 
 rules.assert_event(handle, json.dumps({
     'id': 1,
@@ -84,7 +84,7 @@ handle = rules.create_ruleset(5, 'books2',  json.dumps({
     }
 }))
 
-rules.bind_ruleset(handle, None , 0 , '/tmp/redis.sock')
+rules.bind_ruleset(handle, None , 0 , '/tmp/redis0.sock')
 
 rules.assert_event(handle, json.dumps({
     'id': 1,
@@ -116,7 +116,7 @@ handle = rules.create_ruleset(5, 'books3',  json.dumps({
    }
 }))
 
-rules.bind_ruleset(handle, None , 0 , '/tmp/redis.sock')
+rules.bind_ruleset(handle, None , 0 , '/tmp/redis0.sock')
 
 rules.assert_event(handle, json.dumps({
     'id': 1,
@@ -147,7 +147,7 @@ handle = rules.create_ruleset(5, 'books4', json.dumps({
     }
 }))
 
-rules.bind_ruleset(handle, None , 0 , '/tmp/redis.sock')
+rules.bind_ruleset(handle, None , 0 , '/tmp/redis0.sock')
 
 rules.assert_events(handle, json.dumps([
     {'id': '0', 'sid': 1, 'subject': 'approve', 'amount': 100}, 
@@ -182,7 +182,7 @@ handle = rules.create_ruleset(5, 'approval1',  json.dumps({
     }
 }))
 
-rules.bind_ruleset(handle, None , 0 , '/tmp/redis.sock')
+rules.bind_ruleset(handle, None , 0 , '/tmp/redis0.sock')
 
 rules.assert_event(handle, json.dumps({
     'id': 3,
@@ -221,7 +221,7 @@ handle = rules.create_ruleset(5, 'approval2',  json.dumps({
     }
 }))
 
-rules.bind_ruleset(handle, None , 0 , '/tmp/redis.sock')
+rules.bind_ruleset(handle, None , 0 , '/tmp/redis0.sock')
 
 rules.assert_event(handle, json.dumps({
     'id': 5,
@@ -241,6 +241,24 @@ print(repr(json.loads(result[0])))
 print(repr(json.loads(result[1])))
 
 rules.complete_action(handle, result[2], result[0])
+
+rules.assert_event(handle, json.dumps({
+    'id': 7,
+    'sid': 'second',
+    'total': 100
+}))
+
+rules.assert_event(handle, json.dumps({
+    'id': 8,
+    'sid': 'second',
+    'amount': 100
+}))
+
+result = rules.start_action(handle)
+
+print(repr(json.loads(result[0])))
+print(repr(json.loads(result[1])))
+
 rules.delete_ruleset(handle)
 
 

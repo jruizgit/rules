@@ -11,10 +11,20 @@
 #define HASH_LENGTH 40
 #define MAX_MESSAGE_BATCH 64
 
+#define ACTION_ASSERT_FACT 1
+#define ACTION_ASSERT_EVENT 2
+#define ACTION_RETRACT_FACT 3
+#define ACTION_RETRACT_EVENT 4
+#define ACTION_ADD_FACT 5
+#define ACTION_ADD_EVENT 6
+#define ACTION_REMOVE_FACT 7
+#define ACTION_REMOVE_EVENT 8
+
 typedef char functionHash[HASH_LENGTH + 1];
 
 typedef struct binding {
     redisContext *reContext;
+    functionHash evalMessageHash;
     functionHash addMessageHash;
     functionHash peekActionHash;
     functionHash removeActionHash;
@@ -24,8 +34,6 @@ typedef struct binding {
     char *factsHashset;
     char *eventsHashset;
     char *timersSortedset;
-    functionHash *hashArray;
-    unsigned int hashArrayLength;
 } binding;
 
 typedef struct bindingsList {
@@ -40,14 +48,14 @@ unsigned int getBindingIndex(ruleset *tree,
                              unsigned int *bindingIndex);
 
 unsigned int formatEvalMessage(void *rulesBinding, 
-                               char *key, 
                                char *sid, 
-                               char *mid, 
+                               char *mid,
                                char *message, 
                                jsonProperty *allProperties,
                                unsigned int propertiesLength,
-                               unsigned int actionIndex,
-                               unsigned char assertFact,
+                               unsigned char actionType,
+                               char **keys,
+                               unsigned int keysLength,
                                char **command);
 
 unsigned int formatStoreMessage(void *rulesBinding, 
