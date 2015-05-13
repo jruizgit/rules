@@ -11,7 +11,7 @@
 #define MAX_NODE_RESULTS 16
 #define MAX_STACK_SIZE 64
 #define MAX_STATE_PROPERTY_TIME 2
-#define MAX_COMMAND_COUNT 20000
+#define MAX_COMMAND_COUNT 5000
 #define MAX_ADD_COUNT 1000
 #define MAX_EVAL_COUNT 1000
 
@@ -1849,7 +1849,6 @@ unsigned int completeAndStartAction(void *handle,
     }
 
     ++commandCount;
-    freeReplyObject(reply);
     redisReply *newReply;
     result = executeBatchWithReply(rulesBinding, 
                                    expectedReplies, 
@@ -1857,9 +1856,11 @@ unsigned int completeAndStartAction(void *handle,
                                    commandCount, 
                                    &newReply);  
     if (result != RULES_OK) {
+        //reply object should be freed by the app during abandonAction
         return result;
     }
     
+    freeReplyObject(reply);
     if (newReply->type != REDIS_REPLY_ARRAY) {
         freeReplyObject(newReply);
         free(actionHandle);

@@ -368,8 +368,30 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 
                 oldLua = lua;
                 if (asprintf(&lua, 
-"%scontext = {}\n",
-                            lua)  == -1) {
+"%stoggle = false\n"
+"context = {}\n"
+"reviewers = {}\n"
+"context[\"reviewers\"] = reviewers\n"
+"frame_packers = {}\n"
+"context[\"frame_packers\"] = frame_packers\n"
+"frame_unpackers = {}\n"
+"context[\"frame_unpackers\"] = frame_unpackers\n"
+"primary_message_keys = {}\n"
+"context[\"primary_message_keys\"] = primary_message_keys\n"
+"primary_frame_keys = {}\n"
+"context[\"primary_frame_keys\"] = primary_frame_keys\n"
+"keys = {}\n"
+"context[\"keys\"] = keys\n"
+"inverse_directory = {}\n"
+"context[\"inverse_directory\"] = inverse_directory\n"
+"directory = {[\"0\"] = 1}\n"
+"context[\"directory\"] = directory\n"
+"context[\"results_key\"] = \"%s!%d!r!\" .. sid\n"
+"context[\"expressions_count\"] = %d\n",
+                            lua,
+                            actionName,
+                            ii,
+                            currentJoin->expressionsLength)  == -1) {
                     return ERR_OUT_OF_MEMORY;
                 }  
                 free(oldLua);
@@ -413,14 +435,31 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                     expression *expr = &tree->expressionPool[expressionOffset];
                     char *currentAlias = &tree->stringPool[expr->aliasOffset];
                     char *currentKey = &tree->stringPool[expr->nameOffset];
+                    char *nextKeyTest;
+                    if (iii == (currentJoin->expressionsLength - 1)) {
+                        if (asprintf(&nextKeyTest, "")  == -1) {
+                            return ERR_OUT_OF_MEMORY;
+                        }
+                    } else {
+                        unsigned int nextExpressionOffset = tree->nextPool[currentJoin->expressionsOffset + iii + 1];
+                        expression *nextExpr = &tree->expressionPool[nextExpressionOffset];
+                        if (asprintf(&nextKeyTest, 
+"or input_keys[\"%s\"]", 
+                                     &tree->stringPool[nextExpr->nameOffset])  == -1) {
+                            return ERR_OUT_OF_MEMORY;
+                        }
+                    }
                     
                     if (iii == 0) {
                         oldAddMessageLua = addMessageLua;
                         if (asprintf(&addMessageLua, 
-"%sprimary_message_keys[\"%s\"] = function(message)\n"
-"    return \"\"\n"
+"%sif input_keys[\"%s\"] then\n"
+"    primary_message_keys[\"%s\"] = function(message)\n"
+"        return \"\"\n"
+"    end\n"
 "end\n",
                                     addMessageLua,
+                                    currentKey,
                                     currentKey)  == -1) {
                             return ERR_OUT_OF_MEMORY;
                         }  
@@ -440,52 +479,41 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 
                             oldLua = lua;
                             if (asprintf(&lua, 
-"%scontext_directory[\"%s\"] = context\n"
-"reviewers = {}\n"
-"context[\"reviewers\"] = reviewers\n"
-"frame_packers = {}\n"
-"context[\"frame_packers\"] = frame_packers\n"
-"frame_unpackers = {}\n"
-"context[\"frame_unpackers\"] = frame_unpackers\n"
-"primary_message_keys = {}\n"
-"context[\"primary_message_keys\"] = primary_message_keys\n"
-"primary_frame_keys = {}\n"
-"context[\"primary_frame_keys\"] = primary_frame_keys\n"
-"keys = {[1] = \"%s\"}\n"
-"context[\"keys\"] = keys\n"
-"inverse_directory = {[1] = true}\n"
-"context[\"inverse_directory\"] = inverse_directory\n"
-"directory = {[\"0\"] = 1, [\"%s\"] = 1}\n"
-"context[\"directory\"] = directory\n"
-"context[\"results_key\"] = \"%s!%d!r!\" .. sid\n"                   
-"reviewers[1] = function(message, frame, index)\n"
-"    if not message then\n"
-"        frame[\"%s\"] = \"$n\"\n"
-"        return true\n"
+"%sif input_keys[\"%s\"] %s then\n"
+"    toggle = true\n"
+"    context_directory[\"%s\"] = context\n"
+"    keys[1] = \"%s\"\n"
+"    inverse_directory[1] = true\n"
+"    directory[\"%s\"] = 1\n"
+"    reviewers[1] = function(message, frame, index)\n"
+"        if not message then\n"
+"            frame[\"%s\"] = \"$n\"\n"
+"            return true\n"
+"        end\n"
+"        return false\n"
 "    end\n"
-"    return false\n"
-"end\n"
-"frame_packers[1] = function(frame, full_encode)\n"
-"    local result = {}\n%s"
-"    return cmsgpack.pack(result)\n"
-"end\n"
-"frame_unpackers[1] = function(packed_frame)\n"
-"    local frame = cmsgpack.unpack(packed_frame)\n"
-"    local result = {}\n%s"
-"    return result\n"
-"end\n"
-"primary_message_keys[1] = function(message)\n"
-"    return \"\"\n"
-"end\n"
-"primary_frame_keys[1] = function(frame)\n"
-"    return \"\"\n"
+"    frame_packers[1] = function(frame, full_encode)\n"
+"        local result = {}\n%s"
+"        return cmsgpack.pack(result)\n"
+"    end\n"
+"    frame_unpackers[1] = function(packed_frame)\n"
+"        local frame = cmsgpack.unpack(packed_frame)\n"
+"        local result = {}\n%s"
+"        return result\n"
+"    end\n"
+"    primary_message_keys[1] = function(message)\n"
+"        return \"\"\n"
+"    end\n"
+"    primary_frame_keys[1] = function(frame)\n"
+"        return \"\"\n"
+"    end\n"
 "end\n",
                                          lua,
                                          currentKey,
+                                         nextKeyTest,
                                          currentKey,
                                          currentKey,
-                                         actionName,
-                                         ii,
+                                         currentKey,
                                          currentAlias,
                                          packFrameLua,
                                          unpackFrameLua)  == -1) {
@@ -537,54 +565,43 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 
                             oldLua = lua;
                             if (asprintf(&lua, 
-"%scontext_directory[\"%s\"] = context\n"
-"reviewers = {}\n"
-"context[\"reviewers\"] = reviewers\n"
-"frame_packers = {}\n"
-"context[\"frame_packers\"] = frame_packers\n"
-"frame_unpackers = {}\n"
-"context[\"frame_unpackers\"] = frame_unpackers\n"
-"primary_message_keys = {}\n"
-"context[\"primary_message_keys\"] = primary_message_keys\n"
-"primary_frame_keys = {}\n"
-"context[\"primary_frame_keys\"] = primary_frame_keys\n"
-"keys = {[1] = \"%s\"}\n"
-"context[\"keys\"] = keys\n"
-"inverse_directory = {[1] = true}\n"
-"context[\"inverse_directory\"] = inverse_directory\n"
-"directory = {[\"0\"] = 1, [\"%s\"] = 1}\n"
-"context[\"directory\"] = directory\n"
-"context[\"results_key\"] = \"%s!%d!r!\" .. sid\n"  
-"reviewers[1] = function(message, frame, index)\n"
-"    if message then\n"
-"        frame[\"%s\"] = message\n"
-"        return true\n"
+"%sif input_keys[\"%s\"] %s then\n"
+"    toggle = true\n"
+"    context_directory[\"%s\"] = context\n"
+"    keys[1] = \"%s\"\n"
+"    inverse_directory[1] = true\n"
+"    directory[\"%s\"] = 1\n"
+"    reviewers[1] = function(message, frame, index)\n"
+"        if message then\n"
+"            frame[\"%s\"] = message\n"
+"            return true\n"
+"        end\n"
+"        return false\n"
 "    end\n"
-"    return false\n"
-"end\n"
-"frame_packers[1] = function(frame, full_encode)\n"
-"    local result = {}\n"
-"    local message\n%s"
-"    return cmsgpack.pack(result)\n"
-"end\n"
-"frame_unpackers[1] = function(packed_frame)\n"
-"    local frame = cmsgpack.unpack(packed_frame)\n"
-"    local result = {}\n"
-"    local message\n%s"
-"    return result\n"
-"end\n"
-"primary_message_keys[1] = function(message)\n"
-"    return \"\"\n"
-"end\n"
-"primary_frame_keys[1] = function(frame)\n"
-"    return \"\"\n"
+"    frame_packers[1] = function(frame, full_encode)\n"
+"        local result = {}\n"
+"        local message\n%s"
+"        return cmsgpack.pack(result)\n"
+"    end\n"
+"    frame_unpackers[1] = function(packed_frame)\n"
+"        local frame = cmsgpack.unpack(packed_frame)\n"
+"        local result = {}\n"
+"        local message\n%s"
+"        return result\n"
+"    end\n"
+"    primary_message_keys[1] = function(message)\n"
+"        return \"\"\n"
+"    end\n"
+"    primary_frame_keys[1] = function(frame)\n"
+"        return \"\"\n"
+"    end\n"
 "end\n",
                                          lua,
                                          currentKey,
+                                         nextKeyTest,
                                          currentKey,
                                          currentKey,
-                                         actionName,
-                                         ii,
+                                         currentKey,
                                          currentAlias,
                                          packFrameLua,
                                          unpackFrameLua)  == -1) {
@@ -604,11 +621,14 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 
                         oldAddMessageLua = addMessageLua;
                         if (asprintf(&addMessageLua, 
-"%sprimary_message_keys[\"%s\"] = function(message)\n"
-"    local result = \"\"\n%s"
-"    return result\n"
+"%sif input_keys[\"%s\"] then\n"
+"    primary_message_keys[\"%s\"] = function(message)\n"
+"        local result = \"\"\n%s"
+"        return result\n"
+"    end\n"
 "end\n",
                                     addMessageLua,
+                                    currentKey, 
                                     currentKey, 
                                     primaryKeyLua)  == -1) {
                             return ERR_OUT_OF_MEMORY;
@@ -636,37 +656,41 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 
                             oldLua = lua;
                             if (asprintf(&lua,
-"%scontext_directory[\"%s\"] = context\n"
-"keys[%d] = \"%s\"\n"
-"inverse_directory[%d] = true\n"
-"directory[\"%s\"] = %d\n"
-"reviewers[%d] = function(message, frame, index)\n"
-"    if not message or not (%s) then\n"
-"        frame[\"%s\"] = \"$n\"\n"
-"        return true\n"
+"%sif toggle %s then\n"
+"    toggle = true\n"
+"    context_directory[\"%s\"] = context\n"
+"    keys[%d] = \"%s\"\n"
+"    inverse_directory[%d] = true\n"
+"    directory[\"%s\"] = %d\n"
+"    reviewers[%d] = function(message, frame, index)\n"
+"        if not message or not (%s) then\n"
+"            frame[\"%s\"] = \"$n\"\n"
+"            return true\n"
+"        end\n"
+"        return false\n"
 "    end\n"
-"    return false\n"
-"end\n"
-"frame_packers[%d] = function(frame, full_encode)\n"
-"    local result = {}\n"
-"    local message\n%s"
-"    return cmsgpack.pack(result)\n"
-"end\n"
-"frame_unpackers[%d] = function(packed_frame)\n"
-"    local frame = cmsgpack.unpack(packed_frame)\n"
-"    local result = {}\n"
-"    local message\n%s"
-"    return result\n"
-"end\n"
-"primary_message_keys[%d] = function(message)\n"
-"    local result = \"\"\n%s"
-"    return result\n"
-"end\n"
-"primary_frame_keys[%d] = function(frame)\n"
-"    local result = \"\"\n%s"
-"    return result\n"
+"    frame_packers[%d] = function(frame, full_encode)\n"
+"        local result = {}\n"
+"        local message\n%s"
+"        return cmsgpack.pack(result)\n"
+"    end\n"
+"    frame_unpackers[%d] = function(packed_frame)\n"
+"        local frame = cmsgpack.unpack(packed_frame)\n"
+"        local result = {}\n"
+"        local message\n%s"
+"        return result\n"
+"    end\n"
+"    primary_message_keys[%d] = function(message)\n"
+"        local result = \"\"\n%s"
+"        return result\n"
+"    end\n"
+"    primary_frame_keys[%d] = function(frame)\n"
+"        local result = \"\"\n%s"
+"        return result\n"
+"    end\n"
 "end\n",
                                          lua,
+                                         nextKeyTest,
                                          currentKey,
                                          iii + 1, 
                                          currentKey,
@@ -746,36 +770,40 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 
                             oldLua = lua;
                             if (asprintf(&lua,
-"%scontext_directory[\"%s\"] = context\n"
-"keys[%d] = \"%s\"\n"
-"directory[\"%s\"] = %d\n"
-"reviewers[%d] = function(message, frame, index)\n"
-"    if message and %s then\n"
-"        frame[\"%s\"] = message\n"
-"        return true\n"
+"%sif toggle %s then\n"
+"    toggle = true\n"
+"    context_directory[\"%s\"] = context\n"
+"    keys[%d] = \"%s\"\n"
+"    directory[\"%s\"] = %d\n"
+"    reviewers[%d] = function(message, frame, index)\n"
+"        if message and %s then\n"
+"            frame[\"%s\"] = message\n"
+"            return true\n"
+"        end\n"
+"        return false\n"
 "    end\n"
-"    return false\n"
-"end\n"
-"frame_packers[%d] = function(frame, full_encode)\n"
-"    local result = {}\n"
-"    local message\n%s"
-"    return cmsgpack.pack(result)\n"
-"end\n"
-"frame_unpackers[%d] = function(packed_frame)\n"
-"    local frame = cmsgpack.unpack(packed_frame)\n"
-"    local result = {}\n"
-"    local message\n%s"
-"    return result\n"
-"end\n"
-"primary_message_keys[%d] = function(message)\n"
-"    local result = \"\"\n%s"
-"    return result\n"
-"end\n"
-"primary_frame_keys[%d] = function(frame)\n"
-"    local result = \"\"\n%s"
-"    return result\n"
+"    frame_packers[%d] = function(frame, full_encode)\n"
+"        local result = {}\n"
+"        local message\n%s"
+"        return cmsgpack.pack(result)\n"
+"    end\n"
+"    frame_unpackers[%d] = function(packed_frame)\n"
+"        local frame = cmsgpack.unpack(packed_frame)\n"
+"        local result = {}\n"
+"        local message\n%s"
+"        return result\n"
+"    end\n"
+"    primary_message_keys[%d] = function(message)\n"
+"        local result = \"\"\n%s"
+"        return result\n"
+"    end\n"
+"    primary_frame_keys[%d] = function(frame)\n"
+"        local result = \"\"\n%s"
+"        return result\n"
+"    end\n"
 "end\n",
                                          lua,
+                                         nextKeyTest,
                                          currentKey,
                                          iii + 1, 
                                          currentKey,
@@ -797,6 +825,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                             free(oldLua);
                         // done not (expr->not)
                         }
+                        free(nextKeyTest);
                         free(test);
                         free(primaryKeyLua);
                         free(primaryFrameKeyLua);
@@ -835,12 +864,16 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local facts_hashset = \"%s!f!\" .. sid\n"
 "local visited_hashset = \"%s!v!\" .. sid\n"
 "local actions_key = \"%s!a\"\n"
+"local queue_action = false\n"
 "local facts_message_cache = {}\n"
 "local events_message_cache = {}\n"
 "local facts_mids_cache = {}\n"
 "local events_mids_cache = {}\n"
-"local results\n"
 "local context_directory = {}\n"
+"local input_keys = {}\n"
+"local toggle\n"
+"local expressions_count\n"
+"local results\n"
 "local context\n"
 "local keys\n"
 "local reviewers\n"
@@ -850,7 +883,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local primary_frame_keys\n"
 "local directory\n"
 "local results_key\n"
-"local inverse_directory\n"\
+"local inverse_directory\n"
 "local key\n"
 "local cleanup_mids = function(index, frame, events_key, messages_key, mids_cache, message_cache)\n"
 "    local event_mids = mids_cache[events_key]\n"
@@ -939,7 +972,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        new_frame[name] = new_message\n"
 "    end\n"
 "    if reviewers[index](message, new_frame, index) then\n"
-"        if (index == #reviewers) then\n"
+"        if (index == expressions_count) then\n"
 "            save_result(new_frame, index)\n"
 "            return 1\n"
 "        else\n"
@@ -1089,10 +1122,10 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "                redis.call(\"rpush\", results_key, 0)\n"
 "                redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
 "                redis.call(\"rpush\", actions_key .. \"!\" .. sid, 0)\n"
-"                redis.call(\"zadd\", actions_key , score, sid)\n"
 "                local span_count, span_remain = math.modf((score - new_score) / span)\n"
 "                last_score = new_score + span_count * span\n"
 "                redis.call(\"set\", results_key .. \"!d\", last_score)\n"
+"                queue_action = true\n"
 "            end\n"    
 "        end\n"
 "        local count = 0\n"
@@ -1151,7 +1184,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "                redis.call(\"rpush\", actions_key .. \"!\" .. sid, new_remain)\n"
 "            end\n"
 "            if new_count > 0 or new_remain > 0 then\n"
-"                redis.call(\"zadd\", actions_key , score, sid)\n"
+"                queue_action = true\n"
 "            end\n"
 "        end\n"
 "    end\n"
@@ -1191,7 +1224,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "                        redis.call(\"rpush\", actions_key .. \"!\" .. sid, window)\n"
 "                    end\n"
 "                end\n"
-"                redis.call(\"zadd\", actions_key , score, sid)\n"
+"                queue_action = true\n"
 "             end\n"
 "        end\n"
 "    end\n"
@@ -1226,8 +1259,11 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "            return false\n"
 "        end\n"
 "    end\n"
-"end\n%s"
+"end\n"
 "for index = 6, 5 + keys_count, 1 do\n"
+"    input_keys[ARGV[index]] = true\n"
+"end\n"
+"%sfor index = 6, 5 + keys_count, 1 do\n"
 "    results = {}\n"
 "    key = ARGV[index]\n"
 "    context = context_directory[key]\n"
@@ -1240,12 +1276,16 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    directory = context[\"directory\"]\n"
 "    results_key = context[\"results_key\"]\n"
 "    inverse_directory = context[\"inverse_directory\"]\n"
+"    expressions_count = context[\"expressions_count\"]\n"
 "    local process_key = context[\"process_key\"]\n"
 "    local process_key_count = context[\"process_key_count\"]\n"
 "    process_key(message, process_key_count)\n"
 "    if assert_fact == 0 and events_message_cache[tostring(message[\"id\"])] == false then\n"
 "        break\n"
 "    end\n"
+"end\n"
+"if queue_action then\n"
+"    redis.call(\"zadd\", actions_key , score, sid)\n"
 "end\n"
 "return true\n",
                  name,
@@ -1505,6 +1545,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local visited_hashset = \"%s!v!\" .. sid\n"
 "local message = {}\n"
 "local primary_message_keys = {}\n"
+"local input_keys = {}\n"
 "local save_message = function(current_key, message, events_key, messages_key)\n"
 "    redis.call(\"hsetnx\", messages_key, message[\"id\"], cmsgpack.pack(message))\n"
 "    local primary_key = primary_message_keys[current_key](message)\n"
@@ -1534,6 +1575,9 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "            return false\n"
 "        end\n"
 "    end\n"
+"end\n"
+"for index = 4, 3 + keys_count, 1 do\n"
+"    input_keys[ARGV[index]] = true\n"
 "end\n"
 "%sif assert_fact == 1 then\n"
 "    message[\"$f\"] = 1\n"
@@ -2238,6 +2282,7 @@ unsigned int executeBatchWithReply(void *rulesBinding,
         } else {
             if (reply->type == REDIS_REPLY_ERROR) {
                 printf("%s\n", reply->str);
+                freeReplyObject(reply);
                 result = ERR_REDIS_ERROR;
             } else if (i == (replyCount  - 1) && lastReply) {
                 *lastReply = reply;
