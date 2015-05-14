@@ -349,15 +349,16 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                 
                 oldPeekActionLua = peekActionLua;
                 if (asprintf(&peekActionLua, 
-"%sreviewers = {}\n"
-"reviewers_directory[\"%s!%d!r!\"] = reviewers\n"
+"%sif input_keys[\"%s!%d!r!\"] then\n" 
+"local context = {}\n"
+"context_directory[\"%s!%d!r!\"] = context\n"
+"reviewers = {}\n"
+"context[\"reviewers\"] = reviewers\n"
 "keys = {}\n"
-"keys_directory[\"%s!%d!r!\"] = keys\n"
+"context[\"keys\"] = keys\n"
 "primary_frame_keys = {}\n"
-"primary_frame_keys_directory[\"%s!%d!r!\"] = primary_frame_keys\n",
+"context[\"primary_frame_keys\"] = primary_frame_keys\n",
                             peekActionLua,
-                            actionName,
-                            ii,
                             actionName,
                             ii,
                             actionName,
@@ -395,40 +396,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                     return ERR_OUT_OF_MEMORY;
                 }  
                 free(oldLua);
-
-                if (currentNode->value.c.span > 0) {
-                    oldLua = lua;
-                    if (asprintf(&lua,
-"%scontext[\"process_key\"] = process_key_with_span\n"
-"context[\"process_key_count\"] = %d\n",
-                                 lua,
-                                 currentNode->value.c.span)  == -1) {
-                        return ERR_OUT_OF_MEMORY;
-                    }
-                    free(oldLua);
-
-                } else if (currentNode->value.c.cap > 0) {
-                    oldLua = lua;
-                    if (asprintf(&lua,
-"%scontext[\"process_key\"] = process_key_with_cap\n"
-"context[\"process_key_count\"] = %d\n",
-                                 lua,
-                                 currentNode->value.c.cap)  == -1) {
-                        return ERR_OUT_OF_MEMORY;
-                    }
-                    free(oldLua);
-
-                } else {
-                    oldLua = lua;
-                    if (asprintf(&lua,
-"%scontext[\"process_key\"] = process_key_with_window\n"
-"context[\"process_key_count\"] = %d\n",
-                                 lua,
-                                 currentNode->value.c.count)  == -1) {
-                        return ERR_OUT_OF_MEMORY;
-                    }
-                    free(oldLua);
-                }
 
                 for (unsigned int iii = 0; iii < currentJoin->expressionsLength; ++iii) {
                     unsigned int expressionOffset = tree->nextPool[currentJoin->expressionsOffset + iii];
@@ -835,17 +802,57 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 
                 oldPeekActionLua = peekActionLua;
                 if (asprintf(&peekActionLua, 
-"%sframe_restore_directory[\"%s!%d!r!\"] = function(frame, result)\n"
+"%scontext[\"frame_restore\"] = function(frame, result)\n"
 "    local message\n%s"
 "    return true\n"
+"end\n"
+"return context\n"
 "end\n",
                              peekActionLua,
-                             actionName,
-                             ii,
                              unpackFrameLua)  == -1) {
                     return ERR_OUT_OF_MEMORY;
                 }  
                 free(oldPeekActionLua);
+
+                if (currentNode->value.c.span > 0) {
+                    oldLua = lua;
+                    if (asprintf(&lua,
+"%sif toggle then\n"
+"    context[\"process_key\"] = process_key_with_span\n"
+"    context[\"process_key_count\"] = %d\n"
+"end\n",
+                                 lua,
+                                 currentNode->value.c.span)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
+                    free(oldLua);
+
+                } else if (currentNode->value.c.cap > 0) {
+                    oldLua = lua;
+                    if (asprintf(&lua,
+"%sif toggle then\n"
+"    context[\"process_key\"] = process_key_with_cap\n"
+"    context[\"process_key_count\"] = %d\n"
+"end\n",
+                                 lua,
+                                 currentNode->value.c.cap)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
+                    free(oldLua);
+
+                } else {
+                    oldLua = lua;
+                    if (asprintf(&lua,
+"%sif toggle then\n"
+"    context[\"process_key\"] = process_key_with_window\n"
+"    context[\"process_key_count\"] = %d\n"
+"end\n",
+                                 lua,
+                                 currentNode->value.c.count)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
+                    free(oldLua);
+                }
             }
 
             free(unpackFrameLua);
@@ -1316,13 +1323,10 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local action_key = \"%s!a\"\n"
 "local state_key = \"%s!s\"\n"
 "local timers_key = \"%s!t\"\n"
-"local keys_directory = {}\n"
+"local context_directory = {}\n"
 "local keys\n"
-"local reviewers_directory = {}\n"
 "local reviewers\n"
-"local primary_frame_keys_directory = {}\n"
 "local primary_frame_keys\n"
-"local frame_restore_directory = {}\n"
 "local facts_hashset\n"
 "local events_hashset\n"
 "local events_message_cache = {}\n"
@@ -1330,6 +1334,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local facts_mids_cache = {}\n"
 "local events_mids_cache = {}\n"
 "local return_state = tonumber(ARGV[3])\n"
+"local get_context\n"
 "local get_mids = function(index, frame, events_key, messages_key, mids_cache, message_cache)\n"
 "    local event_mids = mids_cache[events_key]\n"
 "    local primary_key = primary_frame_keys[index](frame)\n"
@@ -1386,15 +1391,15 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local review_frame = function(frame, rule_action_key, sid, max_score)\n"
 "    local indexes = {}\n"
 "    local action_id = string.sub(rule_action_key, 1, (string.len(sid) + 1) * -1)\n"
-"    local frame_restore = frame_restore_directory[action_id]\n"
+"    local context = get_context(action_id)\n"
 "    local full_frame = {}\n"
 "    local cancel = false\n"
 "    events_hashset = events_key .. sid\n"
 "    facts_hashset = facts_key .. sid\n"
-"    keys = keys_directory[action_id]\n"
-"    reviewers = reviewers_directory[action_id]\n"
-"    primary_frame_keys = primary_frame_keys_directory[action_id]\n"
-"    if not frame_restore(frame, full_frame) then\n"
+"    keys = context[\"keys\"]\n"
+"    reviewers = context[\"reviewers\"]\n"
+"    primary_frame_keys = context[\"primary_frame_keys\"]\n"
+"    if not context[\"frame_restore\"](frame, full_frame) then\n"
 "        cancel = true\n"
 "    else\n"
 "        for i = 1, #frame, 1 do\n"
@@ -1502,7 +1507,13 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    end\n"
 "    return sid, name, frame\n"
 "end\n"
-"%slocal sid, action_name, frame = load_frame(tonumber(ARGV[2]))\n"
+"get_context = function(action_key)\n"
+"    if context_directory[action_key] then\n"
+"    return context_directory[action_key]\n"
+"    end\n"
+"    local input_keys = {[action_key] = true}\n%s"
+"end\n"
+"local sid, action_name, frame = load_frame(tonumber(ARGV[2]))\n"
 "if frame then\n"
 "    redis.call(\"zincrby\", action_key, tonumber(ARGV[1]), sid)\n"
 "    local state_fact = redis.call(\"hget\", state_key, sid .. \"!f\")\n"
