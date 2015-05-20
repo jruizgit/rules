@@ -402,23 +402,16 @@ class Ruleset(object):
                         binding  = 0
                         replies = 0
                         pending = {action_binding: 0}
+
+                        binding, replies = rules.start_update_state(self._handle, c._handle, json.dumps(c.s._d))
+                        pending[binding] = replies
+                                
                         for ruleset_name, facts in c.get_retract_facts().iteritems():
                             if len(facts) == 1:
                                 binding, replies = self._host.start_retract_fact(ruleset_name, facts[0])
                             else:
                                 binding, replies = self._host.start_retract_facts(ruleset_name, facts)
                            
-                            if binding in pending:
-                                pending[binding] = pending[binding] + replies
-                            else:
-                                pending[binding] = replies
-
-                        for ruleset_name, messages in c.get_messages().iteritems():
-                            if len(messages) == 1:
-                                binding, replies = self._host.start_post(ruleset_name, messages[0])
-                            else:
-                                binding, replies = self._host.start_post_batch(ruleset_name, messages)
-                            
                             if binding in pending:
                                 pending[binding] = pending[binding] + replies
                             else:
@@ -435,17 +428,30 @@ class Ruleset(object):
                             else:
                                 pending[binding] = replies
 
+                        for ruleset_name, messages in c.get_messages().iteritems():
+                            if len(messages) == 1:
+                                binding, replies = self._host.start_post(ruleset_name, messages[0])
+                            else:
+                                binding, replies = self._host.start_post_batch(ruleset_name, messages)
+                            
+                            if binding in pending:
+                                pending[binding] = pending[binding] + replies
+                            else:
+                                pending[binding] = replies
+
                         for binding, replies in pending.iteritems():
                             if binding != action_binding:
                                 rules.complete(binding, replies)
                             else:
-                                new_result = rules.complete_and_start_action(self._handle, replies, c._handle, json.dumps(c.s._d))
+                                new_result = rules.complete_and_start_action(self._handle, replies, c._handle)
                                 if new_result:
                                     result_container['message'] = json.loads(new_result)
 
                     except Exception as error:
-                        rules.abandon_action(self._handle, c._handle)
-                        complete(error)
+                        print(error)
+                        raise SystemExit
+                        #rules.abandon_action(self._handle, c._handle)
+                        #complete(error)
             
             self._actions[action_name].run(c, action_callback) 
 

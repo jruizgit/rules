@@ -1,6 +1,14 @@
 from durable.lang import *
 import datetime
 
+def unix_time(dt):
+    epoch = datetime.datetime.utcfromtimestamp(0)
+    delta = dt - epoch
+    return delta.total_seconds()
+
+def unix_time_millis(dt):
+    return unix_time(dt) * 1000.0
+
 with ruleset('miss_manners'):
     @when_all(c.guest << m.t == 'guest', 
              (m.t == 'context') & (m.l == 'start'))
@@ -22,7 +30,7 @@ with ruleset('miss_manners'):
         c.post({'t': 'context', 'l': 'assign', 'id': c.s.g_count + 2})
         c.s.count += 1
         c.s.g_count += 3
-        c.s.start_time = datetime.datetime.now().strftime('%I:%M:%S:%f')
+        c.s.start_time = unix_time_millis(datetime.datetime.now())
         print('assign {0}'.format(c.guest.name))
 
     @when_all(by('right_guest'),
@@ -103,7 +111,7 @@ with ruleset('miss_manners'):
              (m.t == 'seating') & (m.right_seat == c.last_seat.seat),
              (m.t == 'context') & (m.l == 'check'))
     def done(c):
-        print('end {0}, {1}'.format(c.s.start_time, datetime.datetime.now().strftime('%I:%M:%S:%f')))
+        print('end {0}'.format(unix_time_millis(datetime.datetime.now()) - c.s.start_time))
     
     @when_all(pri(1), 
              (m.t == 'context') & (m.l == 'check'))

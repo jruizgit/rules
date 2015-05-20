@@ -515,6 +515,35 @@ static PyObject *pyAssertState(PyObject *self, PyObject *args) {
     }
 }
 
+static PyObject *pyStartUpdateState(PyObject *self, PyObject *args) {
+    void *handle;
+    void *actionHandle;
+    char *state;
+    if (!PyArg_ParseTuple(args, "lls", &handle, &actionHandle, &state)) {
+        PyErr_SetString(RulesError, "pyStartUpdateState Invalid argument");
+        return NULL;
+    }
+
+    unsigned int replyCount;
+    void *rulesBinding = NULL;
+    unsigned int result = startUpdateState(handle, actionHandle, state, &rulesBinding, &replyCount);
+    if (result == RULES_OK) {
+        return Py_BuildValue("li", rulesBinding, replyCount);    
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        return Py_BuildValue("li", 0, 0);    
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            asprintf(&message, "Could not update state, error code: %d", result);  
+            PyErr_SetString(RulesError, message);
+            free(message);
+        }
+        return NULL;
+    }
+}
+
 static PyObject *pyStartAction(PyObject *self, PyObject *args) {
     void *handle;
     if (!PyArg_ParseTuple(args, "l", &handle)) {
@@ -573,15 +602,14 @@ static PyObject *pyCompleteAction(PyObject *self, PyObject *args) {
 static PyObject *pyCompleteAndStartAction(PyObject *self, PyObject *args) {
     void *handle;
     void *actionHandle;
-    char *state;
     unsigned int expectedReplies;
-    if (!PyArg_ParseTuple(args, "llls", &handle, &expectedReplies, &actionHandle, &state)) {
+    if (!PyArg_ParseTuple(args, "lll", &handle, &expectedReplies, &actionHandle)) {
         PyErr_SetString(RulesError, "pyCompleteAndStartAction Invalid argument");
         return NULL;
     }
 
     char *messages;
-    unsigned int result = completeAndStartAction(handle, expectedReplies, actionHandle, state, &messages);
+    unsigned int result = completeAndStartAction(handle, expectedReplies, actionHandle, &messages);
     if (result == ERR_NO_ACTION_AVAILABLE) {
         Py_RETURN_NONE;
     } if (result != RULES_OK) {
@@ -720,6 +748,7 @@ static PyMethodDef myModule_methods[] = {
     {"retract_facts", pyRetractFacts, METH_VARARGS},
     {"start_retract_facts", pyStartRetractFacts, METH_VARARGS},
     {"assert_state", pyAssertState, METH_VARARGS},
+    {"start_update_state", pyStartUpdateState, METH_VARARGS},
     {"start_action", pyStartAction, METH_VARARGS},
     {"complete_action", pyCompleteAction, METH_VARARGS},
     {"complete_and_start_action", pyCompleteAndStartAction, METH_VARARGS},

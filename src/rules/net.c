@@ -871,6 +871,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local facts_hashset = \"%s!f!\" .. sid\n"
 "local visited_hashset = \"%s!v!\" .. sid\n"
 "local actions_key = \"%s!a\"\n"
+"local state_key = \"%s!s\"\n"
 "local queue_action = false\n"
 "local facts_message_cache = {}\n"
 "local events_message_cache = {}\n"
@@ -878,9 +879,11 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local events_mids_cache = {}\n"
 "local context_directory = {}\n"
 "local input_keys = {}\n"
+"local candidate = nil\n"
 "local toggle\n"
 "local expressions_count\n"
 "local results\n"
+"local unpacked_results\n"
 "local context\n"
 "local keys\n"
 "local reviewers\n"
@@ -953,6 +956,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "end\n"
 "local save_result = function(frame, index)\n"
 "    table.insert(results, 1, frame_packers[index](frame, true))\n"
+"    table.insert(unpacked_results, 1, frame)\n"
 "    for name, message in pairs(frame) do\n"
 "        if message ~= \"$n\" and not message[\"$f\"] then\n"
 "            redis.call(\"hdel\", events_hashset, message[\"id\"])\n"
@@ -1119,6 +1123,8 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "end\n"
 "local process_key_with_span = function(message, span)\n"
 "    local index = directory[key]\n"
+"    local next_result = nil\n"
+"    local queue_lock = false\n"
 "    if index then\n"
 "        local last_score = redis.call(\"get\", results_key .. \"!d\")\n"
 "        if not last_score then\n"
@@ -1132,7 +1138,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "                local span_count, span_remain = math.modf((score - new_score) / span)\n"
 "                last_score = new_score + span_count * span\n"
 "                redis.call(\"set\", results_key .. \"!d\", last_score)\n"
-"                queue_action = true\n"
+"                queue_lock = true\n"
 "            end\n"    
 "        end\n"
 "        local count = 0\n"
@@ -1155,9 +1161,12 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "            end\n"
 "        end\n"
 "    end\n"
+"    return queue_lock, next_result\n"
 "end\n"
 "local process_key_with_cap = function(message, cap)\n"
 "    local index = directory[key]\n"
+"    local next_result = nil\n"
+"    local queue_lock = false\n"
 "    if index then\n"
 "        local count = 0\n"
 "        if not message then\n"
@@ -1180,6 +1189,20 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "            local diff\n"
 "            local new_count, new_remain = math.modf(#results / cap)\n"
 "            local new_remain = #results %% cap\n"
+"            if redis.call(\"llen\", actions_key .. \"!\" .. sid) == 2 then\n"
+"                local frames = {}\n"
+"                if new_count > 0 then\n"
+"                    for i = 0, cap - 1, 1 do\n"
+"                        table.insert(frames, unpacked_results[#unpacked_results - i])\n"
+"                    end\n"
+"                else\n"
+"                    for i = 0, new_remain - 1, 1 do\n"
+"                        table.insert(frames, unpacked_results[#unpacked_results - i])\n"
+"                    end\n"
+"                end\n"
+"                local last_name = string.find(results_key, \"!\") - 1\n"
+"                next_result = {[string.sub(results_key, 1, last_name)] = frames}\n"
+"            end\n"
 "            if new_count > 0 then\n"
 "                for i = 1, new_count, 1 do\n"
 "                    redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
@@ -1191,13 +1214,16 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "                redis.call(\"rpush\", actions_key .. \"!\" .. sid, new_remain)\n"
 "            end\n"
 "            if new_count > 0 or new_remain > 0 then\n"
-"                queue_action = true\n"
+"                queue_lock = true\n"
 "            end\n"
 "        end\n"
 "    end\n"
+"    return queue_lock, next_result\n"
 "end\n"
 "local process_key_with_window = function(message, window)\n"
 "    local index = directory[key]\n"
+"    local next_result = nil\n"
+"    local queue_lock = false\n"
 "    if index then\n"
 "        local count = 0\n"
 "        if not message then\n"
@@ -1223,6 +1249,18 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "            local new_count, prev_remain = math.modf(length / window)\n"
 "            diff = new_count - prev_count\n"
 "            if diff > 0 then\n"
+"                if redis.call(\"llen\", actions_key .. \"!\" .. sid) == 2 then\n"
+"                    local frames = {}\n"
+"                    for i = 0, window - 1, 1 do\n"
+"                        table.insert(frames, unpacked_results[#unpacked_results - i])\n"
+"                    end\n"
+"                    local last_name = string.find(results_key, \"!\") - 1\n"
+"                    if window == 1 then\n"
+"                        next_result = {[string.sub(results_key, 1, last_name)] = frames[1]}\n"
+"                    else\n"
+"                        next_result = {[string.sub(results_key, 1, last_name)] = frames}\n"
+"                    end\n"
+"                end\n"
 "                for i = 0, diff - 1, 1 do\n"
 "                    redis.call(\"rpush\", actions_key .. \"!\" .. sid, results_key)\n"
 "                    if window == 1 then\n"
@@ -1231,10 +1269,11 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "                        redis.call(\"rpush\", actions_key .. \"!\" .. sid, window)\n"
 "                    end\n"
 "                end\n"
-"                queue_action = true\n"
+"                queue_lock = true\n"
 "             end\n"
 "        end\n"
 "    end\n"
+"    return queue_lock, next_result\n"
 "end\n"
 "local message = nil\n"
 "if #ARGV > (6 + keys_count) then\n"
@@ -1272,6 +1311,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "end\n"
 "%sfor index = 6, 5 + keys_count, 1 do\n"
 "    results = {}\n"
+"    unpacked_results = {}\n"
 "    key = ARGV[index]\n"
 "    context = context_directory[key]\n"
 "    keys = context[\"keys\"]\n"
@@ -1286,15 +1326,30 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    expressions_count = context[\"expressions_count\"]\n"
 "    local process_key = context[\"process_key\"]\n"
 "    local process_key_count = context[\"process_key_count\"]\n"
-"    process_key(message, process_key_count)\n"
+"    local new_candidate\n"
+"    queue_action, new_candidate = process_key(message, process_key_count)\n"
+"    if new_candidate then\n"
+"        candidate = new_candidate\n"
+"    end\n"
 "    if assert_fact == 0 and events_message_cache[tostring(message[\"id\"])] == false then\n"
 "        break\n"
 "    end\n"
 "end\n"
 "if queue_action then\n"
-"    redis.call(\"zadd\", actions_key , score, sid)\n"
+"    if not redis.call(\"zscore\", actions_key, sid) then\n"
+"        redis.call(\"zadd\", actions_key , score, sid)\n"
+"    end\n"
 "end\n"
-"return true\n",
+"if not candidate then\n"
+"redis.call(\"incrby\", \"empty\", 1)\n"
+"    return nil\n"
+"else\n"
+"redis.call(\"incrby\", \"full\", 1)\n"
+"    redis.call(\"set\", \"skip\", \"yes\")\n"
+"    local state_fact = redis.call(\"hget\", state_key, sid .. \"!f\")\n"
+"    return {sid, state_fact, cjson.encode(candidate)}\n"
+"end\n",
+                 name,
                  name,
                  name,
                  name,
@@ -1318,6 +1373,10 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     free(lua);
 
     if (asprintf(&lua, 
+"if redis.call(\"get\", \"skip\") == \"yes\" then\n"
+"    redis.call(\"set\", \"skip\", \"no\")\n"
+"    return nil\n"
+"end\n"
 "local facts_key = \"%s!f!\"\n"
 "local events_key = \"%s!e!\"\n"
 "local action_key = \"%s!a\"\n"
@@ -1460,7 +1519,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        end\n"
 "    end\n"
 "    for i = #packed_frames, 1, -1 do\n"
-"        redis.call(\"lpush\", rule_action_key, packed_frames[i])\n"
+"        redis.call(\"rpush\", rule_action_key, packed_frames[i])\n"
 "    end\n"
 "    if #packed_frames == 0 then\n"
 "        return nil, nil\n"
@@ -1509,7 +1568,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "end\n"
 "get_context = function(action_key)\n"
 "    if context_directory[action_key] then\n"
-"    return context_directory[action_key]\n"
+"        return context_directory[action_key]\n"
 "    end\n"
 "    local input_keys = {[action_key] = true}\n%s"
 "end\n"
@@ -1648,9 +1707,13 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local max_score = tonumber(ARGV[2])\n"
 "local action_key = \"%s!a\"\n"
 "if delete_frame(action_key .. \"!\" .. sid) then\n"
-"    redis.call(\"zadd\", action_key, max_score, sid)\n"
+//"    if redis.call(\"get\", \"skip\") ~= \"yes\" then\n"
+"        redis.call(\"zadd\", action_key, max_score, sid)\n"
+//"    end\n"
 "else\n"
-"    redis.call(\"zrem\", action_key, sid)\n"
+//"    if redis.call(\"get\", \"skip\") ~= \"yes\" then\n"
+"        redis.call(\"zrem\", action_key, sid)\n"
+//"    end\n"
 "end\n", name)  == -1) {
         return ERR_OUT_OF_MEMORY;
     }
@@ -2273,6 +2336,9 @@ unsigned int executeBatchWithReply(void *rulesBinding,
     unsigned int replyCount = commandCount + expectedReplies;
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;
+    if (lastReply) {
+        *lastReply = NULL;
+    }
 
     for (unsigned int i = 0; i < commandCount; ++i) {
         sds newbuf;
@@ -2295,8 +2361,16 @@ unsigned int executeBatchWithReply(void *rulesBinding,
                 printf("%s\n", reply->str);
                 freeReplyObject(reply);
                 result = ERR_REDIS_ERROR;
-            } else if (i == (replyCount  - 1) && lastReply) {
-                *lastReply = reply;
+            } else if (reply->type == REDIS_REPLY_ARRAY) {
+                if (lastReply == NULL) {
+                    freeReplyObject(reply); 
+                } else {
+                    if (*lastReply != NULL) {    
+                        freeReplyObject(*lastReply);  
+                    }
+
+                    *lastReply = reply;
+                }
             } else {
                 freeReplyObject(reply);    
             }

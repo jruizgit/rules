@@ -124,6 +124,12 @@ unsigned int startRetractFacts(void *handle,
                               void **rulesBinding, 
                               unsigned int *replyCount);
 
+unsigned int startUpdateState(void *handle, 
+                              void *actionHandle, 
+                              char *state,
+                              void **rulesBinding,
+                              unsigned int *replyCount);
+
 unsigned int assertState(void *handle, 
                          char *state);
 
@@ -140,7 +146,6 @@ unsigned int completeAction(void *handle,
 unsigned int completeAndStartAction(void *handle, 
                                     unsigned int expectedReplies,
                                     void *actionHandle, 
-                                    char *state, 
                                     char **messages);
 
 unsigned int abandonAction(void *handle, 

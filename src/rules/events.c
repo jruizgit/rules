@@ -1674,8 +1674,8 @@ unsigned int startRetractFacts(void *handle,
                               char *messages, 
                               unsigned int *resultsLength, 
                               unsigned int **results, 
-                             void **rulesBinding, 
-                             unsigned int *replyCount) {
+                              void **rulesBinding, 
+                              unsigned int *replyCount) {
     return startHandleMessages(handle, messages, ACTION_REMOVE_FACT, resultsLength, results, rulesBinding, replyCount);
 }
 
@@ -1739,6 +1739,47 @@ unsigned int startAction(void *handle,
     return RULES_OK;
 }
 
+unsigned int startUpdateState(void *handle, 
+                              void *actionHandle, 
+                              char *state,
+                              void **rulesBinding,
+                              unsigned int *replyCount) {
+    char *commands[MAX_COMMAND_COUNT];
+    unsigned int result = RULES_OK;
+    unsigned int commandCount = 0;
+    actionContext *context = (actionContext*)actionHandle;
+    redisReply *reply = context->reply;
+    if (reply->element[1]->str != NULL) {
+        result = handleMessage(handle,
+                               NULL,
+                               reply->element[1]->str,
+                               ACTION_REMOVE_FACT,
+                               commands,
+                               &commandCount,
+                               rulesBinding);
+        if (result != RULES_OK) {
+            //reply object should be freed by the app during abandonAction
+            freeCommands(commands, commandCount);
+            return result;
+        }
+    }
+
+    result = handleState(handle, 
+                         state, 
+                         commands,
+                         &commandCount,
+                         rulesBinding);
+    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+        //reply object should be freed by the app during abandonAction
+        freeCommands(commands, commandCount);
+        return result;
+    }
+
+    result = startNonBlockingBatch(*rulesBinding, commands, commandCount, replyCount);
+    return result;
+
+}
+
 unsigned int completeAction(void *handle, 
                             void *actionHandle, 
                             char *state) {
@@ -1792,7 +1833,6 @@ unsigned int completeAction(void *handle,
 unsigned int completeAndStartAction(void *handle, 
                                     unsigned int expectedReplies,
                                     void *actionHandle, 
-                                    char *state, 
                                     char **messages) {
     char *commands[MAX_COMMAND_COUNT];
     unsigned int commandCount = 0;
@@ -1809,32 +1849,6 @@ unsigned int completeAndStartAction(void *handle,
     }
 
     ++commandCount;
-    if (reply->element[1]->str != NULL) {
-        result = handleMessage(handle,
-                               NULL,
-                               reply->element[1]->str,
-                               ACTION_REMOVE_FACT,
-                               commands,
-                               &commandCount,
-                               &rulesBinding);
-        if (result != RULES_OK) {
-            //reply object should be freed by the app during abandonAction
-            freeCommands(commands, commandCount);
-            return result;
-        }
-    }
-
-    result = handleState(handle, 
-                         state, 
-                         commands,
-                         &commandCount,
-                         &rulesBinding);
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        //reply object should be freed by the app during abandonAction
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
     if (commandCount == MAX_COMMAND_COUNT) {
         //reply object should be freed by the app during abandonAction
         freeCommands(commands, commandCount);
@@ -1861,8 +1875,7 @@ unsigned int completeAndStartAction(void *handle,
     }
     
     freeReplyObject(reply);
-    if (newReply->type != REDIS_REPLY_ARRAY) {
-        freeReplyObject(newReply);
+    if (newReply == NULL) {
         free(actionHandle);
         return ERR_NO_ACTION_AVAILABLE;
     }

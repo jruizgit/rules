@@ -80,6 +80,14 @@ def make_3j_junction(j, base_point, p1, p2, p3):
     else:
         j['name'] = 'arrow'
 
+def unix_time(dt):
+    epoch = datetime.datetime.utcfromtimestamp(0)
+    delta = dt - epoch
+    return delta.total_seconds()
+
+def unix_time_millis(dt):
+    return unix_time(dt) * 1000.0
+
 with ruleset('waltzdb'):
 
     @when_all(cap(1000),
@@ -214,7 +222,7 @@ with ruleset('waltzdb'):
     @when_all(pri(1),
              (m.t == 'stage') & (m.l == 'labeling'))
     def done_labeling(c):
-        print('end {0}, {1}'.format(c.s.start_time, datetime.datetime.now().strftime('%I:%M:%S:%f')))
+        print('end {0}'.format(unix_time_millis(datetime.datetime.now()) - c.s.start_time))
 
     def visit_3j(c):
         print('Edge Label {0} {1} {2} {3}'.format(c.j.base_point, c.j.p1, c.l.n1, c.l.lid))
@@ -225,7 +233,7 @@ with ruleset('waltzdb'):
         c.assert_fact({'id': c.s.gid + 2, 't': 'edge_label', 'p1': c.j.base_point, 'p2': c.j.p3, 'label_name': c.l.n3, 'lid': c.l.lid})
         c.s.gid += 3
 
-    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now'),
+    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now') & (m.j_t == '3j'),
               c.l << (m.t == 'label') & (m.name == c.j.name), 
               c.el1 << (m.t == 'edge_label') & (m.p1 == c.j.p1) & (m.p2 == c.j.base_point) & (m.label_name == c.l.n1),
               c.el2 << (m.t == 'edge_label') & (m.p1 == c.j.p2) & (m.p2 == c.j.base_point) & (m.label_name == c.l.n2),
@@ -235,7 +243,7 @@ with ruleset('waltzdb'):
     def visit_3j_0(c):
         visit_3j(c)
 
-    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now'),
+    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now') & (m.j_t == '3j'),
               c.l << (m.t == 'label') & (m.name == c.j.name), 
               none((m.t == 'edge_label') & (m.p1 == c.j.p1) & (m.p2 == c.j.base_point)),
               c.el2 << (m.t == 'edge_label') & (m.p1 == c.j.p2) & (m.p2 == c.j.base_point) & (m.label_name == c.l.n2),
@@ -245,7 +253,7 @@ with ruleset('waltzdb'):
     def visit_3j_1(c):
         visit_3j(c)
 
-    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now'),
+    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now') & (m.j_t == '3j'),
               c.l << (m.t == 'label') & (m.name == c.j.name), 
               c.el1 << (m.t == 'edge_label') & (m.p1 == c.j.p1) & (m.p2 == c.j.base_point) & (m.label_name == c.l.n1),
               none((m.t == 'edge_label') & (m.p1 == c.j.p2) & (m.p2 == c.j.base_point)),
@@ -255,7 +263,7 @@ with ruleset('waltzdb'):
     def visit_3j_2(c):
         visit_3j(c)
 
-    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now'),
+    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now') & (m.j_t == '3j'),
               c.l << (m.t == 'label') & (m.name == c.j.name), 
               none((m.t == 'edge_label') & (m.p1 == c.j.p1) & (m.p2 == c.j.base_point)),
               none((m.t == 'edge_label') & (m.p1 == c.j.p2) & (m.p2 == c.j.base_point)),
@@ -265,7 +273,7 @@ with ruleset('waltzdb'):
     def visit_3j_3(c):
         visit_3j(c)
 
-    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now'),
+    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now') & (m.j_t == '3j'),
               c.l << (m.t == 'label') & (m.name == c.j.name), 
               c.el1 << (m.t == 'edge_label') & (m.p1 == c.j.p1) & (m.p2 == c.j.base_point) & (m.label_name == c.l.n1),
               c.el2 << (m.t == 'edge_label') & (m.p1 == c.j.p2) & (m.p2 == c.j.base_point) & (m.label_name == c.l.n2),
@@ -275,7 +283,7 @@ with ruleset('waltzdb'):
     def visit_3j_4(c):
         visit_3j(c)
 
-    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now'),
+    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now') & (m.j_t == '3j'),
               c.l << (m.t == 'label') & (m.name == c.j.name), 
               none((m.t == 'edge_label') & (m.p1 == c.j.p1) & (m.p2 == c.j.base_point)),
               c.el2 << (m.t == 'edge_label') & (m.p1 == c.j.p2) & (m.p2 == c.j.base_point) & (m.label_name == c.l.n2),
@@ -285,7 +293,7 @@ with ruleset('waltzdb'):
     def visit_3j_5(c):
         visit_3j(c)
 
-    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now'),
+    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now') & (m.j_t == '3j'),
               c.l << (m.t == 'label') & (m.name == c.j.name), 
               c.el1 << (m.t == 'edge_label') & (m.p1 == c.j.p1) & (m.p2 == c.j.base_point) & (m.label_name == c.l.n1),
               none((m.t == 'edge_label') & (m.p1 == c.j.p2) & (m.p2 == c.j.base_point)),
@@ -295,7 +303,7 @@ with ruleset('waltzdb'):
     def visit_3j_6(c):
         visit_3j(c)
 
-    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now'),
+    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now') & (m.j_t == '3j'),
               c.l << (m.t == 'label') & (m.name == c.j.name), 
               none((m.t == 'edge_label') & (m.p1 == c.j.p1) & (m.p2 == c.j.base_point)),
               none((m.t == 'edge_label') & (m.p1 == c.j.p2) & (m.p2 == c.j.base_point)),
@@ -306,7 +314,7 @@ with ruleset('waltzdb'):
         visit_3j(c)
 
     @when_all(pri(1),
-             (m.t == 'junction') & (m.visited == 'now'),
+             (m.t == 'junction') & (m.visited == 'now') & (m.j_t == '3j'),
              c.stage << (m.t == 'stage') & (m.l == 'visiting_3j'))
     def end_visit_3j(c):
         c.retract_fact(c.stage)
@@ -321,7 +329,7 @@ with ruleset('waltzdb'):
         c.assert_fact({'id': c.s.gid + 1, 't': 'edge_label', 'p1': c.j.base_point, 'p2': c.j.p2, 'label_name': c.l.n2, 'lid': c.l.lid})
         c.s.gid += 2
 
-    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now'),
+    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now') & (m.j_t == '2j'),
               c.l << (m.t == 'label') & (m.name == c.j.name), 
               c.el1 << (m.t == 'edge_label') & (m.p1 == c.j.p1) & (m.p2 == c.j.base_point) & (m.label_name == c.l.n1),
               c.el2 << (m.t == 'edge_label') & (m.p1 == c.j.p2) & (m.p2 == c.j.base_point) & (m.label_name == c.l.n2),
@@ -330,7 +338,7 @@ with ruleset('waltzdb'):
     def visit_2j_0(c):
         visit_2j(c)
 
-    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now'),
+    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now') & (m.j_t == '2j'),
               c.l << (m.t == 'label') & (m.name == c.j.name), 
               none((m.t == 'edge_label') & (m.p1 == c.j.p1) & (m.p2 == c.j.base_point)),
               c.el2 << (m.t == 'edge_label') & (m.p1 == c.j.p2) & (m.p2 == c.j.base_point) & (m.label_name == c.l.n2),
@@ -339,7 +347,7 @@ with ruleset('waltzdb'):
     def visit_2j_1(c):
         visit_2j(c)
 
-    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now'),
+    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now') & (m.j_t == '2j'),
               c.l << (m.t == 'label') & (m.name == c.j.name), 
               c.el1 << (m.t == 'edge_label') & (m.p1 == c.j.p1) & (m.p2 == c.j.base_point) & (m.label_name == c.l.n1),
               none((m.t == 'edge_label') & (m.p1 == c.j.p2) & (m.p2 == c.j.base_point)),
@@ -348,7 +356,7 @@ with ruleset('waltzdb'):
     def visit_2j_2(c):
         visit_2j(c)
 
-    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now'),
+    @when_all(c.j << (m.t == 'junction') & (m.visited == 'now') & (m.j_t == '2j'),
               c.l << (m.t == 'label') & (m.name == c.j.name), 
               none((m.t == 'edge_label') & (m.p1 == c.j.p1) & (m.p2 == c.j.base_point)),
               none((m.t == 'edge_label') & (m.p1 == c.j.p2) & (m.p2 == c.j.base_point)),
@@ -358,7 +366,7 @@ with ruleset('waltzdb'):
         visit_2j(c)
 
     @when_all(pri(1), 
-             (m.t == 'junction') & (m.visited == 'now'),
+             (m.t == 'junction') & (m.visited == 'now') & (m.j_t == '2j'),
               c.stage << (m.t == 'stage') & (m.l == 'visiting_2j'))
     def end_visit_2j(c):
         c.retract_fact(c.stage)
@@ -840,7 +848,7 @@ with ruleset('waltzdb'):
         create_and_post(host, {'t':'line' ,'p1':500005 ,'p2':500006})
         create_and_post(host, {'t':'line' ,'p1':470008 ,'p2':480008})
         host.assert_fact('waltzdb', {'t':'stage', 'l':'duplicate', 'sid': 1, 'id': 999})
-        host.patch_state('waltzdb', {'sid': 1, 'gid': 1000, 'start_time': datetime.datetime.now().strftime('%I:%M:%S:%f')})
+        host.patch_state('waltzdb', {'sid': 1, 'gid': 1000, 'start_time': unix_time_millis(datetime.datetime.now())})
 
 run_all(['/tmp/redis0.sock'])
 
