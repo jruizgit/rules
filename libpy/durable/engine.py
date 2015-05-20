@@ -448,10 +448,8 @@ class Ruleset(object):
                                     result_container['message'] = json.loads(new_result)
 
                     except Exception as error:
-                        print(error)
-                        raise SystemExit
-                        #rules.abandon_action(self._handle, c._handle)
-                        #complete(error)
+                        rules.abandon_action(self._handle, c._handle)
+                        complete(error)
             
             self._actions[action_name].run(c, action_callback) 
 
