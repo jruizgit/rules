@@ -95,6 +95,7 @@ unsigned int formatRemoveMessage(void *rulesBinding,
                                  char **command);
 
 unsigned int formatPeekAction(void *rulesBinding,
+                              char *sid,
                               char **command);
 
 unsigned int executeBatch(void *rulesBinding,

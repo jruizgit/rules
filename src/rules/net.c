@@ -1341,11 +1341,13 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    end\n"
 "end\n"
 "if not candidate then\n"
+"    if redis.call(\"llen\", actions_key .. \"!\" .. sid) > 2 then\n"
+"    end\n"
 "    return nil\n"
 "else\n"
 "    redis.call(\"set\", \"skip\", \"yes\")\n"
-"    local state_fact = redis.call(\"hget\", state_key, sid .. \"!f\")\n"
-"    return {sid, state_fact, cjson.encode(candidate)}\n"
+"redis.call(\"rpush\", \"debug\", \"o \" .. cjson.encode(candidate))\n"
+"    return {sid, cjson.encode(candidate)}\n"
 "end\n",
                  name,
                  name,
@@ -1390,7 +1392,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local facts_message_cache = {}\n"
 "local facts_mids_cache = {}\n"
 "local events_mids_cache = {}\n"
-"local return_state = tonumber(ARGV[3])\n"
 "local get_context\n"
 "local get_mids = function(index, frame, events_key, messages_key, mids_cache, message_cache)\n"
 "    local event_mids = mids_cache[events_key]\n"
@@ -1456,9 +1457,12 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    keys = context[\"keys\"]\n"
 "    reviewers = context[\"reviewers\"]\n"
 "    primary_frame_keys = context[\"primary_frame_keys\"]\n"
+"redis.call(\"rpush\", \"debug\", \"b \" .. cjson.encode(frame))\n"
 "    if not context[\"frame_restore\"](frame, full_frame) then\n"
+"redis.call(\"rpush\", \"debug\", \"c \")\n"
 "        cancel = true\n"
 "    else\n"
+"redis.call(\"rpush\", \"debug\", \"a \" .. cjson.encode(full_frame))\n"
 "        for i = 1, #frame, 1 do\n"
 "            if frame[i] == \"$n\" then\n"
 "                if not validate_frame(frame, full_frame, i, sid) then\n"
@@ -1532,6 +1536,9 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local load_frame_from_sid = function(sid, max_score)\n"
 "    local action_list = action_key .. \"!\" .. sid\n"
 "    local rule_action_key = redis.call(\"lpop\", action_list)\n"
+"    if not rule_action_key then\n"
+"        return nil, nil\n"
+"    end\n"
 "    local count = redis.call(\"lpop\", action_list)\n"
 "    local name, frame = load_frame_from_rule(rule_action_key, count, sid, max_score)\n"
 "    while not frame do\n"
@@ -1570,15 +1577,20 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    end\n"
 "    local input_keys = {[action_key] = true}\n%s"
 "end\n"
-"local sid, action_name, frame = load_frame(tonumber(ARGV[2]))\n"
+"local new_sid, action_name, frame\n"
+"if #ARGV == 3 then\n"
+"    new_sid = ARGV[3]\n"
+"    action_name, frame = load_frame_from_sid(new_sid, ARGV[2])\n"
+"else\n"
+"    new_sid, action_name, frame = load_frame(tonumber(ARGV[2]))\n"
+"end\n"
 "if frame then\n"
-"    redis.call(\"zincrby\", action_key, tonumber(ARGV[1]), sid)\n"
-"    local state_fact = redis.call(\"hget\", state_key, sid .. \"!f\")\n"
-"    if return_state == 1 then\n"
-"        local state = redis.call(\"hget\", state_key, sid)\n"
-"        return {sid, state_fact, state, cjson.encode({[action_name] = frame})}\n"
+"    if #ARGV == 2 then\n"
+"        redis.call(\"zincrby\", action_key, tonumber(ARGV[1]), new_sid)\n"
+"        local state = redis.call(\"hget\", state_key, new_sid)\n"
+"        return {new_sid, state, cjson.encode({[action_name] = frame})}\n"
 "    else\n"
-"        return {sid, state_fact, cjson.encode({[action_name] = frame})}\n"
+"        return {new_sid, cjson.encode({[action_name] = frame})}\n"
 "    end\n"
 "end\n",
                 name,
@@ -2236,15 +2248,17 @@ unsigned int formatRemoveMessage(void *rulesBinding,
 }
 
 unsigned int formatPeekAction(void *rulesBinding,
+                              char *sid,
                               char **command) {
     binding *currentBinding = (binding*)rulesBinding;
    
     time_t currentTime = time(NULL);
     int result = redisFormatCommand(command, 
-                                    "evalsha %s 0 %d %ld 0", 
+                                    "evalsha %s 0 %d %ld %s", 
                                     currentBinding->peekActionHash, 
                                     60,
-                                    currentTime); 
+                                    currentTime,
+                                    sid); 
     if (result == 0) {
         return ERR_OUT_OF_MEMORY;
     }
@@ -2414,7 +2428,7 @@ unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply
         time_t currentTime = time(NULL);
 
         int result = redisAppendCommand(reContext, 
-                                        "evalsha %s 0 %d %ld 1", 
+                                        "evalsha %s 0 %d %ld", 
                                         currentBinding->peekActionHash, 
                                         60,
                                         currentTime); 

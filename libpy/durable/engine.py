@@ -245,13 +245,26 @@ class Fork(Promise):
 
 class To(Promise):
 
-    def __init__(self, state):
+    def __init__(self, from_state, to_state, assert_state):
         super(To, self).__init__(self._execute)
-        self._state = state
+        self._from_state = from_state
+        self._to_state = to_state
+        self._assert_state = assert_state
         
     def _execute(self, c):
-        c.s['label'] = self._state
+        c.s.running = True
+        if self._from_state != self._to_state:
+            if self._from_state:
+                if c.m and isinstance(c.m, list):
+                    c.retract_fact(c.m[0].chart_context)
+                else:
+                    c.retract_fact(c.chart_context)
 
+            if self._assert_state:
+                c.assert_fact({'label': self._to_state, 'chart': 1, 'id': random.randint(100000, 10000000)})
+            else:
+                c.post({'label': self._to_state, 'chart': 1, 'id': random.randint(100000, 10000000)})
+        
 
 class Ruleset(object):
 
@@ -402,10 +415,7 @@ class Ruleset(object):
                         binding  = 0
                         replies = 0
                         pending = {action_binding: 0}
-
-                        binding, replies = rules.start_update_state(self._handle, c._handle, json.dumps(c.s._d))
-                        pending[binding] = replies
-                                
+        
                         for ruleset_name, facts in c.get_retract_facts().iteritems():
                             if len(facts) == 1:
                                 binding, replies = self._host.start_retract_fact(ruleset_name, facts[0])
@@ -439,6 +449,12 @@ class Ruleset(object):
                             else:
                                 pending[binding] = replies
 
+                        binding, replies = rules.start_update_state(self._handle, c._handle, json.dumps(c.s._d))
+                        if binding in pending:
+                            pending[binding] = pending[binding] + replies
+                        else:
+                            pending[binding] = replies
+                        
                         for binding, replies in pending.iteritems():
                             if binding != action_binding:
                                 rules.complete(binding, replies)
@@ -472,6 +488,7 @@ class Statechart(Ruleset):
                 del s['label']
 
         start_state = {}
+        reflexive_states = {}
 
         for state_name, state in chart_definition.iteritems():
             qualified_name = state_name
@@ -479,6 +496,10 @@ class Statechart(Ruleset):
                 qualified_name = '{0}.{1}'.format(parent_name, state_name)
 
             start_state[qualified_name] = True
+
+            for trigger_name, trigger in state.iteritems():
+                if ('to' in trigger and trigger['to'] == state_name) or 'count' in trigger or 'cap' in trigger or 'span' in trigger:
+                    reflexive_states[qualified_name] = True
 
         for state_name, state in chart_definition.iteritems():
             qualified_name = state_name
@@ -503,12 +524,18 @@ class Statechart(Ruleset):
             else:
                 for trigger_name, trigger in triggers.iteritems():
                     rule = {}
-                    state_test = {'$s': {'$and':[{'label': qualified_name}, {'$s':1}]}}
+                    state_test = {'chart_context': {'$and':[{'label': qualified_name}, {'chart': 1}]}}
                     if 'pri' in trigger:
                         rule['pri'] = trigger['pri']
 
                     if 'count' in trigger:
                         rule['count'] = trigger['count']
+
+                    if 'span' in trigger:
+                        rule['span'] = trigger['span']
+
+                    if 'cap' in trigger:
+                        rule['cap'] = trigger['cap']
 
                     if 'all' in trigger:
                         rule['all'] = list(trigger['all'])
@@ -529,10 +556,18 @@ class Statechart(Ruleset):
                             rule['run'] = Fork(self._host.register_rulesets(self._name, trigger['run']), state_filter)
 
                     if 'to' in trigger:
+                        from_state = None
+                        if qualified_name in reflexive_states:
+                            from_state = qualified_name
+
+                        assert_state = False
+                        if trigger['to'] in reflexive_states:
+                            assert_state = True
+
                         if 'run' in rule:
-                            rule['run'].continue_with(To(trigger['to']))
+                            rule['run'].continue_with(To(from_state, trigger['to'], assert_state))
                         else:
-                            rule['run'] = To(trigger['to'])
+                            rule['run'] = To(from_state, trigger['to'], assert_state)
 
                         if trigger['to'] in start_state: 
                             del start_state[trigger['to']]
@@ -551,9 +586,9 @@ class Statechart(Ruleset):
 
             started = True
             if parent_name:
-                rules[parent_name + '$start'] = {'all':[{'$s': {'$and': [{'label': parent_name}, {'$s':1}]}}], 'run': To(state_name)};
+                rules[parent_name + '$start'] = {'all':[{'chart_context': {'$and': [{'label': parent_name}, {'chart':1}]}}], 'run': To(None, state_name, False)};
             else:
-                rules['$start'] = {'all': [{'$s': {'$and': [{'$nex': {'label': 1}}, {'$s':1}]}}], 'run': To(state_name)};
+                rules['$start'] = {'all': [{'chart_context': {'$and': [{'$nex': {'running': 1}}, {'$s': 1}]}}], 'run': To(None, state_name, False)};
 
         if not started:
             raise Exception('Chart {0} has no start state'.format(self._name))
@@ -576,8 +611,24 @@ class Flowchart(Ruleset):
                 del s['label']
 
         visited = {}
+        reflexive_stages = {}
+
         for stage_name, stage in chart_definition.iteritems():
-            stage_test = {'$s': {'$and':[{'label': stage_name}, {'$s':1}]}}
+            if 'to' in stage:
+                if isinstance(stage['to'], basestring):
+                    if stage['to'] == stage_name:
+                        reflexive_stages[stage_name] = True
+                else:
+                    for transition_name, transition in stage['to'].iteritems():
+                        if transition_name == stage_name or 'count' in transition or 'span' in transition or 'cap' in transition:
+                            reflexive_stages[stage_name] = True
+
+        for stage_name, stage in chart_definition.iteritems():
+            stage_test = {'chart_context': {'$and':[{'label': stage_name}, {'chart':1}]}}
+            from_stage = None
+            if stage_name in reflexive_stages:
+                from_stage = stage_name
+
             if 'to' in stage:
                 if isinstance(stage['to'], basestring):
                     next_stage = None
@@ -587,16 +638,20 @@ class Flowchart(Ruleset):
                     else:
                         raise Exception('Stage {0} not found'.format(stage['to']))
 
+                    assert_stage = False
+                    if stage['to'] in reflexive_stages:
+                        assert_stage = True
+
                     if not 'run' in next_stage:
-                        rule['run'] = To(stage['to'])
+                        rule['run'] = To(from_stage, stage['to'], assert_stage)
                     else:
                         if isinstance(next_stage['run'], basestring):
-                            rule['run'] = To(stage['to']).continue_with(Promise(self._host.get_action(next_stage['run'])))
+                            rule['run'] = To(from_stage, stage['to'], assert_stage).continue_with(Promise(self._host.get_action(next_stage['run'])))
                         elif isinstance(next_stage['run'], Promise) or hasattr(next_stage['run'], '__call__'):
-                            rule['run'] = To(stage['to']).continue_with(next_stage['run'])
+                            rule['run'] = To(from_stage, stage['to'], assert_stage).continue_with(next_stage['run'])
                         else:
                             fork_promise = Fork(self._host.register_rulesets(self._name, next_stage['run']), stage_filter)
-                            rule['run'] = To(stage['to']).continue_with(fork_promise)
+                            rule['run'] = To(from_stage, stage['to'], assert_stage).continue_with(fork_promise)
 
                     rules['{0}.{1}'.format(stage_name, stage['to'])] = rule
                     visited[stage['to']] = True
@@ -611,6 +666,12 @@ class Flowchart(Ruleset):
                         if 'count' in transition:
                             rule['count'] = transition['count']
 
+                        if 'span' in transition:
+                            rule['span'] = transition['span']
+
+                        if 'cap' in transition:
+                            rule['cap'] = transition['cap']
+
                         if 'all' in transition:
                             rule['all'] = list(transition['all'])
                             rule['all'].append(stage_test)
@@ -624,16 +685,20 @@ class Flowchart(Ruleset):
                         else:
                             raise Exception('Stage {0} not found'.format(transition_name))
 
+                        assert_stage = False
+                        if transition_name in reflexive_stages:
+                            assert_stage = True
+
                         if not 'run' in next_stage:
-                            rule['run'] = To(transition_name)
+                            rule['run'] = To(from_stage, transition_name, assert_stage)
                         else:
                             if isinstance(next_stage['run'], basestring):
-                                rule['run'] = To(transition_name).continue_with(Promise(self._host.get_action(next_stage['run'])))
+                                rule['run'] = To(from_stage, transition_name, assert_stage).continue_with(Promise(self._host.get_action(next_stage['run'])))
                             elif isinstance(next_stage['run'], Promise) or hasattr(next_stage['run'], '__call__'):
-                                rule['run'] = To(transition_name).continue_with(next_stage['run'])
+                                rule['run'] = To(from_stage, transition_name, assert_stage).continue_with(next_stage['run'])
                             else:
                                 fork_promise = Fork(self._host.register_rulesets(self._name, next_stage['run']), stage_filter)
-                                rule['run'] = To(transition_name).continue_with(fork_promise)
+                                rule['run'] = To(from_stage, transition_name, assert_stage).continue_with(fork_promise)
 
                         rules['{0}.{1}'.format(stage_name, transition_name)] = rule
                         visited[transition_name] = True
@@ -644,17 +709,17 @@ class Flowchart(Ruleset):
                 if started:
                     raise Exception('Chart {0} has more than one start state'.format(self._name))
 
-                rule = {'all': [{'$s': {'$and': [{'$nex': {'label':1}}, {'$s': 1}]}}]}
+                rule = {'all': [{'chart_context': {'$and': [{'$nex': {'running': 1}}, {'$s': 1}]}}]}
                 if not 'run' in stage:
-                    rule['run'] = To(stage_name)
+                    rule['run'] = To(None, stage_name, False)
                 else:
                     if isinstance(stage['run'], basestring):
-                        rule['run'] = To(stage_name).continue_with(Promise(self._host.get_action(stage['run'])))
+                        rule['run'] = To(None, stage_name, False).continue_with(Promise(self._host.get_action(stage['run'])))
                     elif isinstance(stage['run'], Promise) or hasattr(stage['run'], '__call__'):
-                        rule['run'] = To(stage_name).continue_with(stage['run'])
+                        rule['run'] = To(None, stage_name, False).continue_with(stage['run'])
                     else:
                         fork_promise = Fork(self._host.register_rulesets(self._name, stage['run']), stage_filter)
-                        rule['run'] = To(stage_name).continue_with(fork_promise)
+                        rule['run'] = To(None, stage_name, False).continue_with(fork_promise)
 
                 rules['$start.{0}'.format(stage_name)] = rule
                 started = True
@@ -765,7 +830,7 @@ class Host(object):
 
             def timers_callback(e):
                 if e:
-                    print(e)
+                    print('error {0}'.format(e))
 
                 if (index % 10 == 0) and len(self._ruleset_list):
                     ruleset = self._ruleset_list[(index / 10) % len(self._ruleset_list)]

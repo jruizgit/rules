@@ -1,11 +1,21 @@
 from durable.lang import *
 import datetime
 
+def unix_time(dt):
+    epoch = datetime.datetime.utcfromtimestamp(0)
+    delta = dt - epoch
+    return delta.total_seconds()
+
+def unix_time_millis(dt):
+    return unix_time(dt) * 1000.0
+
 with statechart('miss_manners'):
     with state('start'):
         @to('assign')
         @when_all(m.t == 'guest')
         def assign_first_seating(c):
+            c.s.count = 0
+            c.s.g_count = 1000
             c.assert_fact({'t': 'seating',
                            'id': c.s.g_count,
                            's_id': c.s.count, 
@@ -22,7 +32,8 @@ with statechart('miss_manners'):
                            'guest_name': c.m.name})
             c.s.count += 1
             c.s.g_count += 2
-            print('assign {0}, {1}'.format(c.m.name, datetime.datetime.now().strftime('%I:%M:%S%p')))
+            c.s.start_time = unix_time_millis(datetime.datetime.now())
+            print('assign {0}'.format(c.m.name))
 
     with state('assign'):
         @to('make')
@@ -65,7 +76,7 @@ with statechart('miss_manners'):
 
     with state('make'):
         @to('make')
-        @when_all(count(1001),
+        @when_all(cap(1000),
                   c.seating << (m.t == 'seating') & 
                                (m.path == False),
                   c.path << (m.t == 'path') & 
@@ -74,22 +85,14 @@ with statechart('miss_manners'):
                        (m.p_id == c.seating.s_id) & 
                        (m.guest_name == c.path.guest_name)))
         def make_path(c):
-            if (c.m):
-                for frame in c.m:
-                    c.assert_fact({'t': 'path',
-                                   'id': c.s.g_count,
-                                   'p_id': frame.seating.s_id, 
-                                   'seat': frame.path.seat, 
-                                   'guest_name': frame.path.guest_name})
-                    c.s.g_count += 1
-            else:
+            for frame in c.m:
                 c.assert_fact({'t': 'path',
                                'id': c.s.g_count,
-                               'p_id': c.seating.s_id, 
-                               'seat': c.path.seat, 
-                               'guest_name': c.path.guest_name})
+                               'p_id': frame.seating.s_id, 
+                               'seat': frame.path.seat, 
+                               'guest_name': frame.path.guest_name})
                 c.s.g_count += 1
-
+            
         @to('check')
         @when_all(pri(1), (m.t == 'seating') & (m.path == False))
         def path_done(c):
@@ -98,14 +101,14 @@ with statechart('miss_manners'):
             c.m.path = True
             c.assert_fact(c.m)
             c.s.g_count += 1
-            print('path sid: {0}, pid: {1}, left guest: {2}, right guest {3}, {4}'.format(c.m.s_id, c.m.p_id, c.m.left_guest_name, c.m.right_guest_name, datetime.datetime.now().strftime('%I:%M:%S%p')))
+            print('path sid: {0}, pid: {1}, left guest: {2}, right guest {3}'.format(c.m.s_id, c.m.p_id, c.m.left_guest_name, c.m.right_guest_name))
 
     with state('check'):
         @to('end')
         @when_all(c.last_seat << m.t == 'last_seat', 
                  (m.t == 'seating') & (m.right_seat == c.last_seat.seat))
         def done(c):
-            print('end {0}'.format(datetime.datetime.now().strftime('%I:%M:%S%p')))
+            print('end {0}'.format(unix_time_millis(datetime.datetime.now()) - c.s.start_time))
         
         to('assign')
 
@@ -552,7 +555,6 @@ with statechart('miss_manners'):
         host.assert_fact('miss_manners', {'id': 437, 'sid': 1, 't': 'guest', 'name': '128', 'sex': 'f', 'hobby': 'h1'})
         host.assert_fact('miss_manners', {'id': 438, 'sid': 1, 't': 'guest', 'name': '128', 'sex': 'f', 'hobby': 'h3'})
         host.assert_fact('miss_manners', {'id': 439, 'sid': 1, 't': 'last_seat', 'seat': 128})
-        host.patch_state('miss_manners', {'sid': 1, 'label': 'start', 'count': 0, 'g_count': 1000})
 
 run_all(['/tmp/redis0.sock'])
 

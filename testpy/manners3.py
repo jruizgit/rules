@@ -83,14 +83,13 @@ with ruleset('miss_manners'):
                    (m.guest_name == c.path.guest_name)),
               (m.t == 'context') & (m.l == 'make'))
     def make_path(c):
-        if (c.m):
-            for frame in c.m:
-                c.assert_fact({'t': 'path',
-                               'id': c.s.g_count,
-                               'p_id': frame.seating.s_id, 
-                               'seat': frame.path.seat, 
-                               'guest_name': frame.path.guest_name})
-                c.s.g_count += 1
+        for frame in c.m:
+            c.assert_fact({'t': 'path',
+                           'id': c.s.g_count,
+                           'p_id': frame.seating.s_id, 
+                           'seat': frame.path.seat, 
+                           'guest_name': frame.path.guest_name})
+            c.s.g_count += 1
 
     @when_all(pri(1), 
               c.seating << (m.t == 'seating') & 

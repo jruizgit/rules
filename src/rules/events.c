@@ -1167,19 +1167,7 @@ static unsigned int handleMessageCore(ruleset *tree,
             ++*commandCount;
         }
 
-        if (state) {
-            if (*commandCount == MAX_COMMAND_COUNT) {
-                return ERR_MAX_COMMAND_COUNT;
-            }
-
-            result = formatStoreSessionFact(*rulesBinding, sid, message, 0, &storeCommand);
-            if (result != RULES_OK) {
-                return result;
-            }
-
-            commands[*commandCount] = storeCommand;
-            ++*commandCount;
-        } else {
+        if (!state) {
             // try creating state if doesn't exist
             jsonProperty *targetProperty;
             char *targetState;
@@ -1242,7 +1230,7 @@ static unsigned int handleMessageCore(ruleset *tree,
             result = handleMessage(tree, 
                                    NULL,
                                    stateMessage,  
-                                   ACTION_ASSERT_FACT,
+                                   ACTION_ASSERT_EVENT,
                                    commands,
                                    commandCount,
                                    rulesBinding);
@@ -1253,18 +1241,6 @@ static unsigned int handleMessageCore(ruleset *tree,
             if (result == ERR_EVENT_NOT_HANDLED) {
                 return RULES_OK;
             }
-
-            if (*commandCount == MAX_COMMAND_COUNT) {
-                return ERR_MAX_COMMAND_COUNT;
-            }
-
-            result = formatStoreSessionFact(*rulesBinding, sid, stateMessage, 1, &storeCommand);
-            if (result != RULES_OK) {
-                return result;
-            }
-
-            commands[*commandCount] = storeCommand;
-            ++*commandCount;
         }
 
         return RULES_OK;
@@ -1428,7 +1404,7 @@ static unsigned int handleState(ruleset *tree,
     unsigned int result = handleMessage(tree, 
                                         state,
                                         stateMessage,  
-                                        ACTION_ASSERT_FACT,
+                                        ACTION_ASSERT_EVENT,
                                         commands,
                                         commandCount,
                                         rulesBinding);
@@ -1729,8 +1705,8 @@ unsigned int startAction(void *handle,
         return result;
     }
 
-    *state = reply->element[2]->str;
-    *messages = reply->element[3]->str;
+    *state = reply->element[1]->str;
+    *messages = reply->element[2]->str;
     actionContext *context = malloc(sizeof(actionContext));
     context->reply = reply;
     context->rulesBinding = rulesBinding;
@@ -1747,23 +1723,6 @@ unsigned int startUpdateState(void *handle,
     char *commands[MAX_COMMAND_COUNT];
     unsigned int result = RULES_OK;
     unsigned int commandCount = 0;
-    actionContext *context = (actionContext*)actionHandle;
-    redisReply *reply = context->reply;
-    if (reply->element[1]->str != NULL) {
-        result = handleMessage(handle,
-                               NULL,
-                               reply->element[1]->str,
-                               ACTION_REMOVE_FACT,
-                               commands,
-                               &commandCount,
-                               rulesBinding);
-        if (result != RULES_OK) {
-            //reply object should be freed by the app during abandonAction
-            freeCommands(commands, commandCount);
-            return result;
-        }
-    }
-
     result = handleState(handle, 
                          state, 
                          commands,
@@ -1798,21 +1757,6 @@ unsigned int completeAction(void *handle,
     }
 
     ++commandCount;
-    if (reply->element[1]->str != NULL) {
-        result = handleMessage(handle,
-                               NULL,
-                               reply->element[1]->str,
-                               ACTION_REMOVE_FACT,
-                               commands,
-                               &commandCount,
-                               &rulesBinding);
-        if (result != RULES_OK) {
-            //reply object should be freed by the app during abandonAction
-            freeCommands(commands, commandCount);
-            return result;
-        }
-    }
-
     result = handleState(handle, 
                          state, 
                          commands,
@@ -1855,7 +1799,9 @@ unsigned int completeAndStartAction(void *handle,
         return ERR_MAX_COMMAND_COUNT;
     }
 
-    result = formatPeekAction(rulesBinding, &commands[commandCount]);
+    result = formatPeekAction(rulesBinding, 
+                              reply->element[0]->str,
+                              &commands[commandCount]);
     if (result != RULES_OK) {
         //reply object should be freed by the app during abandonAction
         freeCommands(commands, commandCount);
@@ -1880,7 +1826,7 @@ unsigned int completeAndStartAction(void *handle,
         return ERR_NO_ACTION_AVAILABLE;
     }
 
-    *messages = newReply->element[2]->str;
+    *messages = newReply->element[1]->str;
     context->reply = newReply;
     return RULES_OK;
 }
