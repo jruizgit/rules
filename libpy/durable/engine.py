@@ -261,9 +261,9 @@ class To(Promise):
                     c.retract_fact(c.chart_context)
 
             if self._assert_state:
-                c.assert_fact({'label': self._to_state, 'chart': 1, 'id': random.randint(100000, 10000000)})
+                c.assert_fact({'label': self._to_state, 'chart': 1, 'id': random.randint(1, 1000000000)})
             else:
-                c.post({'label': self._to_state, 'chart': 1, 'id': random.randint(100000, 10000000)})
+                c.post({'label': self._to_state, 'chart': 1, 'id': random.randint(1, 1000000000)})
         
 
 class Ruleset(object):
@@ -284,6 +284,7 @@ class Ruleset(object):
             else:
                 self._actions[rule_name] = Fork(host.register_rulesets(name, action))
 
+        print(json.dumps(ruleset_definition))
         self._handle = rules.create_ruleset(state_cache_size, name, json.dumps(ruleset_definition))
         self._definition = ruleset_definition
         
@@ -331,7 +332,7 @@ class Ruleset(object):
         return rules.start_retract_facts(self._handle, json.dumps(facts))
 
     def start_timer(self, sid, timer_name, timer_duration):
-        timer = {'sid':sid, 'id':random.randint(100000, 10000000), '$t':timer_name}
+        timer = {'sid':sid, 'id':random.randint(1, 1000000000), '$t':timer_name}
         rules.start_timer(self._handle, str(sid), timer_duration, json.dumps(timer))
         
     def assert_state(self, state):

@@ -55,7 +55,7 @@ module Engine
       end
 
       if !(message.key? :sid) && !(message.key? "sid")
-        mesage[:sid] = @s.sid
+        message[:sid] = @s.sid
       end
 
       message_list = []
@@ -261,9 +261,22 @@ module Engine
 
   class To < Promise
 
-    def initialize(state)
+    def initialize(from_state, to_state, assert_state)
       super -> c {
-        c.s.label = state
+        c.s.running = true
+        if from_state && (from_state != to_state)
+          if c.m && (c.m.kind_of? Hash)
+            c.retract c.m[0].chart_context
+          else
+            c.retract c.chart_context
+          end 
+        end
+        id = rand(1000000000)
+        if assert_state
+          c.assert(:label => to_state, :chart => 1, :id => id)
+        else
+          c.post(:label => to_state, :chart => 1, :id => id)
+        end
       }
     end
 
@@ -318,16 +331,20 @@ module Engine
       Rules.assert_event @handle, JSON.generate(message)
     end
 
+    def start_assert_event(message)
+      return Rules.start_assert_event @handle, JSON.generate(message)
+    end
+
     def assert_events(messages)
       Rules.assert_events @handle, JSON.generate(messages)
     end
 
-    def retract_event(message)
-      Rules.retract_event @handle, JSON.generate(message)
+    def start_assert_events(messages)
+      return Rules.start_assert_events @handle, JSON.generate(messages)
     end
 
     def start_timer(sid, timer_name, timer_duration)
-      timer = {:sid => sid, :id => rand(1000000), :$t => timer_name}
+      timer = {:sid => sid, :id => rand(1000000000), :$t => timer_name}
       Rules.start_timer @handle, sid.to_s, timer_duration, JSON.generate(timer)
     end
 
@@ -335,16 +352,32 @@ module Engine
       Rules.assert_fact @handle, JSON.generate(fact)
     end
 
+    def start_assert_fact(fact)
+      return Rules.start_assert_fact @handle, JSON.generate(fact)
+    end
+
     def assert_facts(facts)
       Rules.assert_facts @handle, JSON.generate(facts)
+    end
+
+    def start_assert_facts(facts)
+      return Rules.start_assert_facts @handle, JSON.generate(facts)
     end
 
     def retract_fact(fact)
       Rules.retract_fact @handle, JSON.generate(fact)
     end
 
+    def start_retract_fact(fact)
+      return Rules.start_retract_fact @handle, JSON.generate(fact)
+    end
+
     def retract_facts(facts)
       Rules.assert_facts @handle, JSON.generate(facts)
+    end
+
+    def start_retract_facts(facts)
+      return Rules.start_retract_facts @handle, JSON.generate(facts)
     end
 
     def assert_state(state)
@@ -386,27 +419,33 @@ module Engine
 
       complete.call nil
     end
-      
+                    
     def dispatch(complete)
-      result = nil
+      result_container = {}
+      action_handle = nil
+      action_binding = nil
+      state = nil
       begin
         result = Rules.start_action @handle
+        if result
+          state = JSON.parse result[0]
+          result_container = {:message => JSON.parse(result[1])}
+          action_handle = result[2]
+          action_binding = result[3]
+        end
       rescue Exception => e
         complete.call e
         return
       end
       
-      if !result
-        complete.call nil
-      else
-        state = JSON.parse result[0]
-        event = JSON.parse result[1]
+      while result_container.key? :message do
         action_name = nil
-        for action_name, event in event do
+        for action_name, message in result_container[:message] do
           break
-        end  
-        
-        c = Closure.new state, event, result[2], @name
+        end
+
+        result_container.delete :message
+        c = Closure.new state, message, action_handle, @name
         @actions[action_name].run c, -> e {
           if e
             Rules.abandon_action @handle, c.handle
@@ -416,37 +455,64 @@ module Engine
               for branch_name, branch_state in c._branches do
                 @host.patch_state branch_name, branch_state
               end
-
-              for ruleset_name, messages in c._messages do
-                if messages.length == 1
-                  @host.post ruleset_name, messages[0]
-                else
-                  @host.post_batch ruleset_name, messages
-                end
-              end
-
-              for ruleset_name, facts in c._facts do
-                if facts.length == 1
-                  @host.assert ruleset_name, facts[0]
-                else
-                  @host.assert_facts ruleset_name, facts
-                end
-              end
-
-              for ruleset_name, facts in c._retract do
-                if facts.length == 1
-                  @host.retract ruleset_name, facts[0]
-                else
-                  @host.retract_facts ruleset_name, facts
-                end
-              end
-
               for timer_name, timer_duration in c._timers do
                 start_timer c.s.sid, timer_name, timer_duration
               end
-
-              Rules.complete_action @handle, c.handle, JSON.generate(c.s._d)
-              complete.call nil
+              binding  = 0
+              replies = 0
+              pending = {action_binding => 0}
+              for ruleset_name, facts in c._retract do
+                if facts.length == 1
+                  binding, replies = @host.start_retract ruleset_name, facts[0]
+                else
+                  binding, replies = @host.start_retract_facts ruleset_name, facts
+                end
+                if pending.key? binding
+                  pending[binding] = pending[binding] + replies
+                else
+                  pending[binding] = replies
+                end
+              end
+              for ruleset_name, facts in c._facts do
+                if facts.length == 1
+                  binding, replies = @host.start_assert ruleset_name, facts[0]
+                else
+                  binding, replies = @host.start_assert_facts ruleset_name, facts
+                end
+                if pending.key? binding
+                  pending[binding] = pending[binding] + replies
+                else
+                  pending[binding] = replies
+                end
+              end
+              for ruleset_name, messages in c._messages do
+                if messages.length == 1
+                  binding, replies = @host.start_post ruleset_name, messages[0]
+                else
+                  binding, replies = @host.start_post_batch ruleset_name, messages
+                end
+                if pending.key? binding
+                  pending[binding] = pending[binding] + replies
+                else
+                  pending[binding] = replies
+                end
+              end
+              binding, replies = Rules.start_update_state @handle, c.handle, JSON.generate(c.s._d)
+              if pending.key? binding
+                pending[binding] = pending[binding] + replies
+              else
+                pending[binding] = replies
+              end
+              for binding, replies in pending do
+                if binding != action_binding
+                  Rules.complete(binding, replies)
+                else
+                  new_result = Rules.complete_and_start_action @handle, replies, c.handle
+                  if new_result
+                    result_container[:message] = JSON.parse new_result
+                  end
+                end
+              end
             rescue Exception => e
               Rules.abandon_action @handle, c.handle
               complete.call e
@@ -454,6 +520,7 @@ module Engine
           end
         }
       end
+      complete.call nil
     end
 
     def to_json
@@ -480,11 +547,22 @@ module Engine
         s.delete "label" if (s.key? "label")
       }
       start_state = {}
+      reflexive_states = {}
       
       for state_name, state in chart_definition do
         qualified_name = state_name.to_s
         qualified_name = "#{parent_name}.#{state_name}" if parent_name
         start_state[qualified_name] = true
+
+        for trigger_name, trigger in state do
+          if (trigger.key? :to && trigger[:to] == state_name) || 
+             (trigger.key? "to" && trigger["to"] == state_name) ||
+             (trigger.key? :count) || (trigger.key? "count") ||
+             (trigger.key? :cap) || (trigger.key? "cap") ||
+             (trigger.key? :span) || (trigger.key? "span")
+            reflexive_states[qualified_name] = true
+          end
+        end
       end 
 
       for state_name, state in chart_definition do
@@ -520,9 +598,10 @@ module Engine
           transform qualified_name, triggers, start_state, state[:$chart], rules
         else
           for trigger_name, trigger in triggers do
+
             trigger_name = trigger_name.to_s
             rule = {}
-            state_test = {:$s => {:$and => [{:label => qualified_name}, {:$s => 1}]}}
+            state_test = {:chart_context => {:$and => [{:label => qualified_name}, {:chart => 1}]}}
             if trigger.key? :pri
               rule[:pri] = trigger[:pri]
             elsif trigger.key? "pri"
@@ -533,6 +612,18 @@ module Engine
               rule[:count] = trigger[:count]
             elsif trigger.key? "count"
               rule[:count] = trigger["count"]
+            end
+
+            if trigger.key? :span
+              rule[:span] = trigger[:span]
+            elsif trigger.key? "span"
+              rule[:span] = trigger["span"]
+            end
+
+            if trigger.key? :cap
+              rule[:cap] = trigger[:cap]
+            elsif trigger.key? "cap"
+              rule[:cap] = trigger["cap"]
             end
 
             if (trigger.key? :all) || (trigger.key? "all")
@@ -582,12 +673,20 @@ module Engine
               else
                 trigger_to = trigger["to"]
               end
-
               trigger_to = trigger_to.to_s
+              from_state = nil
+              if reflexive_states.key? qualified_name
+                from_state = qualified_name
+              end
+              assert_state = false
+              if reflexive_states.key? trigger_to
+                assert_state = true
+              end
+
               if rule.key? :run
-                rule[:run].continue_with To.new(trigger_to)
+                rule[:run].continue_with To.new(from_state, trigger_to, assert_state)
               else
-                rule[:run] = To.new trigger_to
+                rule[:run] = To.new from_state, trigger_to, assert_state
               end
 
               start_state.delete trigger_to if start_state.key? trigger_to
@@ -610,9 +709,9 @@ module Engine
         started = true
 
         if parent_name
-          rules[parent_name + "$start"] = {:all => [{:$s => {:$and => [{:label => parent_name}, {:$s => 1}]}}], run: To.new(state_name)};
+          rules[parent_name + "$start"] = {:all => [{:chart_context => {:$and => [{:label => parent_name}, {:chart => 1}]}}], run: To.new(nil, state_name, false)};
         else
-          rules[:$start] = {:all => [{:$s => {:$and => [{:$nex => {:label => 1}}, {:$s => 1}]}}], run: To.new(state_name)};
+          rules[:$start] = {:all => [{:chart_context => {:$and => [{:$nex => {:running => 1}}, {:$s => 1}]}}], run: To.new(nil, state_name, false)};
         end
       end
 
@@ -639,9 +738,35 @@ module Engine
       }
 
       visited = {}
+      reflexive_stages = {}
       for stage_name, stage in chart_definition do
+        if (stage.key? :to) || (stage.key? "to")
+          stage_to = (stage.key? :to) ? stage[:to]: stage["to"]
+          if (stage_to.kind_of? String) || (stage_to.kind_of? Symbol)
+            if stage_to == stage_name
+              reflexive_stages[stage_name] = true
+            end
+          else
+            for transition_name, transition in stage_to do
+              if (transition_name == stage_name) || 
+                 (transition.key? :count) || (transition.key? "count") ||
+                 (transition.key? :cap) || (transition.key? "cap") ||
+                 (transition.key? :span) || (transition.key? "span")
+                reflexive_stages[stage_name] = true
+              end
+            end
+          end
+        end
+      end
+
+      for stage_name, stage in chart_definition do
+        from_stage = nil
+        if reflexive_stages.key? stage_name
+          from_stage = stage_name
+        end
+        
         stage_name = stage_name.to_s
-        stage_test = {:$s => {:$and => [{:label => stage_name}, {:$s => 1}]}}
+        stage_test = {:chart_context => {:$and => [{:label => stage_name}, {:chart => 1}]}}
         if (stage.key? :to) || (stage.key? "to")
           stage_to = (stage.key? :to) ? stage[:to]: stage["to"]
           if (stage_to.kind_of? String) || (stage_to.kind_of? Symbol)
@@ -655,18 +780,23 @@ module Engine
               raise ArgumentError, "Stage #{stage_to.to_s} not found"
             end
 
+            assert_stage = false
+            if reflexive_stages.key? stage_to
+              assert_stage = true
+            end
+
             stage_to = stage_to.to_s
             if !(next_stage.key? :run) && !(next_stage.key? "run")
-              rule[:run] = To.new stage_to
+              rule[:run] = To.new from_stage, stage_to, assert_stage
             else
               next_stage_run = (next_stage.key? :run) ? next_stage[:run]: next_stage["run"]
               if next_stage_run.kind_of? String
-                rule[:run] = To.new(stage_to).continue_with Promise(@host.get_action(next_stage_run))
+                rule[:run] = To.new(from_stage, stage_to, assert_stage).continue_with Promise(@host.get_action(next_stage_run))
               elsif (next_stage_run.kind_of? Promise) || (next_stage_run.kind_of? Proc)
-                rule[:run] = To.new(stage_to).continue_with next_stage_run
+                rule[:run] = To.new(from_stage, stage_to, assert_stage).continue_with next_stage_run
               else
                 fork_promise = Fork.new @host.register_rulesets(@name, next_stage_run), stage_filter
-                rule[:run] = To.new(stage_to).continue_with fork_promise
+                rule[:run] = To.new(from_stage, stage_to, assert_stage).continue_with fork_promise
               end
             end
 
@@ -687,6 +817,18 @@ module Engine
                 rule[:count] = transition[:count]
               elsif transition.key? "count"
                 rule[:count] = transition["count"]
+              end
+
+              if transition.key? :span
+                rule[:span] = transition[:span]
+              elsif transition.key? "span"
+                rule[:span] = transition["span"]
+              end
+
+              if transition.key? :cap
+                rule[:cap] = transition[:cap]
+              elsif transition.key? "cap"
+                rule[:cap] = transition["cap"]
               end
 
               if (transition.key? :all) || (transition.key? "all")
@@ -716,18 +858,23 @@ module Engine
                 raise ArgumentError, "Stage #{transition_name.to_s} not found"
               end
 
+              assert_stage = false
+              if reflexive_stages.key? transition_name
+                assert_stage = true
+              end
+
               transition_name = transition_name.to_s
               if !(next_stage.key? :run) && !(next_stage.key? "run")
-                rule[:run] = To.new transition_name
+                rule[:run] = To.new from_stage, transition_name, assert_stage
               else
                 next_stage_run = (next_stage.key? :run) ? next_stage[:run]: next_stage["run"]
                 if next_stage_run.kind_of? String
-                  rule[:run] = To.new(transition_name).continue_with Promise(@host.get_action(next_stage_run))
+                  rule[:run] = To.new(from_stage, transition_name, assert_stage).continue_with Promise(@host.get_action(next_stage_run))
                 elsif (next_stage_run.kind_of? Promise) || (next_stage_run.kind_of? Proc)
-                  rule[:run] = To.new(transition_name).continue_with next_stage_run
+                  rule[:run] = To.new(from_stage, transition_name, assert_stage).continue_with next_stage_run
                 else
                   fork_promise = Fork.new @host.register_rulesets(@name, next_stage_run), stage_filter
-                  rule[:run] = To.new(transition_name).continue_with fork_promise
+                  rule[:run] = To.new(from_stage, transition_name, assert_stage).continue_with fork_promise
                 end
               end
 
@@ -747,26 +894,24 @@ module Engine
           end
 
           started = true
-          rule = {:all => [{:$s => {:$and => [{:$nex => {:label => 1}}, {:$s => 1}]}}]}
+          rule = {:all => [{:chart_context => {:$and => [{:$nex => {:running => 1}}, {:$s => 1}]}}]}
           if !(stage.key? :run) && !(stage.key? "run")
-            rule[:run] = To.new stage_name
+            rule[:run] = To.new nil, stage_name, false
           else
             stage_run = stage.key? :run ? stage[:run]: stage["run"]
             if stage_run.kind_of? String
-              rule[:run] = To.new(stage_name).continue_with Promise(@host.get_action(stage_run))
+              rule[:run] = To.new(nil, stage_name, false).continue_with Promise(@host.get_action(stage_run))
             elsif (stage_run.kind_of? Promise) || (stage_run.kind_of? Proc)
-              rule[:run] = To.new(stage_name).continue_with stage_run
+              rule[:run] = To.new(nil, stage_name, false).continue_with stage_run
             else
               fork_promise = Fork @host.register_rulesets(@name, stage_run), stage_filter
-              rule[:run] = To.new(stage_name).continue_with fork_promise
+              rule[:run] = To.new(nil, stage_name, false).continue_with fork_promise
             end
           end
           rules["$start.#{stage_name}"] = rule
         end
       end
-
     end
-
   end
 
   class Host
@@ -813,24 +958,48 @@ module Engine
       get_ruleset(ruleset_name).assert_events events
     end
 
+    def start_post_batch(ruleset_name, *events)
+      return get_ruleset(ruleset_name).start_assert_events events
+    end
+
     def post(ruleset_name, event)
       get_ruleset(ruleset_name).assert_event event
+    end
+
+    def start_post(ruleset_name, event)
+      return get_ruleset(ruleset_name).start_assert_event event
     end
 
     def assert(ruleset_name, fact)
       get_ruleset(ruleset_name).assert_fact fact
     end
 
+    def start_assert(ruleset_name, fact)
+      return get_ruleset(ruleset_name).start_assert_fact fact
+    end
+
     def assert_facts(ruleset_name, *facts)
       get_ruleset(ruleset_name).assert_facts facts
+    end
+
+    def start_assert_facts(ruleset_name, *facts)
+      return get_ruleset(ruleset_name).start_assert_facts facts
     end
 
     def retract(ruleset_name, fact)
       get_ruleset(ruleset_name).retract_fact fact
     end
 
+    def start_retract(ruleset_name, fact)
+      return get_ruleset(ruleset_name).start_retract_fact fact
+    end
+
     def retract_facts(ruleset_name, *facts)
       get_ruleset(ruleset_name).retract_facts facts
+    end
+
+    def start_retract_facts(ruleset_name, *facts)
+      return get_ruleset(ruleset_name).start_retract_facts facts
     end
 
     def start_timer(ruleset_name, sid, timer_name, timer_duration)
@@ -863,12 +1032,13 @@ module Engine
       dispatch_ruleset = -> c {
 
         callback = -> e {
+          puts "internal error #{e}" if e
           if index % 10 == 0
             index += 1
-            timers.after 0.1, &dispatch_ruleset
+            timers.after 0.01, &dispatch_ruleset
           else
             index += 1
-            dispatch_ruleset.call 0
+            dispatch_ruleset.call nil
           end
         }
 
@@ -897,6 +1067,5 @@ module Engine
     end
 
   end
-
 
 end

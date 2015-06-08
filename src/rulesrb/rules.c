@@ -60,6 +60,50 @@ static VALUE rbBindRuleset(VALUE self, VALUE handle, VALUE host, VALUE port, VAL
     return Qnil;
 }
 
+static VALUE rbComplete(VALUE self, VALUE rulesBinding, VALUE replyCount) {
+    Check_Type(rulesBinding, T_FIXNUM);
+    Check_Type(replyCount, T_FIXNUM);
+    
+    unsigned int result = complete((void *)FIX2LONG(rulesBinding), FIX2LONG(replyCount));
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not complete action, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
+static VALUE rbStartAssertEvent(VALUE self, VALUE handle, VALUE event) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(event, T_STRING);
+
+    unsigned int replyCount;
+    void *rulesBinding = NULL;
+    unsigned int result = startAssertEvent((void *)FIX2LONG(handle), RSTRING_PTR(event), &rulesBinding, &replyCount);
+    if (result == RULES_OK) {
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(rulesBinding));
+        rb_ary_push(output, INT2FIX(replyCount));
+        return output;  
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(0));
+        rb_ary_push(output, INT2FIX(0));
+        return output; 
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not assert event, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
 static VALUE rbAssertEvent(VALUE self, VALUE handle, VALUE event) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(event, T_STRING);
@@ -74,6 +118,42 @@ static VALUE rbAssertEvent(VALUE self, VALUE handle, VALUE event) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
             rb_raise(rb_eException, "Could not assert event, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
+static VALUE rbStartAssertEvents(VALUE self, VALUE handle, VALUE events) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(events, T_STRING);
+
+    unsigned int *results = NULL;
+    unsigned int resultsLength = 0;
+    unsigned int replyCount;
+    void *rulesBinding = NULL;
+    unsigned int result = startAssertEvents((void *)FIX2LONG(handle), RSTRING_PTR(events), &resultsLength, &results, &rulesBinding, &replyCount);
+    if (result == RULES_OK) {
+        if (results) {
+            free(results);
+        }
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(rulesBinding));
+        rb_ary_push(output, INT2FIX(replyCount));
+        return output;  
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(0));
+        rb_ary_push(output, INT2FIX(0));
+        return output; 
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            if (results) {
+                free(results);
+            }
+            rb_raise(rb_eException, "Could not assert events, error code: %d", result);
         }
     }
 
@@ -126,6 +206,34 @@ static VALUE rbRetractEvent(VALUE self, VALUE handle, VALUE event) {
     return Qnil;
 }
 
+static VALUE rbStartAssertFact(VALUE self, VALUE handle, VALUE fact) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(fact, T_STRING);
+
+    unsigned int replyCount;
+    void *rulesBinding = NULL;
+    unsigned int result = startAssertFact((void *)FIX2LONG(handle), RSTRING_PTR(fact), &rulesBinding, &replyCount);
+    if (result == RULES_OK) {
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(rulesBinding));
+        rb_ary_push(output, INT2FIX(replyCount));
+        return output;  
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(0));
+        rb_ary_push(output, INT2FIX(0));
+        return output; 
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not assert fact, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
 static VALUE rbAssertFact(VALUE self, VALUE handle, VALUE fact) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(fact, T_STRING);
@@ -140,6 +248,42 @@ static VALUE rbAssertFact(VALUE self, VALUE handle, VALUE fact) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
             rb_raise(rb_eException, "Could not assert fact, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
+static VALUE rbStartAssertFacts(VALUE self, VALUE handle, VALUE facts) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(facts, T_STRING);
+
+    unsigned int *results = NULL;
+    unsigned int resultsLength = 0;
+    unsigned int replyCount;
+    void *rulesBinding = NULL;
+    unsigned int result = startAssertFacts((void *)FIX2LONG(handle), RSTRING_PTR(facts), &resultsLength, &results, &rulesBinding, &replyCount);
+    if (result == RULES_OK) {
+        if (results) {
+            free(results);
+        }
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(rulesBinding));
+        rb_ary_push(output, INT2FIX(replyCount));
+        return output;  
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(0));
+        rb_ary_push(output, INT2FIX(0));
+        return output; 
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            if (results) {
+                free(results);
+            }
+            rb_raise(rb_eException, "Could not assert facts, error code: %d", result);
         }
     }
 
@@ -172,6 +316,34 @@ static VALUE rbAssertFacts(VALUE self, VALUE handle, VALUE facts) {
     return Qnil;
 }
 
+static VALUE rbStartRetractFact(VALUE self, VALUE handle, VALUE fact) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(fact, T_STRING);
+
+    unsigned int replyCount;
+    void *rulesBinding = NULL;
+    unsigned int result = startRetractFact((void *)FIX2LONG(handle), RSTRING_PTR(fact), &rulesBinding, &replyCount);
+    if (result == RULES_OK) {
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(rulesBinding));
+        rb_ary_push(output, INT2FIX(replyCount));
+        return output;  
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(0));
+        rb_ary_push(output, INT2FIX(0));
+        return output; 
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not retract fact, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
 static VALUE rbRetractFact(VALUE self, VALUE handle, VALUE fact) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(fact, T_STRING);
@@ -186,6 +358,42 @@ static VALUE rbRetractFact(VALUE self, VALUE handle, VALUE fact) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
             rb_raise(rb_eException, "Could not retract fact, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
+static VALUE rbStartRetractFacts(VALUE self, VALUE handle, VALUE facts) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(facts, T_STRING);
+
+    unsigned int *results = NULL;
+    unsigned int resultsLength = 0;
+    unsigned int replyCount;
+    void *rulesBinding = NULL;
+    unsigned int result = startRetractFacts((void *)FIX2LONG(handle), RSTRING_PTR(facts), &resultsLength, &results, &rulesBinding, &replyCount);
+    if (result == RULES_OK) {
+        if (results) {
+            free(results);
+        }
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(rulesBinding));
+        rb_ary_push(output, INT2FIX(replyCount));
+        return output;  
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(0));
+        rb_ary_push(output, INT2FIX(0));
+        return output; 
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            if (results) {
+                free(results);
+            }
+            rb_raise(rb_eException, "Could not retract facts, error code: %d", result);
         }
     }
 
@@ -238,6 +446,35 @@ static VALUE rbAssertState(VALUE self, VALUE handle, VALUE state) {
     return Qnil;
 }
 
+static VALUE rbStartUpdateState(VALUE self, VALUE handle, VALUE actionHandle, VALUE state) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(actionHandle, T_FIXNUM);
+    Check_Type(state, T_STRING);
+
+    unsigned int replyCount;
+    void *rulesBinding = NULL;
+    unsigned int result = startUpdateState((void *)FIX2LONG(handle), (void *)FIX2LONG(actionHandle), RSTRING_PTR(state), &rulesBinding, &replyCount);
+    if (result == RULES_OK) {
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(rulesBinding));
+        rb_ary_push(output, INT2FIX(replyCount));
+        return output;  
+    } else if (result == ERR_EVENT_NOT_HANDLED) {
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(0));
+        rb_ary_push(output, INT2FIX(0));
+        return output;   
+    } else {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not start update state, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
 static VALUE rbStartAction(VALUE self, VALUE handle) {
     Check_Type(handle, T_FIXNUM);
 
@@ -280,6 +517,27 @@ static VALUE rbCompleteAction(VALUE self, VALUE handle, VALUE actionHandle, VALU
 
     return Qnil;
 }
+
+static VALUE rbCompleteAndStartAction(VALUE self, VALUE handle, VALUE expectedReplies, VALUE actionHandle) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(expectedReplies, T_FIXNUM);
+    Check_Type(actionHandle, T_FIXNUM);
+
+    char *messages;
+    unsigned int result = completeAndStartAction((void *)FIX2LONG(handle), FIX2LONG(expectedReplies), (void *)FIX2LONG(actionHandle), &messages);
+    if (result == ERR_NO_ACTION_AVAILABLE) {
+        return Qnil;
+    } else if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not complete and start action, error code: %d", result);
+        }
+    }
+
+    return rb_str_new2(messages);
+}
+
 
 static VALUE rbAbandonAction(VALUE self, VALUE handle, VALUE actionHandle) {
     Check_Type(handle, T_FIXNUM);
@@ -358,16 +616,25 @@ void Init_rules() {
     rb_define_singleton_method(rulesModule, "create_ruleset", rbCreateRuleset, 3);
     rb_define_singleton_method(rulesModule, "delete_ruleset", rbDeleteRuleset, 1);
     rb_define_singleton_method(rulesModule, "bind_ruleset", rbBindRuleset, 4);
+    rb_define_singleton_method(rulesModule, "complete", rbComplete, 2);
     rb_define_singleton_method(rulesModule, "assert_event", rbAssertEvent, 2);
+    rb_define_singleton_method(rulesModule, "start_assert_event", rbStartAssertEvent, 2);
     rb_define_singleton_method(rulesModule, "assert_events", rbAssertEvents, 2);
+    rb_define_singleton_method(rulesModule, "start_assert_events", rbStartAssertEvents, 2);
     rb_define_singleton_method(rulesModule, "retract_event", rbRetractEvent, 2);
+    rb_define_singleton_method(rulesModule, "start_assert_fact", rbStartAssertFact, 2);
     rb_define_singleton_method(rulesModule, "assert_fact", rbAssertFact, 2);
+    rb_define_singleton_method(rulesModule, "start_assert_facts", rbStartAssertFacts, 2);
     rb_define_singleton_method(rulesModule, "assert_facts", rbAssertFacts, 2);
+    rb_define_singleton_method(rulesModule, "start_retract_fact", rbStartRetractFact, 2);
     rb_define_singleton_method(rulesModule, "retract_fact", rbRetractFact, 2);
+    rb_define_singleton_method(rulesModule, "start_retract_facts", rbStartRetractFacts, 2);
     rb_define_singleton_method(rulesModule, "retract_facts", rbRetractFacts, 2);
     rb_define_singleton_method(rulesModule, "assert_state", rbAssertState, 2);
+    rb_define_singleton_method(rulesModule, "start_update_state", rbStartUpdateState, 3);
     rb_define_singleton_method(rulesModule, "start_action", rbStartAction, 1);
     rb_define_singleton_method(rulesModule, "complete_action", rbCompleteAction, 3);
+    rb_define_singleton_method(rulesModule, "complete_and_start_action", rbCompleteAndStartAction, 3);
     rb_define_singleton_method(rulesModule, "abandon_action", rbAbandonAction, 2);
     rb_define_singleton_method(rulesModule, "start_timer", rbStartTimer, 4);
     rb_define_singleton_method(rulesModule, "assert_timers", rbAssertTimers, 1);

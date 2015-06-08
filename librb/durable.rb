@@ -5,7 +5,7 @@ module Durable
   @@rulesets = {}
   @@start_blocks = []
 
-  def self.run(ruleset_definitions = nil, databases = ["/tmp/redis.sock"], start = nil)
+  def self.run(ruleset_definitions = nil, databases = [{:host => 'localhost', :port => 6379, :password => nil}], start = nil)
     main_host = Engine::Host.new ruleset_definitions, databases
     start.call main_host if start
     main_host.start!
@@ -13,7 +13,7 @@ module Durable
     Interface::Application.run!
   end
 
-  def self.run_all(databases = ["/tmp/redis.sock"])
+  def self.run_all(databases = [{:host => 'localhost', :port => 6379, :password => nil}])
     main_host = Engine::Host.new @@rulesets, databases
     for block in @@start_blocks
       main_host.instance_exec main_host, &block
@@ -413,6 +413,10 @@ module Durable
       {:span => value}
     end
 
+    def cap(value)
+      {:cap => value}
+    end
+
     def timeout(name)
       expression = Expression.new(:$m)
       expression.left = :$t
@@ -462,6 +466,10 @@ module Durable
 
       if options.key? :span
         rule["span"] = options[:span]
+      end
+
+      if options.key? :cap
+        rule["cap"] = options[:cap]
       end
 
       @rules[rule_name] = rule
