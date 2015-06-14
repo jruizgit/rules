@@ -284,7 +284,6 @@ class Ruleset(object):
             else:
                 self._actions[rule_name] = Fork(host.register_rulesets(name, action))
 
-        print(json.dumps(ruleset_definition))
         self._handle = rules.create_ruleset(state_cache_size, name, json.dumps(ruleset_definition))
         self._definition = ruleset_definition
         
@@ -457,12 +456,13 @@ class Ruleset(object):
                             pending[binding] = replies
                         
                         for binding, replies in pending.iteritems():
-                            if binding != action_binding:
-                                rules.complete(binding, replies)
-                            else:
-                                new_result = rules.complete_and_start_action(self._handle, replies, c._handle)
-                                if new_result:
-                                    result_container['message'] = json.loads(new_result)
+                            if binding != 0:
+                                if binding != action_binding:
+                                    rules.complete(binding, replies)
+                                else:
+                                    new_result = rules.complete_and_start_action(self._handle, replies, c._handle)
+                                    if new_result:
+                                        result_container['message'] = json.loads(new_result)
 
                     except Exception as error:
                         rules.abandon_action(self._handle, c._handle)
@@ -728,7 +728,7 @@ class Flowchart(Ruleset):
 
 class Host(object):
 
-    def __init__(self, ruleset_definitions = None, databases = ['/tmp/redis.sock'], state_cache_size = 1024):
+    def __init__(self, ruleset_definitions = None, databases = [{'host': 'localhost', 'port': 6379, 'password':None}], state_cache_size = 1024):
         self._ruleset_directory = {}
         self._ruleset_list = []
         self._databases = databases

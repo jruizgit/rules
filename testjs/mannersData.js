@@ -1,113 +1,151 @@
-var d = require('../libjs/durable');
+        host.assert('missManners', {id: 1, sid: 1, t: 'guest', name: 'n1', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 2, sid: 1, t: 'guest', name: 'n1', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 3, sid: 1, t: 'guest', name: 'n2', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 4, sid: 1, t: 'guest', name: 'n2', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 5, sid: 1, t: 'guest', name: 'n3', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 6, sid: 1, t: 'guest', name: 'n3', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 7, sid: 1, t: 'guest', name: 'n3', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 8, sid: 1, t: 'guest', name: 'n4', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 9, sid: 1, t: 'guest', name: 'n4', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 10, sid: 1, t: 'guest', name: 'n5', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 11, sid: 1, t: 'guest', name: 'n5', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 12, sid: 1, t: 'guest', name: 'n5', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 13, sid: 1, t: 'guest', name: 'n6', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 14, sid: 1, t: 'guest', name: 'n6', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 15, sid: 1, t: 'guest', name: 'n6', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 16, sid: 1, t: 'guest', name: 'n7', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 17, sid: 1, t: 'guest', name: 'n7', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 18, sid: 1, t: 'guest', name: 'n8', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 19, sid: 1, t: 'guest', name: 'n8', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 20, sid: 1, t: 'lastSeat', seat: 8});
 
-with (d.statechart('missManners')) {
-    with (state('start')) {
-        to('assign').whenAll(m.t.eq('guest'), 
-        function(c) {
-            c.s.count = 0;
-            c.s.gcount = 1000;
-            c.assert({t: 'seating',
-                      id: c.s.gcount,
-                      tid: c.s.count,
-                      pid: 0,
-                      path: true,
-                      leftSeat: 1,
-                      leftGuestName: c.m.name,
-                      rightSeat: 1,
-                      rightGuestName: c.m.name});
-            c.assert({t: 'path',
-                      id: c.s.gcount + 1,
-                      pid: c.s.count,
-                      seat: 1,
-                      guestName: c.m.name});
-            c.s.count += 1;
-            c.s.gcount += 2;
-            c.s.startTime = new Date();
-            console.log('assign ' + c.m.name);
-        });
-    }
-    with (state('assign')) {
-        to('make').whenAll(c.seating = and(m.t.eq('seating'), 
-                                           m.path.eq(true)),
-                           c.rightGuest = and(m.t.eq('guest'), 
-                                              m.name.eq(c.seating.rightGuestName)),
-                           c.leftGuest = and(m.t.eq('guest'), 
-                                             m.sex.neq(c.rightGuest.sex), 
-                                             m.hobby.eq(c.rightGuest.hobby)),
-                           none(and(m.t.eq('path'),
-                                    m.pid.eq(c.seating.tid),
-                                    m.guestName.eq(c.leftGuest.name))),
-                           none(and(m.t.eq('chosen'),
-                                    m.cid.eq(c.seating.tid),
-                                    m.guestName.eq(c.leftGuest.name),
-                                    m.hobby.eq(c.rightGuest.hobby))), 
-        function(c) {
-            c.assert({t: 'seating',
-                      id: c.s.gcount,
-                      tid: c.s.count,
-                      pid: c.seating.tid,
-                      path: false,
-                      leftSeat: c.seating.rightSeat,
-                      leftGuestName: c.seating.rightGuestName,
-                      rightSeat: c.seating.rightSeat + 1,
-                      rightGuestName: c.leftGuest.name});
-            c.assert({t: 'path',
-                      id: c.s.gcount + 1,
-                      pid: c.s.count,
-                      seat: c.seating.rightSeat + 1,
-                      guestName: c.leftGuest.name});
-            c.assert({t: 'chosen',
-                      id: c.s.gcount + 2,
-                      cid: c.seating.tid,
-                      guestName: c.leftGuest.name,
-                      hobby: c.rightGuest.hobby});
-            c.s.count += 1;
-            c.s.gcount += 3;
-        }); 
-    }
-    with (state('make')) {
-        to('make').whenAll(cap(1000),
-                           c.seating = and(m.t.eq('seating'),
-                                           m.path.eq(false)),
-                           c.path = and(m.t.eq('path'),
-                                        m.pid.eq(c.seating.pid)),
-                           none(and(m.t.eq('path'),
-                                    m.pid.eq(c.seating.tid),
-                                    m.guestName.eq(c.path.guestName))), 
-        function(c) {
-            for (var i = 0; i < c.m.length; ++i) {
-                var frame = c.m[i];
-                c.assert({t: 'path',
-                          id: c.s.gcount,
-                          pid: frame.seating.tid,
-                          seat: frame.path.seat,
-                          guestName: frame.path.guestName});
-                c.s.gcount += 1;
-            }
-        });
+        host.assert('missManners', {id: 1, sid: 1, t: 'guest', name: 'n1', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 2, sid: 1, t: 'guest', name: 'n1', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 3, sid: 1, t: 'guest', name: 'n1', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 4, sid: 1, t: 'guest', name: 'n2', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 5, sid: 1, t: 'guest', name: 'n2', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 6, sid: 1, t: 'guest', name: 'n3', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 7, sid: 1, t: 'guest', name: 'n3', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 8, sid: 1, t: 'guest', name: 'n4', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 9, sid: 1, t: 'guest', name: 'n4', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 10, sid: 1, t: 'guest', name: 'n5', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 11, sid: 1, t: 'guest', name: 'n5', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 12, sid: 1, t: 'guest', name: 'n6', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 13, sid: 1, t: 'guest', name: 'n6', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 14, sid: 1, t: 'guest', name: 'n7', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 15, sid: 1, t: 'guest', name: 'n7', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 16, sid: 1, t: 'guest', name: 'n7', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 17, sid: 1, t: 'guest', name: 'n8', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 18, sid: 1, t: 'guest', name: 'n8', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 19, sid: 1, t: 'guest', name: 'n9', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 20, sid: 1, t: 'guest', name: 'n9', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 21, sid: 1, t: 'guest', name: 'n9', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 22, sid: 1, t: 'guest', name: 'n10', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 23, sid: 1, t: 'guest', name: 'n10', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 24, sid: 1, t: 'guest', name: 'n11', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 25, sid: 1, t: 'guest', name: 'n11', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 26, sid: 1, t: 'guest', name: 'n11', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 27, sid: 1, t: 'guest', name: 'n12', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 28, sid: 1, t: 'guest', name: 'n12', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 29, sid: 1, t: 'guest', name: 'n13', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 30, sid: 1, t: 'guest', name: 'n13', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 31, sid: 1, t: 'guest', name: 'n13', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 32, sid: 1, t: 'guest', name: 'n14', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 33, sid: 1, t: 'guest', name: 'n14', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 34, sid: 1, t: 'guest', name: 'n15', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 35, sid: 1, t: 'guest', name: 'n15', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 36, sid: 1, t: 'guest', name: 'n15', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 37, sid: 1, t: 'guest', name: 'n16', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 38, sid: 1, t: 'guest', name: 'n16', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 39, sid: 1, t: 'guest', name: 'n16', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 40, sid: 1, t: 'lastSeat', seat: 16});
 
-        to('check').whenAll(pri(1), and(m.t.eq('seating'), m.path.eq(false)), 
-        function(c) {
-            c.retract(c.m);
-            c.m.id = c.s.gcount;
-            c.m.path = true;
-            c.assert(c.m);
-            c.s.gcount += 1;
-            console.log('path sid: ' + c.m.tid + ', pid: ' + c.m.pid + ', left: ' + c.m.leftGuestName + ', right: ' + c.m.rightGuestName);
-        });
-    }
-    with (state('check')) {
-        to('end').whenAll(c.lastSeat = m.t.eq('lastSeat'),
-                          and(m.t.eq('seating'), m.rightSeat.eq(c.lastSeat.seat)), 
-        function(c) {
-            console.log('end ' + (new Date() - c.s.startTime));
-        });
-        to('assign');
-    }
-    
-    state('end');
 
-    whenStart(function (host) {
+
+        host.assert('missManners', {id: 1, sid: 1, t: 'guest', name: 'n1', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 2, sid: 1, t: 'guest', name: 'n1', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 3, sid: 1, t: 'guest', name: 'n2', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 4, sid: 1, t: 'guest', name: 'n2', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 5, sid: 1, t: 'guest', name: 'n2', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 6, sid: 1, t: 'guest', name: 'n3', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 7, sid: 1, t: 'guest', name: 'n3', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 8, sid: 1, t: 'guest', name: 'n4', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 9, sid: 1, t: 'guest', name: 'n4', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 10, sid: 1, t: 'guest', name: 'n5', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 11, sid: 1, t: 'guest', name: 'n5', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 12, sid: 1, t: 'guest', name: 'n6', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 13, sid: 1, t: 'guest', name: 'n6', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 14, sid: 1, t: 'guest', name: 'n6', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 15, sid: 1, t: 'guest', name: 'n7', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 16, sid: 1, t: 'guest', name: 'n7', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 17, sid: 1, t: 'guest', name: 'n7', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 18, sid: 1, t: 'guest', name: 'n8', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 19, sid: 1, t: 'guest', name: 'n8', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 20, sid: 1, t: 'guest', name: 'n8', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 21, sid: 1, t: 'guest', name: 'n9', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 22, sid: 1, t: 'guest', name: 'n9', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 23, sid: 1, t: 'guest', name: 'n9', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 24, sid: 1, t: 'guest', name: 'n10', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 25, sid: 1, t: 'guest', name: 'n10', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 26, sid: 1, t: 'guest', name: 'n11', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 27, sid: 1, t: 'guest', name: 'n11', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 28, sid: 1, t: 'guest', name: 'n12', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 29, sid: 1, t: 'guest', name: 'n12', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 30, sid: 1, t: 'guest', name: 'n13', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 31, sid: 1, t: 'guest', name: 'n13', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 32, sid: 1, t: 'guest', name: 'n14', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 33, sid: 1, t: 'guest', name: 'n14', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 34, sid: 1, t: 'guest', name: 'n15', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 35, sid: 1, t: 'guest', name: 'n15', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 36, sid: 1, t: 'guest', name: 'n15', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 37, sid: 1, t: 'guest', name: 'n16', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 38, sid: 1, t: 'guest', name: 'n16', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 39, sid: 1, t: 'guest', name: 'n16', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 40, sid: 1, t: 'guest', name: 'n17', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 41, sid: 1, t: 'guest', name: 'n17', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 42, sid: 1, t: 'guest', name: 'n18', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 43, sid: 1, t: 'guest', name: 'n18', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 44, sid: 1, t: 'guest', name: 'n19', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 45, sid: 1, t: 'guest', name: 'n19', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 46, sid: 1, t: 'guest', name: 'n19', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 47, sid: 1, t: 'guest', name: 'n20', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 48, sid: 1, t: 'guest', name: 'n20', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 49, sid: 1, t: 'guest', name: 'n20', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 50, sid: 1, t: 'guest', name: 'n21', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 51, sid: 1, t: 'guest', name: 'n21', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 52, sid: 1, t: 'guest', name: 'n21', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 53, sid: 1, t: 'guest', name: 'n22', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 54, sid: 1, t: 'guest', name: 'n22', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 55, sid: 1, t: 'guest', name: 'n22', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 56, sid: 1, t: 'guest', name: 'n23', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 57, sid: 1, t: 'guest', name: 'n23', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 58, sid: 1, t: 'guest', name: 'n23', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 59, sid: 1, t: 'guest', name: 'n24', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 60, sid: 1, t: 'guest', name: 'n24', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 61, sid: 1, t: 'guest', name: 'n25', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 62, sid: 1, t: 'guest', name: 'n25', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 63, sid: 1, t: 'guest', name: 'n25', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 64, sid: 1, t: 'guest', name: 'n26', sex: 'f', hobby: 'h3'});
+        host.assert('missManners', {id: 65, sid: 1, t: 'guest', name: 'n26', sex: 'f', hobby: 'h2'});
+        host.assert('missManners', {id: 66, sid: 1, t: 'guest', name: 'n26', sex: 'f', hobby: 'h1'});
+        host.assert('missManners', {id: 67, sid: 1, t: 'guest', name: 'n27', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 68, sid: 1, t: 'guest', name: 'n27', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 69, sid: 1, t: 'guest', name: 'n27', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 70, sid: 1, t: 'guest', name: 'n28', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 71, sid: 1, t: 'guest', name: 'n28', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 72, sid: 1, t: 'guest', name: 'n29', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 73, sid: 1, t: 'guest', name: 'n29', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 74, sid: 1, t: 'guest', name: 'n29', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 75, sid: 1, t: 'guest', name: 'n30', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 76, sid: 1, t: 'guest', name: 'n30', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 77, sid: 1, t: 'guest', name: 'n30', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 78, sid: 1, t: 'guest', name: 'n31', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 79, sid: 1, t: 'guest', name: 'n31', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 80, sid: 1, t: 'guest', name: 'n32', sex: 'm', hobby: 'h1'});
+        host.assert('missManners', {id: 81, sid: 1, t: 'guest', name: 'n32', sex: 'm', hobby: 'h3'});
+        host.assert('missManners', {id: 82, sid: 1, t: 'guest', name: 'n32', sex: 'm', hobby: 'h2'});
+        host.assert('missManners', {id: 83, sid: 1, t: 'lastSeat', seat: 32});
+
         host.assert('missManners', {id: 1, sid: 1, t: 'guest', name: '1', sex: 'm', hobby: 'h2'});
         host.assert('missManners', {id: 2, sid: 1, t: 'guest', name: '1', sex: 'm', hobby: 'h3'});
         host.assert('missManners', {id: 3, sid: 1, t: 'guest', name: '1', sex: 'm', hobby: 'h1'});
@@ -547,7 +585,3 @@ with (d.statechart('missManners')) {
         host.assert('missManners', {id: 437, sid: 1, t: 'guest', name: '128', sex: 'f', hobby: 'h1'});
         host.assert('missManners', {id: 438, sid: 1, t: 'guest', name: '128', sex: 'f', hobby: 'h3'});
         host.assert('missManners', {id: 439, sid: 1, t: 'lastSeat', seat: 128});
-    });
-}
-
-d.runAll(['/tmp/redis0.sock']);

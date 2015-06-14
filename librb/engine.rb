@@ -504,12 +504,14 @@ module Engine
                 pending[binding] = replies
               end
               for binding, replies in pending do
-                if binding != action_binding
-                  Rules.complete(binding, replies)
-                else
-                  new_result = Rules.complete_and_start_action @handle, replies, c.handle
-                  if new_result
-                    result_container[:message] = JSON.parse new_result
+                if binding != 0
+                  if binding != action_binding
+                    Rules.complete(binding, replies)
+                  else
+                    new_result = Rules.complete_and_start_action @handle, replies, c.handle
+                    if new_result
+                      result_container[:message] = JSON.parse new_result
+                    end
                   end
                 end
               end
@@ -916,7 +918,7 @@ module Engine
 
   class Host
 
-    def initialize(ruleset_definitions = nil, databases = ["/tmp/redis.sock"], state_cache_size = 1024)
+    def initialize(ruleset_definitions = nil, databases = [{:host => 'localhost', :port => 6379, :password => nil}], state_cache_size = 1024)
       @ruleset_directory = {}
       @ruleset_list = []
       @databases = databases

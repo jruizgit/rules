@@ -327,29 +327,6 @@ exports = module.exports = durableEngine = function () {
         );
     }
 
-    var dispatcher = function(func) {
-        return function(c) {
-            if (c.m.constructor !== Array) {
-                var results = 0;
-                for (var name in c.m) {
-                    c[name] = c.m[name];
-                    ++results;
-                }
-            } else {
-                for (var i = 0; i < c.m.length; ++i) {
-                    if (Object.keys(c.m[i]).length === 1) {
-                        for (var name in c.m[i]) {
-                            if (name.indexOf('m', 0) === 0) {
-                                c.m[i] = c.m[i][name];
-                            }
-                        }
-                    }
-                }
-            }            
-            return func(c);
-        }
-    }
-
     var rule = function(op, lexp) {
         var that = {};
         var func;
@@ -382,7 +359,7 @@ exports = module.exports = durableEngine = function () {
             var func;
 
             if (typeof(lexp[lexp.length - 1]) === 'function') {
-                func =  dispatcher(lexp.pop());
+                func =  lexp.pop();
             } else if (rulesetArray.length) {
                 var rulesetDefinitions = {};
                 for (var i = 0; i < rulesetArray.length; ++i) {
@@ -404,6 +381,8 @@ exports = module.exports = durableEngine = function () {
                     newDefinition['pri'] = expDefinition['pri'];
                 } else if (expDefinition['span']) {
                     newDefinition['span'] = expDefinition['span'];
+                } else if (expDefinition['cap']) {
+                    newDefinition['cap'] = expDefinition['cap'];
                 } else {
                     newArray.push(lexp[i]);
                 }
@@ -559,6 +538,14 @@ exports = module.exports = durableEngine = function () {
             return that;
         };
 
+        obj.cap = function(cap) {
+            var that = {};
+            that.define = function () {
+                return {cap: cap};
+            }
+            return that;
+        };
+
         obj.timeout = function(name) {
             return m.$t.eq(name);
         }
@@ -634,7 +621,7 @@ exports = module.exports = durableEngine = function () {
                 if (!flow) {
                     return {to: stateName};
                 } else if (typeof(flow) === 'function') {
-                    return {to: stateName, run: dispatcher(flow)};
+                    return {to: stateName, run: flow};
                 }
                 else {
                     return stateName;
@@ -775,7 +762,7 @@ exports = module.exports = durableEngine = function () {
         that.define = function () {
             var newDefinition = {};
             if (runFunc) {
-                newDefinition['run'] = dispatcher(runFunc);
+                newDefinition['run'] = runFunc;
             } else if (rulesetArray.length) {
                 var rulesetDefinitions = {};
                 for (var i = 0; i < rulesetArray.length; ++i) {

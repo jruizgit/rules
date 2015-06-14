@@ -46,7 +46,6 @@ void jsCreateRuleset(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
         } else {
             args.GetReturnValue().Set(static_cast<double>((long)output));
@@ -69,7 +68,6 @@ void jsDeleteRuleset(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
         }
     }
@@ -102,8 +100,64 @@ void jsBindRuleset(const FunctionCallbackInfo<v8::Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
+        } 
+    }
+}
+
+void jsComplete(const FunctionCallbackInfo<v8::Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsNumber()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        unsigned int result = complete((void *)args[0]->IntegerValue(),
+                                       args[1]->IntegerValue());
+        if (result != RULES_OK) {
+            char *message = NULL;
+            if (asprintf(&message, "Could not complete, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            }
+        } 
+    }
+
+}
+
+void jsStartAssertEvent(const FunctionCallbackInfo<v8::Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        unsigned int replyCount;
+        void *rulesBinding = NULL;
+        unsigned int result = startAssertEvent((void *)args[0]->IntegerValue(),
+                                               *String::Utf8Value(args[1]->ToString()),
+                                               &rulesBinding,
+                                               &replyCount);
+        if (result == RULES_OK) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, (long)rulesBinding));
+            array->Set(1, Number::New(isolate, (long)replyCount));
+            args.GetReturnValue().Set(array);
+        } else if (result == ERR_EVENT_NOT_HANDLED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, 0));
+            array->Set(1, Number::New(isolate, 0));
+            args.GetReturnValue().Set(array);
+        } else {
+            char *message = NULL;
+            if (asprintf(&message, "Could not start assert event, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            } 
         } 
     }
 }
@@ -121,8 +175,7 @@ void jsAssertEvent(const FunctionCallbackInfo<Value>& args) {
         
         if (result == RULES_OK) {
             args.GetReturnValue().Set(1);
-        }
-        else if (result == ERR_EVENT_NOT_HANDLED) {
+        } else if (result == ERR_EVENT_NOT_HANDLED) {
             args.GetReturnValue().Set(0);
         } else {
             char *message = NULL;
@@ -130,8 +183,54 @@ void jsAssertEvent(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
+        } 
+    }
+}
+
+void jsStartAssertEvents(const FunctionCallbackInfo<v8::Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        unsigned int replyCount;
+        void *rulesBinding = NULL;
+        unsigned int *results = NULL;
+        unsigned int resultsLength;
+        unsigned int result = startAssertEvents((void *)args[0]->IntegerValue(), 
+                                                *String::Utf8Value(args[1]->ToString()), 
+                                                &resultsLength, 
+                                                &results,
+                                                &rulesBinding,
+                                                &replyCount);
+        if (result == RULES_OK) {
+            if (results) {
+                free(results);
+            }
+
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, (long)rulesBinding));
+            array->Set(1, Number::New(isolate, (long)replyCount));
+            args.GetReturnValue().Set(array);
+        } else if (result == ERR_EVENT_NOT_HANDLED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, 0));
+            array->Set(1, Number::New(isolate, 0));
+            args.GetReturnValue().Set(array);
+        } else {
+            char *message = NULL;
+            if (asprintf(&message, "Could not start assert events, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                if (results) {
+                    free(results);
+                }
+
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            } 
         } 
     }
 }
@@ -166,7 +265,6 @@ void jsAssertEvents(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
 
             if (results) {
@@ -189,8 +287,7 @@ void jsRetractEvent(const FunctionCallbackInfo<Value>& args) {
         
         if (result == RULES_OK) {
             args.GetReturnValue().Set(1);
-        }
-        else if (result == ERR_EVENT_NOT_HANDLED) {
+        } else if (result == ERR_EVENT_NOT_HANDLED) {
             args.GetReturnValue().Set(0);
         } else {
             char *message = NULL;
@@ -198,8 +295,42 @@ void jsRetractEvent(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
+        } 
+    }
+}
+
+void jsStartAssertFact(const FunctionCallbackInfo<v8::Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        unsigned int replyCount;
+        void *rulesBinding = NULL;
+        unsigned int result = startAssertFact((void *)args[0]->IntegerValue(),
+                                               *String::Utf8Value(args[1]->ToString()),
+                                               &rulesBinding,
+                                               &replyCount);
+        if (result == RULES_OK) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, (long)rulesBinding));
+            array->Set(1, Number::New(isolate, (long)replyCount));
+            args.GetReturnValue().Set(array);
+        } else if (result == ERR_EVENT_NOT_HANDLED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, 0));
+            array->Set(1, Number::New(isolate, 0));
+            args.GetReturnValue().Set(array);
+        } else {
+            char *message = NULL;
+            if (asprintf(&message, "Could not start assert fact, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            } 
         } 
     }
 }
@@ -217,8 +348,7 @@ void jsAssertFact(const FunctionCallbackInfo<Value>& args) {
         
         if (result == RULES_OK) {
             args.GetReturnValue().Set(1);
-        }
-        else if (result == ERR_EVENT_NOT_HANDLED) {
+        } else if (result == ERR_EVENT_NOT_HANDLED) {
             args.GetReturnValue().Set(0);
         } else {
             char *message = NULL;
@@ -226,8 +356,54 @@ void jsAssertFact(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
+        } 
+    }
+}
+
+void jsStartAssertFacts(const FunctionCallbackInfo<v8::Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        unsigned int replyCount;
+        void *rulesBinding = NULL;
+        unsigned int *results = NULL;
+        unsigned int resultsLength;
+        unsigned int result = startAssertFacts((void *)args[0]->IntegerValue(), 
+                                               *String::Utf8Value(args[1]->ToString()), 
+                                               &resultsLength, 
+                                               &results,
+                                               &rulesBinding,
+                                               &replyCount);
+        if (result == RULES_OK) {
+            if (results) {
+                free(results);
+            }
+
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, (long)rulesBinding));
+            array->Set(1, Number::New(isolate, (long)replyCount));
+            args.GetReturnValue().Set(array);
+        } else if (result == ERR_EVENT_NOT_HANDLED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, 0));
+            array->Set(1, Number::New(isolate, 0));
+            args.GetReturnValue().Set(array);
+        } else {
+            char *message = NULL;
+            if (asprintf(&message, "Could not start assert facts, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                if (results) {
+                    free(results);
+                }
+
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            } 
         } 
     }
 }
@@ -262,11 +438,45 @@ void jsAssertFacts(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
             if (results) {
                 free(results);
             }   
+        } 
+    }
+}
+
+void jsStartRetractFact(const FunctionCallbackInfo<v8::Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        unsigned int replyCount;
+        void *rulesBinding = NULL;
+        unsigned int result = startRetractFact((void *)args[0]->IntegerValue(),
+                                               *String::Utf8Value(args[1]->ToString()),
+                                               &rulesBinding,
+                                               &replyCount);
+        if (result == RULES_OK) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, (long)rulesBinding));
+            array->Set(1, Number::New(isolate, (long)replyCount));
+            args.GetReturnValue().Set(array);
+        } else if (result == ERR_EVENT_NOT_HANDLED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, 0));
+            array->Set(1, Number::New(isolate, 0));
+            args.GetReturnValue().Set(array);
+        } else {
+            char *message = NULL;
+            if (asprintf(&message, "Could not start retract fact, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            } 
         } 
     }
 }
@@ -284,8 +494,7 @@ void jsRetractFact(const FunctionCallbackInfo<Value>& args) {
         
         if (result == RULES_OK) {
             args.GetReturnValue().Set(1);
-        }
-        else if (result == ERR_EVENT_NOT_HANDLED) {
+        } else if (result == ERR_EVENT_NOT_HANDLED) {
             args.GetReturnValue().Set(0);
         } else {
             char * message;
@@ -293,8 +502,54 @@ void jsRetractFact(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
+        } 
+    }
+}
+
+void jsStartRetractFacts(const FunctionCallbackInfo<v8::Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        unsigned int replyCount;
+        void *rulesBinding = NULL;
+        unsigned int *results = NULL;
+        unsigned int resultsLength;
+        unsigned int result = startRetractFacts((void *)args[0]->IntegerValue(), 
+                                                *String::Utf8Value(args[1]->ToString()), 
+                                                &resultsLength, 
+                                                &results,
+                                                &rulesBinding,
+                                                &replyCount);
+        if (result == RULES_OK) {
+            if (results) {
+                free(results);
+            }
+
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, (long)rulesBinding));
+            array->Set(1, Number::New(isolate, (long)replyCount));
+            args.GetReturnValue().Set(array);
+        } else if (result == ERR_EVENT_NOT_HANDLED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, 0));
+            array->Set(1, Number::New(isolate, 0));
+            args.GetReturnValue().Set(array);
+        } else {
+            char *message = NULL;
+            if (asprintf(&message, "Could not start retract facts, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                if (results) {
+                    free(results);
+                }
+
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            } 
         } 
     }
 }
@@ -329,7 +584,6 @@ void jsRetractFacts(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
             if (results) {
                 free(results);
@@ -351,8 +605,7 @@ void jsAssertState(const FunctionCallbackInfo<Value>& args) {
         
         if (result == RULES_OK) {
             args.GetReturnValue().Set(1);
-        }
-        else if (result == ERR_EVENT_NOT_HANDLED) {
+        } else if (result == ERR_EVENT_NOT_HANDLED) {
             args.GetReturnValue().Set(0);
         } else {
             char *message = NULL;
@@ -360,8 +613,44 @@ void jsAssertState(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
+        } 
+    }
+}
+
+void jsStartUpdateState(const FunctionCallbackInfo<v8::Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 3) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsNumber() || !args[2]->IsString()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        unsigned int replyCount;
+        void *rulesBinding = NULL;
+        unsigned int result = startUpdateState((void *)args[0]->IntegerValue(),
+                                               (void *)args[1]->IntegerValue(),
+                                               *String::Utf8Value(args[2]->ToString()),
+                                               &rulesBinding,
+                                               &replyCount);
+        
+        if (result == RULES_OK) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, (long)rulesBinding));
+            array->Set(1, Number::New(isolate, (long)replyCount));
+            args.GetReturnValue().Set(array);
+        } else if (result == ERR_EVENT_NOT_HANDLED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, 0));
+            array->Set(1, Number::New(isolate, 0));
+            args.GetReturnValue().Set(array);
+        } else {
+            char *message = NULL;
+            if (asprintf(&message, "Could not start update state, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            } 
         } 
     }
 }
@@ -385,10 +674,10 @@ void jsStartAction(const FunctionCallbackInfo<Value>& args) {
                                           &actionBinding); 
         if (result == RULES_OK) {
             Handle<Array> array = Array::New(isolate, 4);
-            array->Set(0, Number::New(isolate, (long)actionHandle));
-            array->Set(1, String::NewFromUtf8(isolate, session));
-            array->Set(2, String::NewFromUtf8(isolate, messages));
-            array->Set(3, String::NewFromUtf8(isolate, actionBinding));
+            array->Set(0, String::NewFromUtf8(isolate, session));
+            array->Set(1, String::NewFromUtf8(isolate, messages));
+            array->Set(2, Number::New(isolate, (long)actionHandle));
+            array->Set(3, Number::New(isolate, (long)actionBinding));
             args.GetReturnValue().Set(array);
         } else if (result != ERR_NO_ACTION_AVAILABLE) {
             char *message = NULL;
@@ -396,9 +685,35 @@ void jsStartAction(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
         }
+    }
+}
+
+void jsCompleteAndStartAction(const FunctionCallbackInfo<v8::Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 3) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsNumber() || !args[2]->IsNumber()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        char *messages = NULL;
+        unsigned int result = completeAndStartAction((void *)args[0]->IntegerValue(),
+                                                     args[1]->IntegerValue(),
+                                                     (void *)args[2]->IntegerValue(),
+                                                     &messages);
+        if (result == RULES_OK) {
+
+            args.GetReturnValue().Set(String::NewFromUtf8(isolate, messages));
+        } else if (result != ERR_NO_ACTION_AVAILABLE) {
+            char *message = NULL;
+            if (asprintf(&message, "Could not complete and start action, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            }
+        } 
     }
 }
 
@@ -420,7 +735,6 @@ void jsCompleteAction(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
         } 
     }
@@ -443,7 +757,6 @@ void jsAbandonAction(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
         } 
     }
@@ -468,7 +781,6 @@ void jsStartTimer(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
         } 
     }
@@ -494,7 +806,6 @@ void jsAssertTimers(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
         } 
     }
@@ -521,7 +832,6 @@ void jsGetState(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-                free(message);
             }
         }
     }
@@ -593,8 +903,17 @@ void init(Handle<Object> exports) {
     exports->Set(String::NewFromUtf8(isolate, "bindRuleset", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsBindRuleset)->GetFunction());
 
+    exports->Set(String::NewFromUtf8(isolate, "complete", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsComplete)->GetFunction());
+
+    exports->Set(String::NewFromUtf8(isolate, "startAssertEvent", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsStartAssertEvent)->GetFunction());
+
     exports->Set(String::NewFromUtf8(isolate, "assertEvent", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsAssertEvent)->GetFunction());
+
+    exports->Set(String::NewFromUtf8(isolate, "startAssertEvents", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsStartAssertEvents)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "assertEvents", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsAssertEvents)->GetFunction());
@@ -602,14 +921,26 @@ void init(Handle<Object> exports) {
     exports->Set(String::NewFromUtf8(isolate, "retractEvent", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsRetractEvent)->GetFunction());
 
+    exports->Set(String::NewFromUtf8(isolate, "startAssertFact", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsStartAssertFact)->GetFunction());
+
     exports->Set(String::NewFromUtf8(isolate, "assertFact", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsAssertFact)->GetFunction());
+
+    exports->Set(String::NewFromUtf8(isolate, "startAssertFacts", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsStartAssertFacts)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "assertFacts", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsAssertFacts)->GetFunction());
 
+    exports->Set(String::NewFromUtf8(isolate, "startRetractFact", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsStartRetractFact)->GetFunction());
+
     exports->Set(String::NewFromUtf8(isolate, "retractFact", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsRetractFact)->GetFunction());
+
+    exports->Set(String::NewFromUtf8(isolate, "startRetractFacts", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsStartRetractFacts)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "retractFacts", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsRetractFacts)->GetFunction());
@@ -620,11 +951,17 @@ void init(Handle<Object> exports) {
     exports->Set(String::NewFromUtf8(isolate, "assertState", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsAssertState)->GetFunction());
 
+    exports->Set(String::NewFromUtf8(isolate, "startUpdateState", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsStartUpdateState)->GetFunction());
+
     exports->Set(String::NewFromUtf8(isolate, "startAction", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsStartAction)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "completeAction", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsCompleteAction)->GetFunction());
+
+    exports->Set(String::NewFromUtf8(isolate, "completeAndStartAction", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsCompleteAndStartAction)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "abandonAction", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsAbandonAction)->GetFunction());

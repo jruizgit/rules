@@ -6,18 +6,21 @@ exports = module.exports = durableEngine = function () {
 
     var closure = function (document, output, handle, rulesetName) {
         var that = {};
-        var eventsRulesets = [];
+        var targetRulesets = {};
         var eventsDirectory = {};
-        var factsRulesets = [];
         var factsDirectory = {};
-        var retractRulesets = [];
         var retractDirectory = {};
-        var timerNames = [];
         var timerDirectory = {};
-        var branchNames = [];
         var branchDirectory = {};
         that.s = document;
-        that.m = output;
+        
+        if (output.constructor === Array) {
+            that.m = output;
+        } else {
+            for (var name in output) {
+                that[name] = output[name];
+            }
+        }            
 
         that.getRulesetName = function () {
             return rulesetName;
@@ -31,40 +34,28 @@ exports = module.exports = durableEngine = function () {
             return output;
         };
 
-        that.getEventsRulesets = function () {
-            return eventsRulesets;
+        that.getTargetRulesets = function () {
+            var rulesetNames = [];
+            for (var rulesetName in targetRulesets) {
+                rulesetNames.push(rulesetName);
+            }
+            return rulesetNames;
         };
 
         that.getEvents = function () {
             return eventsDirectory;
         };
 
-        that.getFactsRulesets = function () {
-            return factsRulesets;
-        };
-
         that.getFacts = function () {
             return factsDirectory;
-        };
-
-        that.getRetractRulesets = function () {
-            return retractRulesets;
         };
 
         that.getRetract = function () {
             return retractDirectory;
         };
 
-        that.getTimerNames = function () {
-            return timerNames;
-        };
-
         that.getTimers = function () {
             return timerDirectory;
-        };
-
-        that.getBranchNames = function () {
-            return branchNames;
         };
 
         that.getBranches = function () {
@@ -88,7 +79,6 @@ exports = module.exports = durableEngine = function () {
             if (branchDirectory[branchName]) {
                 throw 'branch with name ' + branchName + ' already forked';
             } else {
-                branchNames.push(branchName);
                 branchDocument.sid = branchSid;
                 branchDirectory[branchName] = branchDocument;
             }
@@ -113,7 +103,7 @@ exports = module.exports = durableEngine = function () {
                 eventsList = eventsDirectory[rules];
             } else {
                 eventsList = [];
-                eventsRulesets.push(rules);
+                targetRulesets[rules] = true;
                 eventsDirectory[rules] = eventsList;
             }
 
@@ -139,7 +129,7 @@ exports = module.exports = durableEngine = function () {
                 factsList = factsDirectory[rules];
             } else {
                 factsList = [];
-                factsRulesets.push(rules);
+                targetRulesets[rules] = true;
                 factsDirectory[rules] = factsList;
             }
 
@@ -165,10 +155,9 @@ exports = module.exports = durableEngine = function () {
                 retractList = retractDirectory[rules];
             } else {
                 retractList = [];
-                retractRulesets.push(rules);
+                targetRulesets[rules] = true;
                 retractDirectory[rules] = retractList;
             }
-
             retractList.push(fact);
         };
 
@@ -176,7 +165,6 @@ exports = module.exports = durableEngine = function () {
             if (timerDirectory[name]) {
                 throw 'timer with name ' + name + ' already added';
             } else {
-                timerNames.push(name);
                 timerDirectory[name] = duration;
             }
         };
@@ -226,6 +214,8 @@ exports = module.exports = durableEngine = function () {
                 try {
                     func(c);
                 } catch (reason) {
+                    var err = new Error();
+                    console.log(err.stack);
                     complete(reason, c);
                     return;
                 }
@@ -247,6 +237,8 @@ exports = module.exports = durableEngine = function () {
                         }
                     });
                 } catch (reason) {
+                    var err = new Error();
+                    console.log(err.stack);
                     complete(reason, c);
                 }
             }
@@ -255,17 +247,27 @@ exports = module.exports = durableEngine = function () {
         return that;
     };
 
-    var to = function (state) {
-
+    var to = function (fromState, toState, assertState) {
         var execute = function (c) {
-            c.s.label = state;
+            c.s.running = true;
+            if (fromState !== toState) {
+                if (fromState) {
+                    if (c.m && c.m.constructor === Array) {
+                        c.retract(c.m[0].chart_context);
+                    } else {
+                        c.retract(c.chart_context);
+                    }
+                }
+                
+                if (assertState) {
+                    c.assert({label: toState, chart: 1, id: Math.ceil(Math.random() * 1000000000 + 1)});
+                } else {
+                    c.post({label: toState, chart: 1, id: Math.ceil(Math.random() * 1000000000 + 1)});
+                }
+            }
         };
 
         var that = promise(execute);
-        that.getState = function() {
-            return state;
-        }
-
         return that;
     };
 
@@ -315,231 +317,73 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
-        that.assertEvent = function (message, complete) {
-            if (complete) {
-                try {
-                    complete(null, r.assertEvent(handle, JSON.stringify(message)));
-                } catch(err) {
-                    complete(err);
-                }
-            } else {
-                r.assertEvent(handle, JSON.stringify(message));
-            }
+        that.startAssertEvent = function (message) {
+            return r.startAssertEvent(handle, JSON.stringify(message));
         };
 
-        that.assertEvents = function (messages, complete) {
-            if (complete) {
-                try {
-                    complete(null, r.assertEvents(handle, JSON.stringify(messages)));
-                } catch(err) {
-                    complete(err);
-                }
-            } else {
-                r.assertEvents(handle, JSON.stringify(messages));
-            }
+        that.assertEvent = function (message) {
+            return r.assertEvent(handle, JSON.stringify(message));
         };
 
-        that.assertFact = function (fact, complete) {
-            if (complete) {
-                try {
-                    complete(null, r.assertFact(handle, JSON.stringify(fact)));
-                } catch(err) {
-                    complete(err);
-                }
-            } else {
-                r.assertFact(handle, JSON.stringify(fact));
-            }
+        that.startAssertEvents = function (messages) {
+            return r.startAssertEvents(handle, JSON.stringify(messages));
         };
 
-        that.assertFacts = function (facts, complete) {
-            if (complete) {
-                try {
-                    complete(null, r.assertFacts(handle, JSON.stringify(facts)));
-                } catch(err) {
-                    complete(err);
-                }
-            } else {
-                r.assertFacts(handle, JSON.stringify(facts));
-            }
+        that.assertEvents = function (messages) {
+            return r.assertEvents(handle, JSON.stringify(messages));
         };
 
-        that.retractFact = function (fact, complete) {
-            if (complete) {
-                try {
-                    complete(null, r.retractFact(handle, JSON.stringify(fact)));
-                } catch(err) {
-                    complete(err);
-                }
-            } else {
-                r.retractFact(handle, JSON.stringify(fact));
-            }
+        that.startAssertFact = function (fact) {
+            return r.startAssertFact(handle, JSON.stringify(fact));
         };
 
-        that.retractFacts = function (facts, complete) {
-            if (complete) {
-                try {
-                    complete(null, r.retractFacts(handle, JSON.stringify(facts)));
-                } catch(err) {
-                    complete(err);
-                }
-            } else {
-                r.retractFacts(handle, JSON.stringify(facts));
-            }
+        that.assertFact = function (fact) {
+            return r.assertFact(handle, JSON.stringify(fact));
         };
 
-        that.assertState = function (state, complete) {
-            if (complete) {
-                try {
-                    complete(null, r.assertState(handle, JSON.stringify(state)));
-                } catch(err) {
-                    complete(err);
-                }
-            } else {
-                r.assertState(handle, JSON.stringify(state));
-            }
+        that.startAssertFacts = function (facts) {
+            return r.startAssertFacts(handle, JSON.stringify(facts));
         };
 
-        that.startTimer = function (sid, timerName, timerDuration, complete) {
-            var timer = {sid: sid, id: Math.random() * 10000000 + 1, $t: timerName};
-            if (complete) {
-                try {
-                    complete(null, r.startTimer(handle, sid, timerDuration, JSON.stringify(timer)));
-                } catch(err) {
-                    complete(err);
-                }
-            } else {
-                r.startTimer(handle, sid, timerDuration, JSON.stringify(timer));
-            }
+        that.assertFacts = function (facts) {
+            return r.assertFacts(handle, JSON.stringify(facts));
+        };
+
+        that.startRetractFact = function (fact) {
+            return r.startRetractFact(handle, JSON.stringify(fact));
+        };
+
+        that.retractFact = function (fact) {
+            return r.retractFact(handle, JSON.stringify(fact));
+        };
+
+        that.startRetractFacts = function (facts) {
+            return r.startRetractFacts(handle, JSON.stringify(facts));
+        };
+
+        that.retractFacts = function (facts) {
+            return r.retractFacts(handle, JSON.stringify(facts));
+        };
+
+        that.assertState = function (state) {
+            return r.assertState(handle, JSON.stringify(state));
+        };
+
+        that.startTimer = function (sid, timerName, timerDuration) {
+            var timer = {sid: sid, id: Math.ceil(Math.random() * 1000000000 + 1), $t: timerName};
+            return r.startTimer(handle, sid, timerDuration, JSON.stringify(timer));
         };
 
 
-        that.getState = function (sid, complete) {
-            try {
-                complete(null, JSON.parse(r.getState(handle, sid)));
-            } catch(err) {
-                complete(err);
-            }
+        that.getState = function (sid) {
+            return JSON.parse(r.getState(handle, sid));
         }
 
         that.getRulesetState = function (sid, complete) {
-            try {
-                complete(null, JSON.parse(r.getRulesetState(handle)));
-            } catch(err) {
-                complete(err);
-            }
+            return JSON.parse(r.getRulesetState(handle));
         }
 
-        var retract = function (facts, names, index, c, complete) {
-            if (index == names.length) {
-                complete(null, c);
-            } else {
-                var rules = names[index];
-                var factsList = facts[rules];
-                if (factsList.length == 1) {
-                    host.retract(rules, factsList[0], function (err) {
-                        if (err) {
-                            complete(err, c);
-                        } else {
-                            retract(facts, names, ++index, c, complete);
-                        }
-                    });
-                } else {
-                    host.retractFacts(rules, factsList, function (err) {
-                        if (err) {
-                            complete(err, c);
-                        } else {
-                            retract(facts, names, ++index, c, complete);
-                        }
-                    });
-                }
-            }
-        }
-
-        var assert = function (facts, names, index, c, complete) {
-            if (index == names.length) {
-                complete(null, c);
-            } else {
-                var rules = names[index];
-                var factsList = facts[rules];
-                if (factsList.length == 1) {
-                    host.assert(rules, factsList[0], function (err) {
-                        if (err) {
-                            complete(err, c);
-                        } else {
-                            assert(facts, names, ++index, c, complete);
-                        }
-                    });
-                } else {
-                    host.assertFacts(rules, factsList, function (err) {
-                        if (err) {
-                            complete(err, c);
-                        } else {
-                            assert(facts, names, ++index, c, complete);
-                        }
-                    });
-                }
-            }
-        }
-
-        var postMessages = function (messages, names, index, c, complete) {
-            if (index == names.length) {
-                complete(null, c);
-            } else {
-                var rules = names[index];
-                var messageList = messages[rules];
-                if (messageList.length == 1) {
-                    host.post(rules, messageList[0], function (err) {
-                        if (err) {
-                            complete(err, c);
-                        } else {
-                            postMessages(messages, names, ++index, c, complete);
-                        }
-                    });
-                } else {
-                    host.postBatch(rules, messageList, function (err) {
-                        if (err) {
-                            complete(err, c);
-                        } else {
-                            postMessages(messages, names, ++index, c, complete);
-                        }
-                    });
-                }
-            }
-        }
-
-        var startBranches = function (branches, names, index, c, complete) {
-            if (index == names.length) {
-                complete(null, c);
-            } else {
-                var branchName = names[index];
-                var state = branches[branchName];
-                host.patchState(branchName, state, function (err) {
-                    if (err) {
-                        complete(err, c);
-                    } else {
-                        startBranches(branches, names, ++index, c, complete);
-                    }
-                });
-            }
-        }
-
-        var startTimers = function (timers, names, index, c, complete) {
-            if (index == names.length) {
-                complete(null, c);
-            } else {
-                var timerName = names[index];
-                var duration = timers[timerName];
-                that.startTimer(c.s.sid, timerName, duration, function (err) {
-                    if (err) {
-                        complete(err, c);
-                    } else {
-                        startTimers(timers, names, ++index, c, complete);
-                    }
-                });
-            }
-        }
-
-        that.dispatchTimers = function (complete) {
+        that.dispatchTimers = function (complete) { 
             try {
                 r.assertTimers(handle);
             } catch (reason) {
@@ -550,119 +394,157 @@ exports = module.exports = durableEngine = function () {
             complete();
         };
 
+        var ensureRulesets = function (names, index, c, complete) {
+            if (index == names.length) {
+                complete(null, c);
+            } else {
+                var rulesetName = names[index];
+                host.ensureRuleset(rulesetName, function (err) {
+                    if (err) {
+                        complete(err, c);
+                    } else {
+                        ensureRulesets(names, ++index, c, complete);
+                    }
+                });
+            }
+        }
+
         that.dispatch = function (complete) {
-            var result;
+            var state = null;
+            var actionHandle = null;
+            var actionBinding = null;
+            var resultContainer = {};
             try {
-                result = r.startAction(handle);
+                var result = r.startAction(handle);
+                if (result) { 
+                    state = JSON.parse(result[0]);
+                    resultContainer = {'message': JSON.parse(result[1])};
+                    actionHandle = result[2];
+                    actionBinding = result[3];
+                }
             } catch (reason) {
                 complete(reason);
                 return;
             }
-
-            if (!result) {
-                complete();
-            } 
-            else {
-                var document = JSON.parse(result[1]);
-                var output = JSON.parse(result[2]);
-                var actionName;
-                for (actionName in output) {
-                    output = output[actionName];
+        
+            while (resultContainer['message']) {
+                var actionName = null;
+                var message = null;
+                for (actionName in resultContainer['message']) {
+                    message = resultContainer['message'][actionName];
                     break;
                 }
-
-                var c = closure(document, output, result[0], name);
+                resultContainer['message'] = null;
+                var c = closure(state, message, actionHandle, name);
                 var action = actions[actionName]; 
                 action.run(c, function (err, c) {
                     if (err) {
-                        try {
-                            r.abandonAction(handle, c.getHandle());
-                        } catch (reason) {
-                            complete(reason);
-                            return;
-                        }
+                        r.abandonAction(handle, c.getHandle());
                         complete(err);
                     } else {
-                        var messages = c.getEvents();
-                        var rulesets = c.getEventsRulesets();
-                        postMessages(messages, rulesets, 0, c, function (err, c) {
-                            if (err) {
-                                try {
-                                    r.abandonAction(handle, c.getHandle());
-                                } catch (reason) {
-                                    complete(reason);
-                                    return;
+                        var rulesetNames = c.getTargetRulesets();
+                        ensureRulesets(rulesetNames, 0, c, function(err, c) {
+                            try {
+                                var branches = c.getBranches();
+                                for (var branchName in branches) {
+                                    var branchState = branches[branchName];
+                                    host.patchState(branchName, branchState);
                                 }
-                                complete(err);
-                            } else {
-                                var facts = c.getFacts();
-                                var rulesets = c.getFactsRulesets();
-                                assert(facts, rulesets, 0, c, function (err, c) {
-                                    if (err) {
-                                        try {
-                                            r.abandonAction(handle, c.getHandle());
-                                        } catch (reason) {
-                                            complete(reason);
-                                            return;
-                                        }
-                                        complete(err);
+                                var timers = c.getTimers();
+                                for (var timerName in timers) {
+                                    var timerDuration = timers[timerName];
+                                    host.startTimer(c.s.sid, timerName, timerDuration);
+                                }
+                                
+                                var rulesetName;
+                                var facts;
+                                var bindingReplies;
+                                var binding = 0;
+                                var replies = 0;
+                                var pending = {};
+                                var retractFacts = c.getRetract();
+                                pending[actionBinding] = 0;
+                                for (rulesetName in retractFacts) {
+                                    facts = retractFacts[rulesetName];
+                                    if (facts.length == 1) {
+                                        bindingReplies = host.startRetract(rulesetName, facts[0]);
                                     } else {
-                                        var facts = c.getRetract();
-                                        var rulesets = c.getRetractRulesets();
-                                        retract(facts, rulesets, 0, c, function (err, c) {
-                                            if (err) {
-                                                try {
-                                                    r.abandonAction(handle, c.getHandle());
-                                                } catch (reason) {
-                                                    complete(reason);
-                                                    return;
-                                                }
-                                                complete(err);
-                                            } else {
-                                                var branches = c.getBranches();
-                                                var branchNames = c.getBranchNames();
-                                                startBranches(branches, branchNames, 0, c, function (err, c) {
-                                                    if (err) {
-                                                        try {
-                                                            r.abandonAction(handle, c.getHandle());
-                                                        } catch (reason) {
-                                                            complete(reason);
-                                                            return;
-                                                        }
-                                                        complete(err);
-                                                    } else {
-                                                        var timers = c.getTimers();
-                                                        var timerNames = c.getTimerNames();
-                                                        startTimers(timers, timerNames, 0, c, function (err, c) {
-                                                            if (err) {
-                                                                try {
-                                                                    r.abandonAction(handle, c.getHandle());
-                                                                } catch (reason) {
-                                                                    complete(reason);
-                                                                    return;
-                                                                }
-                                                                complete(err);
-                                                            } else {
-                                                                try {
-                                                                    r.completeAction(handle, c.getHandle(), JSON.stringify(c.s));   
-                                                                } catch (reason) {
-                                                                    complete(reason);
-                                                                    return;
-                                                                }
-                                                                complete();
-                                                            }
-                                                        });
-                                                    }
-                                                });
-                                            }
-                                        });
+                                        bindingReplies = host.startRetractFacts(rulesetName, facts);
                                     }
-                                });
+                                    binding = bindingReplies[0];
+                                    replies = bindingReplies[1];
+
+                                    if (pending[binding]) {
+                                        pending[binding] = pending[binding] + replies;
+                                    } else {
+                                        pending[binding] = replies;
+                                    }
+                                }
+                                var assertFacts = c.getFacts();
+                                for (rulesetName in assertFacts) {
+                                    facts = assertFacts[rulesetName];
+                                    if (facts.length == 1) {
+                                        bindingReplies = host.startAssert(rulesetName, facts[0]);
+                                    } else {
+                                        bindingReplies = host.startAssertFacts(rulesetName, facts);
+                                    }
+                                    binding = bindingReplies[0];
+                                    replies = bindingReplies[1];
+
+                                    if (pending[binding]) {
+                                        pending[binding] = pending[binding] + replies;
+                                    } else {
+                                        pending[binding] = replies;
+                                    }
+                                }
+                                var postEvents = c.getEvents();
+                                for (rulesetName in postEvents) {
+                                    var events = postEvents[rulesetName];
+                                    if (events.length == 1) {
+                                        bindingReplies = host.startPost(rulesetName, events[0]);
+                                    } else {
+                                        bindingReplies = host.startPostBatch(rulesetName, events);
+                                    }
+                                    binding = bindingReplies[0];
+                                    replies = bindingReplies[1];
+                                    if (pending[binding]) {
+                                        pending[binding] = pending[binding] + replies;
+                                    } else {
+                                        pending[binding] = replies;
+                                    }
+                                }
+                                bindingReplies = r.startUpdateState(handle, c.getHandle(), JSON.stringify(c.s));
+                                binding = bindingReplies[0];
+                                replies = bindingReplies[1];
+                                if (pending[binding]) {
+                                    pending[binding] = pending[binding] + replies;
+                                } else {
+                                    pending[binding] = replies;
+                                }
+                                for (binding in pending) {
+                                    replies = pending[binding];
+                                    binding = parseInt(binding);
+                                    if (binding) {
+                                        if (binding != actionBinding) {
+                                            r.complete(binding, replies);
+                                        } else {
+                                            var newResult = r.completeAndStartAction(handle, replies, c.getHandle());
+                                            if (newResult) {
+                                                resultContainer['message'] = JSON.parse(newResult);
+                                            }
+                                        }
+                                    }                                    
+                                }
+                            } catch (reason) {
+                                r.abandonAction(handle, c.getHandle());
+                                complete(reason);
                             }
-                        }); 
+                        });
                     }
                 });
             }
+
+            complete(null);
         };
 
         that.getDefinition = function () {
@@ -692,6 +574,7 @@ exports = module.exports = durableEngine = function () {
         
         var transform = function (parentName, parentTriggers, parentStartState, host, chart, rules) {
             var startState = {};
+            var reflexiveStates = {};
             var state;
             var qualifiedStateName;
             var trigger;
@@ -706,6 +589,14 @@ exports = module.exports = durableEngine = function () {
                 }
 
                 startState[qualifiedStateName] = true;
+                state = chart[stateName];
+                for (triggerName in state) {
+                    trigger = state[triggerName];
+                    if ((trigger.to && trigger.to === stateName) || trigger.count || trigger.cap || trigger.span) {
+                        reflexiveStates[qualifiedStateName] = true;
+                    }
+
+                }
             }
 
             for (stateName in chart) {
@@ -741,13 +632,21 @@ exports = module.exports = durableEngine = function () {
                     for (triggerName in triggers) {
                         trigger = triggers[triggerName];
                         var rule = {};
-                        var stateTest = {$s: {$and:[{label: qualifiedStateName}, {$s:1}]}};
+                        var stateTest = {chart_context: {$and:[{label: qualifiedStateName}, {chart: 1}]}};
                         if (trigger.pri) {
                             rule.pri = trigger.pri;
                         }
 
                         if (trigger.count) {
                             rule.count = trigger.count;
+                        }
+
+                        if (trigger.span) {
+                            rule.span = trigger.span;
+                        }
+
+                        if (trigger.cap) {
+                            rule.cap = trigger.cap;
                         }
 
                         if (trigger.all) {
@@ -773,10 +672,20 @@ exports = module.exports = durableEngine = function () {
                         }
 
                         if (trigger.to) {
+                            var fromState = null;
+                            if (reflexiveStates[qualifiedStateName]) {
+                                fromState = qualifiedStateName;
+                            }
+
+                            var assertState = false;
+                            if (reflexiveStates[trigger.to]) {
+                                assertState = true;
+                            }
+
                             if (rule.run) {
-                                rule.run.continueWith(to(trigger.to));
+                                rule.run.continueWith(to(fromState, trigger.to, assertState));
                             } else {
-                                rule.run = to(trigger.to);
+                                rule.run = to(fromState, trigger.to, assertState);
                             }
                             delete(startState[trigger.to]);
                             if (parentStartState) {
@@ -798,9 +707,9 @@ exports = module.exports = durableEngine = function () {
                 }
 
                 if (parentName) {
-                    rules[parentName + '$start'] = {all:[{$s: {$and: [{label: parentName}, {$s:1}]}}], run: to(stateName)};
+                    rules[parentName + '$start'] = {all: [{chart_context: {$and: [{label: parentName}, {chart:1}]}}], run: to(null, stateName, false)};
                 } else {
-                    rules['$start'] = {all: [{$s: {$and: [{$nex: {label: 1}}, {$s:1}]}}], run: to(stateName)};
+                    rules['$start'] = {all: [{chart_context: {$and: [{$nex: {running: 1}}, {$s: 1}]}}], run: to(null, stateName, false)};
                 }
 
                 started = true;
@@ -826,28 +735,58 @@ exports = module.exports = durableEngine = function () {
         
         var transform = function (host, chart, rules) {
             var visited = {};
+            var reflexiveStages = {};
             var rule;
             var stageName;
             var stage;
+
             for (stageName in chart) {
                 stage = chart[stageName];
-                var stageTest = {$s: {$and:[{label: stageName}, {$s:1}]}};
+                if (stage.to) {
+                    if (typeof(stage.to) === 'string') {
+                        if (stage.to === stageName) {
+                            reflexiveStages[stageName] = true;
+                        }
+                    } else {
+                        for (var transitionName  in stage.to) {
+                            var transition = stage.to[transitionName];
+                            if ((transitionName === stageName) || transition.count || transition.span || transition.cap) {
+                                reflexiveStages[stageName] = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (stageName in chart) {
+                stage = chart[stageName];
+                var stageTest = {chart_context: {$and:[{label: stageName}, {chart:1}]}};
                 var nextStage;
+                var fromStage = null;
+                if (reflexiveStages[stageName]) {
+                    fromStage = stageName;
+                }
+
                 if (stage.to) {
                     if (typeof(stage.to) === 'string') {
                         rule = {};
                         rule.all = [stageTest];
                         nextStage = chart[stage.to];
 
+                        var assertStage = false;
+                        if (reflexiveStages[stage.to]) {
+                            assertStage = true;
+                        }
+
                         if (!nextStage.run) {
-                            rule.run = to(stage.to);
+                            rule.run = to(fromStage, stage.to, assertStage);
                         } else {
                             if (typeof(nextStage.run) === 'string') {
-                                rule.run = to(stage.to).continueWith(host.getAction(nextStage.run));
+                                rule.run = to(fromStage, stage.to, assertStage).continueWith(host.getAction(nextStage.run));
                             } else if (typeof(nextStage.run) === 'function' || nextStage.run.continueWith) {
-                                rule.run = to(stage.to).continueWith(nextStage.run);
+                                rule.run = to(fromStage, stage.to, assertStage).continueWith(nextStage.run);
                             } else {
-                                rule.run = to(stage.to).continueWith(fork(host.registerRulesets(name, nextStage.run), function (pName) {
+                                rule.run = to(fromStage, stage.to, assertStage).continueWith(fork(host.registerRulesets(name, nextStage.run), function (pName) {
                                     return (pName !== 'label');
                                 }));
                             }
@@ -867,6 +806,14 @@ exports = module.exports = durableEngine = function () {
                                 rule.count = transition.count;
                             }
 
+                            if (transition.span) {
+                                rule.span = transition.span;
+                            }
+
+                            if (transition.cap) {
+                                rule.cap = transition.cap;
+                            }
+
                             if (transition.all) {
                                 rule.all = transition.all.concat(stageTest);   
                             } else if (transition.any) {
@@ -880,15 +827,20 @@ exports = module.exports = durableEngine = function () {
                                 throw 'stage ' + transitionName + ' not found'
                             }
 
+                            var assertStage = false;
+                            if (reflexiveStages[transitionName]) {
+                                assertStage = true;
+                            }
+
                             if (!nextStage.run) {
                                 rule.run = to(transitionName);
                             } else {
                                 if (typeof(nextStage.run) === 'string') {
-                                    rule.run = to(transitionName).continueWith(host.getAction(nextStage.run));
+                                    rule.run = to(fromStage, transitionName, assertStage).continueWith(host.getAction(nextStage.run));
                                 } else if (typeof(nextStage.run) === 'function' || nextStage.run.continueWith) {
-                                    rule.run = to(transitionName).continueWith(nextStage.run);
+                                    rule.run = to(fromStage, transitionName, assertStage).continueWith(nextStage.run);
                                 } else {
-                                    rule.run = to(transitionName).continueWith(fork(host.registerRulesets(name, nextStage.run), function (pName) {
+                                    rule.run = to(fromStage, transitionName, assertStage).continueWith(fork(host.registerRulesets(name, nextStage.run), function (pName) {
                                         return (pName !== 'label');
                                     }));
                                 }
@@ -909,16 +861,16 @@ exports = module.exports = durableEngine = function () {
                     }
 
                     stage = chart[stageName];
-                    rule = {all: [{$s: {$and: [{$nex: {label:1}}, {$s: 1}]}}]};
+                    rule = {all: [{chart_context: {$and: [{$nex: {running: 1}}, {$s: 1}]}}]};
                     if (!stage.run) {
-                        rule.run = to(stageName);
+                        rule.run = to(null, stageName, false);
                     } else {
                         if (typeof(stage.run) === 'string') {
-                            rule.run = to(stageName).continueWith(host.getAction(stage.run));
+                            rule.run = to(null, stageName, false).continueWith(host.getAction(stage.run));
                         } else if (typeof(stage.run) === 'function' || stage.run.continueWith) {
-                            rule.run = to(stageName).continueWith(stage.run);
+                            rule.run = to(null, stageName, false).continueWith(stage.run);
                         } else {
-                            rule.run = to(stageName).continueWith(fork(host.registerRulesets(name, stage.run), function (pName) {
+                            rule.run = to(null, stageName, false).continueWith(fork(host.registerRulesets(name, stage.run), function (pName) {
                                 return (pName !== 'label');
                             }));
                         }
@@ -982,7 +934,7 @@ exports = module.exports = durableEngine = function () {
         var rulesDirectory = {};
         var instanceDirectory = {};
         var rulesList = [];
-        databases = databases || ['/tmp/redis.sock'];
+        databases = databases || [{host: 'localhost', port: 6379, password:null}];
         stateCacheSize = stateCacheSize || 1024;
         
         that.getAction = function (actionName) {
@@ -997,48 +949,9 @@ exports = module.exports = durableEngine = function () {
             complete();
         };
 
-        that.getState = function (rulesetName, sid, complete) {
-            var lastError;
-            that.getRuleset(rulesetName, function (err, rules) {
-                if (err) {
-                    if (complete) {
-                        complete(err);
-                    } else {
-                        lastError = err;
-                    }
-                } else {
-                    rules.getState(sid, complete);
-                }
-            });
-
-            if (lastError) {
-                throw lastError;
-            }
-        };
-
-        that.patchState = function (rulesetName, state, complete) {
-            var lastError;
-            that.getRuleset(rulesetName, function (err, rules) {
-                if (err) {
-                    if (complete) {
-                        complete(err);
-                    } else {
-                        lastError = err;
-                    }
-                } else {
-                    rules.assertState(state, complete);
-                }
-            });
-
-            if (lastError) {
-                throw lastError;
-            }
-        };
-
-        that.getRuleset = function (rulesetName, complete) {
-            var rules = rulesDirectory[rulesetName];
-            if (rules) {
-                complete(null, rules);
+        that.ensureRuleset = function (rulesetName, complete) {
+            if (rulesDirectory[rulesetName]) {
+                complete(null);
             } else {   
                 that.loadRuleset(rulesetName, function (err, result) {
                     if (err) {
@@ -1046,6 +959,7 @@ exports = module.exports = durableEngine = function () {
                     } else {
                         try {
                             that.registerRulesets(null, result);
+                            complete(null);
                         } catch (reason) {
                             complete(reason);
                         }
@@ -1053,6 +967,15 @@ exports = module.exports = durableEngine = function () {
                 });
             }
         };
+
+        that.getRuleset = function(rulesetName) {
+            var rules = rulesDirectory[rulesetName];
+            if (!rules) {
+                throw 'Ruleset ' + rulesetName + ' not found';
+            }
+
+            return rules;
+        }
 
         that.setRuleset = function (rulesetName, rulesetDefinition, complete) {
             try {
@@ -1081,156 +1004,91 @@ exports = module.exports = durableEngine = function () {
             return names;
         };
 
+        that.startPostBatch = function (rulesetName, messages) {
+            var rules = that.getRuleset(rulesetName);
+            return rules.startAssertEvents(messages);
+        };
+
         that.postBatch = function () {
             var rulesetName = arguments[0];
             var messages = [];
             var complete;
             if (arguments[1].constructor === Array) {
                 messages = arguments[1];
-                if (arguments.length === 3) {
-                    complete = arguments[2];
-                }
             }
             else {
                 for (var i = 1; i < arguments.length; ++ i) {
-                    if (typeof(arguments[i]) === 'function') {
-                        complete = arguments[i];
-                    } else {
-                        messages.push(arguments[i]);
-                    }
+                    messages.push(arguments[i]);
                 }
             }
 
-            var lastError;
-            that.getRuleset(rulesetName, function (err, rules) {
-                if (err) {
-                    if (complete) {
-                        complete(err);
-                    } else {
-                        lastError = err;
-                    }
-                } else {
-                    rules.assertEvents(messages, complete);
-                }
-            });
-
-            if (lastError) {
-                throw lastError;
-            }
+            var rules = that.getRuleset(rulesetName);
+            return rules.assertEvents(messages);
         };
 
-        that.post = function (rulesetName, message, complete) {
-            var lastError;
-            that.getRuleset(rulesetName, function (err, rules) {
-                if (err) {
-                    if (complete) {
-                        complete(err);
-                    } else {
-                        lastError = err;
-                    }
-                } else {
-                    rules.assertEvent(message, complete);
-                }
-            });
-
-            if (lastError) {
-                throw lastError;
-            }
+        that.startPost = function (rulesetName, message) {
+            var rules = that.getRuleset(rulesetName);
+            return rules.startAssertEvent(message);
         };
 
-        that.assert = function (rulesetName, fact, complete) {
-            var lastError;
-            that.getRuleset(rulesetName, function (err, rules) {
-                if (err) {
-                    if (complete) {
-                        complete(err);
-                    } else {
-                        lastError = err;
-                    }
-                } else {
-                    rules.assertFact(fact, complete);
-                }
-            });
-
-            if (lastError) {
-                throw lastError;
-            }
+        that.post = function (rulesetName, message) {
+            var rules = that.getRuleset(rulesetName);
+            return rules.assertEvent(message);
         };
 
-        that.assertFacts = function (rulesetName, facts, complete) {
-            var lastError;
-            that.getRuleset(rulesetName, function (err, rules) {
-                if (err) {
-                    if (complete) {
-                        complete(err);
-                    } else {
-                        lastError = err;
-                    }
-                } else {
-                    rules.assertFacts(facts, complete);
-                }
-            });
-
-            if (lastError) {
-                throw lastError;
-            }
+        that.startAssert = function (rulesetName, fact) {
+            var rules = that.getRuleset(rulesetName);
+            return rules.startAssertFact(fact);
         };
 
-        that.retract = function (rulesetName, fact, complete) {
-            var lastError;
-            that.getRuleset(rulesetName, function (err, rules) {
-                if (err) {
-                    if (complete) {
-                        complete(err);
-                    } else {
-                        lastError = err;
-                    }
-                } else {
-                    rules.retractFact(fact, complete);
-                }
-            });
-
-            if (lastError) {
-                throw lastError;
-            }
+        that.assert = function (rulesetName, fact) {
+            var rules = that.getRuleset(rulesetName);
+            return rules.assertFact(fact);
         };
 
-        that.retractFacts = function (rulesetName, facts, complete) {
-            var lastError;
-            that.getRuleset(rulesetName, function (err, rules) {
-                if (err) {
-                    if (complete) {
-                        complete(err);
-                    } else {
-                        lastError = err;
-                    }
-                } else {
-                    rules.retractFacts(facts, complete);
-                }
-            });
-
-            if (lastError) {
-                throw lastError;
-            }
+        that.startAssertFacts = function (rulesetName, facts) {
+            var rules = that.getRuleset(rulesetName);
+            return rules.startAssertFacts(facts);
         };
 
-        that.startTimer = function (rulesetName, sid, timerName, timerDuration, complete) {
-            var lastError;
-            that.getRuleset(rulesetName, function (err, rules) {
-                if (err) {
-                    if (complete) {
-                        complete(err);
-                    } else {
-                        lastError = err;
-                    }
-                } else {
-                    rules.startTimer(sid, timerName, timerDuration, complete);
-                }
-            });
+        that.assertFacts = function (rulesetName, facts) {
+            var rules = that.getRuleset(rulesetName);
+            return rules.assertFacts(facts);
+        };
 
-            if (lastError) {
-                throw lastError;
-            }
+        that.startRetract = function (rulesetName, fact) {
+            var rules = that.getRuleset(rulesetName);
+            return rules.startRetractFact(fact);
+        };
+
+        that.retract = function (rulesetName, fact) {
+            var rules = that.getRuleset(rulesetName);
+            return rules.retractFact(fact);
+        };
+
+        that.startRetractFacts = function (rulesetName, facts) {
+            var rules = that.getRuleset(rulesetName);
+            return rules.startRetractFacts(facts);
+        };
+
+        that.retractFacts = function (rulesetName, facts) {
+            var rules = that.getRuleset(rulesetName);
+            return rules.retractFacts(facts);
+        };
+
+        that.getState = function (rulesetName, sid) {
+            var rules = that.getRuleset(rulesetName);
+            return rules.getState(sid);
+        };
+
+        that.patchState = function (rulesetName, state) {
+            var rules = that.getRuleset(rulesetName);
+            return rules.assertState(state);
+        };
+
+        that.startTimer = function (rulesetName, sid, timerName, timerDuration) {
+            var rules = that.getRuleset(rulesetName);
+            return rules.startTimer(sid, timerName, timerDuration);
         };
 
         var dispatchRules = function (index) {
@@ -1303,25 +1161,34 @@ exports = module.exports = durableEngine = function () {
 
             that.get(basePath + '/:rulesetName/:sid', function (request, response) {
                 response.contentType = 'application/json; charset=utf-8';
-                host.getState(request.params.rulesetName, request.params.sid, function (err, result) {
-                        if (err) {
-                            response.send({ error: err }, 404);
+                host.ensureRuleset(request.params.rulesetName, function (err, result) {
+                    if (err)
+                        response.send({ error: err }, 500);
+                    else {
+                        try {
+                            response.send(host.getState(request.params.rulesetName, request.params.sid));
+                        } catch (reason) {
+                            response.send({ error: reason }, 500);
                         }
-                        else {
-                            response.send(result);
-                        }
-                    });
+                    }
+                });
             });
 
             that.post(basePath + '/:rulesetName/:sid', function (request, response) {
                 response.contentType = "application/json; charset=utf-8";
                 var message = request.body;
                 message.sid = request.params.sid;
-                host.post(request.params.rulesetName, message, function (err) {
+
+                host.ensureRuleset(request.params.rulesetName, function (err, result) {
                     if (err)
                         response.send({ error: err }, 500);
-                    else
-                        response.send();
+                    else {
+                        try {
+                            response.send(host.post(request.params.rulesetName, message));
+                        } catch (reason) {
+                            response.send({ error: reason }, 500);
+                        }
+                    }
                 });
             });
 
@@ -1329,23 +1196,30 @@ exports = module.exports = durableEngine = function () {
                 response.contentType = 'application/json; charset=utf-8';
                 var document = request.body;
                 document.id = request.params.sid;
-                host.patchState(request.params.rulesetName, document, function (err) {
-                    if (err) {
+                host.ensureRuleset(request.params.rulesetName, function (err, result) {
+                    if (err)
                         response.send({ error: err }, 500);
-                    } else {
-                        response.send();
+                    else {
+                        try {
+                            response.send(host.patchState(request.params.rulesetName, document));
+                        } catch (reason) {
+                            response.send({ error: reason }, 500);
+                        }
                     }
                 });
             });
 
             that.get(basePath + '/:rulesetName', function (request, response) {
                 response.contentType = 'application/json; charset=utf-8';
-                host.getRuleset(request.params.rulesetName, function (err, result) {
-                    if (err) {
-                        response.send({ error: err }, 404);
-                    }
+                host.ensureRuleset(request.params.rulesetName, function (err, result) {
+                    if (err)
+                        response.send({ error: err }, 500);
                     else {
-                        response.send(result.getDefinition());
+                        try {
+                            response.send(host.getRuleset(request.params.rulesetName));
+                        } catch (reason) {
+                            response.send({ error: reason }, 500);
+                        }
                     }
                 });
             });
