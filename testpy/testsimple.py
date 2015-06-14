@@ -1,6 +1,7 @@
 from durable.lang import *
 import datetime
 import random
+import sys
 
 with statechart('fraud0'):
     with state('start'):
@@ -30,6 +31,7 @@ with statechart('fraud0'):
         host.post('fraud0', {'id': 1, 'sid': 1, 'amount': 200})
         host.post('fraud0', {'id': 2, 'sid': 1, 'amount': 200})
         host.post('fraud0', {'id': 3, 'sid': 1, 'amount': 200})
+        
 
 
 with ruleset('fraud1'):
@@ -255,7 +257,7 @@ with flowchart('a3'):
 
         to('approve').when_all(s.status == 'approved')
         to('deny').when_all(m.subject == 'denied')
-        to('request').when_any(m.subject == 'approved', m.subject == 'ok')
+        to('request').when_all(m.subject == 'approved')
     
     with stage('approve'):
         @run 
@@ -417,141 +419,6 @@ with ruleset('a12'):
                                 {'id': 4, 'sid': 1, 'subject': 'approve'}])
 
 
-with ruleset('p1'):
-    with when_all(m.start == 'yes'): 
-        with ruleset('one'):
-            @when_all(-s.start)
-            def continue_flow(c):
-                c.s.start = 1
-
-            @when_all(s.start == 1)
-            def finish_one(c):
-                print('p1 finish one {0}'.format(c.s.sid))
-                c.signal({'id': 1, 'end': 'one'})
-                c.s.start = 2
-
-        with ruleset('two'): 
-            @when_all(-s.start)
-            def continue_flow(c):
-                c.s.start = 1
-
-            @when_all(s.start == 1)
-            def finish_two(c):
-                print('p1 finish two {0}'.format(c.s.sid))
-                c.signal({'id': 1, 'end': 'two'})
-                c.s.start = 2
-
-    @when_all(m.end == 'one', m.end == 'two')
-    def done(c):
-        print('p1 done {0}'.format(c.s.sid))
-
-    @when_start
-    def start(host):
-        host.post('p1', {'id': 1, 'sid': 1, 'start': 'yes'})
-
-
-with statechart('p2'):
-    with state('input'):
-        @to('process')
-        @when_all(m.subject == 'approve')
-        def get_input(c):
-            print('p2 input {0} from: {1}'.format(c.m.quantity, c.s.sid))
-            c.s.quantity = c.m.quantity
-
-    with state('process'):
-        with to('result').when_all(+s.quantity):
-            with statechart('first'):
-                with state('evaluate'):
-                    @to('end')
-                    @when_all(s.quantity <= 5)
-                    def signal_approved(c):
-                        print('p2 signaling approved from: {0}'.format(c.s.sid))
-                        c.signal({'id': 1, 'subject': 'approved'})
-
-                state('end')
-        
-            with statechart('second'):
-                with state('evaluate'):
-                    @to('end')
-                    @when_all(s.quantity > 5)
-                    def signal_denied(c):
-                        print('p2 signaling denied from: {0}'.format(c.s.sid))
-                        c.signal({'id': 1, 'subject': 'denied'})
-                
-                state('end')
-    
-    with state('result'):
-        @to('approved')
-        @when_all(m.subject == 'approved')
-        def report_approved(c):
-            print('p2 approved from: {0}'.format(c.s.sid))
-
-        @to('denied')
-        @when_all(m.subject == 'denied')
-        def report_denied(c):
-            print('p2 denied from: {0}'.format(c.s.sid)) 
-    
-    state('denied')
-    state('approved')
-
-    @when_start
-    def start(host):
-        host.post('p2', {'id': 1, 'sid': 1, 'subject': 'approve', 'quantity': 3})
-        host.post('p2', {'id': 2, 'sid': 2, 'subject': 'approve', 'quantity': 10})
-
-
-with flowchart('p3'):
-    with stage('start'):
-        to('input').when_all(m.subject == 'approve')
-    
-    with stage('input'):
-        @run
-        def get_input(c):
-            print('p3 input {0} from: {1}'.format(c.m.quantity, c.s.sid))
-            c.s.quantity = c.m.quantity
-
-        to('process')
-    
-    with stage('process'):
-        with flowchart('first'):
-            with stage('start'):
-                to('end').when_all(s.quantity <= 5)
-            
-            with stage('end'):
-                @run
-                def signal_approved(c):
-                    print('p3 signaling approved from: {0}'.format(c.s.sid))
-                    c.signal({'id': 1, 'subject': 'approved'})
-
-        with flowchart('second'):
-            with stage('start'):
-                to('end').when_all(s.quantity > 5)
-
-            with stage('end'):
-                @run
-                def signal_denied(c):
-                    print('p3 signaling denied from: {0}'.format(c.s.sid))
-                    c.signal({'id': 1, 'subject': 'denied'})
-
-        to('approve').when_all(m.subject == 'approved')
-        to('deny').when_all(m.subject == 'denied')
-
-    with stage('approve'):
-        @run
-        def report_approved(c):
-            print('p3 approved from: {0}'.format(c.s.sid))
-
-    with stage('deny'):
-        @run
-        def report_denied(c):
-            print('p3 denied from: {0}'.format(c.s.sid)) 
-
-    @when_start
-    def start(host):
-        host.post('p3', {'id': 1, 'sid': 1, 'subject': 'approve', 'quantity': 3})
-        host.post('p3', {'id': 2, 'sid': 2, 'subject': 'approve', 'quantity': 10})
-
-
 with ruleset('t0'):
     @when_all(timeout('my_timer') | (s.count == 0))
     def start_timer(c):
@@ -582,61 +449,5 @@ with ruleset('t1'):
     @when_start
     def start(host):
         host.post('t1', {'id': 1, 'sid': 1, 'start': 'yes'})
-
-
-with statechart('t2'):
-    with state('input'):
-        with to('pending').when_all(m.subject == 'approve'):
-            with statechart('first'):
-                with state('send'):
-                    @to('evaluate')
-                    def start_timer(c):
-                        c.s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
-                        c.start_timer('first', 4)   
-
-                with state('evaluate'):
-                    @to('end')
-                    @when_all(timeout('first'))
-                    def signal_approved(c):
-                        c.signal({'id': 2, 'subject': 'approved', 'start': c.s.start})
-
-                state('end')
-
-            with statechart('second'):
-                with state('send'):
-                    @to('evaluate')
-                    def start_timer(c):
-                        c.s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
-                        c.start_timer('second', 3)
-
-                with state('evaluate'):
-                    @to('end')
-                    @when_all(timeout('second'))
-                    def signal_denied(c):
-                        c.signal({'id': 3, 'subject': 'denied', 'start': c.s.start})
-
-                state('end')
-
-    with state('pending'):
-        @to('approved')
-        @when_all(m.subject == 'approved')
-        def report_approved(c):
-            print('t2 approved {0}'.format(c.s.sid))
-            print('t2 started @%s' % c.m.start)
-            print('t2 ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
-
-        @to('denied')
-        @when_all(m.subject == 'denied')
-        def report_denied(c):
-            print('t2 denied {0}'.format(c.s.sid))
-            print('t2 started @%s' % c.m.start)
-            print('t2 ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
-
-    state('approved')
-    state('denied')
-    
-    @when_start
-    def start(host):
-        host.post('t2', {'id': 1, 'sid': 1, 'subject': 'approve'})
 
 run_all()

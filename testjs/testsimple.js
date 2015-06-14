@@ -221,7 +221,7 @@ with (d.flowchart('a3')) {
         });
         to('approve').whenAll(s.status.eq('approved'));
         to('deny').whenAll(m.subject.eq('denied'));
-        to('request').whenAny(m.subject.eq('approved'), m.subject.eq('ok'));
+        to('request').whenAll(m.subject.eq('approved'));
     }
     with (stage('approve')) {
         run(function (c) {
@@ -374,136 +374,6 @@ with (d.ruleset('a12')) {
     }); 
 }
 
-with (d.ruleset('p1')) {
-    with (whenAll(m.start.eq('yes'))) {
-        with (ruleset('one')) {
-            whenAll(s.start.nex(), function (c) {
-                c.s.start = 1;
-            });
-            whenAll(s.start.eq(1), function (c) {
-                console.log('p1 finish one');
-                c.signal({id: 1, end: 'one'});
-                c.s.start  = 2;
-            });
-        }
-        with (ruleset('two')) {
-            whenAll(s.start.nex(), function (c) {
-                c.s.start = 1;
-            });
-            whenAll(s.start.eq(1), function (c) {
-                console.log('p1 finish two');
-                c.signal({id: 1, end: 'two'});
-                c.s.start  = 2;
-            });
-        }
-    }
-    whenAll(m.end.eq('one'), m.end.eq('two'), function (c) {
-        console.log('p1 approved');
-        s.status = 'approved';
-    });
-    whenStart(function (host) {
-        host.post('p1', {id: 1, sid: 1, start: 'yes'});
-    });
-}
-
-with (d.statechart('p2')) {
-    with (state('input')) {
-        to('process').whenAll(m.subject.eq('approve'), function (c) {
-            console.log('p2 input ' + c.m.quantity + ' from: ' + c.s.sid);
-            c.s.quantity = c.m.quantity;
-        });
-    }
-    with (state('process')) {
-        with (to('result').whenAll(s.quantity.ex())) {
-            with (statechart('first')) {
-                with (state('evaluate')) {
-                    to('end').whenAll(s.quantity.lte(5), function (c) {
-                        console.log('p2 signaling approved from: ' + c.s.sid);
-                        c.signal({id: 1, subject: 'approved'});
-                    });
-                }
-                state('end');
-            }
-            with (statechart('second')) {
-                with (state('evaluate')) {
-                    to('end').whenAll(s.quantity.gt(5), function (c) {
-                        console.log('p2 signaling denied from: ' + c.s.sid);
-                        c.signal({id: 1, subject: 'denied'});
-                    });
-                }
-                state('end');
-            }
-        }
-    }
-    with (state('result')) {
-        to('approved').whenAll(m.subject.eq('approved'), function (c) {
-            console.log('p2 approved from: ' + c.s.sid);
-        });
-        to('denied').whenAll(m.subject.eq('denied'), function (c) {
-            console.log('p2 denied from: ' + c.s.sid);
-        });
-    }
-    state('denied');
-    state('approved');
-    whenStart(function (host) {
-        host.post('p2', {id: 1, sid: 1, subject: 'approve', quantity: 3});
-        host.post('p2', {id: 2, sid: 2, subject: 'approve', quantity: 10});
-    });
-}
-
-with (d.flowchart('p3')) {
-    with (stage('start')) {
-        to('input').whenAll(m.subject.eq('approve'));
-    }
-    with (stage('input')) {
-        run(function (c) {
-            console.log('p3 input ' + c.m.quantity + ' from: ' + c.s.sid);
-            c.s.quantity = c.m.quantity;
-        });
-        to('process');
-    }
-    with (stage('process')) {
-        with (flowchart('first')) {
-            with (stage('start')) {
-                to('end').whenAll(s.quantity.lte(5));
-            }
-            with (stage('end')) {
-                run(function (c) {
-                    console.log('p3 signaling approved from: ' + c.s.sid);
-                    c.signal({id: 1, subject: 'approved'});
-                });
-            }
-        }
-        with (flowchart('second')) {
-            with (stage('start')) {
-                to('end').whenAll(s.quantity.gt(5));
-            }
-            with (stage('end')) {
-                run(function (c) {
-                    console.log('p3 signaling denied from: ' + c.s.sid);
-                    c.signal({id: 1, subject: 'denied'});
-                });
-            }
-        }
-        to('approve').whenAll(m.subject.eq('approved'));
-        to('deny').whenAll(m.subject.eq('denied'));
-    }
-    with (stage('approve')) {
-        run(function (c) {
-            console.log('p3 approved from: ' + c.s.sid);
-        });
-    }
-    with (stage('deny')) {
-        run(function (c) {
-            console.log('p3 denied from: ' + c.s.sid);
-        });
-    }
-    whenStart(function (host) {
-        host.post('p3', {id: 1, sid: 1, subject: 'approve', quantity: 3});
-        host.post('p3', {id: 2, sid: 2, subject: 'approve', quantity: 10});
-    });
-}
-
 with (d.ruleset('t0')) {
     whenAll(or(m.count.eq(0), timeout('myTimer')), function (c) {
         c.s.count += 1;
@@ -530,59 +400,6 @@ with (d.ruleset('t1')) {
     });
     whenStart(function (host) {
         host.post('t1', {id: 1, sid: 1, start: 'yes'});
-    });
-}
-
-with (d.flowchart('t2')) {
-    with (stage('start')) {
-        to('input').whenAll(m.subject.eq('approve'));
-    }
-    with (stage('input')) {
-        with (statechart('first')) {
-            with (state('send')) {
-                to('evaluate', function(c) {
-                    c.s.start = new Date();
-                    c.startTimer('first', 4);
-                });
-            }
-            with (state('evaluate')) {
-                to('end').whenAll(timeout('first'), function(c) {
-                    c.signal({id: 2, subject: 'approved', start: c.s.start});
-                });
-            }
-        }
-        with (statechart('second')) {
-            with (state('send')) {
-                to('evaluate', function(c) {
-                    c.s.start = new Date();
-                    c.startTimer('first', 3);
-                });
-            }
-            with (state('evaluate')) {
-                to('end').whenAll(timeout('first'), function(c) {
-                    c.signal({id: 3, subject: 'denied', start: c.s.start});
-                });
-            }
-        }
-        to('approve').whenAll(m.subject.eq('approved'));
-        to('deny').whenAll(m.subject.eq('denied'));
-    }
-    with (stage('approve')) {
-        run(function(c) {
-            console.log('t2 approved');
-            console.log('t2 started ' + c.m.start);
-            console.log('t2 ended ' + new Date());
-        });
-    }
-    with (stage('deny')) {
-        run(function(c) {
-            console.log('t2 denied');
-            console.log('t2 started ' + c.m.start);
-            console.log('t2 ended ' + new Date());
-        });
-    }
-    whenStart(function (host) {
-        host.post('t2', {id: 1, sid: 1, subject: 'approve'});
     });
 }
 

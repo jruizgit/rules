@@ -373,22 +373,6 @@ module Durable
       self
     end
 
-    def paralel
-      {:paralel => true}
-    end
-
-    def ruleset(name, &block)
-      @paralel_rulesets[name] = Ruleset.new(name, block).rules
-    end
-
-    def statechart(name, &block)
-      @paralel_rulesets[name.to_s + "$state"] = Statechart.new(name, block).states
-    end
-
-    def flowchart(name, &block)
-      @paralel_rulesets[name.to_s + "$flow"] = Flowchart.new(name, block).stages
-    end
-
     def s
       Arithmetic.new(:$s)
     end
@@ -443,11 +427,7 @@ module Durable
       @rule_index += 1
       rule_name = "r_#{index}"
       rule = nil
-      if options.key? :paralel
-        @paralel_rulesets = {}
-        self.instance_exec &block
-        rule = operator ? {operator => expression_definition, :run => @paralel_rulesets} : {:run => @paralel_rulesets}
-      elsif block
+      if block
         run_lambda = -> c {
           c.instance_exec c, &block
         }
@@ -493,14 +473,10 @@ module Durable
       super name, block
     end
   
-    def to(state_name, rule = nil, paralel = {}, &block)
-      rule = define_rule(nil, nil, paralel, &block) if !rule
+    def to(state_name, rule = nil, &block)
+      rule = define_rule(nil, nil, {}, &block) if !rule
       rule[:to] = state_name
-      if paralel.key? :paralel
-        @paralel_rulesets = {}
-        self.instance_exec &block
-        rule[:run] = @paralel_rulesets
-      elsif block   
+      if block   
         rule[:run] = -> s {s.instance_exec(s, &block)}
       end
       self
@@ -559,12 +535,8 @@ module Durable
       end
     end
 
-    def stage(stage_name, paralel = nil, &block)
-      if paralel
-        @paralel_rulesets = {}
-        self.instance_exec &block
-        @stages[stage_name] = {:run => @paralel_rulesets, :to => {}}
-      elsif block
+    def stage(stage_name, &block)
+      if block
         @stages[stage_name] = {:run => -> s {s.instance_exec(s, &block)}, :to => {}}
       else
         @stages[stage_name] = {:to => {}}

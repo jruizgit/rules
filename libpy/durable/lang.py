@@ -262,14 +262,7 @@ class rule(object):
         
         if len(self.func):
             if len(self.func) == 1 and not hasattr(self.func[0], 'define'):
-                defined_expression = {self.operator: defined_expression, 'run': self.func[0]}
-            else:
-                ruleset_definitions = {}
-                for rset in self.func:
-                    ruleset_name, ruleset_definition = rset.define()
-                    ruleset_definitions[ruleset_name] = ruleset_definition
-
-                defined_expression = {self.operator: defined_expression, 'run': ruleset_definitions}   
+                defined_expression = {self.operator: defined_expression, 'run': self.func[0]}  
         elif self.operator:
                 defined_expression = {self.operator: defined_expression}
 

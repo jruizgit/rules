@@ -30,20 +30,6 @@ module Engine
       end
     end
 
-    def signal(message)
-      if message.kind_of? Content
-        message = message._d
-      end
-
-      name_index = @ruleset_name.rindex "."
-      parent_ruleset_name = ruleset_name[0, name_index]
-      name = ruleset_name[name_index + 1..-1]
-      message_id = (message.key? :id) ? message[:id]: message["id"] 
-      message[:sid] = @s.sid
-      message[:id] = "#{name}.#{message_id}"
-      post parent_ruleset_name, message
-    end
-
     def post(ruleset_name, message = nil)
       if !message
         message = ruleset_name
@@ -119,14 +105,6 @@ module Engine
         @_retract[ruleset_name] = fact_list
       end
       fact_list << fact
-    end
-
-    def fork(branch_name, branch_state)
-      if @_branches.key? branch_name
-        raise ArgumentError, "Branch with name #{branch_name} already forked"
-      else
-        @_branches[branch_name] = branch_state
-      end
     end
 
     private
@@ -244,21 +222,6 @@ module Engine
   end
 
 
-  class Fork < Promise
-
-    def initialize(branch_names, state_filter = nil)
-      super -> c {
-        for branch_name in branch_names do
-          state = c.s._d.dup
-          state_filter.call state if state_filter
-          c.fork branch_name, state
-        end 
-      }
-    end
-
-  end
-
-
   class To < Promise
 
     def initialize(from_state, to_state, assert_state)
@@ -309,8 +272,6 @@ module Engine
           @actions[rule_name] = action.root
         elsif action.kind_of? Proc
           @actions[rule_name] = Promise.new action
-        else
-          @actions[rule_name] = Fork.new host.register_rulesets(name, action)
         end      
       end
       @handle = Rules.create_ruleset name, JSON.generate(ruleset_definition), state_cache_size  
@@ -452,9 +413,6 @@ module Engine
             complete.call e
           else
             begin
-              for branch_name, branch_state in c._branches do
-                @host.patch_state branch_name, branch_state
-              end
               for timer_name, timer_duration in c._timers do
                 start_timer c.s.sid, timer_name, timer_duration
               end
@@ -544,10 +502,6 @@ module Engine
     end
 
     def transform(parent_name, parent_triggers, parent_start_state, chart_definition, rules)
-      state_filter = stage_filter = -> s { 
-        s.delete :label if (s.key? :label)
-        s.delete "label" if (s.key? "label")
-      }
       start_state = {}
       reflexive_states = {}
       
@@ -663,8 +617,6 @@ module Engine
                 rule[:run] = trigger_run
               elsif trigger_run.kind_of? Proc
                 rule[:run] = Promise.new trigger_run
-              else
-                rule[:run] = Fork.new @host.register_rulesets(@name, trigger_run), state_filter
               end     
             end
 
@@ -734,11 +686,6 @@ module Engine
     end
 
     def transform(chart_definition, rules)
-      stage_filter = -> s { 
-        s.delete :label if (s.key? :label)
-        s.delete "label" if (s.key? "label")
-      }
-
       visited = {}
       reflexive_stages = {}
       for stage_name, stage in chart_definition do
@@ -796,9 +743,6 @@ module Engine
                 rule[:run] = To.new(from_stage, stage_to, assert_stage).continue_with Promise(@host.get_action(next_stage_run))
               elsif (next_stage_run.kind_of? Promise) || (next_stage_run.kind_of? Proc)
                 rule[:run] = To.new(from_stage, stage_to, assert_stage).continue_with next_stage_run
-              else
-                fork_promise = Fork.new @host.register_rulesets(@name, next_stage_run), stage_filter
-                rule[:run] = To.new(from_stage, stage_to, assert_stage).continue_with fork_promise
               end
             end
 
@@ -874,9 +818,6 @@ module Engine
                   rule[:run] = To.new(from_stage, transition_name, assert_stage).continue_with Promise(@host.get_action(next_stage_run))
                 elsif (next_stage_run.kind_of? Promise) || (next_stage_run.kind_of? Proc)
                   rule[:run] = To.new(from_stage, transition_name, assert_stage).continue_with next_stage_run
-                else
-                  fork_promise = Fork.new @host.register_rulesets(@name, next_stage_run), stage_filter
-                  rule[:run] = To.new(from_stage, transition_name, assert_stage).continue_with fork_promise
                 end
               end
 
@@ -905,9 +846,6 @@ module Engine
               rule[:run] = To.new(nil, stage_name, false).continue_with Promise(@host.get_action(stage_run))
             elsif (stage_run.kind_of? Promise) || (stage_run.kind_of? Proc)
               rule[:run] = To.new(nil, stage_name, false).continue_with stage_run
-            else
-              fork_promise = Fork @host.register_rulesets(@name, stage_run), stage_filter
-              rule[:run] = To.new(nil, stage_name, false).continue_with fork_promise
             end
           end
           rules["$start.#{stage_name}"] = rule

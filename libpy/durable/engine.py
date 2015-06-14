@@ -42,17 +42,6 @@ class Closure(object):
     def get_retract_facts(self):
         return self._retract_directory
 
-    def signal(self, message):
-        if isinstance(message, Content):
-            message = message._d
-
-        name_index = self.ruleset_name.rindex('.')
-        parent_ruleset_name = self.ruleset_name[:name_index]
-        name = self.ruleset_name[name_index + 1:]
-        message['sid'] = self.s['sid']
-        message['id'] = '{0}.{1}'.format(name, message['id'])
-        self.post(parent_ruleset_name, message)
-
     def post(self, ruleset_name, message = None):
         if not message: 
             message = ruleset_name
@@ -115,12 +104,6 @@ class Closure(object):
             self._retract_directory[ruleset_name] = retract_list
 
         retract_list.append(fact)
-
-    def fork(self, branch_name, branch_state):
-        if branch_name in self._branch_directory:
-            raise Exception('Branch with name {0} already forked'.format(branch_name))
-        else:
-            self._branch_directory[branch_name] = branch_state
 
     def __getattr__(self, name):   
         if name in self._m:
@@ -225,22 +208,6 @@ class Promise(object):
                 self._func(c, callback)
             except Exception as error:
                 complete(error)
-
-
-class Fork(Promise):
-
-    def __init__(self, branch_names, state_filter = None):
-        super(Fork, self).__init__(self._execute)
-        self.branch_names = branch_names
-        self.state_filter = state_filter
-        
-    def _execute(self, c):
-        for branch_name in self.branch_names:
-            state = copy.deepcopy(c.s._d)
-            if self.state_filter:
-                self.state_filter(state)
-
-            c.fork(branch_name, state)
         
 
 class To(Promise):
@@ -281,8 +248,6 @@ class Ruleset(object):
                 self._actions[rule_name] = action.root
             elif (hasattr(action, '__call__')):
                 self._actions[rule_name] = Promise(action)
-            else:
-                self._actions[rule_name] = Fork(host.register_rulesets(name, action))
 
         self._handle = rules.create_ruleset(state_cache_size, name, json.dumps(ruleset_definition))
         self._definition = ruleset_definition
@@ -406,9 +371,6 @@ class Ruleset(object):
                     complete(e)
                 else:
                     try:
-                        for branch_name, branch_state in c.get_branches().iteritems():
-                            self._host.patch_state(branch_name, branch_state)
-
                         for timer_name, timer_duration in c.get_timers().iteritems():
                             self.start_timer(c.s['sid'], timer_name, timer_duration)                            
   
@@ -484,10 +446,6 @@ class Statechart(Ruleset):
         self._definition['$type'] = 'stateChart'
 
     def _transform(self, parent_name, parent_triggers, parent_start_state, chart_definition, rules):
-        def state_filter(s):
-            if 'label' in s:
-                del s['label']
-
         start_state = {}
         reflexive_states = {}
 
@@ -553,8 +511,6 @@ class Statechart(Ruleset):
                             rule['run'] = trigger['run']
                         elif hasattr(trigger['run'], '__call__'):
                             rule['run'] = Promise(trigger['run'])
-                        else:
-                            rule['run'] = Fork(self._host.register_rulesets(self._name, trigger['run']), state_filter)
 
                     if 'to' in trigger:
                         from_state = None
@@ -607,10 +563,6 @@ class Flowchart(Ruleset):
         self._definition['$type'] = 'flowChart'
 
     def _transform(self, chart_definition, rules):
-        def stage_filter(s):
-            if 'label' in s:
-                del s['label']
-
         visited = {}
         reflexive_stages = {}
 
@@ -650,9 +602,6 @@ class Flowchart(Ruleset):
                             rule['run'] = To(from_stage, stage['to'], assert_stage).continue_with(Promise(self._host.get_action(next_stage['run'])))
                         elif isinstance(next_stage['run'], Promise) or hasattr(next_stage['run'], '__call__'):
                             rule['run'] = To(from_stage, stage['to'], assert_stage).continue_with(next_stage['run'])
-                        else:
-                            fork_promise = Fork(self._host.register_rulesets(self._name, next_stage['run']), stage_filter)
-                            rule['run'] = To(from_stage, stage['to'], assert_stage).continue_with(fork_promise)
 
                     rules['{0}.{1}'.format(stage_name, stage['to'])] = rule
                     visited[stage['to']] = True
@@ -697,9 +646,6 @@ class Flowchart(Ruleset):
                                 rule['run'] = To(from_stage, transition_name, assert_stage).continue_with(Promise(self._host.get_action(next_stage['run'])))
                             elif isinstance(next_stage['run'], Promise) or hasattr(next_stage['run'], '__call__'):
                                 rule['run'] = To(from_stage, transition_name, assert_stage).continue_with(next_stage['run'])
-                            else:
-                                fork_promise = Fork(self._host.register_rulesets(self._name, next_stage['run']), stage_filter)
-                                rule['run'] = To(from_stage, transition_name, assert_stage).continue_with(fork_promise)
 
                         rules['{0}.{1}'.format(stage_name, transition_name)] = rule
                         visited[transition_name] = True
@@ -718,9 +664,6 @@ class Flowchart(Ruleset):
                         rule['run'] = To(None, stage_name, False).continue_with(Promise(self._host.get_action(stage['run'])))
                     elif isinstance(stage['run'], Promise) or hasattr(stage['run'], '__call__'):
                         rule['run'] = To(None, stage_name, False).continue_with(stage['run'])
-                    else:
-                        fork_promise = Fork(self._host.register_rulesets(self._name, stage['run']), stage_filter)
-                        rule['run'] = To(None, stage_name, False).continue_with(fork_promise)
 
                 rules['$start.{0}'.format(stage_name)] = rule
                 started = True

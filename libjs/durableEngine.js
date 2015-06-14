@@ -58,32 +58,6 @@ exports = module.exports = durableEngine = function () {
             return timerDirectory;
         };
 
-        that.getBranches = function () {
-            return branchDirectory;
-        };
-
-        that.signal = function (message) {
-            if (that.m === message) {
-                message = copy(message);
-            }
-
-            var nameIndex = rulesetName.lastIndexOf('.');
-            var parentNamespace = rulesetName.slice(0, nameIndex);
-            var name = rulesetName.slice(nameIndex + 1);
-            message.sid = that.s.sid;
-            message.id = name + '.' + message.id;
-            that.post(parentNamespace, message);
-        };
-
-        that.fork = function (branchName, branchSid, branchDocument) {
-            if (branchDirectory[branchName]) {
-                throw 'branch with name ' + branchName + ' already forked';
-            } else {
-                branchDocument.sid = branchSid;
-                branchDirectory[branchName] = branchDocument;
-            }
-        };
-
         that.post = function (rules, message) {
             if (!message) {
                 message = rules;
@@ -166,6 +140,7 @@ exports = module.exports = durableEngine = function () {
                 throw 'timer with name ' + name + ' already added';
             } else {
                 timerDirectory[name] = duration;
+                targetRulesets[rulesetName] = true;
             }
         };
 
@@ -264,36 +239,6 @@ exports = module.exports = durableEngine = function () {
                 } else {
                     c.post({label: toState, chart: 1, id: Math.ceil(Math.random() * 1000000000 + 1)});
                 }
-            }
-        };
-
-        var that = promise(execute);
-        return that;
-    };
-
-    var copy = function (object, filter) {
-        var newObject = {};
-        for (var pName in object) {
-            if (!filter || filter(pName)) {
-                var propertyType = typeof(object[pName]);
-                if (propertyType !== 'function') {
-                    if (propertyType === 'object') {
-                        newObject[pName] = copy(object[pName]);
-                    }
-                    else {
-                        newObject[pName] = object[pName];
-                    }
-                }
-            }
-        }
-
-        return newObject;
-    };
-
-    var fork = function (branchNames, filter) {  
-        var execute = function (c) {
-            for (var i = 0; i < branchNames.length; ++i) {
-                c.fork(branchNames[i], c.s.sid, copy(c.s, filter));
             }
         };
 
@@ -445,15 +390,10 @@ exports = module.exports = durableEngine = function () {
                         var rulesetNames = c.getTargetRulesets();
                         ensureRulesets(rulesetNames, 0, c, function(err, c) {
                             try {
-                                var branches = c.getBranches();
-                                for (var branchName in branches) {
-                                    var branchState = branches[branchName];
-                                    host.patchState(branchName, branchState);
-                                }
                                 var timers = c.getTimers();
                                 for (var timerName in timers) {
                                     var timerDuration = timers[timerName];
-                                    host.startTimer(c.s.sid, timerName, timerDuration);
+                                    that.startTimer(c.s.sid, timerName, timerDuration);
                                 }
                                 
                                 var rulesetName;
@@ -559,8 +499,6 @@ exports = module.exports = durableEngine = function () {
                 actions[actionName] = promise(rule.run);
             } else if (rule.run.continueWith) {
                 actions[actionName] = rule.run.getRoot();
-            } else {
-                actions[actionName] = fork(host.registerRulesets(name, rule.run));
             }
 
             delete(rule.run);
@@ -664,10 +602,6 @@ exports = module.exports = durableEngine = function () {
                                 rule.run = promise(trigger.run);
                             } else if (trigger.run.continueWith) {
                                 rule.run = trigger.run;
-                            } else {
-                                rule.run = fork(host.registerRulesets(name, trigger.run), function (pName) {
-                                    return (pName !== 'label');
-                                });
                             }
                         }
 
@@ -785,10 +719,6 @@ exports = module.exports = durableEngine = function () {
                                 rule.run = to(fromStage, stage.to, assertStage).continueWith(host.getAction(nextStage.run));
                             } else if (typeof(nextStage.run) === 'function' || nextStage.run.continueWith) {
                                 rule.run = to(fromStage, stage.to, assertStage).continueWith(nextStage.run);
-                            } else {
-                                rule.run = to(fromStage, stage.to, assertStage).continueWith(fork(host.registerRulesets(name, nextStage.run), function (pName) {
-                                    return (pName !== 'label');
-                                }));
                             }
                         }
 
@@ -839,10 +769,6 @@ exports = module.exports = durableEngine = function () {
                                     rule.run = to(fromStage, transitionName, assertStage).continueWith(host.getAction(nextStage.run));
                                 } else if (typeof(nextStage.run) === 'function' || nextStage.run.continueWith) {
                                     rule.run = to(fromStage, transitionName, assertStage).continueWith(nextStage.run);
-                                } else {
-                                    rule.run = to(fromStage, transitionName, assertStage).continueWith(fork(host.registerRulesets(name, nextStage.run), function (pName) {
-                                        return (pName !== 'label');
-                                    }));
                                 }
                             }
 
@@ -869,10 +795,6 @@ exports = module.exports = durableEngine = function () {
                             rule.run = to(null, stageName, false).continueWith(host.getAction(stage.run));
                         } else if (typeof(stage.run) === 'function' || stage.run.continueWith) {
                             rule.run = to(null, stageName, false).continueWith(stage.run);
-                        } else {
-                            rule.run = to(null, stageName, false).continueWith(fork(host.registerRulesets(name, stage.run), function (pName) {
-                                return (pName !== 'label');
-                            }));
                         }
                     } 
 

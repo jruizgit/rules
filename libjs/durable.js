@@ -332,27 +332,6 @@ exports = module.exports = durableEngine = function () {
         var func;
         var rulesetArray = [];
 
-        that.ruleset = function(name) {
-            var newRuleset = ruleset(name);
-            rulesets.pop();
-            rulesetArray.push(newRuleset);
-            return newRuleset;
-        }
-
-        that.statechart = function(name) {
-            var newRuleset = statechart(name);
-            rulesets.pop();
-            rulesetArray.push(newRuleset);
-            return newRuleset;
-        }
-
-        that.flowchart = function(name) {
-            var newRuleset = flowchart(name);
-            rulesets.pop();
-            rulesetArray.push(newRuleset);
-            return newRuleset;
-        }
-
         that.define = function(name) {
             var newDefinition = {};
             var expDefinition;
