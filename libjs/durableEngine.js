@@ -246,6 +246,25 @@ exports = module.exports = durableEngine = function () {
         return that;
     };
 
+    var copy = function (object, filter) {
+        var newObject = {};
+        for (var pName in object) {
+            if (!filter || filter(pName)) {
+                var propertyType = typeof(object[pName]);
+                if (propertyType !== 'function') {
+                    if (propertyType === 'object') {
+                        newObject[pName] = copy(object[pName]);
+                    }
+                    else {
+                        newObject[pName] = object[pName];
+                    }
+                }
+            }
+        }
+
+        return newObject;
+    };
+
     var ruleset = function (name, host, rulesetDefinition, stateCacheSize) {
         var that = {};
         var actions = {};
