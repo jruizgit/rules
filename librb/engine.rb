@@ -228,7 +228,7 @@ module Engine
       super -> c {
         c.s.running = true
         if from_state && (from_state != to_state)
-          if c.m && (c.m.kind_of? Hash)
+          if c.m && (c.m.kind_of? Array)
             c.retract c.m[0].chart_context
           else
             c.retract c.chart_context
@@ -274,6 +274,7 @@ module Engine
           @actions[rule_name] = Promise.new action
         end      
       end
+
       @handle = Rules.create_ruleset name, JSON.generate(ruleset_definition), state_cache_size  
       @definition = ruleset_definition
     end    

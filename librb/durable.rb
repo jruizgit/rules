@@ -402,8 +402,7 @@ module Durable
     end
 
     def timeout(name)
-      expression = Expression.new(:$m)
-      expression.left = :$t
+      expression = Expression.new(:$m, :$t)
       expression == name
     end
     

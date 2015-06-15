@@ -1346,7 +1346,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    return nil\n"
 "else\n"
 "    redis.call(\"set\", \"skip\", \"yes\")\n"
-"redis.call(\"rpush\", \"debug\", \"o \" .. cjson.encode(candidate))\n"
 "    return {sid, cjson.encode(candidate)}\n"
 "end\n",
                  name,
@@ -1457,12 +1456,9 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    keys = context[\"keys\"]\n"
 "    reviewers = context[\"reviewers\"]\n"
 "    primary_frame_keys = context[\"primary_frame_keys\"]\n"
-"redis.call(\"rpush\", \"debug\", \"b \" .. cjson.encode(frame))\n"
 "    if not context[\"frame_restore\"](frame, full_frame) then\n"
-"redis.call(\"rpush\", \"debug\", \"c \")\n"
 "        cancel = true\n"
 "    else\n"
-"redis.call(\"rpush\", \"debug\", \"a \" .. cjson.encode(full_frame))\n"
 "        for i = 1, #frame, 1 do\n"
 "            if frame[i] == \"$n\" then\n"
 "                if not validate_frame(frame, full_frame, i, sid) then\n"

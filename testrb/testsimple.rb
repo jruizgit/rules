@@ -218,10 +218,10 @@ Durable.statechart :fraud0 do
   end
   state :metering do
     to :fraud, when_all(m.amount > 100, count(3)) do
-      puts "fraud 2 detected"
+      puts "fraud 0 detected"
     end
     to :standby, when_all(timeout :velocity) do
-      puts "fraud 2 cleared"
+      puts "fraud 0 cleared"
     end
   end
   state :fraud
