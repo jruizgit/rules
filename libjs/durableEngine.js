@@ -64,9 +64,7 @@ exports = module.exports = durableEngine = function () {
                 rules = rulesetName;
             }
 
-            if (that.m === message) {
-                message = copy(message);
-            }
+            message = copy(message);
 
             if (!message.sid) {
                 message.sid = that.s.sid;
@@ -90,9 +88,7 @@ exports = module.exports = durableEngine = function () {
                 rules = rulesetName;
             }
 
-            if (that.m === fact) {
-                fact = copy(fact);
-            }
+            fact = copy(fact);
 
             if (!fact.sid) {
                 fact.sid = that.s.sid;
@@ -106,7 +102,6 @@ exports = module.exports = durableEngine = function () {
                 targetRulesets[rules] = true;
                 factsDirectory[rules] = factsList;
             }
-
             factsList.push(fact);
         };
 
@@ -116,9 +111,7 @@ exports = module.exports = durableEngine = function () {
                 rules = rulesetName;
             }
 
-            if (that.m === fact) {
-                fact = copy(fact);
-            }
+            fact = copy(fact);
 
             if (!fact.sid) {
                 fact.sid = that.s.sid;
