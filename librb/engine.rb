@@ -227,18 +227,21 @@ module Engine
     def initialize(from_state, to_state, assert_state)
       super -> c {
         c.s.running = true
-        if from_state && (from_state != to_state)
-          if c.m && (c.m.kind_of? Array)
-            c.retract c.m[0].chart_context
+        if from_state != to_state
+          if from_state
+            if c.m && (c.m.kind_of? Array)
+              c.retract c.m[0].chart_context
+            else
+              c.retract c.chart_context
+            end 
+          end
+        
+          id = rand(1000000000)
+          if assert_state
+            c.assert(:label => to_state, :chart => 1, :id => id)
           else
-            c.retract c.chart_context
-          end 
-        end
-        id = rand(1000000000)
-        if assert_state
-          c.assert(:label => to_state, :chart => 1, :id => id)
-        else
-          c.post(:label => to_state, :chart => 1, :id => id)
+            c.post(:label => to_state, :chart => 1, :id => id)
+          end
         end
       }
     end
@@ -512,8 +515,8 @@ module Engine
         start_state[qualified_name] = true
 
         for trigger_name, trigger in state do
-          if (trigger.key? :to && trigger[:to] == state_name) || 
-             (trigger.key? "to" && trigger["to"] == state_name) ||
+          if ((trigger.key? :to) && (trigger[:to] == state_name)) || 
+             ((trigger.key? "to") && (trigger["to"] == state_name)) ||
              (trigger.key? :count) || (trigger.key? "count") ||
              (trigger.key? :cap) || (trigger.key? "cap") ||
              (trigger.key? :span) || (trigger.key? "span")
