@@ -1,4 +1,4 @@
-require_relative "../librb/durable"
+require "durable"
 
 Durable.ruleset :fraud_detection do
   when_all span(10), (m.t == "debit_cleared") | (m.t == "credit_cleared") do

@@ -1,4 +1,4 @@
-require_relative '../librb/durable'
+require "durable"
 
 Durable.ruleset :a0 do
   when_all (m.amount < 100) | (m.subject == "approve") | (m.subject == "ok") do

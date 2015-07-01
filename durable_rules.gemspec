@@ -6,8 +6,8 @@ Gem::Specification.new do |s|
   s.authors     = ["Jesus Ruiz"]
   s.email       = "jr3791@live.com"
   s.homepage    = "https://www.github.com/jruizgit/rules"
-  s.license     = 'MIT'
-  s.require_path = "librb"
+  s.license     = "MIT"
+  s.require_paths = ["/librb"]
   s.files = []
 
   
@@ -25,4 +25,5 @@ Gem::Specification.new do |s|
 
   s.add_development_dependency "rake", "10.0"
   s.add_development_dependency "rake-compiler", "~> 0.7.1"
+  s.add_runtime_dependency "timers", "~> 4.0.1"
 end

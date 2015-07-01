@@ -1,4 +1,4 @@
-require_relative "../librb/durable"
+require "durable"
 
 Durable.statechart :miss_manners do
   state :start do

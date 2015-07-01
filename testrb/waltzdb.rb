@@ -1,4 +1,4 @@
-require_relative "../librb/durable"
+require_relative "durable"
 require "json"
 
 $fact_count = 0
