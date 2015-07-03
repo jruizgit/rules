@@ -515,7 +515,3 @@ run_all()
 ```
 [top](reference.md#table-of-contents)  
 
-
-[top](reference.md#table-of-contents)  
- 
-
