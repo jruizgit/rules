@@ -19,7 +19,6 @@ Reference Manual
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
   * [Flowchart](reference.md#flowchart)
-  * [Parallel](reference.md#parallel)  
 
 ### Local Setup
 ------
@@ -47,21 +46,6 @@ Now that your cache and web server are ready, let's write a simple rule:
  
 
 [top](reference.md#table-of-contents) 
-### Cloud Setup
---------
-#### Redis install
-Redis To Go has worked well for me and is very fast if you are deploying an app using Heroku or AWS.   
-1. Go to: [Redis To Go](https://redistogo.com)  
-2. Create an account (the free instance with 5MB has enough space for you to evaluate durable_rules)  
-3. Make sure you write down the host, port and password, which represents your new account  
-#### Heroku install
-Heroku is a good platform to create a cloud application in just a few minutes.  
-1. Go to: [Heroku](https://www.heroku.com)  
-2. Create an account (the free instance with 1 dyno works well for evaluating durable_rules)  
-#### First app
-2. Deploy and scale the App
-3. Run `heroku logs`, you should see the message: `a0 approved from 1`  
-[top](reference.md#table-of-contents)  
 
 ### Rules
 ------
@@ -457,53 +441,7 @@ Durable.run_all
 ```
 [top](reference.md#table-of-contents)  
 
-#### Parallel
-Rulesets can be structured for concurrent execution by defining hierarchical rulesets.   
 
-Parallel rules:
-* Actions can be defined by using `ruleset`, `statechart` and `flowchart` constructs.   
-* The context used for child rulesets is a deep copy of the parent context at the time of the action execution.  
-* The child context id is qualified with that if its parent ruleset.  
-* Child rulesets can signal events to parent rulesets.  
-
-In this example two child rulesets are created when observing the `start = "yes"` event. When both child rulesets complete, the parent resumes.  
-
-API:  
-* `signal parent_context_id, {event}`  
-```ruby
-require 'durable'
-Durable.ruleset :p1 do
-  when_all m.start == "yes", paralel do 
-    ruleset :one do 
-      when_all -s.start do
-        s.start = 1
-      end
-      when_all s.start == 1 do
-        puts "p1 finish one"
-        signal :id => 1, :end => "one"
-        s.start = 2
-      end 
-    end
-    ruleset :two do 
-      when_all -s.start do
-        s.start = 1
-      end
-      when_all s.start == 1 do
-        puts "p1 finish two"
-        signal :id => 1, :end => "two"
-        s.start = 2
-      end 
-    end
-  end
-  when_all m.end == "one", m.end == "two" do
-    puts 'p1 approved'
-  end
-  when_start do
-    post :p1, {:id => 1, :sid => 1, :start => "yes"}
-  end
-end
-Durable.run_all
-```
 [top](reference.md#table-of-contents)  
  
 
