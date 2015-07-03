@@ -2,8 +2,8 @@ Reference Manual
 =====
 ### Table of contents
 ------
-* [Local Setup](reference.md#setup)
-* [Cloud Setup](reference.md#setup)
+* [Local Setup](reference.md#local-setup)
+* [Cloud Setup](reference.md#cloud-setup)
 * [Rules](reference.md#rules)
   * [Simple Filter](reference.md#simple-filter)
   * [Correlated Sequence](reference.md#correlated-sequence)
@@ -19,13 +19,12 @@ Reference Manual
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
   * [Flowchart](reference.md#flowchart)
-  * [Parallel](reference.md#parallel)  
 
 ### Local Setup
 ------
 durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
 #### Redis install
-durable.js relies on Redis version 2.8  
+durable_rules relies on Redis version 2.8  
  
 _Mac_  
 1. Download [Redis](http://download.redis.io/releases/redis-2.8.4.tar.gz)   
@@ -67,7 +66,7 @@ Now that your cache ready, let's write a simple rule:
 
 Note: If you are using [Redis To Go](https://redistogo.com), replace the last line.
   ```python
-  run_all([{'host': 'hostName', 'port': port, 'password': 'password'}]);
+  run_all([{'host': 'host_name', 'port': port, 'password': 'password'}]);
   ```
 
 [top](reference.md#table-of-contents) 
@@ -78,15 +77,6 @@ Redis To Go has worked well for me and is very fast if you are deploying an app 
 1. Go to: [Redis To Go](https://redistogo.com)  
 2. Create an account (the free instance with 5MB has enough space for you to evaluate durable_rules)  
 3. Make sure you write down the host, port and password, which represents your new account  
-#### Heroku install
-Heroku is a good platform to create a cloud application in just a few minutes.  
-1. Go to: [Heroku](https://www.heroku.com)  
-2. Create an account (the free instance with 1 dyno works well for evaluating durable_rules)  
-#### First app (under construction)
-
-2. Deploy and scale the App
-3. Run `heroku logs`, you should see the message: `a0 approved from 1`  
-[top](reference.md#table-of-contents)  
 
 ### Rules
 ------
@@ -525,55 +515,7 @@ run_all()
 ```
 [top](reference.md#table-of-contents)  
 
-#### Parallel
-Rulesets can be structured for concurrent execution by defining hierarchical rulesets.   
 
-Parallel rules:
-* Actions can be defined by using `ruleset`, `statechart` and `flowchart` constructs.   
-* The context used for child rulesets is a deep copy of the parent context at the time of the action execution.  
-* The child context id is qualified with that if its parent ruleset.  
-* Child rulesets can signal events to parent rulesets.  
-
-In this example two child rulesets are created when observing the `start = "yes"` event. When both child rulesets complete, the parent resumes.
-
-API:  
-* `signal(parent_context_id, {event})`  
-```python
-from durable.lang import *
-with ruleset('p1'):
-    with when_all(m.start == 'yes'): 
-        with ruleset('one'):
-            @when_all(-s.start)
-            def continue_flow(c):
-                c.s.start = 1
-
-            @when_all(s.start == 1)
-            def finish_one(c):
-                print('p1 finish one {0}'.format(c.s.sid))
-                c.signal({'id': 1, 'end': 'one'})
-                c.s.start = 2
-
-        with ruleset('two'): 
-            @when_all(-s.start)
-            def continue_flow(c):
-                c.s.start = 1
-
-            @when_all(s.start == 1)
-            def finish_two(c):
-                print('p1 finish two {0}'.format(c.s.sid))
-                c.signal({'id': 1, 'end': 'two'})
-                c.s.start = 2
-
-    @when_all(m.end == 'one', m.end == 'two')
-    def done(c):
-        print('p1 done {0}'.format(c.s.sid))
-
-    @when_start
-    def start(host):
-        host.post('p1', {'id': 1, 'sid': 1, 'start': 'yes'})
-
-run_all()
-```
 [top](reference.md#table-of-contents)  
  
 
