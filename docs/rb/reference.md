@@ -2,8 +2,8 @@ Reference Manual
 =====
 ### Table of contents
 ------
-* [Local Setup](reference.md#setup)
-* [Cloud Setup](reference.md#setup)
+* [Local Setup](reference.md#local-setup)
+* [Cloud Setup](reference.md#cloud-setup)
 * [Rules](reference.md#rules)
   * [Simple Filter](reference.md#simple-filter)
   * [Correlated Sequence](reference.md#correlated-sequence)
@@ -24,7 +24,7 @@ Reference Manual
 ------
 durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
 #### Redis install
-durable.js relies on Redis version 2.8  
+durable_rules relies on Redis version 2.8 or higher 
  
 _Mac_  
 1. Download [Redis](http://download.redis.io/releases/redis-2.8.4.tar.gz)   
@@ -67,9 +67,7 @@ Note: If you are using [Redis To Go](https://redistogo.com), replace the last li
   ```ruby
   Durable.run_all([{:host => "host_name", :port => "port", :password => "password"}])
   ```
-
- 
-
+  
 [top](reference.md#table-of-contents) 
 
 ### Rules
