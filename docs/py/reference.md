@@ -67,7 +67,7 @@ Now that your cache ready, let's write a simple rule:
 
 Note: If you are using [Redis To Go](https://redistogo.com), replace the last line.
   ```python
-  d.runAll([{'host': 'hostName', 'port': port, 'password': 'password'}]);
+  run_all([{'host': 'hostName', 'port': port, 'password': 'password'}]);
   ```
 
 [top](reference.md#table-of-contents) 
