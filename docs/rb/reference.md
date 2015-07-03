@@ -41,7 +41,32 @@ For more information go to: https://github.com/MSOpenTech/redis
 Note: To test applications locally you can also use a Redis [cloud service](reference.md#cloud-setup) 
 
 #### First App
-Now that your cache and web server are ready, let's write a simple rule:  
+Now that your cache ready, let's write a simple rule:  
+
+1. Start a terminal  
+2. Create a directory for your app: `mkdir firstapp` `cd firstapp`  
+3. In the new directory `sudo gem install durable_rules` (this will download durable_rules and its dependencies)  
+4. In that same directory create a test.rb file using your favorite editor  
+5. Copy/Paste and save the following code:
+  ```ruby
+  require "durable"
+  Durable.ruleset :test do
+    when_all (m.subject == "World") do
+      puts "Hello #{m.subject}"
+    end
+    when_start do
+      post :test, {:id => 1, :sid => 1, :subject => "World"}
+    end
+  end
+  Durable.run_all
+  ```
+7. In the terminal type `python test.py`  
+8. You should see the message: `Hello World`  
+
+Note: If you are using [Redis To Go](https://redistogo.com), replace the last line.
+  ```ruby
+  Durable.run_all([{:host => "host_name", :port => "port", :password => "password"}])
+  ```
 
  
 
@@ -61,7 +86,7 @@ Logical operator precedence:
 2. Boolean operators: `|` (or) , `&` (and)   
 3. Pattern matching: >, <, >=, <=, ==, !=   
 ```ruby
-require 'durable'
+require "durable"
 Durable.ruleset :a0 do
   when_all (m.subject < 100) | (m.subject == "approve") | (m.subject == "ok") do
     puts "a0 approved ->#{m.subject}"
@@ -82,7 +107,7 @@ Arithmetic operator precedence:
 1. `*`, `/`  
 2. `+`, `-`  
 ```ruby
-require 'durable'
+require "durable"
 Durable.ruleset :fraud_detection do
   when_all c.first = m.t == "purchase",
            c.second = m.amount > first.amount * 2,
@@ -97,6 +122,7 @@ Durable.ruleset :fraud_detection do
     post :fraud_detection, {:id => 3, :sid => 1, :t => "purchase", :amount => 300}
   end
 end
+Durable.run_all
 ```
 [top](reference.md#table-of-contents)  
 #### Choice of Sequences
@@ -111,7 +137,7 @@ The following functions can be combined to form richer sequences:
 * any: patterns separated by `,`, any of the patterns can match.    
 * none: no event or fact matching the pattern.  
 ```ruby
-require 'durable'
+require "durable"
 Durable.ruleset :a4 do
   when_any all(m.subject == "approve", m.amount == 1000),
            all(m.subject == "jumbo", m.amount == 10000) do
@@ -130,7 +156,7 @@ Events or facts can produce multiple results in a single fact, in which case dur
 
 In this example, notice how the last rule is triggered first, as it has the highest priority. In the last rule result facts are ordered starting with the most recent.
 ```ruby
-require 'durable'
+require "durable"
 Durable.ruleset :attributes do
   when_all pri(3), count(3), m.amount < 300 do
     puts "attributes ->" + m[0].amount.to_s
@@ -162,7 +188,7 @@ Summary of rule attributes:
 * pri: defines the scheduled action order in case of conflict.  
 
 ```ruby
-require 'durable'
+require "durable"
 Durable.ruleset :t0 do
   when_all (timeout :my_timer) | (m.count == 0) do
     s.count += 1
@@ -198,7 +224,7 @@ API:
 * `post ruleset_name, {event}`  
 * `post_batch ruleset_name, {event}, {event}...`  
 ```ruby
-require 'durable'
+require "durable"
 Durable.ruleset :fraud_detection do
   when_all c.first = m.t == "purchase",
            c.second = m.location != first.location do
@@ -231,7 +257,7 @@ API:
 * `assert_facts ruleset_name, {fact}, {fact}...`
 * `retract ruleset_name, {fact}`  
 ```ruby
-require 'durable'
+require "durable"
 Durable.ruleset :fraud_detection do
   when_all c.first = m.t == "purchase",
            c.second = m.location != first.location,
@@ -262,7 +288,7 @@ API:
 * `patch_state ruleset_name, {state}`  
 * `state.property = ...`  
 ```ruby
-require 'durable'
+require "durable"
 Durable.ruleset :a8 do
   when_all m.amount < s.max_amount + s.id(:global).min_amount do
     puts "a8 approved " + m.amount.to_s
@@ -293,7 +319,7 @@ API:
 * `start_timer timer_name, seconds`  
 * `when... timeout(timer_name)`  
 ```ruby
-require 'durable'
+require "durable"
 Durable.ruleset :t1 do
   when_all m.start == "yes" do
     s.start = Time.now
@@ -334,7 +360,7 @@ API:
 * `to state_name, [rule] [do action_block]`  
 
 ```ruby
-require 'durable'
+require "durable"
 Durable.statechart :a2 do
   state :input do
     to :denied, when_all((m.subject == 'approve') & (m.amount > 1000)) do
@@ -365,7 +391,7 @@ Durable.run_all
 
 The example below shows a statechart, where the `canceled` and reflective `work` transitions are reused for both the `enter` and the `process` states. 
 ```ruby
-require 'durable'
+require "durable"
 Durable.statechart :a6 do
   state :start do
     to :work
@@ -415,7 +441,7 @@ API:
 * `to stage_name, [rule]`  
 Note: conditions have to be defined immediately after the stage definition  
 ```ruby
-require 'durable'
+require "durable"
 Durable.flowchart :a3 do
   stage :input
   to :request, when_all((m.subject == 'approve') & (m.amount <= 1000))
@@ -441,7 +467,4 @@ Durable.run_all
 ```
 [top](reference.md#table-of-contents)  
 
-
-[top](reference.md#table-of-contents)  
- 
 
