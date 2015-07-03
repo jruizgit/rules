@@ -47,19 +47,21 @@ Now that your cache ready, let's write a simple rule:
 2. Create a directory for your app: `mkdir firstapp` `cd firstapp`  
 3. In the new directory `sudo gem install durable_rules` (this will download durable_rules and its dependencies)  
 4. In that same directory create a test.rb file using your favorite editor  
-5. Copy/Paste and save the following code:
-  ```ruby
-  require "durable"
-  Durable.ruleset :test do
-    when_all (m.subject == "World") do
-      puts "Hello #{m.subject}"
-    end
-    when_start do
-      post :test, {:id => 1, :sid => 1, :subject => "World"}
-    end
+5. Copy/Paste and save the following code:  
+
+```ruby
+require "durable"
+Durable.ruleset :test do
+  when_all (m.subject == "World") do
+    puts "Hello #{m.subject}"
   end
-  Durable.run_all
-  ```
+  when_start do
+    post :test, {:id => 1, :sid => 1, :subject => "World"}
+  end
+end
+Durable.run_all
+```  
+
 7. In the terminal type `python test.py`  
 8. You should see the message: `Hello World`  
 
