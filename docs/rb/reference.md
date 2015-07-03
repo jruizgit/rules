@@ -67,8 +67,14 @@ Note: If you are using [Redis To Go](https://redistogo.com), replace the last li
   ```ruby
   Durable.run_all([{:host => "host_name", :port => "port", :password => "password"}])
   ```
-  
 [top](reference.md#table-of-contents) 
+### Cloud Setup
+--------
+#### Redis install
+Redis To Go has worked well for me and is very fast if you are deploying an app using Heroku or AWS.   
+1. Go to: [Redis To Go](https://redistogo.com)  
+2. Create an account (the free instance with 5MB has enough space for you to evaluate durable_rules)  
+3. Make sure you write down the host, port and password, which represents your new account  
 
 ### Rules
 ------
