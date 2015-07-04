@@ -13,6 +13,8 @@ The Durable Rules core engine is implemented in C, which enables ultra fast rule
 
 durable_rules is simple: to define a rule, all you need to do is describe the event or fact pattern to match (antecedent) and the action to take (consequent).
 
+In this example the rule can be triggered by posting `{"id": 1, "subject": "World"}` to url `http://localhost:5000/test/1`.
+
     from durable.lang import *
 
     with ruleset('test'):
