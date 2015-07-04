@@ -324,7 +324,7 @@ Durable.statechart :miss_manners do
 end
 ```
 ### Python
-```pyhton
+```python
 from durable.lang import *
 
 with statechart('miss_manners'):
