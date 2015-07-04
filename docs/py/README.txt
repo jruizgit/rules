@@ -9,11 +9,13 @@ A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts a
 
 The Durable Rules core engine is implemented in C, which enables ultra fast rule evaluation and inference as well as muti-language support. Durable Rules relies on state of the art technologies: Werkzeug(http://werkzeug.pocoo.org/ is used to host rulesets). Inference state is cached using Redis(http://www.redis.io), This allows for fault tolerant execution and scale-out without giving up performance.
 
-**Example 1 **::
+**Example 1**
 
 durable_rules is simple: to define a rule, all you need to do is describe the event or fact pattern to match (antecedent) and the action to take (consequent).
 
-In this example the rule can be triggered by posting `{"id": 1, "subject": "World"}` to url `http://localhost:5000/test/1`.
+In this example the rule can be triggered by posting `{"id": 1, "subject": "World"}` to url `http://localhost:5000/test/1`
+
+::
 
     from durable.lang import *
 
@@ -26,14 +28,15 @@ In this example the rule can be triggered by posting `{"id": 1, "subject": "Worl
 
     run_all()
 
-**Example 2 **::
+**Example 2**
 
-Let’s consider a couple of fictitious fraud rules used in bank account management.  
+Let’s consider a couple of fictitious fraud rules used in bank account management.
 Note: I'm paraphrasing the example presented in this article(https://www.packtpub.com/books/content/drools-jboss-rules-50complex-event-processing).  
 
 1. If there are two debit requests greater than 200% the average monthly withdrawal amount in a span of 2 minutes, flag the account as medium risk.
-2. If there are three consecutive increasing debit requests, withdrawing more than 70% the average monthly balance in a span of three minutes, flag the account as high risk
+2. If there are three consecutive increasing debit requests, withdrawing more than 70% the average monthly balance in a span of three minutes, flag the account as high risk.
 
+::
 
     from durable.lang import *
     
@@ -77,11 +80,13 @@ Note: I'm paraphrasing the example presented in this article(https://www.packtpu
 
     run_all()
 
-**Example 3 **::
+**Example 3**
 
 durable_rules can also be used to solve traditional production bussiness rules problems. The example below is the 'Miss Manners' benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent guests are of opposite sex and share at least one hobby. 
 
 To improve readability, with durable_rules, the ruleset flow structure can be defined using a statechart. The benchmark results compare well with other business rules systems both from an execution time as well as memory utilization perspective.
+
+::
 
     from durable.lang import *
 
