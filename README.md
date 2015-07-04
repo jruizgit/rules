@@ -25,7 +25,7 @@ Blog:
 
 durable_rules is simple. Using your scripting language of choice, you only need to describe the event or fact pattern to match (antecedent) and the action to take (consequent).  
 
-In this example the rule can be triggered by posting `{"id": 1, "sid": 1, "subject": "World"}` to url `http://localhost:5000/test/1`.  
+In this example the rule can be triggered by posting `{"id": 1, "subject": "World"}` to url `http://localhost:5000/test/1`.  
 
 ### Ruby
 ```ruby
