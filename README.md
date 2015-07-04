@@ -55,9 +55,9 @@ run_all()
 var d = require('durable');
 
 with (d.ruleset('test')) {
-    # antecedent
+    // antecedent
     whenAll(m.subject.eq('World'), function (c) {
-        # consequent
+        // consequent
         console.log('Hello ' + c.m.subject);
     });
 } 
