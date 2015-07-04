@@ -30,7 +30,7 @@ rules = Extension('rules',
                   sources = ['src/rulespy/rules.c'],
                   include_dirs=['src/rules'])
 
-here = path.abspath(path.dirname(__file__)) + 'docs/py'
+here = path.abspath(path.dirname(__file__)) + '/docs/py'
 with open(path.join(here, 'README.txt'), encoding='utf-8') as f:
     long_description = f.read()
 
