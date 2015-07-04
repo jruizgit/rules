@@ -30,13 +30,13 @@ rules = Extension('rules',
                   sources = ['src/rulespy/rules.c'],
                   include_dirs=['src/rules'])
 
-here = path.abspath(path.dirname(__file__))
+here = path.abspath(path.dirname(__file__)) + 'docs/py'
 with open(path.join(here, 'README.txt'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup (
     name = 'durable_rules',
-    version = '0.31.23',
+    version = '0.32.01',
     description = 'for real time analytics',
     long_description=long_description,
     url='https://github.com/jruizgit/rules',
