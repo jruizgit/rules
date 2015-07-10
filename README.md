@@ -8,7 +8,7 @@ A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts a
 
 The Durable Rules core engine is implemented in C, which enables ultra fast rule evaluation and inference as well as muti-language support. Durable Rules relies on state of the art technologies: [Node.js](http://www.nodejs.org), [Werkzeug](http://werkzeug.pocoo.org/), [Sinatra](http://www.sinatrarb.com/) are used to host rulesets written in JavaScript, Python and Ruby respectively. Inference state is cached using [Redis](http://www.redis.io). This allows for fault tolerant execution and scale-out without giving up performance.
 
-### Getting Started  
+## Getting Started  
 
 durable_rules is simple. Using your scripting language of choice, you only need to describe the event or fact pattern to match (antecedent) and the action to take (consequent).  
 
@@ -53,7 +53,7 @@ with (d.ruleset('test')) {
 d.runAll();
 ```
 
-### Event Process and Fraud Detection  
+## Event Processing and Fraud Detection  
 
 Let’s consider a couple of fictitious fraud rules used in bank account management.  
 Note: I'm paraphrasing the example presented in this [article](https://www.packtpub.com/books/content/drools-jboss-rules-50complex-event-processing).  
@@ -204,7 +204,7 @@ with (d.ruleset('fraudDetection')) {
 d.runAll();
 ```
 
-### Business Rules and Miss Manners 
+## Business Rules and Miss Manners 
 
 durable_rules can also be used to solve traditional production bussiness rules problems. This example is an industry benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent people are of opposite sex and share at least one hobby. 
 
@@ -218,7 +218,7 @@ Note how the benchmark flow structure is defined using a statechart to improve c
 
 #### [JavaScript](https://github.com/jruizgit/rules/blob/master/testjs/manners.js)
 
-### To Learn More  
+## To Learn More  
 Reference Manual:  
 * [Ruby](https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md)  
 * [Python](https://github.com/jruizgit/rules/blob/master/docs/py/reference.md)  
