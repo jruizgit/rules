@@ -8,13 +8,13 @@ A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts a
 
 The Durable Rules core engine is implemented in C, which enables ultra fast rule evaluation and inference as well as muti-language support. Durable Rules relies on state of the art technologies: [Node.js](http://www.nodejs.org), [Werkzeug](http://werkzeug.pocoo.org/), [Sinatra](http://www.sinatrarb.com/) are used to host rulesets written in JavaScript, Python and Ruby respectively. Inference state is cached using [Redis](http://www.redis.io). This allows for fault tolerant execution and scale-out without giving up performance.
 
-### Example 1  
+### Getting Started  
 
 durable_rules is simple. Using your scripting language of choice, you only need to describe the event or fact pattern to match (antecedent) and the action to take (consequent).  
 
 In this example the rule can be triggered by posting `{"id": 1, "subject": "World"}` to url `http://localhost:5000/test/1`.  
 
-### Ruby
+#### Ruby
 ```ruby
 require "durable"
 Durable.ruleset :test do
@@ -26,7 +26,7 @@ Durable.ruleset :test do
 end
 Durable.run_all
 ```  
-### Python
+#### Python
 ```python
 from durable.lang import *
 
@@ -39,7 +39,7 @@ with ruleset('test'):
 
 run_all()
 ```  
-### JavaScript
+#### JavaScript
 ```javascript
 var d = require('durable');
 
@@ -53,7 +53,7 @@ with (d.ruleset('test')) {
 d.runAll();
 ```
 
-### Example 2  
+### Event Process and Fraud Detection  
 
 Let’s consider a couple of fictitious fraud rules used in bank account management.  
 Note: I'm paraphrasing the example presented in this [article](https://www.packtpub.com/books/content/drools-jboss-rules-50complex-event-processing).  
@@ -62,7 +62,7 @@ Note: I'm paraphrasing the example presented in this [article](https://www.packt
 2. If there are three consecutive increasing debit requests, withdrawing more than 70% the average monthly balance in a span of three minutes, flag the account as high risk.
 
 
-### Ruby
+#### Ruby
 ```ruby
 require "durable"
 
@@ -109,7 +109,7 @@ end
 
 Durable.run_all
 ```
-### Python
+#### Python
 ```python
 from durable.lang import *
 
@@ -153,7 +153,7 @@ with ruleset('fraud_detection'):
 
 run_all()
 ```
-### JavaScript
+#### JavaScript
 ```javascript
 var d = require('durable');
 
@@ -204,19 +204,19 @@ with (d.ruleset('fraudDetection')) {
 d.runAll();
 ```
 
-### Example 3  
+### Business Rules and Miss Manners 
 
-durable_rules can also be used to solve traditional production bussiness rules problems. This example is the 'Miss Manners' industry benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent people are of opposite sex and share at least one hobby. 
+durable_rules can also be used to solve traditional production bussiness rules problems. This example is an industry benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent people are of opposite sex and share at least one hobby. 
 
-Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance. The benchmark results are competitive with other business rules systems both from an execution time as well as memory utilization perspective.  
+Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance. The benchmark results are very competitive with other business rules systems. For 128 guests, 438 facts, the execution time is less than 2 seconds in JavaScript and Python slightly above 2 seconds in Ruby. The memory utilization in all cases is remarkable.  
 
 <div align="center"><img src="https://raw.github.com/jruizgit/rules/master/docs/manners.jpg" width="800px" height="300px" /></div>
 
-### [Ruby](https://github.com/jruizgit/rules/blob/master/testrb/manners.rb)
+#### [Ruby](https://github.com/jruizgit/rules/blob/master/testrb/manners.rb)
 
-### [Python](https://github.com/jruizgit/rules/blob/master/testpy/manners.py)
+#### [Python](https://github.com/jruizgit/rules/blob/master/testpy/manners.py)
 
-### [JavaScript](https://github.com/jruizgit/rules/blob/master/testjs/manners.js)
+#### [JavaScript](https://github.com/jruizgit/rules/blob/master/testjs/manners.js)
 
 ### To Learn More  
 Reference Manual:  
