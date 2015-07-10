@@ -212,7 +212,7 @@ Note how the benchmark flow structure is defined using a statechart to improve c
 
 <div align="center"><img src="https://raw.github.com/jruizgit/rules/master/docs/manners.jpg" width="800px" height="300px" /></div>  
 
-(IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive)  
+###### _IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive_    
 
 #### [Ruby](https://github.com/jruizgit/rules/blob/master/testrb/manners.rb)
 
