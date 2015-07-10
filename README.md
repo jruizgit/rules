@@ -221,7 +221,9 @@ d.runAll();
 
 durable_rules can also be used to solve traditional production bussiness rules problems. This example is the 'Miss Manners' industry benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent people are of opposite sex and share at least one hobby. 
 
-Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance. The benchmark results are competitive with other business rules systems both from an execution time as well as memory utilization perspective.
+Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance. The benchmark results are competitive with other business rules systems both from an execution time as well as memory utilization perspective.  
+
+<div align="center"><img src="https://raw.github.com/jruizgit/rules/master/docs/manners.jpg" width="440px" height="200px" /></div>
 
 ### Ruby
 
