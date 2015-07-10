@@ -208,9 +208,11 @@ d.runAll();
 
 durable_rules can also be used to solve traditional production bussiness rules problems. This example is an industry benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent people are of opposite sex and share at least one hobby. 
 
-Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance. The benchmark results are very competitive with other business rules systems. For 128 guests, 438 facts, the execution time is less than 2 seconds in JavaScript and Python slightly above 2 seconds in Ruby. The memory utilization in all cases is remarkable.  
+Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance. The benchmark results are very competitive with other business rules systems. For 128 guests, 438 facts, the execution time is less than 2 seconds in JavaScript and Python slightly above 2 seconds in Ruby. The memory utilization in all cases is remarkable. 
 
-<div align="center"><img src="https://raw.github.com/jruizgit/rules/master/docs/manners.jpg" width="800px" height="300px" /></div>
+<div align="center"><img src="https://raw.github.com/jruizgit/rules/master/docs/manners.jpg" width="800px" height="300px" /></div>  
+
+(IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive)  
 
 #### [Ruby](https://github.com/jruizgit/rules/blob/master/testrb/manners.rb)
 
