@@ -8,19 +8,6 @@ A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts a
 
 The Durable Rules core engine is implemented in C, which enables ultra fast rule evaluation and inference as well as muti-language support. Durable Rules relies on state of the art technologies: [Node.js](http://www.nodejs.org), [Werkzeug](http://werkzeug.pocoo.org/), [Sinatra](http://www.sinatrarb.com/) are used to host rulesets written in JavaScript, Python and Ruby respectively. Inference state is cached using [Redis](http://www.redis.io). This allows for fault tolerant execution and scale-out without giving up performance.
 
-### To Learn More  
-Reference Manual:  
-* [Ruby](https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md)  
-* [Python](https://github.com/jruizgit/rules/blob/master/docs/py/reference.md)  
-* [JavaScript](https://github.com/jruizgit/rules/blob/master/docs/js/reference.md)  
-
-Blog:  
-* [Polyglot (03/2015)](http://jruizblog.com/2015/03/02/polyglot/)  
-* [Rete_D (02/2015)](http://jruizblog.com/2015/02/23/rete_d/)
-* [Boosting Performance with C (08/2014)](http://jruizblog.com/2014/08/19/boosting-performance-with-c/)
-* [Rete Meets Redis (02/2014)](http://jruizblog.com/2014/02/02/rete-meets-redis/)
-* [Inference: From Expert Systems to Cloud Scale Event Processing (01/2014)](http://jruizblog.com/2014/01/27/event-processing/)
-
 ### Example 1  
 
 durable_rules is simple. Using your scripting language of choice, you only need to describe the event or fact pattern to match (antecedent) and the action to take (consequent).  
@@ -225,10 +212,22 @@ Note how the benchmark flow structure is defined using a statechart to improve c
 
 <div align="center"><img src="https://raw.github.com/jruizgit/rules/master/docs/manners.jpg" width="800px" height="300px" /></div>
 
-### Ruby
+### [Ruby](https://github.com/jruizgit/rules/blob/master/testrb/manners.rb)
 
-### Python
+### [Python](https://github.com/jruizgit/rules/blob/master/testpy/manners.py)
 
-### JavaScript
+### [JavaScript](https://github.com/jruizgit/rules/blob/master/testjs/manners.js)
 
+### To Learn More  
+Reference Manual:  
+* [Ruby](https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md)  
+* [Python](https://github.com/jruizgit/rules/blob/master/docs/py/reference.md)  
+* [JavaScript](https://github.com/jruizgit/rules/blob/master/docs/js/reference.md)  
+
+Blog:  
+* [Polyglot (03/2015)](http://jruizblog.com/2015/03/02/polyglot/)  
+* [Rete_D (02/2015)](http://jruizblog.com/2015/02/23/rete_d/)
+* [Boosting Performance with C (08/2014)](http://jruizblog.com/2014/08/19/boosting-performance-with-c/)
+* [Rete Meets Redis (02/2014)](http://jruizblog.com/2014/02/02/rete-meets-redis/)
+* [Inference: From Expert Systems to Cloud Scale Event Processing (01/2014)](http://jruizblog.com/2014/01/27/event-processing/)
 
