@@ -4,4 +4,8 @@ rvm:
  - "1.9.2"
  - "1.9.3"
  - rbx
- 
+notifications:
+  email:
+    - jr3791@live.com
+
+
