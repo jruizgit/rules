@@ -5,10 +5,6 @@ rvm:
  - "1.9.3"
  - rbx
 
-language: node_js
-node_js:
-  - "0.12"
-
 notifications:
   email:
     - jr3791@live.com
