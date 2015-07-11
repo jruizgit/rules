@@ -4,6 +4,15 @@ rvm:
  - "1.9.2"
  - "1.9.3"
  - rbx
+
+language: node_js
+node_js:
+  - "0.12"
+
+language: python
+python:
+  - "2.7"
+
 notifications:
   email:
     - jr3791@live.com
