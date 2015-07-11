@@ -9,13 +9,6 @@ language: node_js
 node_js:
   - "0.12"
 
-language: python
-python:
-  - "2.7"
-
-install:
-  - "pip install ."
-
 notifications:
   email:
     - jr3791@live.com
