@@ -30,7 +30,11 @@ with ruleset('miss_manners'):
         c.post({'t': 'context', 'l': 'assign', 'id': c.s.g_count + 2})
         c.s.count += 1
         c.s.g_count += 3
+<<<<<<< Updated upstream
         c.s.start_time = unix_time_millis(datetime.datetime.now())
+=======
+        c.s.start_time = datetime.datetime.now().strftime('%I:%M:%S:%f')
+>>>>>>> Stashed changes
         print('assign {0}'.format(c.guest.name))
 
     @when_all(by('right_guest'),
@@ -110,7 +114,11 @@ with ruleset('miss_manners'):
              (m.t == 'seating') & (m.right_seat == c.last_seat.seat),
              (m.t == 'context') & (m.l == 'check'))
     def done(c):
+<<<<<<< Updated upstream
         print('end {0}'.format(unix_time_millis(datetime.datetime.now()) - c.s.start_time))
+=======
+        print('end {0}, {1}'.format(c.s.start_time, datetime.datetime.now().strftime('%I:%M:%S:%f')))
+>>>>>>> Stashed changes
     
     @when_all(pri(1), 
              (m.t == 'context') & (m.l == 'check'))
