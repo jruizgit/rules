@@ -3347,7 +3347,7 @@
         createAndPost(host, {t:'line' ,p1:1940005 ,p2:1940006});
         createAndPost(host, {t:'line' ,p1:1910008 ,p2:1920008});
 
-                createAndPost(host, {t:'line', p1:50003, p2:60003});
+        createAndPost(host, {t:'line', p1:50003, p2:60003});
         createAndPost(host, {t:'line', p1:30005, p2:30006});
         createAndPost(host, {t:'line', p1:80005, p2:80006});
         createAndPost(host, {t:'line', p1:50008, p2:60008});
