@@ -1034,12 +1034,7 @@ exports = module.exports = durableEngine = function () {
                     if (err) {
                         console.log(err);
                     }
-                    if (index % 10) {
-                        dispatchRules(index + 1);
-                    }
-                    else {
-                        setTimeout(dispatchRules, 1, index + 1);
-                    }
+                    setImmediate(dispatchRules, index + 1);
                 });
             }
         };
