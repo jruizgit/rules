@@ -1,4 +1,4 @@
-require_relative "durable"
+require "durable"
 require "json"
 
 $fact_count = 0
