@@ -228,6 +228,7 @@ Reference Manual:
 * [JavaScript](https://github.com/jruizgit/rules/blob/master/docs/js/reference.md)  
 
 Blog:  
+* [Miss Manners and Waltzdb (07/2015)](http://jruizblog.com/2015/07/20/miss-manners-and-waltzdb/)
 * [Polyglot (03/2015)](http://jruizblog.com/2015/03/02/polyglot/)  
 * [Rete_D (02/2015)](http://jruizblog.com/2015/02/23/rete_d/)
 * [Boosting Performance with C (08/2014)](http://jruizblog.com/2014/08/19/boosting-performance-with-c/)
