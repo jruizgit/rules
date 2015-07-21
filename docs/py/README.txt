@@ -7,7 +7,7 @@ durable_rules is a polyglot micro-framework for real-time, consistent and scalab
 
 A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts and massive streams of events in real time. A simple, yet powerful meta-liguistic abstraction lets you define simple and complex rulesets as well as control flow structures such as flowcharts, statecharts, nested statecharts and time driven flows. 
 
-The Durable Rules core engine is implemented in C, which enables ultra fast rule evaluation as well as muti-language support. Durable Rules relies on state of the art technologies: Werkzeug(http://werkzeug.pocoo.org/ is used to host rulesets). Inference state is cached using Redis(http://www.redis.io), This allows for fault tolerant execution and scale-out without giving up performance.
+The durable_rules core engine is implemented in C, which enables ultra fast rule evaluation as well as muti-language support. durable_rules relies on state of the art technologies: Werkzeug(http://werkzeug.pocoo.org/ is used to host rulesets). Inference state is cached using Redis(http://www.redis.io), This allows for fault tolerant execution and scale-out without giving up performance.
 
 **Example 1**
 
