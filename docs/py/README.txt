@@ -5,9 +5,9 @@ for real time analytics
 -----------------------
 durable_rules is a polyglot micro-framework for real-time, consistent and scalable coordination of events. With durable_rules you can track and analyze information about things that happen (events) by combining data from multiple sources to infer more complicated circumstances.
 
-A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts and massive streams of events in real time. A simple, yet powerful meta-liguistic abstraction lets you define simple and complex rulesets, such as flowcharts, statecharts, nested statecharts, paralel and time driven flows. 
+A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts and massive streams of events in real time. A simple, yet powerful meta-liguistic abstraction lets you define simple and complex rulesets as well as control flow structures such as flowcharts, statecharts, nested statecharts and time driven flows. 
 
-The Durable Rules core engine is implemented in C, which enables ultra fast rule evaluation and inference as well as muti-language support. Durable Rules relies on state of the art technologies: Werkzeug(http://werkzeug.pocoo.org/ is used to host rulesets). Inference state is cached using Redis(http://www.redis.io), This allows for fault tolerant execution and scale-out without giving up performance.
+The Durable Rules core engine is implemented in C, which enables ultra fast rule evaluation as well as muti-language support. Durable Rules relies on state of the art technologies: Werkzeug(http://werkzeug.pocoo.org/ is used to host rulesets). Inference state is cached using Redis(http://www.redis.io), This allows for fault tolerant execution and scale-out without giving up performance.
 
 **Example 1**
 
@@ -82,9 +82,9 @@ Note: I'm paraphrasing the example presented in this article(https://www.packtpu
 
 **Example 3**
 
-durable_rules can also be used to solve traditional production bussiness rules problems. The example below is the 'Miss Manners' benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent guests are of opposite sex and share at least one hobby. 
+durable_rules can also be used to solve traditional Production Bussiness Rules problems. The example below is the 'Miss Manners' benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent guests are of opposite sex and share at least one hobby. 
 
-To improve readability, with durable_rules, the ruleset flow structure can be defined using a statechart. The benchmark results compare well with other business rules systems both from an execution time as well as memory utilization perspective.
+Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance nor altering the combinatorics required by the benchmark. For 128 guests, 438 facts, the execution time is less than 2 seconds. More details documented in this blog post (http://jruizblog.com/2015/07/20/miss-manners-and-waltzdb/).
 
 ::
 
@@ -200,6 +200,7 @@ To improve readability, with durable_rules, the ruleset flow structure can be de
 
 **Blog:** 
 
+- Miss Manners and Waltzdb (07/2015): http://jruizblog.com/2015/07/20/miss-manners-and-waltzdb/
 - Polyglot (03/2015):http://jruizblog.com/2015/03/02/polyglot/
 - Rete_D (02/2015):http://jruizblog.com/2015/02/23/rete_d/
 - Boosting Performance with C (08/2014): http://jruizblog.com/2014/08/19/boosting-performance-with-c/
