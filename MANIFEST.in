@@ -1,5 +1,6 @@
 include MANIFEST.in
 include LICENSE
+include docs/py/README.txt
 include deps/hiredis/COPYING
 include deps/hiredis/*.[ch]
 include src/rules/*.[ch]
