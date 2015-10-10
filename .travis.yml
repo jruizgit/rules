@@ -5,6 +5,8 @@ python:
 
 install: "python setup.py build"
 
+script: ""
+
 notifications:
   email:
     - jr3791@live.com
