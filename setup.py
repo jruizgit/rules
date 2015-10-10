@@ -6,6 +6,9 @@ except ImportError:
   from distutils.command import install_lib as _install_lib
 from codecs import open
 from os import path
+from os import environ
+
+environ['CFLAGS'] = '-std=c99'
 
 # Patch "install_lib" command to run build_clib before build_ext
 # to properly work with easy_install.
@@ -28,8 +31,7 @@ rules_lib = ('rules_py',
 
 rules = Extension('rules',
                   sources = ['src/rulespy/rules.c'],
-                  include_dirs=['src/rules'],
-                  extra_compile_args = ['-std=c99'])
+                  include_dirs=['src/rules'])
 
 here = path.abspath(path.dirname(__file__)) + '/docs/py'
 with open(path.join(here, 'README.txt'), encoding='utf-8') as f:
