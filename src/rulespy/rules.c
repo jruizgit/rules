@@ -837,7 +837,7 @@ static PyMethodDef myModule_methods[] = {
     {NULL, NULL}
 };
 
-PyMODINIT_FUNC initrules()
+PyMODINIT_FUNC initrules(void)
 {
     PyObject *m = Py_InitModule("rules", myModule_methods);
     if (m != NULL) {
