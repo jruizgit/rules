@@ -1,7 +1,9 @@
-language: ruby
-rvm:
- - "1.9.3"
- - rbx
+language: python
+
+python:
+  - "2.7"
+
+install: "python setup.py build"
 
 notifications:
   email:
