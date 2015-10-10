@@ -28,7 +28,8 @@ rules_lib = ('rules_py',
 
 rules = Extension('rules',
                   sources = ['src/rulespy/rules.c'],
-                  include_dirs=['src/rules'])
+                  include_dirs=['src/rules'],
+                  extra_compile_args = ['-std=c99'])
 
 here = path.abspath(path.dirname(__file__)) + '/docs/py'
 with open(path.join(here, 'README.txt'), encoding='utf-8') as f:
@@ -36,7 +37,7 @@ with open(path.join(here, 'README.txt'), encoding='utf-8') as f:
 
 setup (
     name = 'durable_rules',
-    version = '0.33.04',
+    version = '0.33.05',
     description = 'for real time analytics',
     long_description=long_description,
     url='https://github.com/jruizgit/rules',
