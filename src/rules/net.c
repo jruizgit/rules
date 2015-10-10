@@ -123,7 +123,8 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
     unsigned char setPrimaryKey = 0;
     *primaryKey = NULL;
     *primaryFrameKey = NULL;
-    if (asprintf(test, "") == -1) {
+    *test = (char*)calloc(1, sizeof(char));
+    if (!*test) {
         return ERR_OUT_OF_MEMORY;
     }
     
@@ -284,10 +285,13 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
     }
 
     if (*primaryKey == NULL) {
-        if (asprintf(primaryKey, "") == -1) {
+        *primaryKey = (char*)calloc(1, sizeof(char));
+        if (!*primaryKey) {
             return ERR_OUT_OF_MEMORY;
         }
-        if (asprintf(primaryFrameKey, "") == -1) {
+
+        *primaryFrameKey = (char*)calloc(1, sizeof(char));
+        if (!*primaryFrameKey) {
             return ERR_OUT_OF_MEMORY;
         }
     }
@@ -310,15 +314,19 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     char *peekActionLua = NULL;
     char *addMessageLua = NULL;
     char *oldLua;
-    if (asprintf(&peekActionLua, "")  == -1) {
+    
+    peekActionLua = (char*)calloc(1, sizeof(char));
+    if (!peekActionLua) {
         return ERR_OUT_OF_MEMORY;
     }
 
-    if (asprintf(&lua, "")  == -1) {
+    lua = (char*)calloc(1, sizeof(char));
+    if (!lua) {
         return ERR_OUT_OF_MEMORY;
     }
 
-    if (asprintf(&addMessageLua, "")  == -1) {
+    addMessageLua = (char*)calloc(1, sizeof(char));
+    if (!addMessageLua) {
         return ERR_OUT_OF_MEMORY;
     }
 
@@ -404,7 +412,8 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                     char *currentKey = &tree->stringPool[expr->nameOffset];
                     char *nextKeyTest;
                     if (iii == (currentJoin->expressionsLength - 1)) {
-                        if (asprintf(&nextKeyTest, "")  == -1) {
+                        nextKeyTest = (char*)calloc(1, sizeof(char));
+                        if (!nextKeyTest) {
                             return ERR_OUT_OF_MEMORY;
                         }
                     } else {
@@ -419,6 +428,10 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                     
                     if (iii == 0) {
                         oldAddMessageLua = addMessageLua;
+                        if (!addMessageLua) {
+                            addMessageLua = "";
+                        }
+
                         if (asprintf(&addMessageLua, 
 "%sif input_keys[\"%s\"] then\n"
 "    primary_message_keys[\"%s\"] = function(message)\n"
@@ -489,6 +502,10 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                             free(oldLua);
 
                             oldPeekActionLua = peekActionLua;
+                            if (!peekActionLua) {
+                                peekActionLua = "";
+                            }
+
                             if (asprintf(&peekActionLua, 
 "%skeys[1] = \"%s\"\n"
 "reviewers[1] = function(message, frame, index)\n"
@@ -527,8 +544,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                                         currentAlias)  == -1) {
                                 return ERR_OUT_OF_MEMORY;
                             }
-
-
 
                             oldLua = lua;
                             if (asprintf(&lua, 
@@ -1356,6 +1371,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
                  lua)  == -1) {
         return ERR_OUT_OF_MEMORY;
     }
+
     free(oldLua);
     redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
     redisGetReply(reContext, (void**)&reply);

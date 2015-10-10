@@ -497,7 +497,10 @@ static unsigned int reduceProperties(unsigned char operator,
     char rightTemp = 0;
     if (leftProperty->type == JSON_STRING || rightProperty->type == JSON_STRING) {
         if (operator != OP_ADD) {
-            asprintf(state, "");
+            *state = (char*)calloc(1, sizeof(char));
+            if (!*state) {
+                return ERR_OUT_OF_MEMORY;
+            }
             return RULES_OK;
         }
 

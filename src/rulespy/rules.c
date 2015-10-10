@@ -19,9 +19,12 @@ static PyObject *pyCreateRuleset(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not create ruleset, error code: %d", result);
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not create ruleset, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -42,9 +45,12 @@ static PyObject *pyDeleteRuleset(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not delete ruleset, error code: %d", result);
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not delete ruleset, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -70,9 +76,12 @@ static PyObject *pyBindRuleset(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not create connection, error code: %d", result);
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not create connection, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -96,9 +105,12 @@ static PyObject *pyComplete(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not complete, error code: %d", result);
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not complete, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -124,9 +136,12 @@ static PyObject *pyAssertEvent(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not assert event, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not assert event, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -152,9 +167,12 @@ static PyObject *pyStartAssertEvent(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not assert event, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not assert event, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -184,9 +202,12 @@ static PyObject *pyAssertEvents(PyObject *self, PyObject *args) {
                 free(results);
             }
             char *message;
-            asprintf(&message, "Could not assert events, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not assert events, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -217,9 +238,12 @@ static PyObject *pyStartAssertEvents(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not assert events, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not assert events, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -243,9 +267,12 @@ static PyObject *pyRetractEvent(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not retract event, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not retract event, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -269,9 +296,12 @@ static PyObject *pyAssertFact(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not assert fact, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not assert fact, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -297,9 +327,12 @@ static PyObject *pyStartAssertFact(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not assert fact, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not assert fact, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -329,9 +362,12 @@ static PyObject *pyAssertFacts(PyObject *self, PyObject *args) {
                 free(results);
             } 
             char *message;
-            asprintf(&message, "Could not assert facts, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not assert facts, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -362,9 +398,12 @@ static PyObject *pyStartAssertFacts(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not assert facts, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not assert facts, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -388,9 +427,12 @@ static PyObject *pyRetractFact(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not retract fact, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not retract fact, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -416,9 +458,12 @@ static PyObject *pyStartRetractFact(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not retract fact, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not retract fact, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -448,9 +493,12 @@ static PyObject *pyRetractFacts(PyObject *self, PyObject *args) {
                 free(results);
             } 
             char *message;
-            asprintf(&message, "Could not retract facts, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not retract facts, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -481,9 +529,12 @@ static PyObject *pyStartRetractFacts(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not retract facts, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not retract facts, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -507,9 +558,12 @@ static PyObject *pyAssertState(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not assert state, error code: %d", result);
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not assert state, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -536,9 +590,12 @@ static PyObject *pyStartUpdateState(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not update state, error code: %d", result);  
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not update state, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -563,9 +620,12 @@ static PyObject *pyStartAction(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not start action, error code: %d", result);
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not start action, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -589,9 +649,12 @@ static PyObject *pyCompleteAction(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not complete action, error code: %d", result);
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not complete action, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -617,9 +680,12 @@ static PyObject *pyCompleteAndStartAction(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not complete and start action, error code: %d", result);
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not complete and start action, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -642,9 +708,12 @@ static PyObject *pyAbandonAction(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not abandon action, error code: %d", result);
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not abandon action, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -668,9 +737,12 @@ static PyObject *pyStartTimer(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not start timer, error code: %d", result);
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not start timer, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -695,9 +767,12 @@ static PyObject *pyAssertTimers(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not assert timers, error code: %d", result);
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not assert timers, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
@@ -718,9 +793,12 @@ static PyObject *pyGetState(PyObject *self, PyObject *args) {
             PyErr_NoMemory();
         } else { 
             char *message;
-            asprintf(&message, "Could not get state, error code: %d", result);
-            PyErr_SetString(RulesError, message);
-            free(message);
+            if (asprintf(&message, "Could not get state, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
         }
         return NULL;
     }
