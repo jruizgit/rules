@@ -8,7 +8,7 @@ from codecs import open
 from os import path
 from os import environ
 
-environ['CFLAGS'] = '-std=gnu99'
+environ['CFLAGS'] = '-std=c99 -D_GNU_SOURCE'
 
 # Patch "install_lib" command to run build_clib before build_ext
 # to properly work with easy_install.
