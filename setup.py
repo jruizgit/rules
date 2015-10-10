@@ -8,7 +8,7 @@ from codecs import open
 from os import path
 from os import environ
 
-environ['CFLAGS'] = '-std=c99'
+environ['CFLAGS'] = '-D_GNU_SOURCE -std=c99'
 
 # Patch "install_lib" command to run build_clib before build_ext
 # to properly work with easy_install.
@@ -39,7 +39,7 @@ with open(path.join(here, 'README.txt'), encoding='utf-8') as f:
 
 setup (
     name = 'durable_rules',
-    version = '0.33.05',
+    version = '0.33.5',
     description = 'for real time analytics',
     long_description=long_description,
     url='https://github.com/jruizgit/rules',
