@@ -64,7 +64,7 @@ static PyObject *pyBindRuleset(PyObject *self, PyObject *args) {
     unsigned int port;
     char *password = NULL;
     unsigned int result;
-    if (PyArg_ParseTuple(args, "lzls", &handle, &password, &port, &host)) {
+    if (PyArg_ParseTuple(args, "zlsl", &password, &port, &host, &handle)) {
         result = bindRuleset(handle, host, port, password);
     } else {
         PyErr_SetString(RulesError, "pyBindRuleset Invalid argument");

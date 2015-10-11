@@ -255,9 +255,9 @@ class Ruleset(object):
     def bind(self, databases):
         for db in databases:
             if isinstance(db, basestring):
-                rules.bind_ruleset(self._handle, None, 0, db)
+                rules.bind_ruleset(None, 0, db, self._handle)
             else: 
-                rules.bind_ruleset(self._handle, db['password'], db['port'], db['host'])
+                rules.bind_ruleset(db['password'], db['port'], db['host'], self._handle)
 
     def assert_event(self, message):
         rules.assert_event(self._handle, json.dumps(message))
