@@ -1,7 +1,7 @@
 =============
 durable_rules
 =============  
-for real time analytics
+for real time analytics (a Python Rules Engine)
 -----------------------
 durable_rules is a polyglot micro-framework for real-time, consistent and scalable coordination of events. With durable_rules you can track and analyze information about things that happen (events) by combining data from multiple sources to infer more complicated circumstances.
 
