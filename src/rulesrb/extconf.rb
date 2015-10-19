@@ -31,7 +31,7 @@ end
 
 # Statically link to hiredis (mkmf can't do this for us)
 $CFLAGS << " -I#{rules_lib} "
-$LDFLAGS << " #{hiredis_lib}/libhiredis.a #{rules_lib}/rules.a"
+$LDFLAGS << " -L#{rules_lib} -L#{hiredis_lib} -lrules -lhiredis"
 
 have_func("rb_thread_fd_select")
 create_makefile('src/rulesrb/rules')

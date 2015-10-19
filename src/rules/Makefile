@@ -1,27 +1,17 @@
 OBJ=events.o json.o net.o rete.o state.o
-LIBNAME=rules
+LIBNAME=librules
 
 # Fallback to gcc when $CC is not in $PATH.
 CC:=$(shell sh -c 'type $(CC) >/dev/null 2>/dev/null && echo $(CC) || echo gcc')
 OPTIMIZATION?=-O3
 WARNINGS=-Wall
 DEBUG?= -g -ggdb
-REAL_CFLAGS=$(OPTIMIZATION) -fPIC $(CFLAGS) $(WARNINGS) $(DEBUG) $(ARCH)
-REAL_LDFLAGS=$(LDFLAGS) $(ARCH)
-
-REAL_CFLAGS+= -I../../deps/hiredis
-REAL_LDFLAGS+= ../deps/hiredis/libhiredis.a
+REAL_CFLAGS=$(OPTIMIZATION) -fPIC $(CFLAGS) $(WARNINGS) $(DEBUG) $(ARCH) -I../../deps/hiredis -D_GNU_SOURCE
 
 STLIBSUFFIX=a
 STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
-STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
-
-# Platform-specific overrides
-uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
-ifeq ($(uname_S),SunOS)
-  REAL_LDFLAGS+= -ldl -lnsl -lsocket
-  INSTALL= cp -r
-endif
+STLIB_MAKE_CMD=ld $(ARCH) -o $(STLIBNAME) -L../../deps/hiredis/ -lhiredis -r
+#STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
 
 all: $(STLIBNAME)
 
@@ -37,19 +27,10 @@ $(STLIBNAME): $(OBJ)
 
 static: $(STLIBNAME)
 
-rules-%: %.o $(STLIBNAME)
-	$(CC) -o $@ $(REAL_LDFLAGS) $< $(STLIBNAME)
-
 .c.o:
 	$(CC) -std=c99 -c $(REAL_CFLAGS) $<
 
 clean:
-	rm -rf $(STLIBNAME) $(BINS) *.o *.gcda *.gcno *.gcov
+	rm -rf $(STLIBNAME) $(BINS) *.o 
 
-gprof:
-	$(MAKE) CFLAGS="-pg" LDFLAGS="-pg"
-
-noopt:
-	$(MAKE) OPTIMIZATION=""
-
-.PHONY: all clean gprof gcov noopt
+.PHONY: all clean
