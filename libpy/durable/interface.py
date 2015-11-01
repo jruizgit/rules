@@ -15,13 +15,9 @@ class Application(object):
         self._host = host
         self._host_name = host_name
         self._port = port
-        routing_rules.append(Rule('/favicon.ico', endpoint=self._empty))
         routing_rules.append(Rule('/<ruleset_name>', endpoint=self._ruleset_definition_request))
         routing_rules.append(Rule('/<ruleset_name>/<sid>', endpoint=self._state_request))
         self._url_map = Map(routing_rules)
-
-    def _empty(self, environ, start_response):
-        return Response()(environ, start_response)
 
     def _ruleset_definition_request(self, environ, start_response, ruleset_name):
         def encode_promise(obj):
