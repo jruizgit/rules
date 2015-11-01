@@ -65,7 +65,7 @@ class Application(object):
     
     def run(self):
         self._host.run()
-        if self.port != 443:
+        if self._port != 443:
             run_simple(self._host_name, self._port, self, use_debugger=True, use_reloader=False)
         else:
             make_ssl_devcert('key', host=self._host_name)
