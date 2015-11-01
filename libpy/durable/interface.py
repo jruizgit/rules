@@ -6,12 +6,15 @@ from werkzeug.routing import Map, Rule
 from werkzeug.exceptions import HTTPException, NotFound
 from werkzeug.wsgi import SharedDataMiddleware
 from werkzeug.serving import run_simple
+from werkzeug.serving import make_ssl_devcert
 
 
 class Application(object):
 
-    def __init__(self, host, routing_rules = []):
+    def __init__(self, host, host_name, port, routing_rules = []):
         self._host = host
+        self._host_name = host_name
+        self._port = port
         routing_rules.append(Rule('/<ruleset_name>', endpoint=self._ruleset_definition_request))
         routing_rules.append(Rule('/<ruleset_name>/<sid>', endpoint=self._state_request))
         self._url_map = Map(routing_rules)
@@ -62,5 +65,9 @@ class Application(object):
     
     def run(self):
         self._host.run()
-        run_simple('127.0.0.1', 5000, self, use_debugger=True, use_reloader=False)
+        if self.port != 443:
+            run_simple(self._host_name, self._port, self, use_debugger=True, use_reloader=False)
+        else:
+            make_ssl_devcert('key', host=self._host_name)
+            run_simple(self._host_name, self._port, self, use_debugger=True, use_reloader=False, ssl_context=('key.crt', 'key.key'))
 
