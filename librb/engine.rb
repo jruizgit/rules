@@ -5,13 +5,14 @@ require_relative "../src/rulesrb/rules"
 module Engine
   
   class Closure
-    attr_reader :handle, :ruleset_name, :_timers, :_branches, :_messages, :_facts, :_retract
+    attr_reader :host, :handle, :ruleset_name, :_timers, :_branches, :_messages, :_facts, :_retract
     attr_accessor :s
 
-    def initialize(state, message, handle, ruleset_name)
+    def initialize(host, state, message, handle, ruleset_name)
       @s = Content.new(state)
       @ruleset_name = ruleset_name
       @handle = handle
+      @host = host
       @_timers = {}
       @_messages = {}
       @_branches = {}
@@ -410,7 +411,7 @@ module Engine
         end
 
         result_container.delete :message
-        c = Closure.new state, message, action_handle, @name
+        c = Closure.new @host, state, message, action_handle, @name
         @actions[action_name].run c, -> e {
           if e
             Rules.abandon_action @handle, c.handle

@@ -4,7 +4,7 @@ exports = module.exports = durableEngine = function () {
     var stat = require('node-static');
     var r = require('bindings')('rulesjs.node');
 
-    var closure = function (document, output, handle, rulesetName) {
+    var closure = function (host, document, output, handle, rulesetName) {
         var that = {};
         var targetRulesets = {};
         var eventsDirectory = {};
@@ -28,6 +28,10 @@ exports = module.exports = durableEngine = function () {
 
         that.getHandle = function () {
             return handle;
+        };
+
+        that.getHost = function() {
+            return host;
         };
 
         that.getOutput = function () {
@@ -392,7 +396,7 @@ exports = module.exports = durableEngine = function () {
                     break;
                 }
                 resultContainer['message'] = null;
-                var c = closure(state, message, actionHandle, name);
+                var c = closure(host, state, message, actionHandle, name);
                 var action = actions[actionName]; 
                 action.run(c, function (err, c) {
                     if (err) {

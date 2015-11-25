@@ -8,8 +8,9 @@ import time
 
 class Closure(object):
 
-    def __init__(self, state, message, handle, ruleset_name):
+    def __init__(self, host, state, message, handle, ruleset_name):
         self.ruleset_name = ruleset_name
+        self.host = host
         self.s = Content(state)
         self._handle = handle
         self._timer_directory = {}
@@ -363,7 +364,7 @@ class Ruleset(object):
                 break
 
             del(result_container['message'])
-            c = Closure(state, message, action_handle, self._name)
+            c = Closure(self._host, state, message, action_handle, self._name)
             
             def action_callback(e):
                 if e:
