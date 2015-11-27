@@ -188,8 +188,7 @@ exports = module.exports = durableEngine = function () {
                 } catch (reason) {
                     var err = new Error();
                     console.log(err.stack);
-                    complete(reason, c);
-                    return;
+                    c.s.exception = reason;
                 }
 
                 if (next) {
@@ -201,7 +200,8 @@ exports = module.exports = durableEngine = function () {
                 try {
                     func(c, function (err) {
                         if (err) {
-                            complete(err, c);
+                            c.s.exception = err;
+                            complete(null, c);
                         } else if (next) {
                             next.run(c, complete);
                         } else {
@@ -211,7 +211,8 @@ exports = module.exports = durableEngine = function () {
                 } catch (reason) {
                     var err = new Error();
                     console.log(err.stack);
-                    complete(reason, c);
+                    c.s.exception = reason;
+                    complete(null, c);
                 }
             }
         };

@@ -194,8 +194,7 @@ module Engine
         begin
           @func.call c  
         rescue Exception => e
-          complete.call e
-          return
+          c.s.exception = e.to_s
         end
         
         if @next
@@ -207,7 +206,8 @@ module Engine
         begin
           @func.call c, -> e {
             if e
-              complete.call e
+              c.s.exception = e.to_s
+              complete.call nil
             elsif @next
               @next.run c, complete
             else
@@ -215,7 +215,8 @@ module Engine
             end
           }
         rescue Exception => e
-          complete.call e
+          c.s.exception = e.to_s
+          complete.call nil
         end  
       end
     end

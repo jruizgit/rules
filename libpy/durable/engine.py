@@ -187,11 +187,9 @@ class Promise(object):
         if self._sync:
             try:
                 self._func(c)
-
             except Exception as error:
-                complete(error)
-                return
-
+                c.s.exception = str(error)
+                
             if self._next:
                 self._next.run(c, complete)
             else:
@@ -199,8 +197,9 @@ class Promise(object):
         else:
             try:
                 def callback(e):
-                    if e: 
-                        complete(e) 
+                    if e:
+                        c.s.exception = str(e) 
+                        complete(None) 
                     elif self._next: 
                         self._next.run(c, complete) 
                     else: 
@@ -208,7 +207,8 @@ class Promise(object):
 
                 self._func(c, callback)
             except Exception as error:
-                complete(error)
+                c.s.exception = str(error)
+                complete(None)
         
 
 class To(Promise):
