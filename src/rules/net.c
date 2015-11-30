@@ -1388,10 +1388,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     free(lua);
 
     if (asprintf(&lua, 
-"if redis.call(\"get\", \"skip\") == \"yes\" then\n"
-"    redis.call(\"set\", \"skip\", \"no\")\n"
-"    return nil\n"
-"end\n"
 "local facts_key = \"%s!f!\"\n"
 "local events_key = \"%s!e!\"\n"
 "local action_key = \"%s!a\"\n"
@@ -1408,6 +1404,11 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local facts_mids_cache = {}\n"
 "local events_mids_cache = {}\n"
 "local get_context\n"
+"if redis.call(\"get\", \"skip\") == \"yes\" then\n"
+"    redis.call(\"zincrby\", action_key, tonumber(ARGV[1]), ARGV[3])\n"
+"    redis.call(\"set\", \"skip\", \"no\")\n"
+"    return nil\n"
+"end\n"
 "local get_mids = function(index, frame, events_key, messages_key, mids_cache, message_cache)\n"
 "    local event_mids = mids_cache[events_key]\n"
 "    local primary_key = primary_frame_keys[index](frame)\n"
@@ -1597,7 +1598,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    new_sid, action_name, frame = load_frame(tonumber(ARGV[2]))\n"
 "end\n"
 "if frame then\n"
-"    local score = redis.call(\"zincrby\", action_key, tonumber(ARGV[1]), new_sid)\n"
+"    redis.call(\"zincrby\", action_key, tonumber(ARGV[1]), new_sid)\n"
 "    if #ARGV == 2 then\n"
 "        local state = redis.call(\"hget\", state_key, new_sid)\n"
 "        return {new_sid, state, cjson.encode({[action_name] = frame})}\n"
@@ -1729,9 +1730,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local max_score = tonumber(ARGV[2])\n"
 "local action_key = \"%s!a\"\n"
 "if delete_frame(action_key .. \"!\" .. sid) then\n"
-"    if not redis.call(\"zscore\", action_key, sid) then\n"
-"        redis.call(\"zadd\", action_key , max_score, sid)\n"
-"    end\n"
+"    redis.call(\"zadd\", action_key , max_score, sid)\n"
 "else\n"
 "    redis.call(\"zrem\", action_key, sid)\n"
 "end\n", name)  == -1) {

@@ -342,21 +342,27 @@ class Ruleset(object):
 
         complete(None)
 
-    def dispatch(self, complete):
+    def dispatch(self, complete, async_result = None):
         state = None
         action_handle = None
         action_binding = None
         result_container = {}
-        try:
-            result = rules.start_action(self._handle)
-            if result: 
-                state = json.loads(result[0])
-                result_container = {'message': json.loads(result[1])}
-                action_handle = result[2]
-                action_binding = result[3]
-        except Exception as error:
-            complete(error)
-            return
+        if async_result:
+            state = async_result[0]
+            result_container = {'message': json.loads(async_result[1])}
+            action_handle = async_result[2]
+            action_binding = async_result[3]
+        else:
+            try:
+                result = rules.start_action(self._handle)
+                if result: 
+                    state = json.loads(result[0])
+                    result_container = {'message': json.loads(result[1])}
+                    action_handle = result[2]
+                    action_binding = result[3]
+            except Exception as error:
+                complete(error)
+                return
         
         while 'message' in result_container:
             action_name = None
@@ -425,14 +431,21 @@ class Ruleset(object):
                                 else:
                                     new_result = rules.complete_and_start_action(self._handle, replies, c._handle)
                                     if new_result:
-                                        result_container['message'] = json.loads(new_result)
+                                        if 'async' in result_container:
+                                            def terminal(e):
+                                                return
+
+                                            self.dispatch(terminal, [state, new_result, action_handle, action_binding])
+                                        else:
+                                            result_container['message'] = json.loads(new_result)
 
                     except Exception as error:
                         rules.abandon_action(self._handle, c._handle)
                         complete(error)
-            
+                
             self._actions[action_name].run(c, action_callback) 
-            
+            result_container['async'] = True 
+           
         complete(None)
 
 class Statechart(Ruleset):

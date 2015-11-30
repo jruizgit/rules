@@ -158,17 +158,29 @@ with ruleset('fraud7'):
 
 t = None
 with statechart('fraud8'):
-    with state('standby'):
-        @to('fraud')
+    with state('first'):
+        @to('second')
         @when_all(m.amount > 100)
-        def start_metering(c, complete):
+        def start_first(c, complete):
             def execute_scripts():
-                print('execute')
+                print('execute 1')
                 complete(None)
                
-            print('start async') 
-            t = threading.Timer(5, execute_scripts)
+            print('start async 1') 
+            t = threading.Timer(1, execute_scripts)
             t.start()
+
+    with state('second'):
+        @to('fraud')
+        def start_second(c, complete):
+            def execute_scripts():
+                print('execute 2')
+                complete(None)
+               
+            print('start async 2') 
+            t = threading.Timer(1, execute_scripts)
+            t.start()
+
         
     state('fraud')
 
