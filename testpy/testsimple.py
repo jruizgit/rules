@@ -2,6 +2,8 @@ from durable.lang import *
 import datetime
 import random
 import sys
+import threading
+
 
 with statechart('fraud0'):
     with state('start'):
@@ -152,6 +154,27 @@ with ruleset('fraud7'):
         host.post('fraud7', {'id': 6, 'sid': 1, 't': 'withrawal'})
         host.post('fraud7', {'id': 7, 'sid': 1, 't': 'chargeback'})
         host.retract_fact('fraud7', {'id': 4, 'sid': 1, 't': 'balance'})
+
+
+t = None
+with statechart('fraud8'):
+    with state('standby'):
+        @to('fraud')
+        @when_all(m.amount > 100)
+        def start_metering(c, complete):
+            def execute_scripts():
+                print('execute')
+                complete(None)
+               
+            print('start async') 
+            t = threading.Timer(5, execute_scripts)
+            t.start()
+        
+    state('fraud')
+
+    @when_start
+    def start(host):
+        host.post('fraud8', {'id': 1, 'sid': 1, 'amount': 200})
 
 
 with ruleset('a0'):

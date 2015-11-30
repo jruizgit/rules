@@ -432,7 +432,7 @@ class Ruleset(object):
                         complete(error)
             
             self._actions[action_name].run(c, action_callback) 
-
+            
         complete(None)
 
 class Statechart(Ruleset):
