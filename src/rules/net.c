@@ -2288,6 +2288,9 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
     unsigned int result = RULES_OK;
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;
+    if (commandCount > 0) {
+        reContext->obuf = sdsempty();
+    }
 
     for (unsigned int i = 0; i < commandCount; ++i) {
         sds newbuf;
@@ -2359,6 +2362,10 @@ unsigned int executeBatchWithReply(void *rulesBinding,
     redisContext *reContext = currentBinding->reContext;
     if (lastReply) {
         *lastReply = NULL;
+    }
+
+    if (commandCount > 0) {
+        reContext->obuf = sdsempty();
     }
 
     for (unsigned int i = 0; i < commandCount; ++i) {
