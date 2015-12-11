@@ -2292,17 +2292,17 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
         reContext->obuf = sdsempty();
     }
 
+    sds newbuf = sdsempty();
     for (unsigned int i = 0; i < commandCount; ++i) {
-        sds newbuf;
-        newbuf = sdscatlen(reContext->obuf, commands[i], strlen(commands[i]));
+        newbuf = sdscatlen(newbuf, commands[i], strlen(commands[i]));
         if (newbuf == NULL) {
             return ERR_OUT_OF_MEMORY;
         }
 
-        reContext->obuf = newbuf;
         free(commands[i]);
     }
 
+    reContext->obuf = newbuf;
     int wdone = 0;
     do {
         if (redisBufferWrite(reContext, &wdone) == REDIS_ERR) {
@@ -2364,21 +2364,17 @@ unsigned int executeBatchWithReply(void *rulesBinding,
         *lastReply = NULL;
     }
 
-    if (commandCount > 0) {
-        reContext->obuf = sdsempty();
-    }
-
+    sds newbuf = sdsempty();
     for (unsigned int i = 0; i < commandCount; ++i) {
-        sds newbuf;
-        newbuf = sdscatlen(reContext->obuf, commands[i], strlen(commands[i]));
+        newbuf = sdscatlen(newbuf, commands[i], strlen(commands[i]));
         if (newbuf == NULL) {
             return ERR_OUT_OF_MEMORY;
         }
 
-        reContext->obuf = newbuf;
         free(commands[i]);
     }
 
+    reContext->obuf = newbuf;
     redisReply *reply;
     for (unsigned int i = 0; i < replyCount; ++i) {
         result = redisGetReply(reContext, (void**)&reply);
