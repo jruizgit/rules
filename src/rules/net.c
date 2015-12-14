@@ -2009,7 +2009,7 @@ unsigned int formatEvalMessage(void *rulesBinding,
     argv[4] = mid;
     argvl[4] = strlen(mid);
     argv[5] = score;
-    argvl[5] = 10;
+    argvl[5] = strlen(score);
     argv[6] = (actionType == ACTION_ASSERT_FACT || actionType == ACTION_RETRACT_FACT) ? "1" : "0";
     argvl[6] = 1;
     argv[7] = keysLengthString;
@@ -2280,6 +2280,7 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
                                    char **commands,
                                    unsigned int commandCount,
                                    unsigned int *replyCount) {
+    printf("********* Starting batch\n");
     *replyCount = commandCount;
     if (commandCount == 0) {
         return RULES_OK;
@@ -2288,12 +2289,10 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
     unsigned int result = RULES_OK;
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;
-    if (commandCount > 0) {
-        reContext->obuf = sdsempty();
-    }
-
+    
     sds newbuf = sdsempty();
     for (unsigned int i = 0; i < commandCount; ++i) {
+        printf("Command %s\n", commands[i]);
         newbuf = sdscatlen(newbuf, commands[i], strlen(commands[i]));
         if (newbuf == NULL) {
             return ERR_OUT_OF_MEMORY;
@@ -2352,6 +2351,7 @@ unsigned int executeBatchWithReply(void *rulesBinding,
                                    char **commands,
                                    unsigned int commandCount,
                                    redisReply **lastReply) {
+    printf("********* Executing batch\n");
     if (commandCount == 0) {
         return RULES_OK;
     }
@@ -2366,6 +2366,7 @@ unsigned int executeBatchWithReply(void *rulesBinding,
 
     sds newbuf = sdsempty();
     for (unsigned int i = 0; i < commandCount; ++i) {
+        printf("Command %s\n", commands[i]);
         newbuf = sdscatlen(newbuf, commands[i], strlen(commands[i]));
         if (newbuf == NULL) {
             return ERR_OUT_OF_MEMORY;
