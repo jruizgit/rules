@@ -2280,7 +2280,6 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
                                    char **commands,
                                    unsigned int commandCount,
                                    unsigned int *replyCount) {
-    printf("********* Starting batch\n");
     *replyCount = commandCount;
     if (commandCount == 0) {
         return RULES_OK;
@@ -2292,7 +2291,6 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
     
     sds newbuf = sdsempty();
     for (unsigned int i = 0; i < commandCount; ++i) {
-        printf("Command %s\n", commands[i]);
         newbuf = sdscatlen(newbuf, commands[i], strlen(commands[i]));
         if (newbuf == NULL) {
             return ERR_OUT_OF_MEMORY;
@@ -2351,7 +2349,6 @@ unsigned int executeBatchWithReply(void *rulesBinding,
                                    char **commands,
                                    unsigned int commandCount,
                                    redisReply **lastReply) {
-    printf("********* Executing batch\n");
     if (commandCount == 0) {
         return RULES_OK;
     }
@@ -2366,7 +2363,6 @@ unsigned int executeBatchWithReply(void *rulesBinding,
 
     sds newbuf = sdsempty();
     for (unsigned int i = 0; i < commandCount; ++i) {
-        printf("Command %s\n", commands[i]);
         newbuf = sdscatlen(newbuf, commands[i], strlen(commands[i]));
         if (newbuf == NULL) {
             return ERR_OUT_OF_MEMORY;
@@ -2564,7 +2560,7 @@ unsigned int getSession(void *rulesBinding, char *sid, char **state) {
         return ERR_NEW_SESSION;
     }
 
-    *state = malloc(strlen(reply->str) * sizeof(char));
+    *state = malloc((strlen(reply->str) + 1) * sizeof(char));
     if (!*state) {
         return ERR_OUT_OF_MEMORY;
     }
