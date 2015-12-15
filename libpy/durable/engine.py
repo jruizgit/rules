@@ -199,8 +199,8 @@ class Promise(object):
                 def callback(e):
                     if e:
                         c.s.exception = str(e) 
-                        complete(None) 
-                    elif self._next: 
+                         
+                    if self._next: 
                         self._next.run(c, complete) 
                     else: 
                         complete(None)
@@ -240,7 +240,6 @@ class Ruleset(object):
         self._actions = {}
         self._name = name
         self._host = host
-        self.lock = threading.RLock()
         for rule_name, rule in ruleset_definition.iteritems():
             action = rule['run']
             del rule['run']
@@ -379,7 +378,6 @@ class Ruleset(object):
                     complete(e)
                 else:
                     try:
-                        self.lock.acquire()
                         for timer_name, timer_duration in c.get_timers().iteritems():
                             self.start_timer(c.s['sid'], timer_name, timer_duration)                            
   
@@ -444,8 +442,6 @@ class Ruleset(object):
                     except Exception as error:
                         rules.abandon_action(self._handle, c._handle)
                         complete(error)
-                    finally:
-                        self.lock.release()
                 
             self._actions[action_name].run(c, action_callback) 
             result_container['async'] = True 
@@ -719,140 +715,55 @@ class Host(object):
         self.save_ruleset(ruleset_name, ruleset_definition)
 
     def get_state(self, ruleset_name, sid):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            return rset.get_state(sid)
-        finally:
-            rset.lock.release()
+        return self.get_ruleset(ruleset_name).get_state(sid)
 
     def get_ruleset_state(self, ruleset_name):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            return rset.get_ruleset_state(sid)
-        finally:
-            rset.lock.release()
+        return self.get_ruleset(ruleset_name).get_ruleset_state(sid)
 
     def post_batch(self, ruleset_name, messages):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            rset.assert_events(messages)
-        finally:
-            rset.lock.release()
+        self.get_ruleset(ruleset_name).assert_events(messages)
 
     def start_post_batch(self, ruleset_name, messages):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            return rset.start_assert_events(messages)
-        finally:
-            rset.lock.release()
+        return self.get_ruleset(ruleset_name).start_assert_events(messages)
 
     def post(self, ruleset_name, message):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            rset.assert_event(message)
-        finally:
-            rset.lock.release()
+        self.get_ruleset(ruleset_name).assert_event(message)
 
     def start_post(self, ruleset_name, message):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            return rset.start_assert_event(message)
-        finally:
-            rset.lock.release()
+        return self.get_ruleset(ruleset_name).start_assert_event(message)
 
     def assert_fact(self, ruleset_name, fact):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            rset.assert_fact(fact)
-        finally:
-            rset.lock.release()
+        self.get_ruleset(ruleset_name).assert_fact(fact)
 
     def start_assert_fact(self, ruleset_name, fact):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            return rset.start_assert_fact(fact)
-        finally:
-            rset.lock.release()
+        return self.get_ruleset(ruleset_name).start_assert_fact(fact)
 
     def assert_facts(self, ruleset_name, facts):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            rset.assert_facts(facts)
-        finally:
-            rset.lock.release()
+        self.get_ruleset(ruleset_name).assert_facts(facts)
 
     def start_assert_facts(self, ruleset_name, facts):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            return rset.start_assert_facts(facts)
-        finally:
-            rset.lock.release()
+        return self.get_ruleset(ruleset_name).start_assert_facts(facts)
 
     def retract_fact(self, ruleset_name, fact):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            rset.retract_fact(fact)
-        finally:
-            rset.lock.release()
+        self.get_ruleset(ruleset_name).retract_fact(fact)
 
     def start_retract_fact(self, ruleset_name, fact):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            return rset.start_retract_fact(fact)
-        finally:
-            rset.lock.release()
+        return self.get_ruleset(ruleset_name).start_retract_fact(fact)
 
     def retract_facts(self, ruleset_name, facts):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            rset.retract_fact(fact)
-        finally:
-            rset.lock.release()
+        self.get_ruleset(ruleset_name).retract_facts(facts)
 
     def start_retract_facts(self, ruleset_name, facts):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            return rset.start_retract_facts(facts)
-        finally:
-            rset.lock.release()
+        return self.get_ruleset(ruleset_name).start_retract_facts(facts)
 
     def start_timer(self, ruleset_name, sid, timer_name, timer_duration):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            rset.start_timer(sid, timer_name, timer_duration)
-        finally:
-            rset.lock.release()
+        self.get_ruleset(ruleset_name).start_timer(sid, timer_name, timer_duration)
 
     def patch_state(self, ruleset_name, state):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            rset.assert_state(state)
-        finally:
-            rset.lock.release()
+        self.get_ruleset(ruleset_name).assert_state(state)
 
     def patch_ruleset_state(self, ruleset_name, state):
-        rset = self.get_ruleset(ruleset_name)
-        try: 
-            rset.lock.acquire()
-            rset.set_ruleset_state(state)
-        finally:
-            rset.lock.release()
+        self.get_ruleset(ruleset_name).set_ruleset_state(state)
 
     def register_rulesets(self, parent_name, ruleset_definitions):
         rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions, self._state_cache_size)
@@ -881,21 +792,13 @@ class Host(object):
 
                 if (index % 10 == 0) and len(self._ruleset_list):
                     ruleset = self._ruleset_list[(index / 10) % len(self._ruleset_list)]
-                    try:
-                        ruleset.lock.acquire()
-                        ruleset.dispatch_timers(callback)
-                    finally:
-                        ruleset.lock.release()
+                    ruleset.dispatch_timers(callback)
                 else:
                     callback(e)
 
             if len(self._ruleset_list):
                 ruleset = self._ruleset_list[index % len(self._ruleset_list)]
-                try:
-                    ruleset.lock.acquire()
-                    ruleset.dispatch(timers_callback)
-                finally:
-                    ruleset.lock.release()
+                ruleset.dispatch(timers_callback)
             else:
                 timers_callback(None)
 
