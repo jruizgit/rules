@@ -1884,8 +1884,16 @@ unsigned int bindRuleset(void *handle,
         return ERR_CONNECT_REDIS;
     }
 
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 100000;
+    int result = redisSetTimeout(reContext, tv);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
     if (password != NULL) {
-        int result = redisAppendCommand(reContext, "auth %s", password);
+        result = redisAppendCommand(reContext, "auth %s", password);
         if (result != REDIS_OK) {
             return ERR_REDIS_ERROR;
         }

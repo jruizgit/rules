@@ -783,8 +783,9 @@ class Host(object):
                 if index % 10:
                     dispatch_ruleset(index + 1)
                 else:
-                    self._ruleset_timer = threading.Timer(0.1, dispatch_ruleset, (index + 1, ))
-                    self._ruleset_timer.start()
+                    self._timer = threading.Timer(0.1, dispatch_ruleset, (index + 1, ))
+                    self._timer.daemon = True
+                    self._timer.start()
 
             def timers_callback(e):
                 if e:
@@ -803,4 +804,5 @@ class Host(object):
                 timers_callback(None)
 
         self._timer = threading.Timer(0.1, dispatch_ruleset, (0,))
+        self._timer.daemon = True
         self._timer.start()
