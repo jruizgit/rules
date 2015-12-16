@@ -1885,8 +1885,8 @@ unsigned int bindRuleset(void *handle,
     }
 
     struct timeval tv;
-    tv.tv_sec = 0;
-    tv.tv_usec = 100000;
+    tv.tv_sec = 15;
+    tv.tv_usec = 0;
     int result = redisSetTimeout(reContext, tv);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
@@ -2311,7 +2311,7 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
     int wdone = 0;
     do {
         if (redisBufferWrite(reContext, &wdone) == REDIS_ERR) {
-            printf("error %u %s\n", reContext->err, reContext->errstr);
+            printf("start non blocking batch error %u %s\n", reContext->err, reContext->errstr);
             return ERR_REDIS_ERROR;
         }
     } while (!wdone);
@@ -2335,7 +2335,7 @@ unsigned int completeNonBlockingBatch(void *rulesBinding,
             result = ERR_REDIS_ERROR;
         } else {
             if (reply->type == REDIS_REPLY_ERROR) {
-                printf("error %d %s\n", i, reply->str);
+                printf("complete non blocking batch error %d %s\n", i, reply->str);
                 result = ERR_REDIS_ERROR;
             }
 

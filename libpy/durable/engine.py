@@ -789,7 +789,7 @@ class Host(object):
 
             def timers_callback(e):
                 if e:
-                    print('error {0}'.format(e))
+                    print('callback error {0}'.format(e))
 
                 if (index % 10 == 0) and len(self._ruleset_list):
                     ruleset = self._ruleset_list[(index / 10) % len(self._ruleset_list)]
