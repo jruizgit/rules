@@ -1355,13 +1355,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        redis.call(\"zadd\", actions_key , score, sid)\n"
 "    end\n"
 "end\n"
-"if not candidate then\n"
-"    return nil\n"
-"else\n"
-"    redis.call(\"set\", \"skip\", \"yes\")\n"
-"redis.call(\"rpush\", state_key .. \"!\" .. sid .. \"!d1\", cjson.encode(candidate))\n"
-"    return {sid, cjson.encode(candidate)}\n"
-"end\n",
+"return nil\n",
                  name,
                  name,
                  name,
@@ -1403,11 +1397,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "local facts_mids_cache = {}\n"
 "local events_mids_cache = {}\n"
 "local get_context\n"
-"if redis.call(\"get\", \"skip\") == \"yes\" then\n"
-"    redis.call(\"zincrby\", action_key, tonumber(ARGV[1]), ARGV[3])\n"
-"    redis.call(\"set\", \"skip\", \"no\")\n"
-"    return nil\n"
-"end\n"
 "local get_mids = function(index, frame, events_key, messages_key, mids_cache, message_cache)\n"
 "    local event_mids = mids_cache[events_key]\n"
 "    local primary_key = primary_frame_keys[index](frame)\n"
@@ -1601,10 +1590,8 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    redis.call(\"zincrby\", action_key, tonumber(ARGV[1]), new_sid)\n"
 "    if #ARGV == 2 then\n"
 "        local state = redis.call(\"hget\", state_key, new_sid)\n"
-"redis.call(\"rpush\", state_key .. \"!\" .. new_sid .. \"!d2\", cjson.encode({[action_name] = frame}))\n"
 "        return {new_sid, state, cjson.encode({[action_name] = frame})}\n"
 "    else\n"
-"redis.call(\"rpush\", state_key .. \"!\" .. new_sid .. \"!d3\", cjson.encode({[action_name] = frame}))\n"
 "        return {new_sid, cjson.encode({[action_name] = frame})}\n"
 "    end\n"
 "end\n",
