@@ -1356,11 +1356,10 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    end\n"
 "end\n"
 "if not candidate then\n"
-"    if redis.call(\"llen\", actions_key .. \"!\" .. sid) > 2 then\n"
-"    end\n"
 "    return nil\n"
 "else\n"
 "    redis.call(\"set\", \"skip\", \"yes\")\n"
+"redis.call(\"rpush\", state_key .. \"!\" .. sid .. \"!d1\", cjson.encode(candidate))\n"
 "    return {sid, cjson.encode(candidate)}\n"
 "end\n",
                  name,
@@ -1488,6 +1487,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    if cancel then\n"
 "        for i = 1, #frame, 1 do\n"
 "            if type(frame[i]) == \"table\" then\n"
+"redis.call(\"rpush\", state_key .. \"!\" .. sid .. \"!c\", cjson.encode(frame[i]))\n"
 "                redis.call(\"hsetnx\", events_hashset, frame[i][\"id\"], cmsgpack.pack(frame[i]))\n"
 "                redis.call(\"zadd\", timers_key, max_score, cjson.encode(frame[i]))\n"
 "            end\n"
@@ -1601,8 +1601,10 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    redis.call(\"zincrby\", action_key, tonumber(ARGV[1]), new_sid)\n"
 "    if #ARGV == 2 then\n"
 "        local state = redis.call(\"hget\", state_key, new_sid)\n"
+"redis.call(\"rpush\", state_key .. \"!\" .. new_sid .. \"!d2\", cjson.encode({[action_name] = frame}))\n"
 "        return {new_sid, state, cjson.encode({[action_name] = frame})}\n"
 "    else\n"
+"redis.call(\"rpush\", state_key .. \"!\" .. new_sid .. \"!d3\", cjson.encode({[action_name] = frame}))\n"
 "        return {new_sid, cjson.encode({[action_name] = frame})}\n"
 "    end\n"
 "end\n",
