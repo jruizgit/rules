@@ -2227,7 +2227,7 @@ unsigned int formatPeekAction(void *rulesBinding,
     int result = redisFormatCommand(command, 
                                     "evalsha %s 0 %d %ld %s", 
                                     currentBinding->peekActionHash, 
-                                    180,
+                                    300,
                                     currentTime,
                                     sid); 
     if (result == 0) {
@@ -2401,7 +2401,7 @@ unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply
         int result = redisAppendCommand(reContext, 
                                         "evalsha %s 0 %d %ld", 
                                         currentBinding->peekActionHash, 
-                                        180,
+                                        300,
                                         currentTime); 
         if (result != REDIS_OK) {
             continue;
