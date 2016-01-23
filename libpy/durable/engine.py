@@ -15,6 +15,7 @@ class Closure(object):
         self._handle = handle
         self._timer_directory = {}
         self._message_directory = {}
+        self._queued_message_directory = {}
         self._branch_directory = {}
         self._fact_directory = {}
         self._retract_directory = {}
@@ -36,6 +37,9 @@ class Closure(object):
 
     def get_messages(self):
         return self._message_directory
+
+    def get_queued_messages(self):
+        return self._queued_message_directory
 
     def get_facts(self):
         return self._fact_directory
@@ -59,6 +63,18 @@ class Closure(object):
             message_list = self._message_directory[ruleset_name]
         else:
             self._message_directory[ruleset_name] = message_list
+
+        message_list.append(message)
+
+    def queue(self, ruleset_name, message):
+        if isinstance(message, Content):
+            message = message._d
+
+        message_list = []
+        if  ruleset_name in self._queued_message_directory:
+            message_list = self._queued_message_directory[ruleset_name]
+        else:
+            self._queued_message_directory[ruleset_name] = message_list
 
         message_list.append(message)
 
@@ -299,6 +315,9 @@ class Ruleset(object):
     def start_timer(self, sid, timer_name, timer_duration):
         timer = {'sid':sid, 'id':random.randint(1, 1000000000), '$t':timer_name}
         rules.start_timer(self._handle, str(sid), timer_duration, json.dumps(timer))
+
+    def queue_event(self, sid, ruleset_name, message):
+        rules.queue_event(self._handle, str(sid), ruleset_name, json.dumps(message))
         
     def assert_state(self, state):
         rules.assert_state(self._handle, json.dumps(state))
@@ -379,7 +398,11 @@ class Ruleset(object):
                 else:
                     try:
                         for timer_name, timer_duration in c.get_timers().iteritems():
-                            self.start_timer(c.s['sid'], timer_name, timer_duration)                            
+                            self.start_timer(c.s['sid'], timer_name, timer_duration)
+
+                        for ruleset_name, messages in c.get_queued_messages().iteritems():
+                            for message in messages:
+                                self.queue_event(c.s['sid'], ruleset_name, message)                            
   
                         binding  = 0
                         replies = 0

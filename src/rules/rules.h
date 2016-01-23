@@ -156,6 +156,11 @@ unsigned int startTimer(void *handle,
                         unsigned int duration, 
                         char *timer);
 
+unsigned int queueMessage(void *handle, 
+                          char *sid, 
+                          char *destination, 
+                          char *message);
+
 unsigned int assertTimers(void *handle);
 
 unsigned int getState(void *handle, 

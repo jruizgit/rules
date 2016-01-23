@@ -2495,6 +2495,35 @@ unsigned int registerTimer(void *rulesBinding, unsigned int duration, char *time
     return RULES_OK;
 }
 
+unsigned int registerMessage(void *rulesBinding, char *destination, char *message) {
+    binding *currentBinding = (binding*)rulesBinding;
+    redisContext *reContext = currentBinding->reContext;   
+    time_t currentTime = time(NULL);
+
+    int result = redisAppendCommand(reContext, 
+                                    "zadd %s!t %ld %s", 
+                                    destination, 
+                                    currentTime, 
+                                    message);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+    
+    redisReply *reply;
+    result = redisGetReply(reContext, (void**)&reply);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    if (reply->type == REDIS_REPLY_ERROR) {
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    }
+
+    freeReplyObject(reply);    
+    return RULES_OK;
+}
+
 unsigned int getSession(void *rulesBinding, char *sid, char **state) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext; 

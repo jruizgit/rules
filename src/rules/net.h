@@ -132,6 +132,10 @@ unsigned int registerTimer(void *rulesBinding,
                            unsigned int duration, 
                            char *timer);
 
+unsigned int registerMessage(void *rulesBinding, 
+                             char *destination, 
+                             char *message);
+
 unsigned int deleteBindingsList(ruleset *tree);
 
 unsigned int getSession(void *rulesBinding, 

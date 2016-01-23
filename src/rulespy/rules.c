@@ -750,6 +750,35 @@ static PyObject *pyStartTimer(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+static PyObject *pyQueueEvent(PyObject *self, PyObject *args) {
+    void *handle;
+    char *sid = NULL;
+    char *destination = NULL;
+    char *event = NULL;
+    if (!PyArg_ParseTuple(args, "lsss", &handle, &sid, &destination, &event)) {
+        PyErr_SetString(RulesError, "pyQueueMessage Invalid argument");
+        return NULL;
+    }
+
+    unsigned int result = queueMessage(handle, sid, destination, event);
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *resultMessage;
+            if (asprintf(&resultMessage, "Could not start timer, error code: %d", result)) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, resultMessage);
+                free(resultMessage);
+            }
+        }
+        return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
+
 static PyObject *pyAssertTimers(PyObject *self, PyObject *args) {
     void *handle;
     if (!PyArg_ParseTuple(args, "l", &handle)) {
@@ -832,6 +861,7 @@ static PyMethodDef myModule_methods[] = {
     {"complete_and_start_action", pyCompleteAndStartAction, METH_VARARGS},
     {"abandon_action", pyAbandonAction, METH_VARARGS},
     {"start_timer", pyStartTimer, METH_VARARGS},
+    {"queue_event", pyQueueEvent, METH_VARARGS},
     {"assert_timers", pyAssertTimers, METH_VARARGS},
     {"get_state", pyGetState, METH_VARARGS},
     {NULL, NULL}

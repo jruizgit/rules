@@ -1840,6 +1840,16 @@ unsigned int abandonAction(void *handle, void *actionHandle) {
     return RULES_OK;
 }
 
+unsigned int queueMessage(void *handle, char *sid, char *destination, char *message) {
+    void *rulesBinding;
+    unsigned int result = resolveBinding(handle, sid, &rulesBinding);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    return registerMessage(rulesBinding, destination, message);
+}
+
 unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *timer) {
     void *rulesBinding;
     unsigned int result = resolveBinding(handle, sid, &rulesBinding);
