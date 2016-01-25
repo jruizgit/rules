@@ -5,6 +5,7 @@ import threading
 import inspect
 import random
 import time
+import os
 
 class Closure(object):
 
@@ -380,6 +381,7 @@ class Ruleset(object):
                     action_handle = result[2]
                     action_binding = result[3]
             except Exception as error:
+                print('start action error {0}'.format(str(error)))
                 complete(error)
                 return
         
@@ -463,6 +465,7 @@ class Ruleset(object):
                                             result_container['message'] = json.loads(new_result)
 
                     except Exception as error:
+                        print('action callback error {0}'.format(str(error)))
                         rules.abandon_action(self._handle, c._handle)
                         complete(error)
                 
@@ -812,7 +815,8 @@ class Host(object):
 
             def timers_callback(e):
                 if e:
-                    print('callback error {0}'.format(str(e)))
+                    print('exit on callback error {0}'.format(str(e)))
+                    os._exit(1)
 
                 if (index % 5 == 0) and len(self._ruleset_list):
                     ruleset = self._ruleset_list[(index / 5) % len(self._ruleset_list)]
