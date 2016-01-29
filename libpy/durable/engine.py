@@ -6,6 +6,7 @@ import inspect
 import random
 import time
 import os
+import traceback
 
 class Closure(object):
 
@@ -380,8 +381,9 @@ class Ruleset(object):
                     result_container = {'message': json.loads(result[1])}
                     action_handle = result[2]
                     action_binding = result[3]
-            except Exception as error:
+            except BaseException as error:
                 print('start action error {0}'.format(str(error)))
+                traceback.print_exc()
                 complete(error)
                 return
         
@@ -464,8 +466,9 @@ class Ruleset(object):
                                         else:
                                             result_container['message'] = json.loads(new_result)
 
-                    except Exception as error:
+                    except BaseException as error:
                         print('action callback error {0}'.format(str(error)))
+                        traceback.print_exc()
                         rules.abandon_action(self._handle, c._handle)
                         complete(error)
                 
