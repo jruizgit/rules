@@ -6,6 +6,7 @@ import inspect
 import random
 import time
 import os
+import sys
 import traceback
 
 class Closure(object):
@@ -205,8 +206,12 @@ class Promise(object):
         if self._sync:
             try:
                 self._func(c)
-            except Exception as error:
-                c.s.exception = str(error)
+            except BaseException as error:
+                c.s.exception = 'exception caught {0}'.format(str(error))
+                complete(None)
+            except:
+                c.s.exception = 'unknown exception'
+                complete(None)
                 
             if self._next:
                 self._next.run(c, complete)
@@ -224,8 +229,11 @@ class Promise(object):
                         complete(None)
 
                 self._func(c, callback)
-            except Exception as error:
-                c.s.exception = str(error)
+            except BaseException as error:
+                c.s.exception = 'exception caught {0}'.format(str(error))
+                complete(None)
+            except:
+                c.s.exception = 'unknown exception'
                 complete(None)
         
 
@@ -383,8 +391,14 @@ class Ruleset(object):
                     action_binding = result[3]
             except BaseException as error:
                 print('start action error {0}'.format(str(error)))
-                traceback.print_exc()
+                t, v, tb = sys.exc_info()
+                print('start action exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format(tb)))
                 complete(error)
+                return
+            except:
+                t, v, tb = sys.exc_info()
+                print('start action exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format(tb)))
+                complete('unknown error')
                 return
         
         while 'message' in result_container:
@@ -468,9 +482,15 @@ class Ruleset(object):
 
                     except BaseException as error:
                         print('action callback error {0}'.format(str(error)))
-                        traceback.print_exc()
+                        t, v, tb = sys.exc_info()
+                        print('exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format(tb)))
                         rules.abandon_action(self._handle, c._handle)
                         complete(error)
+                    except:
+                        t, v, tb = sys.exc_info()
+                        print('exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format(tb)))
+                        rules.abandon_action(self._handle, c._handle)
+                        complete('unknown error')
                 
             self._actions[action_name].run(c, action_callback) 
             result_container['async'] = True 
