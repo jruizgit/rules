@@ -392,12 +392,12 @@ class Ruleset(object):
             except BaseException as error:
                 print('start action error {0}'.format(str(error)))
                 t, v, tb = sys.exc_info()
-                print('start action exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format(tb)))
+                print('start action exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                 complete(error)
                 return
             except:
                 t, v, tb = sys.exc_info()
-                print('start action exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format(tb)))
+                print('start action exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                 complete('unknown error')
                 return
         
@@ -483,12 +483,12 @@ class Ruleset(object):
                     except BaseException as error:
                         print('action callback error {0}'.format(str(error)))
                         t, v, tb = sys.exc_info()
-                        print('exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format(tb)))
+                        print('exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                         rules.abandon_action(self._handle, c._handle)
                         complete(error)
                     except:
                         t, v, tb = sys.exc_info()
-                        print('exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format(tb)))
+                        print('exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                         rules.abandon_action(self._handle, c._handle)
                         complete('unknown error')
                 
