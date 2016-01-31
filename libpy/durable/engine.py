@@ -829,7 +829,7 @@ class Host(object):
     def run(self):
         def dispatch_ruleset(index):
             def callback(e):
-                if index % 3:
+                if index % 5:
                     dispatch_ruleset(index + 1)
                 else:
                     self._timer = threading.Timer(0.1, dispatch_ruleset, (index + 1, ))
