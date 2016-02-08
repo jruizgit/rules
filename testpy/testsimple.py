@@ -485,4 +485,18 @@ with ruleset('t1'):
     def start(host):
         host.post('t1', {'id': 1, 'sid': 1, 'start': 'yes'})
 
+with ruleset('q0'): 
+    @when_all(m.start == 'yes')
+    def start_queue(c):
+        print('q0 started')
+        c.queue('q0', {'id': 2, 'sid': 1, 'end': 'yes'})
+
+    @when_all(m.end == 'yes')
+    def end_timer(c):
+        print('q0 ended')
+
+    @when_start
+    def start(host):
+        host.post('q0', {'id': 1, 'sid': 1, 'start': 'yes'})
+
 run_all()

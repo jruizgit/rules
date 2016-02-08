@@ -391,12 +391,12 @@ class Ruleset(object):
                     action_binding = result[3]
             except BaseException as error:
                 t, v, tb = sys.exc_info()
-                print('start action exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
+                print('start action base exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                 complete(error)
                 return
             except:
                 t, v, tb = sys.exc_info()
-                print('start action exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
+                print('start action unknown exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                 complete('unknown error')
                 return
         
@@ -481,11 +481,11 @@ class Ruleset(object):
 
                     except BaseException as error:
                         t, v, tb = sys.exc_info()
-                        print('exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
+                        print('base exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                         rules.abandon_action(self._handle, c._handle)
                         complete(error)
                     except:
-                        print('exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
+                        print('unknown exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                         rules.abandon_action(self._handle, c._handle)
                         complete('unknown error')
                 
@@ -835,7 +835,8 @@ class Host(object):
 
             def timers_callback(e):
                 if e:
-                    if '306' not in e:
+                    if str(e).find('306') == -1:
+                        print('Exiting {0}'.format(str(e)))
                         os._exit(1)
 
                 if (index % 5 == 0) and len(self._ruleset_list):
