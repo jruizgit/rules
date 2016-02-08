@@ -390,7 +390,6 @@ class Ruleset(object):
                     action_handle = result[2]
                     action_binding = result[3]
             except BaseException as error:
-                print('start action error {0}'.format(str(error)))
                 t, v, tb = sys.exc_info()
                 print('start action exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                 complete(error)
@@ -481,13 +480,11 @@ class Ruleset(object):
                                             result_container['message'] = json.loads(new_result)
 
                     except BaseException as error:
-                        print('action callback error {0}'.format(str(error)))
                         t, v, tb = sys.exc_info()
                         print('exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                         rules.abandon_action(self._handle, c._handle)
                         complete(error)
                     except:
-                        t, v, tb = sys.exc_info()
                         print('exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                         rules.abandon_action(self._handle, c._handle)
                         complete('unknown error')
@@ -838,8 +835,8 @@ class Host(object):
 
             def timers_callback(e):
                 if e:
-                    print('exit on callback error {0}'.format(str(e)))
-                    os._exit(1)
+                    if '306' not in e:
+                        os._exit(1)
 
                 if (index % 5 == 0) and len(self._ruleset_list):
                     ruleset = self._ruleset_list[(index / 5) % len(self._ruleset_list)]

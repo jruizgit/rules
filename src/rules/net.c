@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <errno.h>
 #include "net.h"
 #include "rules.h"
 #include "json.h"
@@ -1839,7 +1840,7 @@ unsigned int bindRuleset(void *handle,
     }
 
     struct timeval tv;
-    tv.tv_sec = 30;
+    tv.tv_sec = 120;
     tv.tv_usec = 0;
     int result = redisSetTimeout(reContext, tv);
     if (result != REDIS_OK) {
@@ -2273,6 +2274,22 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
     return result;
 }
 
+static unsigned int tryGetReply(redisContext *reContext, 
+                                redisReply **reply) {
+
+    if (redisGetReply(reContext, (void**)reply) != REDIS_OK) {
+        printf("getReply err %d, %d, %s\n", reContext->err, errno, reContext->errstr);
+        if (redisReconnect(reContext) != REDIS_OK) {
+            printf("reconnect err %d, %d, %s\n", reContext->err, errno, reContext->errstr);
+            return ERR_REDIS_ERROR;
+        }
+
+        return ERR_TRY_AGAIN;
+    }
+
+    return RULES_OK;
+}
+
 unsigned int completeNonBlockingBatch(void *rulesBinding,
                                       unsigned int replyCount) {
     if (replyCount == 0) {
@@ -2284,9 +2301,9 @@ unsigned int completeNonBlockingBatch(void *rulesBinding,
     redisContext *reContext = currentBinding->reContext;
     redisReply *reply;
     for (unsigned int i = 0; i < replyCount; ++i) {
-        result = redisGetReply(reContext, (void**)&reply);
-        if (result != REDIS_OK) {
-            result = ERR_REDIS_ERROR;
+        result = tryGetReply(reContext, &reply);
+        if (result != RULES_OK) {
+            return result;
         } else {
             if (reply->type == REDIS_REPLY_ERROR) {
                 printf("complete non blocking batch error %d %s\n", i, reply->str);
@@ -2336,9 +2353,9 @@ unsigned int executeBatchWithReply(void *rulesBinding,
     reContext->obuf = newbuf;
     redisReply *reply;
     for (unsigned int i = 0; i < replyCount; ++i) {
-        result = redisGetReply(reContext, (void**)&reply);
-        if (result != REDIS_OK) {
-            result = ERR_REDIS_ERROR;
+        result = tryGetReply(reContext, &reply);
+        if (result != RULES_OK) {
+            return result;
         } else {
             if (reply->type == REDIS_REPLY_ERROR) {
                 printf("%s\n", reply->str);
@@ -2376,12 +2393,13 @@ unsigned int removeMessage(void *rulesBinding, char *sid, char *mid) {
     }
 
     redisReply *reply;
-    result = redisGetReply(reContext, (void**)&reply);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
+    result = tryGetReply(reContext, &reply);
+    if (result != RULES_OK) {
+        return result;
     }
 
     if (reply->type == REDIS_REPLY_ERROR) {
+        printf("removeMessage err string %s\n", reply->str);
         freeReplyObject(reply);
         return ERR_REDIS_ERROR;
     }
@@ -2407,13 +2425,13 @@ unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply
             continue;
         }
 
-        result = redisGetReply(reContext, (void**)reply);
-        if (result != REDIS_OK) {
-            return ERR_REDIS_ERROR;
+        result = tryGetReply(reContext, reply);
+        if (result != RULES_OK) {
+            return result;
         }
 
         if ((*reply)->type == REDIS_REPLY_ERROR) {
-            printf("%s\n", (*reply)->str);
+            printf("peekAction err string %s\n", (*reply)->str);
             freeReplyObject(*reply);
             return ERR_REDIS_ERROR;
         }
@@ -2445,12 +2463,13 @@ unsigned int peekTimers(ruleset *tree, void **bindingContext, redisReply **reply
             continue;
         }
 
-        result = redisGetReply(reContext, (void**)reply);
-        if (result != REDIS_OK) {
-            return ERR_REDIS_ERROR;
+        result = tryGetReply(reContext, reply);
+        if (result != RULES_OK) {
+            return result;
         }
 
         if ((*reply)->type == REDIS_REPLY_ERROR) {
+            printf("peekTimers err string %s\n", (*reply)->str);
             freeReplyObject(*reply);
             return ERR_REDIS_ERROR;
         }
@@ -2481,12 +2500,13 @@ unsigned int registerTimer(void *rulesBinding, unsigned int duration, char *time
     }
     
     redisReply *reply;
-    result = redisGetReply(reContext, (void**)&reply);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
+    result = tryGetReply(reContext, &reply);
+    if (result != RULES_OK) {
+        return result;
     }
 
     if (reply->type == REDIS_REPLY_ERROR) {
+        printf("registerTimer err string %s\n", reply->str);
         freeReplyObject(reply);
         return ERR_REDIS_ERROR;
     }
@@ -2510,12 +2530,13 @@ unsigned int registerMessage(void *rulesBinding, char *destination, char *messag
     }
     
     redisReply *reply;
-    result = redisGetReply(reContext, (void**)&reply);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
+    result = tryGetReply(reContext, &reply);
+    if (result != RULES_OK) {
+        return result;
     }
 
     if (reply->type == REDIS_REPLY_ERROR) {
+        printf("registerMessage err string %s\n", reply->str);
         freeReplyObject(reply);
         return ERR_REDIS_ERROR;
     }
@@ -2536,9 +2557,9 @@ unsigned int getSession(void *rulesBinding, char *sid, char **state) {
     }
 
     redisReply *reply;
-    result = redisGetReply(reContext, (void**)&reply);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
+    result = tryGetReply(reContext, &reply);
+    if (result != RULES_OK) {
+        return result;
     }
 
     if (reply->type == REDIS_REPLY_ERROR) {

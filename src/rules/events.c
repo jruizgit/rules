@@ -1711,6 +1711,10 @@ unsigned int startAction(void *handle,
     *state = reply->element[1]->str;
     *messages = reply->element[2]->str;
     actionContext *context = malloc(sizeof(actionContext));
+    if (!context) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    
     context->reply = reply;
     context->rulesBinding = rulesBinding;
     *actionHandle = context;

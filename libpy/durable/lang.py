@@ -599,7 +599,7 @@ _ruleset_stack = []
 _rulesets = []
 _start_functions = []
 
-def run_all(databases = [{'host': 'localhost', 'port': 6379, 'password':None}], host_name = '127.0.0.1', port = 5000, routing_rules = []):
+def run_all(databases = [{'host': 'localhost', 'port': 6379, 'password':None}], host_name = '127.0.0.1', port = 5000, routing_rules = [], callback = None):
     ruleset_definitions = {}
     for rset in _rulesets:
         ruleset_name, ruleset_definition = rset.define()
@@ -609,6 +609,9 @@ def run_all(databases = [{'host': 'localhost', 'port': 6379, 'password':None}], 
     for start in _start_functions:
         start(main_host)
 
-    main_app = interface.Application(main_host, host_name, port, routing_rules)
+    main_app = interface.Application(main_host, host_name, port, routing_rules, callback)
     main_app.run()
+
+def run_server(callback, databases = [{'host': 'localhost', 'port': 6379, 'password':None}], routing_rules = []):
+    run_all(databases, None, None, routing_rules, callback)
 
