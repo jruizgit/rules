@@ -1840,7 +1840,7 @@ unsigned int bindRuleset(void *handle,
     }
 
     struct timeval tv;
-    tv.tv_sec = 120;
+    tv.tv_sec = 10;
     tv.tv_usec = 0;
     int result = redisSetTimeout(reContext, tv);
     if (result != REDIS_OK) {

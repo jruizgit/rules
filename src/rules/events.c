@@ -1775,7 +1775,12 @@ unsigned int completeAction(void *handle,
         return result;
     }
 
-    result = executeBatch(rulesBinding, commands, commandCount);  
+    result = executeBatch(rulesBinding, commands, commandCount); 
+    if (result != RULES_OK) {
+        //reply object should be freed by the app during abandonAction
+        return result;
+    }
+
     freeReplyObject(reply);
     free(actionHandle);
     return result;
