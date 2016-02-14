@@ -35,7 +35,6 @@ with statechart('fraud0'):
         host.post('fraud0', {'id': 3, 'sid': 1, 'amount': 200})
         
 
-
 with ruleset('fraud1'):
     @when_all(c.first << m.t == 'purchase',
               c.second << m.location != c.first.location)
@@ -355,11 +354,6 @@ with statechart('a6'):
             def continue_process(c):
                 print('a6 processing')
 
-        @to('work')
-        @when_all(m.subject == 'reset')
-        def reset(c):
-            print('a6 resetting')
-
         @to('canceled')
         @when_all(m.subject == 'cancel')
         def cancel(c):
@@ -371,6 +365,7 @@ with statechart('a6'):
         host.post('a6', {'id': 1, 'sid': 1, 'subject': 'enter'})
         host.post('a6', {'id': 2, 'sid': 1, 'subject': 'continue'})
         host.post('a6', {'id': 3, 'sid': 1, 'subject': 'continue'})
+        host.post('a6', {'id': 4, 'sid': 1, 'subject': 'cancel'})
        
 
 with ruleset('a7'):

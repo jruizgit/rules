@@ -528,8 +528,7 @@ class Statechart(Ruleset):
             triggers = {}
             if parent_triggers:
                 for parent_trigger_name, trigger in parent_triggers.iteritems():
-                    trigger_name = parent_trigger_name[parent_trigger_name.rindex('.') + 1:]
-                    triggers['{0}.{1}'.format(qualified_name, trigger_name)] = trigger 
+                    triggers['{0}.{1}'.format(qualified_name, parent_trigger_name)] = trigger 
 
             for trigger_name, trigger in state.iteritems():
                 if trigger_name != '$chart':
@@ -577,20 +576,21 @@ class Statechart(Ruleset):
                         if qualified_name in reflexive_states:
                             from_state = qualified_name
 
+                        to_state = trigger['to']
                         assert_state = False
-                        if trigger['to'] in reflexive_states:
+                        if to_state in reflexive_states:
                             assert_state = True
 
                         if 'run' in rule:
-                            rule['run'].continue_with(To(from_state, trigger['to'], assert_state))
+                            rule['run'].continue_with(To(from_state, to_state, assert_state))
                         else:
-                            rule['run'] = To(from_state, trigger['to'], assert_state)
+                            rule['run'] = To(from_state, to_state, assert_state)
 
-                        if trigger['to'] in start_state: 
-                            del start_state[trigger['to']]
+                        if to_state in start_state: 
+                            del start_state[to_state]
 
-                        if parent_start_state and trigger['to'] in parent_start_state:
-                            del parent_start_state[trigger['to']]
+                        if parent_start_state and to_state in parent_start_state:
+                            del parent_start_state[to_state]
                     else:
                         raise Exception('Trigger {0} destination not defined'.format(trigger_name))
 
@@ -599,7 +599,7 @@ class Statechart(Ruleset):
         started = False 
         for state_name in start_state.keys():
             if started:
-                raise Exception('Chart {0} has more than one start state'.format(self._name))
+                raise Exception('Chart {0} has more than one start state {1}'.format(self._name, state_name))
 
             started = True
             if parent_name:
