@@ -1868,3 +1868,14 @@ unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *ti
 
     return registerTimer(rulesBinding, duration, timer);
 }
+
+unsigned int renewActionLease(void *handle, char *sid) {
+    void *rulesBinding;
+    unsigned int result = resolveBinding(handle, sid, &rulesBinding);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    return updateAction(rulesBinding, sid);
+}
+

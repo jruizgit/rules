@@ -168,6 +168,9 @@ unsigned int getState(void *handle,
                       char *sid, 
                       char **state);
 
+unsigned int renewActionLease(void *handle, 
+                              char *sid);
+
 #ifdef _WIN32
 int asprintf(char** ret, char* format, ...);
 #endif

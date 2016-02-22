@@ -1758,6 +1758,29 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     freeReplyObject(reply);
     free(lua);
 
+    if (asprintf(&lua,
+"local actions_key = \"%s!a\"\n"
+"local score = tonumber(ARGV[2])\n"
+"local sid = ARGV[1]\n"
+"if redis.call(\"zscore\", actions_key, sid) then\n"
+"    redis.call(\"zadd\", actions_key , score, sid)\n"
+"end\n", name)  == -1) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    redisGetReply(reContext, (void**)&reply);
+    if (reply->type == REDIS_REPLY_ERROR) {
+        printf("%s\n", reply->str);
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    }
+
+    strncpy(rulesBinding->updateActionHash, reply->str, 40);
+    rulesBinding->updateActionHash[40] = '\0';
+    freeReplyObject(reply);
+    free(lua);
+
     char *sessionHashset = malloc((nameLength + 3) * sizeof(char));
     if (!sessionHashset) {
         return ERR_OUT_OF_MEMORY;
@@ -2228,7 +2251,7 @@ unsigned int formatPeekAction(void *rulesBinding,
     int result = redisFormatCommand(command, 
                                     "evalsha %s 0 %d %ld %s", 
                                     currentBinding->peekActionHash, 
-                                    300,
+                                    15,
                                     currentTime,
                                     sid); 
     if (result == 0) {
@@ -2419,7 +2442,7 @@ unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply
         int result = redisAppendCommand(reContext, 
                                         "evalsha %s 0 %d %ld", 
                                         currentBinding->peekActionHash, 
-                                        300,
+                                        15,
                                         currentTime); 
         if (result != REDIS_OK) {
             continue;
@@ -2581,4 +2604,32 @@ unsigned int getSession(void *rulesBinding, char *sid, char **state) {
     return REDIS_OK;
 }
 
+unsigned int updateAction(void *rulesBinding, char *sid) {
+    binding *currentBinding = (binding*)rulesBinding;
+    redisContext *reContext = currentBinding->reContext;   
+    time_t currentTime = time(NULL);
 
+    int result = redisAppendCommand(reContext, 
+                                    "evalsha %s 0 %s %ld", 
+                                    currentBinding->updateActionHash,
+                                    sid,
+                                    currentTime + 15); 
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+    
+    redisReply *reply;
+    result = tryGetReply(reContext, &reply);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    if (reply->type == REDIS_REPLY_ERROR) {
+        printf("updateAction err string %s\n", reply->str);
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    }
+
+    freeReplyObject(reply);    
+    return RULES_OK;
+}

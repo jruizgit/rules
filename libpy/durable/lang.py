@@ -192,7 +192,7 @@ class rule(object):
         self.pri = None
         self.span = None
         self.cap = None
-        self.by = None
+        self.max_time = None
         self.func = []
         new_args = []
         for arg in args:
@@ -205,8 +205,8 @@ class rule(object):
                     self.span = arg['span']
                 elif 'cap' in arg:
                     self.cap = arg['cap']
-                elif 'by' in arg:
-                    self.by = arg['by']
+                elif 'max_time' in arg:
+                    self.max_time = arg['max_time']
                 else:
                     self.func = arg
             elif isinstance(arg, value) or isinstance(arg, rule):
@@ -278,8 +278,8 @@ class rule(object):
         if self.cap:
             defined_expression['cap'] = self.cap
 
-        if self.by:
-            defined_expression['by'] = self.by
+        if self.max_time:
+            defined_expression['max_time'] = self.max_time
 
         return defined_expression
 
@@ -587,8 +587,8 @@ def span(value):
 def cap(value):
     return {'cap': value}
 
-def by(value):
-    return {'by': value}
+def max_time(value):
+    return {'max_time': value}
 
 m = value('m')
 s = value('$s')

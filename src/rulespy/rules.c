@@ -836,6 +836,32 @@ static PyObject *pyGetState(PyObject *self, PyObject *args) {
     return returnValue;
 }
 
+static PyObject *pyRenewActionLease(PyObject *self, PyObject *args) {
+    void *handle;
+    char *sid;
+    if (!PyArg_ParseTuple(args, "ls", &handle, &sid)) {
+        PyErr_SetString(RulesError, "pyRenewActionLease Invalid argument");
+        return NULL;
+    }
+
+    unsigned int result = renewActionLease(handle, sid);
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            if (asprintf(&message, "Could not renew action lease, error code: %d", result) == -1) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
+        }
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef myModule_methods[] = {
     {"create_ruleset", pyCreateRuleset, METH_VARARGS},
     {"delete_ruleset", pyDeleteRuleset, METH_VARARGS},
@@ -864,6 +890,7 @@ static PyMethodDef myModule_methods[] = {
     {"queue_event", pyQueueEvent, METH_VARARGS},
     {"assert_timers", pyAssertTimers, METH_VARARGS},
     {"get_state", pyGetState, METH_VARARGS},
+    {"renew_action_lease", pyRenewActionLease, METH_VARARGS},
     {NULL, NULL}
 };
 

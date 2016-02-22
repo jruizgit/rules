@@ -3,6 +3,7 @@ import datetime
 import random
 import sys
 import threading
+import time
 
 
 with statechart('fraud0'):
@@ -480,6 +481,29 @@ with ruleset('t1'):
     def start(host):
         host.post('t1', {'id': 1, 'sid': 1, 'start': 'yes'})
 
+
+with ruleset('t2'): 
+    @when_all(m.start == 'yes', max_time(10))
+    def first_time(c):
+        print('first_time started')
+        c.post({'id': 2, 'end': 'yes'})
+        time.sleep(7)
+
+    @when_all(m.end == 'yes')
+    def second_time(c):
+        print('second_time started')
+        time.sleep(7)
+
+    @when_all(+s.exception)
+    def timeout(c):
+        print('expected exception: {0}'.format(c.s.exception))
+        c.s.exception = None
+
+    @when_start
+    def start(host):
+        host.post('t2', {'id': 1, 'sid': 1, 'start': 'yes'})
+
+
 with ruleset('q0'): 
     @when_all(m.start == 'yes')
     def start_queue(c):
@@ -493,5 +517,7 @@ with ruleset('q0'):
     @when_start
     def start(host):
         host.post('q0', {'id': 1, 'sid': 1, 'start': 'yes'})
+
+
 
 run_all()

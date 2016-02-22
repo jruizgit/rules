@@ -22,6 +22,7 @@ class Closure(object):
         self._branch_directory = {}
         self._fact_directory = {}
         self._retract_directory = {}
+        self._completed = False
         if isinstance(message, dict): 
             self._m = message
         else:
@@ -125,6 +126,14 @@ class Closure(object):
 
         retract_list.append(fact)
 
+    def renew_action_lease(self):
+        self.host.renew_action_lease(self.ruleset_name, self.s['sid']) 
+
+    def _has_completed(self):
+        value = self._completed
+        self._completed = True
+        return value
+
     def __getattr__(self, name):   
         if name in self._m:
             return Content(self._m[name])
@@ -147,7 +156,9 @@ class Content(object):
             return None
 
     def __setitem__(self, key, value):
-        if isinstance(value, Content):
+        if value == None:
+            del self._d[key]
+        elif isinstance(value, Content):
             self._d[key] = value._d
         else:    
             self._d[key] = value
@@ -176,10 +187,12 @@ class Content(object):
 
 class Promise(object):
 
-    def __init__(self, func):
+    def __init__(self, func, timeout = 5):
         self._func = func
         self._next = None
         self._sync = True
+        self._timer = None
+        self._timeout = timeout
         self.root = self
 
         arg_count = func.__code__.co_argcount
@@ -203,16 +216,32 @@ class Promise(object):
         return self._next
 
     def run(self, c, complete):
+        def timeout(time_left):
+            time_left -= 5
+            if time_left <= 0:
+                c.s.exception = 'timeout expired'
+                complete(None)
+            else:
+                c.renew_action_lease()
+                self._timer = threading.Timer(5, timeout, (time_left, ))
+                self._timer.daemon = True
+                self._timer.start()
+        
         if self._sync:
+            self._timer = threading.Timer(5, timeout, (self._timeout, ))
+            self._timer.daemon = True
+            self._timer.start()
             try:
-                self._func(c)
+                self._func(c) 
             except BaseException as error:
                 c.s.exception = 'exception caught {0}'.format(str(error))
                 complete(None)
             except:
                 c.s.exception = 'unknown exception'
                 complete(None)
-                
+            finally:
+                self._timer.cancel()
+               
             if self._next:
                 self._next.run(c, complete)
             else:
@@ -220,6 +249,7 @@ class Promise(object):
         else:
             try:
                 def callback(e):
+                    self._timer.cancel()
                     if e:
                         c.s.exception = str(e) 
                          
@@ -228,7 +258,13 @@ class Promise(object):
                     else: 
                         complete(None)
 
-                self._func(c, callback)
+                time_left = self._func(c, callback)
+                if time_left == None:
+                    time_left = self._timeout
+
+                self._timer = threading.Timer(5, timeout, (time_left, ))
+                self._timer.daemon = True
+                self._timer.start()
             except BaseException as error:
                 c.s.exception = 'exception caught {0}'.format(str(error))
                 complete(None)
@@ -267,14 +303,19 @@ class Ruleset(object):
         self._name = name
         self._host = host
         for rule_name, rule in ruleset_definition.iteritems():
+            timeout = 5
+            if 'max_time' in rule:
+                timeout = rule['max_time']
+                del rule['max_time']
+
             action = rule['run']
             del rule['run']
             if isinstance(action, basestring):
-                self._actions[rule_name] = Promise(host.get_action(action))
+                self._actions[rule_name] = Promise(host.get_action(action), timeout)
             elif isinstance(action, Promise):
                 self._actions[rule_name] = action.root
             elif (hasattr(action, '__call__')):
-                self._actions[rule_name] = Promise(action)
+                self._actions[rule_name] = Promise(action, timeout)
 
         self._handle = rules.create_ruleset(state_cache_size, name, json.dumps(ruleset_definition))
         self._definition = ruleset_definition
@@ -335,6 +376,9 @@ class Ruleset(object):
     def get_state(self, sid):
         return json.loads(rules.get_state(self._handle, sid))
     
+    def renew_action_lease(self, sid):
+        rules.renew_action_lease(self._handle, str(sid))
+
     def get_definition(self):
         return self._definition
 
@@ -409,6 +453,9 @@ class Ruleset(object):
             c = Closure(self._host, state, message, action_handle, self._name)
             
             def action_callback(e):
+                if c._has_completed():
+                    return
+
                 if e:
                     rules.abandon_action(self._handle, c._handle)
                     complete(e)
@@ -555,6 +602,9 @@ class Statechart(Ruleset):
                     if 'cap' in trigger:
                         rule['cap'] = trigger['cap']
 
+                    if 'max_time' in trigger:
+                        rule['max_time'] = trigger['max_time']
+
                     if 'all' in trigger:
                         rule['all'] = list(trigger['all'])
                         rule['all'].append(state_test)
@@ -681,6 +731,9 @@ class Flowchart(Ruleset):
 
                         if 'cap' in transition:
                             rule['cap'] = transition['cap']
+
+                        if 'max_time' in transition:
+                            rule['max_time'] = transition['max_time']
 
                         if 'all' in transition:
                             rule['all'] = list(transition['all'])
@@ -810,6 +863,9 @@ class Host(object):
 
     def patch_ruleset_state(self, ruleset_name, state):
         self.get_ruleset(ruleset_name).set_ruleset_state(state)
+
+    def renew_action_lease(self, ruleset_name, sid):
+        self.get_ruleset(ruleset_name).renew_action_lease(sid)
 
     def register_rulesets(self, parent_name, ruleset_definitions):
         rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions, self._state_cache_size)

@@ -37,7 +37,7 @@ with open(path.join(here, 'README.txt'), encoding='utf-8') as f:
 
 setup (
     name = 'durable_rules',
-    version = '0.33.59',
+    version = '0.33.60',
     description = 'for real time analytics (a Python Rules Engine)',
     long_description=long_description,
     url='https://github.com/jruizgit/rules',
