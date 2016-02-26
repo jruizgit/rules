@@ -62,7 +62,7 @@ end
 Durable.run_all
 ```  
 
-7. In the terminal type `python test.py`  
+7. In the terminal type `ruby test.rb`  
 8. You should see the message: `Hello World`  
 
 Note: If you are using [Redis To Go](https://redistogo.com), replace the last line.
