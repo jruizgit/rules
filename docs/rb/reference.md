@@ -45,7 +45,7 @@ Now that your cache ready, let's write a simple rule:
 
 1. Start a terminal  
 2. Create a directory for your app: `mkdir firstapp` `cd firstapp`  
-3. In the new directory `sudo gem install durable_rules` (this will download durable_rules and its dependencies)  
+3. In the new directory `gem install durable_rules` (this will download durable_rules and its dependencies)  
 4. In that same directory create a test.rb file using your favorite editor  
 5. Copy/Paste and save the following code:  
 
