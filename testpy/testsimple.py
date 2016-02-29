@@ -455,7 +455,7 @@ with ruleset('t0'):
     def start_timer(c):
         c.s.count += 1
         c.post('t0', {'id': c.s.count, 'sid': 1, 't': 'purchase'})
-        c.start_timer('my_timer', random.randint(1, 3))
+        c.start_timer('my_timer', random.randint(1, 3), 't_{0}'.format(c.s.count))
 
     @when_all(span(5), m.t == 'purchase')
     def pulse(c):
@@ -470,12 +470,19 @@ with ruleset('t1'):
     @when_all(m.start == 'yes')
     def start_timer(c):
         c.s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
-        c.start_timer('my_timer', 5)
+        c.start_timer('my_first_timer', 3)
+        c.start_timer('my_second_timer', 6)
 
-    @when_all(timeout('my_timer'))
-    def end_timer(c):
+    @when_all(timeout('my_first_timer'))
+    def end_first_timer(c):
         print('t1 started @%s' % c.s.start)
-        print('t1 ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
+        print('t1 first_timer ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
+        c.cancel_timer('my_second_timer')
+
+    @when_all(timeout('my_second_timer'))
+    def end_first_timer(c):
+        print('t1 started @%s' % c.s.start)
+        print('t1 second_timer ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
 
     @when_start
     def start(host):
@@ -483,21 +490,18 @@ with ruleset('t1'):
 
 
 with ruleset('t2'): 
-    @when_all(m.start == 'yes', max_time(10))
+    @when_all(m.start == 'yes')
     def first_time(c):
-        print('first_time started')
-        c.post({'id': 2, 'end': 'yes'})
+        print('first time started')
         time.sleep(7)
+        print('renewing lease')
+        c.renew_action_lease()
+        time.sleep(7)
+        c.post({'id': 2, 'end': 'yes'})
 
     @when_all(m.end == 'yes')
     def second_time(c):
-        print('second_time started')
-        time.sleep(7)
-
-    @when_all(+s.exception)
-    def timeout(c):
-        print('expected exception: {0}'.format(c.s.exception))
-        c.s.exception = None
+        print('second time completed')
 
     @when_start
     def start(host):

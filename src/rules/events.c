@@ -1869,6 +1869,16 @@ unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *ti
     return registerTimer(rulesBinding, duration, timer);
 }
 
+unsigned int cancelTimer(void *handle, char *sid, char *timer) {
+    void *rulesBinding;
+    unsigned int result = resolveBinding(handle, sid, &rulesBinding);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    return removeTimer(rulesBinding, timer);
+}
+
 unsigned int renewActionLease(void *handle, char *sid) {
     void *rulesBinding;
     unsigned int result = resolveBinding(handle, sid, &rulesBinding);

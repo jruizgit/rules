@@ -5,6 +5,7 @@ import threading
 import inspect
 import random
 import time
+import datetime
 import os
 import sys
 import traceback
@@ -17,12 +18,14 @@ class Closure(object):
         self.s = Content(state)
         self._handle = handle
         self._timer_directory = {}
+        self._cancelled_timer_directory = {}
         self._message_directory = {}
         self._queued_message_directory = {}
         self._branch_directory = {}
         self._fact_directory = {}
         self._retract_directory = {}
         self._completed = False
+        self._start_time = self._unix_now()
         if isinstance(message, dict): 
             self._m = message
         else:
@@ -33,8 +36,17 @@ class Closure(object):
 
                 self.m.append(Content(one_message))
 
+    def _unix_now(self):
+        dt = datetime.datetime.now()
+        epoch = datetime.datetime.utcfromtimestamp(0)
+        delta = dt - epoch
+        return delta.total_seconds()
+
     def get_timers(self):
         return self._timer_directory
+
+    def get_cancelled_timers(self):
+        return self._cancelled_timer_directory
 
     def get_branches(self):
         return self._branch_directory
@@ -82,11 +94,25 @@ class Closure(object):
 
         message_list.append(message)
 
-    def start_timer(self, timer_name, duration):
-        if timer_name in self._timer_directory:
-            raise Exception('Timer with name {0} already added'.format(timer_name))
+    def start_timer(self, timer_name, duration, timer_id = None):
+        if not timer_id:
+            timer_id = timer_name
+
+        if timer_id in self._timer_directory:
+            raise Exception('Timer with id {0} already added'.format(timer_id))
         else:
-            self._timer_directory[timer_name] = duration
+            timer = {'sid':self.s['sid'], 'id': timer_id, '$t': timer_name}
+            self._timer_directory[timer_id] = (timer, duration)
+
+    def cancel_timer(self, timer_name, timer_id = None):
+        if not timer_id:
+            timer_id = timer_name
+
+        if timer_id in self._cancelled_timer_directory:
+            raise Exception('Timer with id {0} already cancelled'.format(timer_id))
+        else:
+            timer = {'sid':self.s['sid'], 'id': timer_id, '$t': timer_name}
+            self._cancelled_timer_directory[timer_id] = timer
 
     def assert_fact(self, ruleset_name, fact = None):
         if not fact: 
@@ -127,9 +153,14 @@ class Closure(object):
         retract_list.append(fact)
 
     def renew_action_lease(self):
-        self.host.renew_action_lease(self.ruleset_name, self.s['sid']) 
+        if self._unix_now() - self._start_time < 10:
+            self._start_time = self._unix_now()
+            self.host.renew_action_lease(self.ruleset_name, self.s['sid']) 
 
     def _has_completed(self):
+        if self._unix_now() - self._start_time > 10:
+            self._completed = True
+
         value = self._completed
         self._completed = True
         return value
@@ -187,12 +218,10 @@ class Content(object):
 
 class Promise(object):
 
-    def __init__(self, func, timeout = 5):
+    def __init__(self, func):
         self._func = func
         self._next = None
         self._sync = True
-        self._timer = None
-        self._timeout = timeout
         self.root = self
 
         arg_count = func.__code__.co_argcount
@@ -216,21 +245,7 @@ class Promise(object):
         return self._next
 
     def run(self, c, complete):
-        def timeout(time_left):
-            time_left -= 5
-            if time_left <= 0:
-                c.s.exception = 'timeout expired'
-                complete(None)
-            else:
-                c.renew_action_lease()
-                self._timer = threading.Timer(5, timeout, (time_left, ))
-                self._timer.daemon = True
-                self._timer.start()
-        
         if self._sync:
-            self._timer = threading.Timer(5, timeout, (self._timeout, ))
-            self._timer.daemon = True
-            self._timer.start()
             try:
                 self._func(c) 
             except BaseException as error:
@@ -239,8 +254,6 @@ class Promise(object):
             except:
                 c.s.exception = 'unknown exception'
                 complete(None)
-            finally:
-                self._timer.cancel()
                
             if self._next:
                 self._next.run(c, complete)
@@ -249,7 +262,6 @@ class Promise(object):
         else:
             try:
                 def callback(e):
-                    self._timer.cancel()
                     if e:
                         c.s.exception = str(e) 
                          
@@ -258,13 +270,7 @@ class Promise(object):
                     else: 
                         complete(None)
 
-                time_left = self._func(c, callback)
-                if time_left == None:
-                    time_left = self._timeout
-
-                self._timer = threading.Timer(5, timeout, (time_left, ))
-                self._timer.daemon = True
-                self._timer.start()
+                self._func(c, callback)
             except BaseException as error:
                 c.s.exception = 'exception caught {0}'.format(str(error))
                 complete(None)
@@ -303,19 +309,14 @@ class Ruleset(object):
         self._name = name
         self._host = host
         for rule_name, rule in ruleset_definition.iteritems():
-            timeout = 5
-            if 'max_time' in rule:
-                timeout = rule['max_time']
-                del rule['max_time']
-
             action = rule['run']
             del rule['run']
             if isinstance(action, basestring):
-                self._actions[rule_name] = Promise(host.get_action(action), timeout)
+                self._actions[rule_name] = Promise(host.get_action(action))
             elif isinstance(action, Promise):
                 self._actions[rule_name] = action.root
             elif (hasattr(action, '__call__')):
-                self._actions[rule_name] = Promise(action, timeout)
+                self._actions[rule_name] = Promise(action)
 
         self._handle = rules.create_ruleset(state_cache_size, name, json.dumps(ruleset_definition))
         self._definition = ruleset_definition
@@ -363,9 +364,11 @@ class Ruleset(object):
     def start_retract_facts(self, facts):
         return rules.start_retract_facts(self._handle, json.dumps(facts))
 
-    def start_timer(self, sid, timer_name, timer_duration):
-        timer = {'sid':sid, 'id':random.randint(1, 1000000000), '$t':timer_name}
+    def start_timer(self, sid, timer, timer_duration):
         rules.start_timer(self._handle, str(sid), timer_duration, json.dumps(timer))
+
+    def cancel_timer(self, sid, timer):
+        rules.cancel_timer(self._handle, str(sid), json.dumps(timer))
 
     def queue_event(self, sid, ruleset_name, message):
         rules.queue_event(self._handle, str(sid), ruleset_name, json.dumps(message))
@@ -461,8 +464,11 @@ class Ruleset(object):
                     complete(e)
                 else:
                     try:
-                        for timer_name, timer_duration in c.get_timers().iteritems():
-                            self.start_timer(c.s['sid'], timer_name, timer_duration)
+                        for timer_id, timer in c.get_cancelled_timers().iteritems():
+                            self.cancel_timer(c.s['sid'], timer)
+
+                        for timer_id, timer_duration in c.get_timers().iteritems():
+                            self.start_timer(c.s['sid'], timer_duration[0], timer_duration[1])
 
                         for ruleset_name, messages in c.get_queued_messages().iteritems():
                             for message in messages:
@@ -602,9 +608,6 @@ class Statechart(Ruleset):
                     if 'cap' in trigger:
                         rule['cap'] = trigger['cap']
 
-                    if 'max_time' in trigger:
-                        rule['max_time'] = trigger['max_time']
-
                     if 'all' in trigger:
                         rule['all'] = list(trigger['all'])
                         rule['all'].append(state_test)
@@ -731,9 +734,6 @@ class Flowchart(Ruleset):
 
                         if 'cap' in transition:
                             rule['cap'] = transition['cap']
-
-                        if 'max_time' in transition:
-                            rule['max_time'] = transition['max_time']
 
                         if 'all' in transition:
                             rule['all'] = list(transition['all'])

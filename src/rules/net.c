@@ -2538,6 +2538,34 @@ unsigned int registerTimer(void *rulesBinding, unsigned int duration, char *time
     return RULES_OK;
 }
 
+unsigned int removeTimer(void *rulesBinding, char *timer) {
+    binding *currentBinding = (binding*)rulesBinding;
+    redisContext *reContext = currentBinding->reContext;   
+    
+    int result = redisAppendCommand(reContext, 
+                                    "zrem %s %s", 
+                                    currentBinding->timersSortedset,
+                                    timer);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+    
+    redisReply *reply;
+    result = tryGetReply(reContext, &reply);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    if (reply->type == REDIS_REPLY_ERROR) {
+        printf("deleteTimer err string %s\n", reply->str);
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    }
+
+    freeReplyObject(reply);    
+    return RULES_OK;
+}
+
 unsigned int registerMessage(void *rulesBinding, char *destination, char *message) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;   

@@ -750,6 +750,34 @@ static PyObject *pyStartTimer(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+static PyObject *pyCancelTimer(PyObject *self, PyObject *args) {
+    void *handle;
+    char *sid;
+    char *timer = NULL;
+    if (!PyArg_ParseTuple(args, "lss", &handle, &sid, &timer)) {
+        PyErr_SetString(RulesError, "pyCancelTimer Invalid argument");
+        return NULL;
+    }
+
+    unsigned int result = cancelTimer(handle, sid, timer);
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            if (asprintf(&message, "Could not cancel timer, error code: %d", result) == -1) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
+        }
+        return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
+
 static PyObject *pyQueueEvent(PyObject *self, PyObject *args) {
     void *handle;
     char *sid = NULL;
@@ -887,6 +915,7 @@ static PyMethodDef myModule_methods[] = {
     {"complete_and_start_action", pyCompleteAndStartAction, METH_VARARGS},
     {"abandon_action", pyAbandonAction, METH_VARARGS},
     {"start_timer", pyStartTimer, METH_VARARGS},
+    {"cancel_timer", pyCancelTimer, METH_VARARGS},
     {"queue_event", pyQueueEvent, METH_VARARGS},
     {"assert_timers", pyAssertTimers, METH_VARARGS},
     {"get_state", pyGetState, METH_VARARGS},

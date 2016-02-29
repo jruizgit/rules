@@ -157,6 +157,10 @@ unsigned int startTimer(void *handle,
                         unsigned int duration, 
                         char *timer);
 
+unsigned int cancelTimer(void *handle, 
+                         char *sid, 
+                         char *timer);
+
 unsigned int queueMessage(void *handle, 
                           char *sid, 
                           char *destination, 
