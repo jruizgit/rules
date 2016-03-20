@@ -10,6 +10,13 @@ import os
 import sys
 import traceback
 
+def _unix_now():
+    dt = datetime.datetime.now()
+    epoch = datetime.datetime.utcfromtimestamp(0)
+    delta = dt - epoch
+    return delta.total_seconds()
+
+
 class Closure(object):
 
     def __init__(self, host, state, message, handle, ruleset_name):
@@ -25,7 +32,7 @@ class Closure(object):
         self._fact_directory = {}
         self._retract_directory = {}
         self._completed = False
-        self._start_time = self._unix_now()
+        self._start_time = _unix_now()
         if isinstance(message, dict): 
             self._m = message
         else:
@@ -35,12 +42,6 @@ class Closure(object):
                     one_message = one_message['m']
 
                 self.m.append(Content(one_message))
-
-    def _unix_now(self):
-        dt = datetime.datetime.now()
-        epoch = datetime.datetime.utcfromtimestamp(0)
-        delta = dt - epoch
-        return delta.total_seconds()
 
     def get_timers(self):
         return self._timer_directory
@@ -153,12 +154,12 @@ class Closure(object):
         retract_list.append(fact)
 
     def renew_action_lease(self):
-        if self._unix_now() - self._start_time < 10:
-            self._start_time = self._unix_now()
+        if _unix_now() - self._start_time < 10:
+            self._start_time = _unix_now()
             self.host.renew_action_lease(self.ruleset_name, self.s['sid']) 
 
     def _has_completed(self):
-        if self._unix_now() - self._start_time > 10:
+        if _unix_now() - self._start_time > 10:
             self._completed = True
 
         value = self._completed
@@ -222,6 +223,7 @@ class Promise(object):
         self._func = func
         self._next = None
         self._sync = True
+        self._timer = None
         self.root = self
 
         arg_count = func.__code__.co_argcount
@@ -245,6 +247,16 @@ class Promise(object):
         return self._next
 
     def run(self, c, complete):
+        def timeout(max_time):
+            if _unix_now() > max_time:
+                c.s.exception = 'timeout expired'
+                complete(None)
+            else:
+                c.renew_action_lease()
+                self._timer = threading.Timer(5, timeout, (max_time, ))
+                self._timer.daemon = True
+                self._timer.start()
+
         if self._sync:
             try:
                 self._func(c) 
@@ -262,6 +274,10 @@ class Promise(object):
         else:
             try:
                 def callback(e):
+                    if self._timer:
+                        self._timer.cancel()
+                        self._timer = None
+
                     if e:
                         c.s.exception = str(e) 
                          
@@ -270,7 +286,11 @@ class Promise(object):
                     else: 
                         complete(None)
 
-                self._func(c, callback)
+                time_left = self._func(c, callback)     
+                if time_left:
+                    self._timer = threading.Timer(5, timeout, (_unix_now() + time_left, ))      
+                    self._timer.daemon = True     
+                    self._timer.start()
             except BaseException as error:
                 c.s.exception = 'exception caught {0}'.format(str(error))
                 complete(None)

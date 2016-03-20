@@ -1553,7 +1553,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "    new_sid, action_name, frame = load_frame(tonumber(ARGV[2]))\n"
 "end\n"
 "if frame then\n"
-"    local new_score = redis.call(\"zincrby\", action_key, tonumber(ARGV[1]), new_sid)\n"
+"    redis.call(\"zadd\", action_key, tonumber(ARGV[1]), new_sid)\n"
 "    if #ARGV == 2 then\n"
 "        local state = redis.call(\"hget\", state_key, new_sid)\n"
 "        return {new_sid, state, cjson.encode({[action_name] = frame})}\n"
@@ -2251,7 +2251,7 @@ unsigned int formatPeekAction(void *rulesBinding,
     int result = redisFormatCommand(command, 
                                     "evalsha %s 0 %d %ld %s", 
                                     currentBinding->peekActionHash, 
-                                    15,
+                                    currentTime + 15,
                                     currentTime,
                                     sid); 
     if (result == 0) {
@@ -2442,7 +2442,7 @@ unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply
         int result = redisAppendCommand(reContext, 
                                         "evalsha %s 0 %d %ld", 
                                         currentBinding->peekActionHash, 
-                                        15,
+                                        currentTime + 15,
                                         currentTime); 
         if (result != REDIS_OK) {
             continue;

@@ -163,10 +163,10 @@ with statechart('fraud8'):
         @when_all(m.amount > 100)
         def start_first(c, complete):
             def execute_scripts():
-                print('execute 1')
+                print('fraud8 execute 1')
                 complete(None)
                
-            print('start async 1') 
+            print('fraud8 start async 1') 
             t = threading.Timer(1, execute_scripts)
             t.start()
 
@@ -174,10 +174,10 @@ with statechart('fraud8'):
         @to('fraud')
         def start_second(c, complete):
             def execute_scripts():
-                print('execute 2')
+                print('fraud8 execute 2')
                 complete(None)
                
-            print('start async 2') 
+            print('fraud8 start async 2') 
             t = threading.Timer(1, execute_scripts)
             t.start()
 
@@ -492,7 +492,7 @@ with ruleset('t1'):
 with ruleset('t2'): 
     @when_all(m.start == 'yes')
     def first_time(c):
-        print('first time started')
+        print('t2 first started')
         time.sleep(7)
         print('renewing lease')
         c.renew_action_lease()
@@ -501,11 +501,49 @@ with ruleset('t2'):
 
     @when_all(m.end == 'yes')
     def second_time(c):
-        print('second time completed')
+        print('t2 second completed')
 
     @when_start
     def start(host):
         host.post('t2', {'id': 1, 'sid': 1, 'start': 'yes'})
+
+
+t3 = None
+with ruleset('t3'):
+    @when_all(m.start == 'yes')
+    def first_time3(c, complete):
+        def first_timeout3():
+            print('t3 first completed')
+            c.post({'id': 2, 'end': 'yes'})
+            complete(None)
+
+        print('t3 first started {0}'.format(c.m.id))
+        t3 = threading.Timer(5, first_timeout3)
+        t3.daemon = True      
+        t3.start()
+        return 10
+        
+    @when_all(m.end == 'yes')
+    def second_time3(c, complete):
+        def second_timeout3():
+            print('t3 second completed')
+            c.post({'id': 3, 'end': 'yes'})
+            complete(None)
+
+        print('t3 second started')
+        t3 = threading.Timer(7, second_timeout3) 
+        t3.daemon = True     
+        t3.start()
+        return 5
+        
+    @when_all(+s.exception)
+    def timeout(c):
+        print('t3 expected exception: {0}'.format(c.s.exception))
+        c.s.exception = None
+
+    @when_start
+    def start(host):
+        host.post('t3', {'id': 1, 'sid': 1, 'start': 'yes'})
 
 
 with ruleset('q0'): 
@@ -521,7 +559,6 @@ with ruleset('q0'):
     @when_start
     def start(host):
         host.post('q0', {'id': 1, 'sid': 1, 'start': 'yes'})
-
 
 
 run_all()
