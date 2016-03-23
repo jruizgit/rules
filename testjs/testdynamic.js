@@ -1,10 +1,10 @@
 var stat = require('node-static');
 var redis = require('redis');
-var d = require('../libjs/durable');
+var d = require('../libjs/durableEngine');
 
 var host = d.host();
 var app = d.application(host);
-var db = redis.createClient('/tmp/redis.sock');
+var db = redis.createClient();
 var fileServer = new stat.Server(__dirname);
 
 function printAction(actionName) {
