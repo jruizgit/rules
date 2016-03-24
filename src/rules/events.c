@@ -793,7 +793,7 @@ static unsigned int isMatch(ruleset *tree,
             *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.i, alphaOp);
             break;
         case OP_DOUBLE_DOUBLE: 
-            *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.d, alphaOp);
+            *propertyMatch = compareDouble(currentProperty->value.d, rightProperty->value.d, alphaOp);
             break;
         case OP_DOUBLE_STRING:
             {
@@ -869,7 +869,6 @@ static unsigned int isMatch(ruleset *tree,
     if (releaseRightState) {
         free(rightState);
     }
-    
     return result;
 }
 
