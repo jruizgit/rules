@@ -26,7 +26,7 @@ handle = rules.create_ruleset(5, 'books1',  json.dumps({
     }
 }))
 
-rules.bind_ruleset(handle, None , 0 , '/tmp/redis0.sock')
+rules.bind_ruleset(None , 0 , '/tmp/redis0.sock', handle)
 
 rules.assert_event(handle, json.dumps({
     'id': 1,
@@ -84,7 +84,7 @@ handle = rules.create_ruleset(5, 'books2',  json.dumps({
     }
 }))
 
-rules.bind_ruleset(handle, None , 0 , '/tmp/redis0.sock')
+rules.bind_ruleset(None , 0 , '/tmp/redis0.sock', handle)
 
 rules.assert_event(handle, json.dumps({
     'id': 1,
@@ -116,7 +116,7 @@ handle = rules.create_ruleset(5, 'books3',  json.dumps({
    }
 }))
 
-rules.bind_ruleset(handle, None , 0 , '/tmp/redis0.sock')
+rules.bind_ruleset(None , 0 , '/tmp/redis0.sock', handle)
 
 rules.assert_event(handle, json.dumps({
     'id': 1,
@@ -147,7 +147,7 @@ handle = rules.create_ruleset(5, 'books4', json.dumps({
     }
 }))
 
-rules.bind_ruleset(handle, None , 0 , '/tmp/redis0.sock')
+rules.bind_ruleset(None , 0 , '/tmp/redis0.sock', handle)
 
 rules.assert_events(handle, json.dumps([
     {'id': '0', 'sid': 1, 'subject': 'approve', 'amount': 100}, 
@@ -182,7 +182,7 @@ handle = rules.create_ruleset(5, 'approval1',  json.dumps({
     }
 }))
 
-rules.bind_ruleset(handle, None , 0 , '/tmp/redis0.sock')
+rules.bind_ruleset(None , 0 , '/tmp/redis0.sock', handle)
 
 rules.assert_event(handle, json.dumps({
     'id': 3,
@@ -221,7 +221,7 @@ handle = rules.create_ruleset(5, 'approval2',  json.dumps({
     }
 }))
 
-rules.bind_ruleset(handle, None , 0 , '/tmp/redis0.sock')
+rules.bind_ruleset(None , 0 , '/tmp/redis0.sock', handle)
 
 rules.assert_event(handle, json.dumps({
     'id': 5,
@@ -261,5 +261,66 @@ print(repr(json.loads(result[1])))
 
 rules.delete_ruleset(handle)
 
+handle = rules.create_ruleset(5, 'poc',  json.dumps({
+    'test': {
+        'all': [{'m': {'$lt': {'value': 0.2}}}]
+   }
+}))
+rules.bind_ruleset(None , 0 , '/tmp/redis0.sock', handle)
 
+rules.assert_events(handle, json.dumps([{
+    'id': 1,
+    'sid': 'sid',
+    'value': 0.3,
+    'is_anomaly': 0,
+    'timestamp':1
+}, 
+{
+    'id': 2,
+    'sid': 'sid',
+    'value': 0.1,
+    'is_anomaly': 0,
+    'timestamp': 2
+},
+{
+    'id': 3,
+    'sid': 'sid',
+    'value': 0.09,
+    'is_anomaly': 0,
+    'timestamp':3
+},
+{
+    'id': 4,
+    'sid': 'sid',
+    'value': 0.16,
+    'is_anomaly': 0,
+    'timestamp': 4
+}
+]))
+
+result = rules.start_action(handle)
+
+if result:
+    print(repr(json.loads(result[0])))
+    print(repr(json.loads(result[1])))
+
+rules.complete_action(handle, result[2], result[0])
+
+result = rules.start_action(handle)
+
+if result:
+    print(repr(json.loads(result[0])))
+    print(repr(json.loads(result[1])))
+
+rules.complete_action(handle, result[2], result[0])
+
+result = rules.start_action(handle)
+
+if result:
+    print(repr(json.loads(result[0])))
+    print(repr(json.loads(result[1])))
+
+rules.complete_action(handle, result[2], result[0])
+
+rules.delete_ruleset(handle)
 

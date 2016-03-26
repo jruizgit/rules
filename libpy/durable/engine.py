@@ -561,6 +561,9 @@ class Ruleset(object):
                         print('unknown exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                         rules.abandon_action(self._handle, c._handle)
                         complete('unknown error')
+            
+            if 'async' in result_container:
+                del result_container['async']
                 
             self._actions[action_name].run(c, action_callback) 
             result_container['async'] = True 
