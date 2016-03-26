@@ -8,6 +8,7 @@
       },
       'sources': [
         './hiredis/hiredis.c',
+        './hiredis/read.c',
         './hiredis/net.c',
         './hiredis/sds.c',
         './hiredis/async.c',
