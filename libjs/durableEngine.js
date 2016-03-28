@@ -8,10 +8,15 @@ exports = module.exports = durableEngine = function () {
         var that = {};
         var targetRulesets = {};
         var eventsDirectory = {};
+        var queuedEventsDirectory = {};
         var factsDirectory = {};
         var retractDirectory = {};
         var timerDirectory = {};
+        var cancelledTimerDirectory = {};
         var branchDirectory = {};
+        var startTime = new Date().getTime();
+        var completed = false;
+
         that.s = document;
         
         if (output.constructor === Array) {
@@ -34,10 +39,6 @@ exports = module.exports = durableEngine = function () {
             return host;
         };
 
-        that.getOutput = function () {
-            return output;
-        };
-
         that.getTargetRulesets = function () {
             var rulesetNames = [];
             for (var rulesetName in targetRulesets) {
@@ -50,6 +51,10 @@ exports = module.exports = durableEngine = function () {
             return eventsDirectory;
         };
 
+        that.getQueuedEvents = function () {
+            return queuedEventsDirectory;
+        };
+
         that.getFacts = function () {
             return factsDirectory;
         };
@@ -60,6 +65,10 @@ exports = module.exports = durableEngine = function () {
 
         that.getTimers = function () {
             return timerDirectory;
+        };
+
+        that.getCancelledTimers = function () {
+            return cancelledTimerDirectory;
         };
 
         that.post = function (rules, message) {
@@ -81,6 +90,19 @@ exports = module.exports = durableEngine = function () {
                 eventsList = [];
                 targetRulesets[rules] = true;
                 eventsDirectory[rules] = eventsList;
+            }
+
+            eventsList.push(message);
+        };
+
+        that.queue = function (rules, message) {
+            message = copy(message);
+            var eventsList;
+            if (queuedEventsDirectory[rules]) {
+                eventsList = queuedEventsDirectory[rules];
+            } else {
+                eventsList = [];
+                queuedEventsDirectory[rules] = eventsList;
             }
 
             eventsList.push(message);
@@ -132,14 +154,49 @@ exports = module.exports = durableEngine = function () {
             retractList.push(fact);
         };
 
-        that.startTimer = function (name, duration) {
-            if (timerDirectory[name]) {
-                throw 'timer with name ' + name + ' already added';
+        that.startTimer = function (name, duration, id) {
+            if (!id) {
+                id = name;
+            }
+
+            if (timerDirectory[id]) {
+                throw 'timer with id ' + id + ' already added';
             } else {
-                timerDirectory[name] = duration;
-                targetRulesets[rulesetName] = true;
+                timerDirectory[id] = [{sid: that.s.sid, id: id, $t: name}, duration];
+                
             }
         };
+
+        that.cancelTimer = function (name, duration, id) {
+            if (!id) {
+                id = name;
+            }
+
+            if (cancelledTimerDirectory[id]) {
+                throw 'timer with id ' + id + ' already cancelled';
+            } else {
+                cancelledTimerDirectory[id] = {sid: that.s.sid, id: id, $t: name};
+            }
+        };
+
+        that.renewActionLease = function() {
+            if ((new Date().getTime() - startTime) < 10000) {
+                startTime = new Date().getTime();
+                host.renewActionLease(rulesetName, that.s.sid);
+            }
+        };
+
+        that.hasCompleted = function () {
+            if ((new Date().getTime() - startTime) > 10000) {
+                completed = true;
+            }
+
+            return completed;
+        };
+
+        that.complete = function () {
+            completed = true;
+        }
 
         return that;
     };
@@ -181,14 +238,23 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.run = function (c, complete) {
+            var timeoutCallback = function(maxTime) {
+                if (new Date().getTime() > maxTime) {
+                    c.s.exception = 'timeout expired';
+                    complete(null, c)
+                } else if (!c.hasCompleted()) {
+                    c.renewActionLease();
+                    setTimeout(timeoutCallback, 5000, maxTime);
+                }
+            }
+
             // complete should never throw
             if (sync) {
                 try {
                     func(c);
                 } catch (reason) {
-                    var err = new Error();
-                    console.log(err.stack);
-                    c.s.exception = reason;
+                    console.log(reason.stack);
+                    c.s.exception = String(reason);
                 }
 
                 if (next) {
@@ -198,7 +264,7 @@ exports = module.exports = durableEngine = function () {
                 }
             } else {
                 try {
-                    func(c, function (err) {
+                    var timeLeft = func(c, function (err) {
                         if (err) {
                             c.s.exception = err;
                             complete(null, c);
@@ -208,10 +274,13 @@ exports = module.exports = durableEngine = function () {
                             complete(null, c);
                         }
                     });
+
+                    if (timeLeft) {
+                        setTimeout(timeoutCallback, 5000, new Date().getTime() + timeLeft * 1000);
+                    }
                 } catch (reason) {
-                    var err = new Error();
-                    console.log(err.stack);
-                    c.s.exception = reason;
+                    console.log(reason.stack);
+                    c.s.exception = String(reason);
                     complete(null, c);
                 }
             }
@@ -295,6 +364,10 @@ exports = module.exports = durableEngine = function () {
             return r.assertEvents(handle, JSON.stringify(messages));
         };
 
+        that.queueEvent = function (sid, rulesetName, message) {
+            return r.queueEvent(handle, sid, rulesetName, JSON.stringify(message));
+        };
+
         that.startAssertFact = function (fact) {
             return r.startAssertFact(handle, JSON.stringify(fact));
         };
@@ -331,14 +404,20 @@ exports = module.exports = durableEngine = function () {
             return r.assertState(handle, JSON.stringify(state));
         };
 
-        that.startTimer = function (sid, timerName, timerDuration) {
-            var timer = {sid: sid, id: Math.ceil(Math.random() * 1000000000 + 1), $t: timerName};
+        that.startTimer = function (sid, timer, timerDuration) {
             return r.startTimer(handle, sid, timerDuration, JSON.stringify(timer));
         };
 
+        that.cancelTimer = function (sid, timer) {
+            return r.cancelTimer(handle, sid, JSON.stringify(timer));
+        };        
 
         that.getState = function (sid) {
             return JSON.parse(r.getState(handle, sid));
+        }
+
+        that.renewActionLease = function (sid) {
+            return r.renewActionLease(handle, sid);
         }
 
         that.getRulesetState = function (sid, complete) {
@@ -371,22 +450,29 @@ exports = module.exports = durableEngine = function () {
             }
         }
 
-        that.dispatch = function (complete) {
+        that.dispatch = function (complete, asyncResult) {
             var state = null;
             var actionHandle = null;
             var actionBinding = null;
             var resultContainer = {};
-            try {
-                var result = r.startAction(handle);
-                if (result) { 
-                    state = JSON.parse(result[0]);
-                    resultContainer = {'message': JSON.parse(result[1])};
-                    actionHandle = result[2];
-                    actionBinding = result[3];
+            if (asyncResult) {
+                state = asyncResult[0];
+                resultContainer = {'message': JSON.parse(asyncResult[1])};
+                actionHandle = asyncResult[2];
+                actionBinding = asyncResult[3];
+            } else {
+                try {
+                    var result = r.startAction(handle);
+                    if (result) { 
+                        state = JSON.parse(result[0]);
+                        resultContainer = {'message': JSON.parse(result[1])};
+                        actionHandle = result[2];
+                        actionBinding = result[3];
+                    }
+                } catch (reason) {
+                    complete(reason);
+                    return;
                 }
-            } catch (reason) {
-                complete(reason);
-                return;
             }
         
             while (resultContainer['message']) {
@@ -397,28 +483,57 @@ exports = module.exports = durableEngine = function () {
                     break;
                 }
                 resultContainer['message'] = null;
+                if (resultContainer['async']) {
+                    resultContainer['async'] = null;
+                }
+
                 var c = closure(host, state, message, actionHandle, name);
-                var action = actions[actionName]; 
-                action.run(c, function (err, c) {
+                actions[actionName].run(c, function (err, c) {
                     if (err) {
                         r.abandonAction(handle, c.getHandle());
                         complete(err);
                     } else {
                         var rulesetNames = c.getTargetRulesets();
                         ensureRulesets(rulesetNames, 0, c, function(err, c) {
+                            if (c.hasCompleted()) {
+                                return;
+                            } else {
+                                c.complete();
+                            }
+
+                            if (err) {
+                                r.abandonAction(handle, c.getHandle());
+                                complete(err);
+                                return;
+                            }
+
                             try {
-                                var timers = c.getTimers();
-                                for (var timerName in timers) {
-                                    var timerDuration = timers[timerName];
-                                    that.startTimer(c.s.sid, timerName, timerDuration);
-                                }
-                                
                                 var rulesetName;
                                 var facts;
                                 var bindingReplies;
                                 var binding = 0;
                                 var replies = 0;
                                 var pending = {};
+                                
+                                var timers = c.getCancelledTimers();
+                                for (var timerId in timers) {
+                                    that.cancelTimer(c.s.sid, timers[timerId]);
+                                }
+
+                                timers = c.getTimers();
+                                for (var timerId in timers) {
+                                    var timerTuple = timers[timerId];
+                                    that.startTimer(c.s.sid, timerTuple[0], timerTuple[1]);
+                                }
+
+                                var queuedEvents = c.getQueuedEvents();
+                                for (var targetRuleset in queuedEvents) {
+                                    var messagesList = queuedEvents[targetRuleset];
+                                    for (var i = 0; i < messagesList.length; ++i) {
+                                        that.queueEvent(c.s.sid, targetRuleset, messagesList[i]);
+                                    }
+                                }
+                                
                                 var retractFacts = c.getRetract();
                                 pending[actionBinding] = 0;
                                 for (rulesetName in retractFacts) {
@@ -487,7 +602,11 @@ exports = module.exports = durableEngine = function () {
                                         } else {
                                             var newResult = r.completeAndStartAction(handle, replies, c.getHandle());
                                             if (newResult) {
-                                                resultContainer['message'] = JSON.parse(newResult);
+                                                if (resultContainer['async']) {
+                                                    that.dispatch(function (e) {}, [state, newResult, actionHandle, actionBinding]);
+                                                } else {
+                                                    resultContainer['message'] = JSON.parse(newResult);
+                                                }
                                             }
                                         }
                                     }                                    
@@ -499,6 +618,7 @@ exports = module.exports = durableEngine = function () {
                         });
                     }
                 });
+                resultContainer['async'] = true;
             }
 
             complete(null);
@@ -564,8 +684,7 @@ exports = module.exports = durableEngine = function () {
                 triggers = {};
                 if (parentTriggers) {
                     for (var parentTriggerName in parentTriggers) {
-                        triggerName = parentTriggerName.substring(parentTriggerName.lastIndexOf('.') + 1);
-                        triggers[qualifiedStateName + '.' + triggerName] = parentTriggers[parentTriggerName];
+                        triggers[qualifiedStateName + '.' + parentTriggerName] = parentTriggers[parentTriggerName];
                     }
                 }
 
@@ -944,8 +1063,7 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.startPostBatch = function (rulesetName, messages) {
-            var rules = that.getRuleset(rulesetName);
-            return rules.startAssertEvents(messages);
+            return that.getRuleset(rulesetName).startAssertEvents(messages);
         };
 
         that.postBatch = function () {
@@ -966,68 +1084,63 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.startPost = function (rulesetName, message) {
-            var rules = that.getRuleset(rulesetName);
-            return rules.startAssertEvent(message);
+            return that.getRuleset(rulesetName).startAssertEvent(message);
         };
 
         that.post = function (rulesetName, message) {
-            var rules = that.getRuleset(rulesetName);
-            return rules.assertEvent(message);
+            return that.getRuleset(rulesetName).assertEvent(message);
+        };
+
+        that.queue = function (rulesetName, message) {
+            return that.getRuleset(rulesetName).queueEvent(message.sid, message);
         };
 
         that.startAssert = function (rulesetName, fact) {
-            var rules = that.getRuleset(rulesetName);
-            return rules.startAssertFact(fact);
+            return that.getRuleset(rulesetName).startAssertFact(fact);
         };
 
         that.assert = function (rulesetName, fact) {
-            var rules = that.getRuleset(rulesetName);
-            return rules.assertFact(fact);
+            return that.getRuleset(rulesetName).assertFact(fact);
         };
 
         that.startAssertFacts = function (rulesetName, facts) {
-            var rules = that.getRuleset(rulesetName);
-            return rules.startAssertFacts(facts);
+            return that.getRuleset(rulesetName).startAssertFacts(facts);
         };
 
         that.assertFacts = function (rulesetName, facts) {
-            var rules = that.getRuleset(rulesetName);
-            return rules.assertFacts(facts);
+            return that.getRuleset(rulesetName).assertFacts(facts);
         };
 
         that.startRetract = function (rulesetName, fact) {
-            var rules = that.getRuleset(rulesetName);
-            return rules.startRetractFact(fact);
+            return that.getRuleset(rulesetName).startRetractFact(fact);
         };
 
         that.retract = function (rulesetName, fact) {
-            var rules = that.getRuleset(rulesetName);
-            return rules.retractFact(fact);
+            return that.getRuleset(rulesetName).retractFact(fact);
         };
 
         that.startRetractFacts = function (rulesetName, facts) {
-            var rules = that.getRuleset(rulesetName);
-            return rules.startRetractFacts(facts);
+            return that.getRuleset(rulesetName).startRetractFacts(facts);
         };
 
         that.retractFacts = function (rulesetName, facts) {
-            var rules = that.getRuleset(rulesetName);
-            return rules.retractFacts(facts);
+            return that.getRuleset(rulesetName).retractFacts(facts);
         };
 
         that.getState = function (rulesetName, sid) {
-            var rules = that.getRuleset(rulesetName);
             return rules.getState(sid);
         };
 
         that.patchState = function (rulesetName, state) {
-            var rules = that.getRuleset(rulesetName);
-            return rules.assertState(state);
+            return that.getRuleset(rulesetName).assertState(state);
         };
 
         that.startTimer = function (rulesetName, sid, timerName, timerDuration) {
-            var rules = that.getRuleset(rulesetName);
-            return rules.startTimer(sid, timerName, timerDuration);
+            return that.getRuleset(rulesetName).startTimer(sid, timerName, timerDuration);
+        };
+
+        that.renewActionLease = function (rulesetName, sid) {
+            return that.getRuleset(rulesetName).renewActionLease(sid);
         };
 
         var dispatchRules = function (index) {
@@ -1037,7 +1150,11 @@ exports = module.exports = durableEngine = function () {
                 var rules = rulesList[index % rulesList.length];
                 rules.dispatch(function (err) {
                     if (err) {
-                        console.log(err);
+                        if (String(err).search('306') == -1) {
+                            console.log('Exiting ' + err);
+                            console.log(JSON.stringify(rules.getDefinition()))
+                            process.exit(1);
+                        }
                     }
                     setImmediate(dispatchRules, index + 1);
                 });

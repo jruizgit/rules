@@ -1438,7 +1438,6 @@ static unsigned int handleTimers(void *handle,
 
         commands[*commandCount] = command;
         ++*commandCount;
-        
         result = handleMessage(handle, 
                                NULL,
                                reply->element[i]->str, 

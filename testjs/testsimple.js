@@ -133,6 +133,31 @@ with (d.ruleset('fraud6')) {
     });
 }
 
+with (d.statechart('fraud7')) {
+    with (state('first')) {
+        to('second').whenAll(m.amount.gt(100), function (c, complete) {
+            console.log('fraud7 start async 1');
+            setTimeout(function() {
+                console.log('fraud7 execute 1');
+                complete();
+            }, 1000);
+        });
+    }
+    with (state('second')) {
+        to('fraud', function (c, complete) {
+            console.log('fraud7 start async 2');
+            setTimeout(function() {
+                console.log('fraud7 execute 2');
+                complete();
+            }, 1000);
+        });
+    }
+    state('fraud');
+    whenStart(function (host) {
+        host.post('fraud7', {id: 1, sid: 1, amount: 200});
+    });
+}
+
 with (d.ruleset('a0')) {
     whenAll(or(m.amount.lt(100), m.subject.eq('approve'), m.subject.eq('ok')), function (c) {
         console.log('a0 approved from ' + c.s.sid);
@@ -269,9 +294,6 @@ with (d.ruleset('a5')) {
 }
 
 with (d.statechart('a6')) {
-    with (state('start')) {
-        to('work');
-    }
     with (state('work')) {
         with (state('enter')) {
             to('process').whenAll(m.subject.eq('enter'), function (c) {
@@ -283,19 +305,16 @@ with (d.statechart('a6')) {
                 console.log('a6 processing');
             });
         }
-        to('work').whenAll(m.subject.eq('reset'), function (c) {
-            console.log('a6 resetting');
-        });
-        to('canceled').whenAll(m.subject.eq('cancel'), function (c) {
+        to('canceled').whenAll(pri(1), m.subject.eq('cancel'), function (c) {
             console.log('a6 canceling');
         });
     }
     state('canceled');
     whenStart(function (host) {
         host.post('a6', {id: 1, sid: 1, subject: 'enter'});
-        host.post('a6', {id: 2, sid: 1, subject: 'enter'});
+        host.post('a6', {id: 2, sid: 1, subject: 'continue'});
         host.post('a6', {id: 3, sid: 1, subject: 'continue'});
-        host.post('a6', {id: 4, sid: 1, subject: 'continue'});
+        host.post('a6', {id: 4, sid: 1, subject: 'cancel'});
     });
 }
 
@@ -378,7 +397,7 @@ with (d.ruleset('t0')) {
     whenAll(or(m.count.eq(0), timeout('myTimer')), function (c) {
         c.s.count += 1;
         c.post('t0', {id: c.s.count, sid: 1, t: 'purchase'});
-        c.startTimer('myTimer', Math.random() * 3 + 1);
+        c.startTimer('myTimer', Math.random() * 3 + 1, 't0_' + c.s.count);
     });
     whenAll(span(5), m.t.eq('purchase'), function (c) {
         console.log('t0 pulse ->' + c.m.length);
@@ -391,15 +410,62 @@ with (d.ruleset('t0')) {
 with (d.ruleset('t1')) {
     whenAll(m.start.eq('yes'), function (c) {
         c.s.start = new Date();
-        c.startTimer('myTimer', 5);
+        c.startTimer('myFirstTimer', 3);
+        c.startTimer('mySecondTimer', 6);
     });
-    whenAll(timeout('myTimer'), function (c) {
-        console.log('t1 end');
-        console.log('t1 started ' + c.s.start);
-        console.log('t1 ended ' + new Date());
+    whenAll(timeout('myFirstTimer'), function (c) {
+        console.log('t1 first timer started ' + c.s.start);
+        console.log('t1 first timer ended ' + new Date());
+        c.cancelTimer('mySecondTimer');
+    });
+    whenAll(timeout('mySecondTimer'), function (c) {
+        console.log('t1 second timer started ' + c.s.start);
+        console.log('t1 second timer ended ' + new Date());
     });
     whenStart(function (host) {
         host.post('t1', {id: 1, sid: 1, start: 'yes'});
+    });
+}
+
+with (d.ruleset('t2')) {
+    whenAll(m.start.eq('yes'), function (c, complete) {
+        console.log('t2 first started');
+
+        setTimeout(function() {
+            console.log('t2 first completed');
+            c.post({id: 2, end: 'yes'});
+            complete();
+        }, 7000);
+        return 10;
+    });
+    whenAll(m.end.eq('yes'), function (c, complete) {
+        console.log('t2 second started');
+        setTimeout(function() {
+            console.log('t2 second completed');
+            c.post({id: 3, end: 'yes'});
+            complete();
+        }, 7000);
+        return 4;
+    });
+    whenAll(s.exception.ex(), function (c) {
+        console.log('t2 expected exception ' + c.s.exception);
+        delete(c.s.exception); 
+    });
+    whenStart(function (host) {
+        host.post('t2', {id: 1, sid: 1, start: 'yes'});
+    });
+}
+
+with (d.ruleset('q0')) {
+    whenAll(m.start.eq('yes'), function (c) {
+        console.log('q0 started');
+        c.queue('q0', {sid: 1, id: 2, end: 'yes'});
+    });
+    whenAll(m.end.eq('yes'), function (c) {
+        console.log('q0 ended');
+    });
+    whenStart(function (host) {
+        host.post('q0', {id: 1, sid: 1, start: 'yes'});
     });
 }
 

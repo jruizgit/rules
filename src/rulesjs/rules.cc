@@ -300,6 +300,30 @@ void jsRetractEvent(const FunctionCallbackInfo<Value>& args) {
     }
 }
 
+void jsQueueEvent(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 4) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[3]->IsString()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        unsigned int result = queueMessage((void *)args[0]->IntegerValue(),
+                                           *String::Utf8Value(args[1]->ToString()),
+                                           *String::Utf8Value(args[2]->ToString()),
+                                           *String::Utf8Value(args[3]->ToString()));
+        
+        if (result != RULES_OK) {
+            char *message = NULL;
+            if (asprintf(&message, "Could not queue event, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            }
+        } 
+    }
+}
+
 void jsStartAssertFact(const FunctionCallbackInfo<v8::Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
@@ -765,7 +789,7 @@ void jsAbandonAction(const FunctionCallbackInfo<Value>& args) {
 void jsStartTimer(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
-    if (args.Length() < 3) {
+    if (args.Length() < 4) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[2]->IsNumber() || !args[3]->IsString()) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
@@ -778,6 +802,29 @@ void jsStartTimer(const FunctionCallbackInfo<Value>& args) {
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not start timer, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            }
+        } 
+    }
+}
+
+void jsCancelTimer(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 3) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[2]->IsString()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        unsigned int result = cancelTimer((void *)args[0]->IntegerValue(),
+                                         *String::Utf8Value(args[1]->ToString()),
+                                         *String::Utf8Value(args[2]->ToString()));
+        
+        if (result != RULES_OK) {
+            char *message = NULL;
+            if (asprintf(&message, "Could not cancel timer, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
@@ -829,6 +876,27 @@ void jsGetState(const FunctionCallbackInfo<Value>& args) {
         } else if (result != ERR_NEW_SESSION) {
             char *message = NULL;
             if (asprintf(&message, "Could not get state, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            }
+        }
+    }
+}
+
+void jsRenewActionLease(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        unsigned int result = renewActionLease((void *)args[0]->IntegerValue(), 
+                                               *v8::String::Utf8Value(args[1]->ToString())); 
+        if (result != RULES_OK) {
+            char *message = NULL;
+            if (asprintf(&message, "Could not renew action lease, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
@@ -921,6 +989,9 @@ void init(Handle<Object> exports) {
     exports->Set(String::NewFromUtf8(isolate, "retractEvent", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsRetractEvent)->GetFunction());
 
+    exports->Set(String::NewFromUtf8(isolate, "queueEvent", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsQueueEvent)->GetFunction());
+
     exports->Set(String::NewFromUtf8(isolate, "startAssertFact", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsStartAssertFact)->GetFunction());
 
@@ -969,8 +1040,14 @@ void init(Handle<Object> exports) {
     exports->Set(String::NewFromUtf8(isolate, "startTimer", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsStartTimer)->GetFunction());
 
+    exports->Set(String::NewFromUtf8(isolate, "cancelTimer", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsCancelTimer)->GetFunction());
+
     exports->Set(String::NewFromUtf8(isolate, "getState", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsGetState)->GetFunction());
+
+    exports->Set(String::NewFromUtf8(isolate, "renewActionLease", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsRenewActionLease)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "createProxy", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsCreateProxy)->GetFunction());
