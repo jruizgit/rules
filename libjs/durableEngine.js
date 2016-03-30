@@ -1128,7 +1128,7 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.getState = function (rulesetName, sid) {
-            return rules.getState(sid);
+            return that.getRuleset(rulesetName).getState(sid);
         };
 
         that.patchState = function (rulesetName, state) {
@@ -1195,26 +1195,14 @@ exports = module.exports = durableEngine = function () {
         }
 
         that.use(bodyParser.json());
-
-        that.get('/durableVisual.js', function (request, response) {
-            request.addListener('end',function () {
-                fileServer.serveFile('/durableVisual.js', 200, {}, request, response);
-            }).resume();
-        });
-
         that.run = function () {
-
-            that.get(basePath + '/:rulesetName/:sid/admin.html', function (request, response) {
-                request.addListener('end',function () {
-                    fileServer.serveFile('/admin.html', 200, {}, request, response);
-                }).resume();
-            });
 
             that.get(basePath + '/:rulesetName/:sid', function (request, response) {
                 response.contentType = 'application/json; charset=utf-8';
                 host.ensureRuleset(request.params.rulesetName, function (err, result) {
-                    if (err)
+                    if (err) {
                         response.send({ error: err }, 500);
+                    }
                     else {
                         try {
                             response.send(host.getState(request.params.rulesetName, request.params.sid));
@@ -1231,11 +1219,13 @@ exports = module.exports = durableEngine = function () {
                 message.sid = request.params.sid;
 
                 host.ensureRuleset(request.params.rulesetName, function (err, result) {
-                    if (err)
+                    if (err) {
                         response.send({ error: err }, 500);
+                    }
                     else {
                         try {
-                            response.send(host.post(request.params.rulesetName, message));
+                            host.post(request.params.rulesetName, message)
+                            response.send();
                         } catch (reason) {
                             response.send({ error: reason }, 500);
                         }
@@ -1252,7 +1242,8 @@ exports = module.exports = durableEngine = function () {
                         response.send({ error: err }, 500);
                     else {
                         try {
-                            response.send(host.patchState(request.params.rulesetName, document));
+                            host.patchState(request.params.rulesetName, document);
+                            response.send();
                         } catch (reason) {
                             response.send({ error: reason }, 500);
                         }
@@ -1267,7 +1258,7 @@ exports = module.exports = durableEngine = function () {
                         response.send({ error: err }, 500);
                     else {
                         try {
-                            response.send(host.getRuleset(request.params.rulesetName));
+                            response.send(host.getRuleset(request.params.rulesetName).getDefinition());
                         } catch (reason) {
                             response.send({ error: reason }, 500);
                         }

@@ -6,7 +6,7 @@
 <script type="text/javascript" src="http://d3js.org/d3.v3.min.js?3.1.9"></script>
 <script type="text/javascript">
 
-    function register() {
+    function save() {
         try {
             var rulesetText = document.getElementById('rulesetpad').value;
             var ruleset = JSON.parse(rulesetText);
@@ -25,8 +25,7 @@
             server.post(JSON.stringify(rulesetDefinition), function(err) {
                 if (err) {
                     alert('Server error ' + err.responseText);
-                }
-                else {
+                } else {
                     d3.select('iframe')
                       .attr('src', '/' + rulesetName + '/sample/admin.html?disableScratchpad=true&size=330');
                 }
@@ -36,7 +35,7 @@
         }
     }
 
-    function get() {
+    function load() {
         var rulesetName = document.getElementById('name').value;    
         d3.json('http://localhost:5000/' + rulesetName, function(err, result) {
             if (err) {
@@ -46,7 +45,6 @@
                 d3.select('iframe')
                   .attr('src', '/' + rulesetName + '/sample/admin.html?disableScratchpad=true&size=330');
 
-                result = JSON.parse(result);
                 d3.select('textarea[id="rulesetpad"]')
                   .text(JSON.stringify(result, null, 4));
             }
@@ -101,69 +99,65 @@
         .attr('style', "border:1px solid grey");
 
     body.append('br');
+    body.append('br');
         
     body.append('textarea')
         .attr('rows', '25')
         .attr('cols', '44')
         .attr('id', 'rulesetpad')
         .text('{\r\n' + 
-              '    "wait": {\r\n' +
-              '        "approve": {\r\n' +
-              '            "when": {\r\n' +
-              '                "subject": "approve"\r\n' +
-              '            },\r\n' +
-              '            "run": "approve action",\r\n' +
-              '            "to": "approved"\r\n' +
-              '        },\r\n' +
-              '        "deny": {\r\n' +
-              '            "when": {\r\n' +
-              '                "subject": "deny"\r\n' +
-              '            },\r\n' +
-              '            "run": "deny action",\r\n' +
-              '            "to": "denied"\r\n' +
-              '        }\r\n' +
+              '    "start": {\r\n' + 
+              '        "trigger": {\r\n' + 
+              '            "all":[{\r\n' + 
+              '                "m": {"$gt":{"amount":100}}\r\n' + 
+              '            }],\r\n' +
+              '            "to": "suspect",\r\n' + 
+              '            "run": "suspect"\r\n' + 
+              '        }\r\n' + 
               '    },\r\n' +
-              '    "approved": {},\r\n' +
-              '    "denied": {}\r\n' +
-              '}');
-
+              '    "suspect": {\r\n' + 
+              '        "trigger": {\r\n' + 
+              '            "all":[{\r\n' + 
+              '                "m": {"$gt":{"amount":1000}}\r\n' + 
+              '            }],\r\n' +
+              '            "to": "fraud",\r\n' + 
+              '            "run": "fraud"\r\n' + 
+              '        }\r\n' + 
+              '    },\r\n' + 
+              '    "fraud":{}\r\n' + 
+              '}\r\n');
 
     body.append('iframe')
         .attr('width', 330)
-        .attr('height', 331)
+        .attr('height', 329)
         .attr('scrolling', 'no')
         .attr('style', "border:1px solid grey");
 
     body.append('br');
+    body.append('br');
 
     body.append('input')
         .attr('type', 'button')
         .attr('id', 'approve')
-        .attr('value', 'Register')
-        .on('click', register);
+        .attr('value', 'Save')
+        .on('click', save);
 
     body.append('input')
         .attr('type', 'button')
         .attr('id', 'approve')
-        .attr('value', 'Restore')
-        .on('click', get);
+        .attr('value', 'Load')
+        .on('click', load);
 
     body.append('br');
-    body.append('br');
-    body.append('span')
-        .append('b')
-        .text('Message: ');
-
     body.append('br');
 
     body.append('textarea')
         .attr('rows', '5')
         .attr('cols', '44')
         .attr('id', 'messagepad')
-        .text('{\r\n' + 
-              '    "id": 1, "sid": "sample", "subject": "approve"\r\n' +
-              '}');
+        .text('{"id": 1, "amount": 2000}');
 
+    body.append('br');
     body.append('br');
 
     body.append('input')
