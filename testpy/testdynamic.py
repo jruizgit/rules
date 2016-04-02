@@ -48,11 +48,11 @@ class Application(interface.Application):
         return Exception('File not found')
 
     def _dynamic_request(self, environ, start_response):
-        middleware = SharedDataMiddleware(self._not_found, {'/': 'testjs'})
+        middleware = SharedDataMiddleware(self._not_found, {'/': os.path.dirname(__file__)})
         return middleware(environ, start_response)
 
     def _admin_request(self, environ, start_response, ruleset_name, sid):
-        middleware = SharedDataMiddleware(self._not_found, {'/{0}/{1}/'.format(ruleset_name, sid): 'testjs'})
+        middleware = SharedDataMiddleware(self._not_found, {'/{0}/{1}/'.format(ruleset_name, sid): os.path.dirname(__file__)})
         return middleware(environ, start_response)
 
 if __name__ == '__main__':
