@@ -45,7 +45,7 @@ with ruleset('test'):
 
 run_all()
 ```  
-#### JavaScript
+#### Node.js
 ```javascript
 var d = require('durable');
 
@@ -159,7 +159,7 @@ with ruleset('fraud_detection'):
 
 run_all()
 ```
-#### JavaScript
+#### Node.js
 ```javascript
 var d = require('durable');
 
@@ -224,7 +224,7 @@ _IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive_
 
 #### [Python](https://github.com/jruizgit/rules/blob/master/testpy/manners.py)
 
-#### [JavaScript](https://github.com/jruizgit/rules/blob/master/testjs/manners.js)
+#### [Node.js](https://github.com/jruizgit/rules/blob/master/testjs/manners.js)
 
 ## Image recognition and Waltzdb
 
@@ -240,13 +240,13 @@ _IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive_
 
 #### [Python](https://github.com/jruizgit/rules/blob/master/testpy/waltzdb.py)
 
-#### [JavaScript](https://github.com/jruizgit/rules/blob/master/testjs/waltzdb.js)
+#### [Node.js](https://github.com/jruizgit/rules/blob/master/testjs/waltzdb.js)
 
 ## To Learn More  
 Reference Manual:  
 * [Ruby](https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md)  
 * [Python](https://github.com/jruizgit/rules/blob/master/docs/py/reference.md)  
-* [JavaScript](https://github.com/jruizgit/rules/blob/master/docs/js/reference.md)  
+* [Node.js](https://github.com/jruizgit/rules/blob/master/docs/js/reference.md)  
 
 Blog:  
 * [Miss Manners and Waltzdb (07/2015)](http://jruizblog.com/2015/07/20/miss-manners-and-waltzdb/)
