@@ -3,9 +3,9 @@ require "timers"
 require_relative "../src/rulesrb/rules"
 
 module Engine
-  
+  @@timers = nil
   class Closure
-    attr_reader :host, :handle, :ruleset_name, :_timers, :_branches, :_messages, :_facts, :_retract
+    attr_reader :host, :handle, :ruleset_name, :_timers, :_cancelled_timers, :_branches, :_messages, :_queued_messages, :_facts, :_retract
     attr_accessor :s
 
     def initialize(host, state, message, handle, ruleset_name)
@@ -14,10 +14,14 @@ module Engine
       @handle = handle
       @host = host
       @_timers = {}
+      @_cancelled_timers = {}
       @_messages = {}
+      @_queued_messages = {}
       @_branches = {}
       @_facts = {}
       @_retract = {}
+      @_start_time = Time.now
+      @_completed = false
       if message.kind_of? Hash
         @m = message
       else
@@ -54,11 +58,47 @@ module Engine
       message_list << message
     end
 
-    def start_timer(timer_name, duration)
-      if @_timers.key? timer_name
-        raise ArgumentError, "Timer with name #{timer_name} already added"
+    def queue(ruleset_name, message)
+      if message.kind_of? Content
+        message = message._d
+      end
+
+      if !(message.key? :sid) && !(message.key? "sid")
+        message[:sid] = @s.sid
+      end
+
+      message_list = []
+      if @_queued_messages.key? ruleset_name
+        message_list = @_queued_messages[ruleset_name]
       else
-        @_timers[timer_name] = duration
+        @_queued_messages[ruleset_name] = message_list
+      end
+      message_list << message
+    end
+
+    def start_timer(timer_name, duration, timer_id = nil)
+      if !timer_id
+        timer_id = timer_name
+      end
+
+      if @_timers.key? timer_id
+        raise ArgumentError, "Timer with id #{timer_id} already added"
+      else
+        timer = {:sid => @s.sid, :id => timer_id, :$t => timer_name}
+        @_timers[timer_id] = [timer, duration]
+      end
+    end
+
+    def cancel_timer(timer_name, timer_id = nil)
+      if !timer_id
+        timer_id = timer_name
+      end
+
+      if @_cancelled_timers.key? timer_id
+        raise ArgumentError, "Timer with id #{timer_id} already cancelled"
+      else
+        timer = {:sid => @s.sid, :id => timer_id, :$t => timer_name}
+        @_cancelled_timers[timer_id] = timer
       end
     end
 
@@ -108,6 +148,22 @@ module Engine
       fact_list << fact
     end
 
+    def renew_action_lease()
+      if Time.now - @_start_time < 10000
+        @_start_time = Time.now
+        @host.renew_action_lease(@ruleset_name, @s.sid)
+      end
+    end
+
+    def has_completed()
+      if Time.now - @_start_time > 10000
+        @_completed = true
+      end
+      value = @_completed
+      @_completed = true
+      value
+    end
+
     private
 
     def handle_property(name, value=nil)
@@ -147,7 +203,11 @@ module Engine
     def handle_property(name, value=nil)
       name = name.to_s
       if name.end_with? '='
-        @_d[name[0..-2]] = value
+        if value == nil
+          @_d.delete(name[0..-2])
+        else
+          @_d[name[0..-2]] = value
+        end
         nil
       elsif name.end_with? '?'
         @_d.key? name[0..-2]
@@ -168,12 +228,16 @@ module Engine
 
   class Promise
     attr_accessor :root
-
     def initialize(func)
       @func = func
       @next = nil
       @sync = true
       @root = self
+      @timers = Timers::Group.new
+    
+      if func.arity > 1
+        @sync = false
+      end
     end
 
     def continue_with(next_func)
@@ -194,6 +258,8 @@ module Engine
         begin
           @func.call c  
         rescue Exception => e
+          puts "unexpected error #{e}"
+          puts e.backtrace
           c.s.exception = e.to_s
         end
         
@@ -204,7 +270,7 @@ module Engine
         end
       else
         begin
-          @func.call c, -> e {
+          time_left = @func.call c, -> e {
             if e
               c.s.exception = e.to_s
               complete.call nil
@@ -214,7 +280,25 @@ module Engine
               complete.call nil
             end
           }
+
+          if time_left && (time_left.kind_of? Integer)
+            max_time = Time.now + time_left
+            my_timer = @timers.every(5) {
+              if Time.now > max_time
+                my_timer.cancel
+                c.s.exception = "timeout expired"
+                complete.call nil
+              else
+                c.renew_action_lease()
+              end
+            }
+            Thread.new do
+              loop { @timers.wait }
+            end
+          end
         rescue Exception => e
+          puts "unexpected error #{e}"
+          puts e.backtrace
           c.s.exception = e.to_s
           complete.call nil
         end  
@@ -298,6 +382,10 @@ module Engine
       Rules.assert_event @handle, JSON.generate(message)
     end
 
+    def queue_event(sid, ruleset_name, message)
+      Rules.queue_event @handle, sid.to_s, ruleset_name.to_s, JSON.generate(message)
+    end
+
     def start_assert_event(message)
       return Rules.start_assert_event @handle, JSON.generate(message)
     end
@@ -310,9 +398,12 @@ module Engine
       return Rules.start_assert_events @handle, JSON.generate(messages)
     end
 
-    def start_timer(sid, timer_name, timer_duration)
-      timer = {:sid => sid, :id => rand(1000000000), :$t => timer_name}
+    def start_timer(sid, timer, timer_duration)
       Rules.start_timer @handle, sid.to_s, timer_duration, JSON.generate(timer)
+    end
+
+    def cancel_timer(sid, timer)
+      Rules.cancel_timer @handle, sid.to_s, JSON.generate(timer)
     end
 
     def assert_fact(fact)
@@ -352,8 +443,12 @@ module Engine
     end
 
     def get_state(sid)
-      JSON.parse Rules.get_state(@handle, sid)
+      JSON.parse Rules.get_state(@handle, sid.to_s)
     end
+
+    def renew_action_lease(sid)
+      Rules.renew_action_lease @handle, sid.to_s
+    end 
 
     def Ruleset.create_rulesets(parent_name, host, ruleset_definitions, state_cache_size)
       branches = {}
@@ -387,22 +482,29 @@ module Engine
       complete.call nil
     end
                     
-    def dispatch(complete)
+    def dispatch(complete, async_result = nil)
       result_container = {}
       action_handle = nil
       action_binding = nil
       state = nil
-      begin
-        result = Rules.start_action @handle
-        if result
-          state = JSON.parse result[0]
-          result_container = {:message => JSON.parse(result[1])}
-          action_handle = result[2]
-          action_binding = result[3]
+      if async_result
+        state = async_result[0]
+        result_container = {:message => JSON.parse(async_result[1])}
+        action_handle = async_result[2]
+        action_binding = async_result[3]
+      else
+        begin
+          result = Rules.start_action @handle
+          if result
+            state = JSON.parse result[0]
+            result_container = {:message => JSON.parse(result[1])}
+            action_handle = result[2]
+            action_binding = result[3]
+          end
+        rescue Exception => e
+          complete.call e
+          return
         end
-      rescue Exception => e
-        complete.call e
-        return
       end
       
       while result_container.key? :message do
@@ -413,15 +515,35 @@ module Engine
 
         result_container.delete :message
         c = Closure.new @host, state, message, action_handle, @name
+
+        if result_container.key? :async
+          result_container.delete :async
+        end
+                
         @actions[action_name].run c, -> e {
+          if c.has_completed
+            return
+          end
+            
           if e
             Rules.abandon_action @handle, c.handle
             complete.call e
           else
             begin
-              for timer_name, timer_duration in c._timers do
-                start_timer c.s.sid, timer_name, timer_duration
+              for timer_id, timer in c._cancelled_timers do
+                cancel_timer c.s.sid, timer
               end
+
+              for timer_id, timer_duration in c._timers do
+                start_timer c.s.sid, timer_duration[0], timer_duration[1]
+              end
+
+              for ruleset_name, messages in c._queued_messages do
+                for message in messages do
+                  queue_event c.s.sid, ruleset_name, message  
+                end
+              end
+
               binding  = 0
               replies = 0
               pending = {action_binding => 0}
@@ -467,6 +589,7 @@ module Engine
               else
                 pending[binding] = replies
               end
+
               for binding, replies in pending do
                 if binding != 0
                   if binding != action_binding
@@ -474,17 +597,24 @@ module Engine
                   else
                     new_result = Rules.complete_and_start_action @handle, replies, c.handle
                     if new_result
-                      result_container[:message] = JSON.parse new_result
+                      if result_container.key? :async
+                        dispatch -> e {}, [state, new_result, action_handle, action_binding]
+                      else
+                        result_container[:message] = JSON.parse new_result
+                      end
                     end
                   end
                 end
               end
             rescue Exception => e
               Rules.abandon_action @handle, c.handle
+              puts "internal error #{e}"
+              puts e.backtrace
               complete.call e
             end
           end
         }
+        result_container[:async] = true 
       end
       complete.call nil
     end
@@ -535,8 +665,7 @@ module Engine
         if parent_triggers
           for parent_trigger_name, trigger in parent_triggers do
             parent_trigger_name = parent_trigger_name.to_s
-            trigger_name = parent_trigger_name[parent_trigger_name.rindex('.')..-1]
-            triggers["#{qualified_name}.#{trigger_name}"] = trigger
+            triggers["#{qualified_name}.#{parent_trigger_name}"] = trigger
           end
         end
 
@@ -956,6 +1085,10 @@ module Engine
       get_ruleset(ruleset_name).assert_state state
     end
 
+    def renew_action_lease(ruleset_name, sid)
+      get_ruleset(ruleset_name).renew_action_lease sid
+    end
+
     def register_rulesets(parent_name, ruleset_definitions)
       rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions, @state_cache_size)
       for ruleset_name, ruleset in rulesets do
@@ -978,8 +1111,7 @@ module Engine
       dispatch_ruleset = -> c {
 
         callback = -> e {
-          puts "internal error #{e}" if e
-          if index % 10 == 0
+          if index % 5 == 0
             index += 1
             timers.after 0.01, &dispatch_ruleset
           else
@@ -989,9 +1121,8 @@ module Engine
         }
 
         timers_callback = -> e {
-          puts "internal error #{e}" if e
-          if index % 10 == 0 && @ruleset_list.length > 0
-            ruleset = @ruleset_list[(index / 10) % @ruleset_list.length]
+          if index % 5 == 0 && @ruleset_list.length > 0
+            ruleset = @ruleset_list[(index / 5) % @ruleset_list.length]
             ruleset.dispatch_timers callback
           else
             callback.call e
@@ -1006,7 +1137,7 @@ module Engine
         end
       }
 
-      timers.after 0.001, &dispatch_ruleset
+      timers.after 0.01, &dispatch_ruleset
       Thread.new do
         loop { timers.wait }
       end

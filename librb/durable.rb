@@ -427,9 +427,17 @@ module Durable
       rule_name = "r_#{index}"
       rule = nil
       if block
-        run_lambda = -> c {
-          c.instance_exec c, &block
-        }
+        run_lambda = nil
+        if block.arity < 2
+          run_lambda = -> c {
+            c.instance_exec c, &block
+          }
+        else
+          run_lambda = -> (c, complete) {
+            c.instance_exec c, complete, &block
+          }
+        end
+
         rule = operator ? {operator => expression_definition, :run => run_lambda} : {:run => run_lambda}
       else
         rule = operator ? {operator => expression_definition} : {}
@@ -475,8 +483,18 @@ module Durable
     def to(state_name, rule = nil, &block)
       rule = define_rule(nil, nil, {}, &block) if !rule
       rule[:to] = state_name
-      if block   
-        rule[:run] = -> s {s.instance_exec(s, &block)}
+      if block
+        if block.arity < 2
+          rule[:run] = -> c {
+            c.instance_exec c, &block
+          }
+        else
+          rule[:run] = -> (c, complete) {
+            c.instance_exec c, complete, &block
+          }
+        end
+      else 
+        rule[:run] = -> c {}
       end
       self
     end
@@ -536,7 +554,18 @@ module Durable
 
     def stage(stage_name, &block)
       if block
-        @stages[stage_name] = {:run => -> s {s.instance_exec(s, &block)}, :to => {}}
+        run_lambda = nil
+        if block.arity < 2
+          run_lambda = -> c {
+            c.instance_exec c, &block
+          }
+        else
+          run_lambda = -> (c, complete) {
+            c.instance_exec c, complete, &block
+          }
+        end
+
+        @stages[stage_name] = {:run => run_lambda, :to => {}}
       else
         @stages[stage_name] = {:to => {}}
       end

@@ -84,6 +84,9 @@ class Closure(object):
         message_list.append(message)
 
     def queue(self, ruleset_name, message):
+        if not 'sid' in message:
+            message['sid'] = self.s['sid']
+
         if isinstance(message, Content):
             message = message._d
 
@@ -397,7 +400,7 @@ class Ruleset(object):
         rules.assert_state(self._handle, json.dumps(state))
         
     def get_state(self, sid):
-        return json.loads(rules.get_state(self._handle, sid))
+        return json.loads(rules.get_state(self._handle, str(sid)))
     
     def renew_action_lease(self, sid):
         rules.renew_action_lease(self._handle, str(sid))

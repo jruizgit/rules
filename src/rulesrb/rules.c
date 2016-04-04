@@ -124,6 +124,24 @@ static VALUE rbAssertEvent(VALUE self, VALUE handle, VALUE event) {
     return Qnil;
 }
 
+static VALUE rbQueueEvent(VALUE self, VALUE handle, VALUE sid, VALUE destination, VALUE event) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(sid, T_STRING);
+    Check_Type(destination, T_STRING);
+    Check_Type(event, T_STRING);
+
+    unsigned int result = queueMessage((void *)FIX2LONG(handle), RSTRING_PTR(sid), RSTRING_PTR(destination), RSTRING_PTR(event));
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not queue event, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
 static VALUE rbStartAssertEvents(VALUE self, VALUE handle, VALUE events) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(events, T_STRING);
@@ -573,6 +591,23 @@ static VALUE rbStartTimer(VALUE self, VALUE handle, VALUE sid, VALUE duration, V
     return Qnil;
 }
 
+static VALUE rbCancelTimer(VALUE self, VALUE handle, VALUE sid, VALUE timer) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(sid, T_STRING);
+    Check_Type(timer, T_STRING);    
+
+    unsigned int result = cancelTimer((void *)FIX2LONG(handle), RSTRING_PTR(sid), RSTRING_PTR(timer));
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not cancel timer, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
 static VALUE rbAssertTimers(VALUE self, VALUE handle) {
     Check_Type(handle, T_FIXNUM);
 
@@ -611,6 +646,23 @@ static VALUE rbGetState(VALUE self, VALUE handle, VALUE sid) {
     return output;
 }
 
+
+static VALUE rbRenewActionLease(VALUE self, VALUE handle, VALUE sid) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(sid, T_STRING);
+
+    unsigned int result = renewActionLease((void *)FIX2LONG(handle), RSTRING_PTR(sid));
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not renew action lease, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
+
 void Init_rules() {
     rulesModule = rb_define_module("Rules");
     rb_define_singleton_method(rulesModule, "create_ruleset", rbCreateRuleset, 3);
@@ -618,6 +670,7 @@ void Init_rules() {
     rb_define_singleton_method(rulesModule, "bind_ruleset", rbBindRuleset, 4);
     rb_define_singleton_method(rulesModule, "complete", rbComplete, 2);
     rb_define_singleton_method(rulesModule, "assert_event", rbAssertEvent, 2);
+    rb_define_singleton_method(rulesModule, "queue_event", rbQueueEvent, 4);
     rb_define_singleton_method(rulesModule, "start_assert_event", rbStartAssertEvent, 2);
     rb_define_singleton_method(rulesModule, "assert_events", rbAssertEvents, 2);
     rb_define_singleton_method(rulesModule, "start_assert_events", rbStartAssertEvents, 2);
@@ -637,8 +690,10 @@ void Init_rules() {
     rb_define_singleton_method(rulesModule, "complete_and_start_action", rbCompleteAndStartAction, 3);
     rb_define_singleton_method(rulesModule, "abandon_action", rbAbandonAction, 2);
     rb_define_singleton_method(rulesModule, "start_timer", rbStartTimer, 4);
+    rb_define_singleton_method(rulesModule, "cancel_timer", rbCancelTimer, 3);
     rb_define_singleton_method(rulesModule, "assert_timers", rbAssertTimers, 1);
     rb_define_singleton_method(rulesModule, "get_state", rbGetState, 2);
+    rb_define_singleton_method(rulesModule, "renew_action_lease", rbRenewActionLease, 2);
 }
 
 

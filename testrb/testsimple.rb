@@ -114,9 +114,6 @@ Durable.ruleset :a5 do
 end
 
 Durable.statechart :a6 do
-  state :start do
-    to :work
-  end
   state :work do   
     state :enter do
       to :process, when_all(m.subject == "enter") do
@@ -128,10 +125,7 @@ Durable.statechart :a6 do
         puts "a6 processing"
       end
     end
-    to :work, when_all(m.subject == "reset") do
-      puts "a6 resetting"
-    end
-    to :canceled, when_all(m.subject == "cancel") do
+    to :canceled, when_all(pri(1), m.subject == "cancel") do
       puts "a6 canceling"
     end
   end
@@ -140,6 +134,7 @@ Durable.statechart :a6 do
     post :a6, {:id => 1, :sid => 1, :subject => "enter"}
     post :a6, {:id => 2, :sid => 1, :subject => "continue"}
     post :a6, {:id => 3, :sid => 1, :subject => "continue"}
+    post :a6, {:id => 4, :sid => 1, :subject => "cancel"}
   end
 end
 
@@ -294,6 +289,33 @@ Durable.ruleset :fraud4 do
   end
 end
 
+Durable.statechart :fraud8 do
+  state :first do 
+    to :second, when_all(m.amount > 100) do |c, complete|
+      puts "fraud8 start async 1"
+      Thread.new do
+        sleep 1
+        puts "fraud8 execute 1"
+        complete.call nil
+      end
+    end
+  end
+  state :second do
+    to :fraud do |c, complete|
+      puts "fraud8 start async 2"
+      Thread.new do
+        sleep 1
+        puts "fraud8 execute 2"
+        complete.call nil
+      end
+    end
+  end
+  state :fraud
+  when_start do
+    post :fraud8, {:id => 1, :sid => 1, :amount => 200}
+  end
+end
+
 Durable.ruleset :pri0 do
   when_all pri(3), m.amount < 300 do
     puts "pri0, 1 approved " + m.amount.to_s
@@ -367,7 +389,7 @@ Durable.ruleset :t0 do
   when_all (timeout :my_timer) | (m.count == 0) do
     s.count += 1
     post :t0, {:id => s.count, :sid => 1, :t => "purchase"}
-    start_timer(:my_timer, rand(3))
+    start_timer(:my_timer, rand(3), "t_#{s.count}")
   end
   when_all span(5), m.t == "purchase" do 
     puts("t0 pulse -> #{m.count}")
@@ -380,18 +402,65 @@ end
 Durable.ruleset :t1 do
   when_all m.start == "yes" do
     s.start = Time.now
-    start_timer(:my_timer, 5)
+    start_timer :my_first_timer, 3
+    start_timer :my_second_timer, 6
   end
-  when_all timeout :my_timer do
-    puts "t1 End"
-    puts "t1 Started #{s.start}"
-    puts "t1 Ended #{Time.now}"
+  when_all timeout :my_first_timer do
+    puts "t1 started #{s.start}"
+    puts "t1 first_timer ended #{Time.now}"
+    cancel_timer :my_second_timer
+  end
+  when_all timeout :my_second_timer do
+    puts "t1 started #{s.start}"
+    puts "t1 second_timer ended #{Time.now}"
   end
   when_start do
     post :t1, {:id => 1, :sid => 1, :start => "yes"}
   end
 end
 
+Durable.ruleset :t3 do
+  when_all m.start == "yes" do |c, complete|
+    puts "t3 first started #{c.m.id}"
+    Thread.new do
+      sleep 5
+      puts "t3 first completed"
+      post({:id => 2, :end => "yes"})
+      complete.call nil
+    end
+    10
+  end
+  when_all m.end == "yes" do |c, complete|
+    puts "t3 second started #{c.m.id}"
+    Thread.new do
+      sleep 7
+      puts "t3 second completed"
+      post({:id => 3, :end => "yes"})
+      complete.call nil
+    end
+    5
+  end
+  when_all +m.exception do
+    puts "t3 exception #{s.exception}"
+    s.exception = nil
+  end
+  when_start do
+    post :t3, {:id => 1, :sid => 1, :start => "yes"}
+  end
+end
+
+Durable.ruleset :q0 do
+  when_all m.start == "yes" do
+    puts "q0 started"
+    queue :q0, {:id => 2, :sid => 1, :end => "yes"}
+  end
+  when_all m.end == "yes" do
+    puts "q0 ended"
+  end
+  when_start do
+    post :q0, {:id => 1, :sid => 1, :start => "yes"}
+  end
+end
 
 Durable.run_all
 
