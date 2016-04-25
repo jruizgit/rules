@@ -26,7 +26,7 @@ handle = rules.create_ruleset(5, 'books1',  json.dumps({
     }
 }))
 
-rules.bind_ruleset(None , 0 , '/tmp/redis0.sock', handle)
+rules.bind_ruleset(None, 6379, "localhost", handle)
 
 rules.assert_event(handle, json.dumps({
     'id': 1,
@@ -84,7 +84,7 @@ handle = rules.create_ruleset(5, 'books2',  json.dumps({
     }
 }))
 
-rules.bind_ruleset(None , 0 , '/tmp/redis0.sock', handle)
+rules.bind_ruleset(None, 6379, "localhost", handle)
 
 rules.assert_event(handle, json.dumps({
     'id': 1,
@@ -116,7 +116,7 @@ handle = rules.create_ruleset(5, 'books3',  json.dumps({
    }
 }))
 
-rules.bind_ruleset(None , 0 , '/tmp/redis0.sock', handle)
+rules.bind_ruleset(None, 6379, "localhost", handle)
 
 rules.assert_event(handle, json.dumps({
     'id': 1,
@@ -147,7 +147,8 @@ handle = rules.create_ruleset(5, 'books4', json.dumps({
     }
 }))
 
-rules.bind_ruleset(None , 0 , '/tmp/redis0.sock', handle)
+rules.bind_ruleset(None, 6379, "localhost", handle)
+
 
 rules.assert_events(handle, json.dumps([
     {'id': '0', 'sid': 1, 'subject': 'approve', 'amount': 100}, 
@@ -182,7 +183,7 @@ handle = rules.create_ruleset(5, 'approval1',  json.dumps({
     }
 }))
 
-rules.bind_ruleset(None , 0 , '/tmp/redis0.sock', handle)
+rules.bind_ruleset(None, 6379, "localhost", handle)
 
 rules.assert_event(handle, json.dumps({
     'id': 3,
@@ -221,7 +222,7 @@ handle = rules.create_ruleset(5, 'approval2',  json.dumps({
     }
 }))
 
-rules.bind_ruleset(None , 0 , '/tmp/redis0.sock', handle)
+rules.bind_ruleset(None, 6379, "localhost", handle)
 
 rules.assert_event(handle, json.dumps({
     'id': 5,
@@ -266,7 +267,7 @@ handle = rules.create_ruleset(5, 'poc',  json.dumps({
         'all': [{'m': {'$lt': {'value': 0.2}}}]
    }
 }))
-rules.bind_ruleset(None , 0 , '/tmp/redis0.sock', handle)
+rules.bind_ruleset(None, 6379, "localhost", handle)
 
 rules.assert_events(handle, json.dumps([{
     'id': 1,
