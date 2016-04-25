@@ -556,5 +556,5 @@ with statechart('miss_manners'):
         host.assert_fact('miss_manners', {'id': 438, 'sid': 1, 't': 'guest', 'name': '128', 'sex': 'f', 'hobby': 'h3'})
         host.assert_fact('miss_manners', {'id': 439, 'sid': 1, 't': 'last_seat', 'seat': 128})
 
-run_all(['/tmp/redis0.sock'])
+run_all()
 
