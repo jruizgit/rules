@@ -1,7 +1,6 @@
 from durable.lang import *
-import random
 import time
-import json
+
 
 with ruleset('fraud_detection'):
     @when_all(span(10),
@@ -9,7 +8,7 @@ with ruleset('fraud_detection'):
     def handle_balance(c):
         debit_total = 0
         credit_total = 0
-        if c.s.balance == None:
+        if c.s.balance is None:
             c.s.balance = 0
             c.s.avg_balance = 0
             c.s.avg_withdraw = 0
