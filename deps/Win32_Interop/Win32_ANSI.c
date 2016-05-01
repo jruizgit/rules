@@ -25,7 +25,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "Win32_ANSI.h"
+#include "win32_ANSI.h"
 
 #define lenof(array) (sizeof(array)/sizeof(*(array)))
 

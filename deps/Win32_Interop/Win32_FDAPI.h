@@ -20,11 +20,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
-
-#ifndef _WIN32_FDAPI_H
-#define _WIN32_FDAPI_H
-#endif
+#ifndef WIN32_INTEROP_FDAPI_H
+#define WIN32_INTEROP_FDAPI_H
 
 // fcntl flags used in Redis
 #define	F_GETFL		3
@@ -33,55 +30,29 @@
 
 typedef unsigned long nfds_t;
 
-#if !defined(ssize_t)
-#ifdef _WIN64
-typedef __int64           ssize_t;
-#else
-typedef long              ssize_t;
-#endif
-#endif
-
-#define INCL_WINSOCK_API_PROTOTYPES 0 // Important! Do not include Winsock API definitions to avoid conflicts with API entry points defnied below.
+// Important! Do not include Winsock API definitions to avoid conflicts
+// with API entry points defined below.
+#define INCL_WINSOCK_API_PROTOTYPES 0
+#include "win32_types_hiredis.h"
 #include <WinSock2.h>
-#undef FD_ISSET
 #include <fcntl.h>
 #include <stdio.h>
 
-// the following are required to be defined before WS2tcpip is included.
-typedef void (*redis_WSASetLastError)(int iError);
-typedef int (*redis_WSAGetLastError)(void);
-typedef int (*redis_WSAIoctl)(int rfd,DWORD dwIoControlCode,LPVOID lpvInBuffer,DWORD cbInBuffer,LPVOID lpvOutBuffer,DWORD cbOutBuffer,LPDWORD lpcbBytesReturned,LPWSAOVERLAPPED lpOverlapped,LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
-
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
-extern redis_WSASetLastError WSASetLastError;
-extern redis_WSAGetLastError WSAGetLastError;
-extern redis_WSAIoctl WSAIoctl;
-
-#ifdef __cplusplus
-}
-#endif
-
-// including a version of this file modified to eliminate prototype definitions not removed by INCL_WINSOCK_API_PROTOTYPES
+// Including a version of this file modified to eliminate prototype
+// definitions not removed by INCL_WINSOCK_API_PROTOTYPES
 #include "WS2tcpip.h"
 
-// reintroducing the inline APIs removed by INCL_WINSOCK_API_PROTOTYPES that Redis is using
+// Reintroducing the inline APIs removed by INCL_WINSOCK_API_PROTOTYPES
+// that Redis is using
 #ifdef UNICODE
 #define gai_strerror   gai_strerrorW
 #else
 #define gai_strerror   gai_strerrorA
-#endif  /* UNICODE */
+#endif /* UNICODE */
 
 #define GAI_STRERROR_BUFFER_SIZE 1024
 
-WS2TCPIP_INLINE
-char *
-gai_strerrorA(
-    _In_ int ecode)
-{
+WS2TCPIP_INLINE char* gai_strerrorA(_In_ int ecode) {
     DWORD dwMsgLen;
     static char buff[GAI_STRERROR_BUFFER_SIZE + 1];
 
@@ -98,12 +69,7 @@ gai_strerrorA(
     return buff;
 }
 
-WS2TCPIP_INLINE
-WCHAR *
-gai_strerrorW(
-    _In_ int ecode
-    )
-{
+WS2TCPIP_INLINE WCHAR* gai_strerrorW(_In_ int ecode) {
     DWORD dwMsgLen;
     static WCHAR buff[GAI_STRERROR_BUFFER_SIZE + 1];
 
@@ -135,7 +101,6 @@ gai_strerrorW(
 #define POLLNVAL    0x0004
 
 typedef struct pollfd {
-
     SOCKET  fd;
     SHORT   events;
     SHORT   revents;
@@ -143,59 +108,38 @@ typedef struct pollfd {
 } WSAPOLLFD, *PWSAPOLLFD, FAR *LPWSAPOLLFD;
 #endif
 
-// WinSock APIs used in Win32_wsiocp.cpp
-typedef int (*redis_WSASend)(int rfd, LPWSABUF lpBuffers, DWORD dwBufferCount, LPDWORD lpNumberOfBytesSent, DWORD dwFlags, LPWSAOVERLAPPED lpOverlapped, LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
-typedef int (*redis_WSARecv)(int rfd,LPWSABUF lpBuffers,DWORD dwBufferCount,LPDWORD lpNumberOfBytesRecvd,LPDWORD lpFlags,LPWSAOVERLAPPED lpOverlapped,LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
-typedef int (*redis_WSACleanup)(void);
-typedef int (*redis_ioctlsocket)(int rfd,long cmd,u_long *argp );
-typedef unsigned long (*redis_inet_addr)(const char *cp);
-typedef struct hostent* (*redis_gethostbyname)(const char *name);
-typedef char* (*redis_inet_ntoa)(struct in_addr in);
-typedef BOOL (*redis_WSAGetOverlappedResult)(int rfd,LPWSAOVERLAPPED lpOverlapped, LPDWORD lpcbTransfer, BOOL fWait, LPDWORD lpdwFlags);
-
-typedef int (*redis_WSADuplicateSocket)(int rfd, DWORD dwProcessId, LPWSAPROTOCOL_INFO lpProtocolInfo);
-typedef int (*redis_WSASocket)(int af, int type, int protocol, LPWSAPROTOCOL_INFO lpProtocolInfo, GROUP g, DWORD dwFlags);
-
-// other API forwards
-typedef int (*redis_setmode)(int fd,int mode);
-typedef size_t (*redis_fwrite)(const void * _Str, size_t _Size, size_t _Count, FILE * _File);
-
 // API prototypes must match the unix implementation
-typedef int (*redis_pipe)(int pipefd[2]);
-typedef int (*redis_socket)(int af,int type,int protocol);
-typedef int (*redis_close)(int fd);
-typedef int (*redis_open)(const char * _Filename, int _OpenFlag, int flags);
-typedef int (*redis_accept)(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
-typedef int (*redis_setsockopt)(int sockfd, int level, int optname,const void *optval, socklen_t optlen);
-typedef int (*redis_fcntl)(int fd, int cmd, int flags);
-typedef int (*redis_poll)(struct pollfd *fds, nfds_t nfds, int timeout); 
-typedef int (*redis_getsockopt)(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
-typedef int (*redis_connect)(int sockfd, const struct sockaddr *addr, size_t addrlen);
-typedef ssize_t (*redis_read)(int fd, void *buf, size_t count);
-typedef ssize_t (*redis_write)(int fd, const void *buf, size_t count); 
-typedef int (*redis_fsync)(int fd);
-typedef int (*_redis_fstat)(int fd, struct __stat64 *buffer);
-typedef int (*redis_listen)(int sockfd, int backlog);
-typedef int (*redis_ftruncate)(int fd, long long length);
-typedef int (*redis_bind)(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-typedef int (*redis_shutdown)(int sockfd, int how); 
-typedef u_short (*redis_htons)(u_short hostshort);
-typedef u_long (*redis_htonl)(u_long hostlong);
-typedef int (*redis_getpeername)(int sockfd, struct sockaddr *addr, socklen_t * addrlen);
-typedef int (*redis_getsockname)(int sockfd, struct sockaddr* addrsock, int* addrlen );
-typedef u_short (*redis_ntohs)(u_short netshort);
-typedef void (*redis_freeaddrinfo)(struct addrinfo *ai);
-typedef int (*redis_getaddrinfo)(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res);
-typedef const char* (*redis_inet_ntop)(int af, const void *src, char *dst, size_t size);
+typedef int (*fdapi_pipe)(int pipefd[2]);
+typedef int (*fdapi_socket)(int af,int type,int protocol);
+typedef int (*fdapi_open)(const char * _Filename, int _OpenFlag, int flags);
+typedef int (*fdapi_accept)(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+typedef int (*fdapi_setsockopt)(int sockfd, int level, int optname,const void *optval, socklen_t optlen);
+typedef int (*fdapi_fcntl)(int fd, int cmd, int flags);
+typedef int (*fdapi_poll)(struct pollfd *fds, nfds_t nfds, int timeout);
+typedef int (*fdapi_getsockopt)(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
+typedef int (*fdapi_connect)(int sockfd, const struct sockaddr *addr, size_t addrlen);
+typedef ssize_t (*fdapi_read)(int fd, void *buf, size_t count);
+typedef ssize_t (*fdapi_write)(int fd, const void *buf, size_t count);
+typedef int (*fdapi_fsync)(int fd);
+typedef int (*fdapi_listen)(int sockfd, int backlog);
+typedef int (*fdapi_ftruncate)(int fd, PORT_LONGLONG length);
+typedef int (*fdapi_bind)(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+typedef u_short (*fdapi_htons)(u_short hostshort);
+typedef u_long (*fdapi_htonl)(u_long hostlong);
+typedef u_short (*fdapi_ntohs)(u_short netshort);
+typedef int (*fdapi_getpeername)(int sockfd, struct sockaddr *addr, socklen_t * addrlen);
+typedef int (*fdapi_getsockname)(int sockfd, struct sockaddr* addrsock, int* addrlen );
+typedef void (*fdapi_freeaddrinfo)(struct addrinfo *ai);
+typedef int (*fdapi_getaddrinfo)(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res);
+typedef const char* (*fdapi_inet_ntop)(int af, const void *src, char *dst, size_t size);
+typedef int (*fdapi_inet_pton)(int af, const char * src, void *dst);
+typedef int (*fdapi_select)(int nfds, fd_set *readfds, fd_set *writefds,fd_set *exceptfds, struct timeval *timeout);
+typedef u_int (*fdapi_ntohl)(u_int netlong);
+typedef int (*fdapi_isatty)(int fd);
+typedef int (*fdapi_access)(const char *pathname, int mode);
+typedef u_int64 (*fdapi_lseek64)(int fd, u_int64 offset, int whence);
 
-typedef int (*redis_select)(int nfds, fd_set *readfds, fd_set *writefds,fd_set *exceptfds, struct timeval *timeout);
-typedef u_int (*redis_ntohl)(u_int netlong);
-typedef int (*redis_isatty)(int fd);
-typedef int (*redis_access)(const char *pathname, int mode);
-typedef u_int64 (*redis_lseek64)(int fd, u_int64 offset, int whence); 
-typedef intptr_t (*redis_get_osfhandle)(int fd);
-typedef int (*redis_open_osfhandle)(intptr_t osfhandle, int flags);
-typedef int(*redis_FD_ISSET)(int fd, fd_set *);
+typedef BOOL fnWSIOCP_CloseSocketStateRFD(int rfd);
 
 // access() mode definitions 
 #define X_OK    0
@@ -208,80 +152,80 @@ extern "C"
 #endif
 
 // API replacements
-extern redis_pipe pipe;
-extern redis_socket socket;
-extern redis_WSASend WSASend;
-extern redis_WSARecv WSARecv;
-extern redis_WSACleanup WSACleanup;
-extern redis_ioctlsocket ioctlsocket;
-extern redis_inet_addr inet_addr;
-extern redis_inet_ntoa inet_ntoa;
-extern redis_WSAGetOverlappedResult WSAGetOverlappedResult;
-extern redis_WSADuplicateSocket WSADuplicateSocket;
-extern redis_WSASocket WSASocket;
+extern fdapi_accept         accept;
+extern fdapi_access         access;
+extern fdapi_bind           bind;
+extern fdapi_connect        connect;
+extern fdapi_fcntl          fcntl;
+extern fdapi_freeaddrinfo   freeaddrinfo;
+extern fdapi_fsync          fsync;
+extern fdapi_ftruncate      ftruncate;
+extern fdapi_getaddrinfo    getaddrinfo;
+extern fdapi_getsockopt     getsockopt;
+extern fdapi_getpeername    getpeername;
+extern fdapi_getsockname    getsockname;
+extern fdapi_htonl          htonl;
+extern fdapi_htons          htons;
+extern fdapi_isatty         isatty;
+extern fdapi_inet_ntop      inet_ntop;
+extern fdapi_inet_pton      inet_pton;
+extern fdapi_listen         listen;
+extern fdapi_lseek64        lseek64;
+extern fdapi_ntohl          ntohl;
+extern fdapi_ntohs          ntohs;
+extern fdapi_open           open;
+extern fdapi_pipe           pipe;
+extern fdapi_poll           poll;
+extern fdapi_read           read;
+extern fdapi_select         select;
+extern fdapi_setsockopt     setsockopt;
+extern fdapi_socket         socket;
+extern fdapi_write          write;
 
-extern redis_close fdapi_close;
-extern redis_open open;
-extern redis_accept accept;
-extern redis_setsockopt setsockopt;
-extern redis_fcntl fcntl;
-extern redis_poll poll;
-extern redis_getsockopt getsockopt;
-extern redis_connect connect;
-extern redis_read read;
-extern redis_write write;
-extern redis_fsync fsync;
-extern _redis_fstat fdapi_fstat64;
-extern redis_listen listen;
-extern redis_ftruncate ftruncate;
-extern redis_bind bind;
-extern redis_shutdown shutdown;
-extern redis_gethostbyname gethostbyname;
-extern redis_htons htons;
-extern redis_htonl htonl;
-extern redis_getpeername getpeername;
-extern redis_getsockname getsockname;
-extern redis_ntohs ntohs;
-extern redis_setmode fdapi_setmode;
-extern redis_fwrite fdapi_fwrite;
+// Other FD based APIs
+void    FDAPI_SaveSocketAddrStorage(int rfd, SOCKADDR_STORAGE* socketAddrStorage);
+BOOL    FDAPI_SocketAttachIOCP(int rfd, HANDLE iocph);
+BOOL    FDAPI_AcceptEx(int listenFD,int acceptFD,PVOID lpOutputBuffer,DWORD dwReceiveDataLength,DWORD dwLocalAddressLength,DWORD dwRemoteAddressLength,LPDWORD lpdwBytesReceived,LPOVERLAPPED lpOverlapped);
+BOOL    FDAPI_ConnectEx(int fd,const struct sockaddr *name,int namelen,PVOID lpSendBuffer,DWORD dwSendDataLength,LPDWORD lpdwBytesSent,LPOVERLAPPED lpOverlapped);
+void    FDAPI_GetAcceptExSockaddrs(int fd, PVOID lpOutputBuffer,DWORD dwReceiveDataLength,DWORD dwLocalAddressLength,DWORD dwRemoteAddressLength,LPSOCKADDR *LocalSockaddr,LPINT LocalSockaddrLength,LPSOCKADDR *RemoteSockaddr,LPINT RemoteSockaddrLength);
+int     FDAPI_UpdateAcceptContext( int fd );
+int     FDAPI_PipeSetNonBlock(int rfd, int non_blocking);
+void**  FDAPI_GetSocketStatePtr(int rfd);
+void    FDAPI_ClearSocketInfo(int fd);
 
-extern redis_select select;
-extern redis_ntohl ntohl;
-extern redis_isatty isatty;
-extern redis_access access;
-extern redis_lseek64 lseek64;
-extern redis_get_osfhandle fdapi_get_osfhandle;
-extern redis_open_osfhandle fdapi_open_osfhandle;
-extern redis_freeaddrinfo freeaddrinfo;
-extern redis_getaddrinfo getaddrinfo;
-extern redis_inet_ntop inet_ntop;
-extern redis_FD_ISSET FD_ISSET;
+int     FDAPI_WSAIoctl(int rfd, DWORD dwIoControlCode, LPVOID lpvInBuffer, DWORD cbInBuffer, LPVOID lpvOutBuffer, DWORD cbOutBuffer, LPDWORD lpcbBytesReturned, LPWSAOVERLAPPED lpOverlapped, LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
+int     FDAPI_WSASend(int rfd, LPWSABUF lpBuffers, DWORD dwBufferCount, LPDWORD lpNumberOfBytesSent, DWORD dwFlags, LPWSAOVERLAPPED lpOverlapped, LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
+int     FDAPI_WSARecv(int rfd, LPWSABUF lpBuffers, DWORD dwBufferCount, LPDWORD lpNumberOfBytesRecvd, LPDWORD lpFlags, LPWSAOVERLAPPED lpOverlapped, LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
+BOOL    FDAPI_WSAGetOverlappedResult(int rfd, LPWSAOVERLAPPED lpOverlapped, LPDWORD lpcbTransfer, BOOL fWait, LPDWORD lpdwFlags);
+int     FDAPI_WSADuplicateSocket(int rfd, DWORD dwProcessId, LPWSAPROTOCOL_INFO lpProtocolInfo);
+int     FDAPI_WSASocket(int af, int type, int protocol, LPWSAPROTOCOL_INFO lpProtocolInfo, GROUP g, DWORD dwFlags);
+int     FDAPI_WSAGetLastError(void);
 
-// other FD based APIs
-BOOL SetFDInformation(int FD, DWORD mask, DWORD flags);
-HANDLE FDAPI_CreateIoCompletionPortOnFD(int FD, HANDLE ExistingCompletionPort, ULONG_PTR CompletionKey, DWORD NumberOfConcurrentThreads);
-BOOL FDAPI_AcceptEx(int listenFD,int acceptFD,PVOID lpOutputBuffer,DWORD dwReceiveDataLength,DWORD dwLocalAddressLength,DWORD dwRemoteAddressLength,LPDWORD lpdwBytesReceived,LPOVERLAPPED lpOverlapped);
-BOOL FDAPI_ConnectEx(int fd,const struct sockaddr *name,int namelen,PVOID lpSendBuffer,DWORD dwSendDataLength,LPDWORD lpdwBytesSent,LPOVERLAPPED lpOverlapped);
-void FDAPI_GetAcceptExSockaddrs(int fd, PVOID lpOutputBuffer,DWORD dwReceiveDataLength,DWORD dwLocalAddressLength,DWORD dwRemoteAddressLength,LPSOCKADDR *LocalSockaddr,LPINT LocalSockaddrLength,LPSOCKADDR *RemoteSockaddr,LPINT RemoteSockaddrLength);
-int FDAPI_UpdateAcceptContext( int fd );
+intptr_t FDAPI_get_osfhandle(int fd);
+int      FDAPI_open_osfhandle(intptr_t osfhandle, int flags);
 
-// other networking functions
+// FDAPI helper function
+void FDAPI_SetCloseSocketState(fnWSIOCP_CloseSocketStateRFD* func);
+
+// Other networking functions
 BOOL ParseStorageAddress(const char *ip, int port, SOCKADDR_STORAGE* pSotrageAddr);
-int StorageSize(SOCKADDR_STORAGE *ss);
 
-// macroize CRT definitions to point to our own
+extern int FDAPI_close(int rfd);
+extern int FDAPI_fclose(FILE *file);
+extern int FDAPI_setmode(int fd, int mode);
+extern size_t FDAPI_fwrite(const void *buffer, size_t size, size_t count, FILE *file);
+extern int FDAPI_fileno(FILE *file);
+
+// Macroize CRT definitions to point to our own
 #ifndef FDAPI_NOCRTREDEFS
-#define close(fd) fdapi_close(fd)
-#define setmode(fd,mode) fdapi_setmode(fd,mode)
-#define fwrite(Str, Size, Count, File) fdapi_fwrite(Str,Size,Count,File)
-#define _get_osfhandle(fd) fdapi_get_osfhandle(fd)
-
-#define _INC_STAT_INL
-#define fstat(_Desc, _Stat) fdapi_fstat64(_Desc,_Stat)
+#define close(fd)                   FDAPI_close(fd)
+#define fclose(File)                FDAPI_fclose(File)
+#define setmode(fd,mode)            FDAPI_setmode(fd,mode)
+#define fwrite(Str,Size,Count,File) FDAPI_fwrite(Str,Size,Count,File)
+#define fileno(File)                FDAPI_fileno(File)
 #endif
 
 #ifdef __cplusplus
-
-bool IsWindowsVersionAtLeast(WORD wMajorVersion, WORD wMinorVersion, WORD wServicePackMajor);
 }
+#endif
 #endif

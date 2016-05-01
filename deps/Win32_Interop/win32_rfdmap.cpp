@@ -20,139 +20,139 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
+#include "win32_types_hiredis.h"
 #include "win32_rfdmap.h"
+#include "win32_assert.h"
 
 RFDMap& RFDMap::getInstance() {
-    static RFDMap    instance; // Instantiated on first use. Guaranteed to be destroyed.
+    static RFDMap instance; // Instantiated on first use. Guaranteed to be destroyed.
     return instance;
 }
 
-RFDMap::RFDMap() { maxRFD = minRFD; };                   
+RFDMap::RFDMap() {
+    InitializeCriticalSection(&mutex);
+    // stdin, assigned rfd = 0
+    addCrtFD(0);
+    // stdout, assigned rfd = 1
+    addCrtFD(1);
+    // stderr, assigned rfd = 2
+    addCrtFD(2);
+}
 
 RFD RFDMap::getNextRFDAvailable() {
-	if( RFDRecyclePool.empty() == false ) {
-		int RFD = RFDRecyclePool.front();
-		RFDRecyclePool.pop();
-		return RFD;
-	} else {
-        maxRFD = minRFD + (int)SocketToRFDMap.size() + (int)PosixFDToRFDMap.size();
-		return maxRFD;
-	}
+    RFD rfd;
+    EnterCriticalSection(&mutex);
+    if (RFDRecyclePool.empty() == false) {
+        rfd = RFDRecyclePool.front();
+        RFDRecyclePool.pop();
+    } else {
+        if (next_available_rfd < INT_MAX) {
+            rfd = RFDMap::next_available_rfd++;
+        } else {
+            rfd = INVALID_FD;
+        }
+    }
+    LeaveCriticalSection(&mutex);
+    return rfd;
 }
 
 RFD RFDMap::addSocket(SOCKET s) {
-	if (SocketToRFDMap.find(s) != SocketToRFDMap.end()) {
-		return invalidRFD;
-	}
+    RFD rfd;
+    EnterCriticalSection(&mutex);
+    if (SocketToRFDMap.find(s) != SocketToRFDMap.end()) {
+        rfd = INVALID_FD;
+    } else {
+        rfd = getNextRFDAvailable();
+        if (rfd != INVALID_FD) {
+            SocketToRFDMap[s] = rfd;
 
-	RFD rfd = getNextRFDAvailable();
-	SocketToRFDMap[s] = rfd;
-	RFDToSocketMap[rfd] = s;
-	return rfd;
-}
-
-void RFDMap::removeSocket(SOCKET s) {	
-	S2RFDIterator mit = SocketToRFDMap.find(s);
-    if(mit == SocketToRFDMap.end()) {
-//            redisLog( REDIS_DEBUG, "RFDMap::removeSocket() - failed to find socket!" );
-        return;
+            SocketInfo socket_info;
+            socket_info.socket = s;
+            socket_info.state = NULL;
+            socket_info.flags = 0;
+            memset(&(socket_info.socketAddrStorage), 0, sizeof(SOCKADDR_STORAGE));
+            RFDToSocketInfoMap[rfd] = socket_info;
+        }
     }
-	RFD rfd = (*mit).second;
-	RFDRecyclePool.push(rfd);
-    RFDToSocketMap.erase(rfd);
-	SocketToRFDMap.erase(s);
+    LeaveCriticalSection(&mutex);
+    return rfd;
 }
 
-RFD RFDMap::addPosixFD(int posixFD) {
-	if (PosixFDToRFDMap.find(posixFD) != PosixFDToRFDMap.end()) {
-//      redisLog( REDIS_DEBUG, "RFDMap::addPosixFD() - posixFD already exists!" );
-		return invalidRFD;
-	}
-
-	RFD rfd = getNextRFDAvailable();
-	PosixFDToRFDMap[posixFD] = rfd;
-	RFDToPosixFDMap[rfd] = posixFD;
-	return rfd;
+void RFDMap::removeSocketToRFD(SOCKET s) {
+    EnterCriticalSection(&mutex);
+    SocketToRFDMap.erase(s);
+    LeaveCriticalSection(&mutex);
 }
 
-void RFDMap::removePosixFD(int posixFD) {	
-	PosixFD2RFDIterator mit = PosixFDToRFDMap.find(posixFD);
-    if(mit == PosixFDToRFDMap.end()) {
-//      redisLog( REDIS_DEBUG, "RFDMap::removePosixFD() - failed to find posix FD!" );
-        return;
+void RFDMap::removeRFDToSocketInfo(RFD rfd) {
+    EnterCriticalSection(&mutex);
+    RFDToSocketInfoMap.erase(rfd);
+    RFDRecyclePool.push(rfd);
+    LeaveCriticalSection(&mutex);
+}
+
+RFD RFDMap::addCrtFD(int crt_fd) {
+    RFD rfd;
+    EnterCriticalSection(&mutex);
+    if (CrtFDToRFDMap.find(crt_fd) != CrtFDToRFDMap.end()) {
+        rfd = CrtFDToRFDMap[crt_fd];
+    } else {
+        rfd = getNextRFDAvailable();
+        if (rfd != INVALID_FD) {
+            CrtFDToRFDMap[crt_fd] = rfd;
+            RFDToCrtFDMap[rfd] = crt_fd;
+        }
     }
-	RFD rfd = (*mit).second;
-	RFDRecyclePool.push(rfd);
-    RFDToPosixFDMap.erase(rfd);
-	PosixFDToRFDMap.erase(posixFD);
+    LeaveCriticalSection(&mutex);
+    return rfd;
+}
+
+void RFDMap::removeCrtFD(int crt_fd) {
+    // crt_fd between FIRST_RESERVED_RFD_INDEX and LAST_RESERVED_RFD_INDEX
+    // should never be removed.
+    ASSERT(FIRST_RESERVED_RFD_INDEX == 0);
+    if (crt_fd > RFDMap::LAST_RESERVED_RFD_INDEX) {
+        EnterCriticalSection(&mutex);
+        map<int, RFD>::iterator mit = CrtFDToRFDMap.find(crt_fd);
+        if (mit != CrtFDToRFDMap.end()) {
+            RFD rfd = (*mit).second;
+            RFDRecyclePool.push(rfd);
+            RFDToCrtFDMap.erase(rfd);
+            CrtFDToRFDMap.erase(crt_fd);
+        }
+        LeaveCriticalSection(&mutex);
+    }
 }
 
 SOCKET RFDMap::lookupSocket(RFD rfd) {
-	if (RFDToSocketMap.find(rfd)  != RFDToSocketMap.end()) {
-		return RFDToSocketMap[rfd];
-	} else {
-//      redisLog( REDIS_DEBUG, "RFDMap::lookupSocket() - failed to find socket!" );
-		return INVALID_SOCKET;
-	}
-}
-
-int RFDMap::lookupPosixFD(RFD rfd) {
-	if (RFDToPosixFDMap.find(rfd)  != RFDToPosixFDMap.end()) {
-		return RFDToPosixFDMap[rfd];
-	} else if (rfd >= 0 && rfd <= 2) {
-		return rfd;
-	}
-	else {
-//   	redisLog( REDIS_DEBUG, "RFDMap::lookupPosixFD() - failed to find posix FD!" );
-		return -1;
-	}
-}
-
-RFD RFDMap::lookupRFD(SOCKET s) {
-	if (SocketToRFDMap.find(s) != SocketToRFDMap.end()) {
-		return SocketToRFDMap[s];
-	} else {
-//		redisLog( REDIS_DEBUG, "RFDMap::lookupFD() - failed to map SOCKET to RFD!" );
-		return invalidRFD;
-	}
-}
-
-RFD RFDMap::lookupRFD(int posixFD) {
-	if (PosixFDToRFDMap.find(posixFD) != PosixFDToRFDMap.end()) {
-		return PosixFDToRFDMap[posixFD];
-	} else {
-//		redisLog( REDIS_DEBUG, "RFDMap::lookupFD() - failed to map posixFD to RFD!" );
-		return invalidRFD;
-	}
-}
-
-RFD RFDMap::getMinRFD() {
-	return minRFD;
-}
-
-RFD RFDMap::getMaxRFD() {
-    return maxRFD;
-}
-
-bool RFDMap::SetSocketState( SOCKET s, RedisSocketState state )
-{
-    S2StateIterator sit = SocketToStateMap.find(s);
-    if(sit != SocketToStateMap.end() ) {
-        SocketToStateMap[s] = state;
-        return true;
-    } else {
-        return false;
+    SOCKET socket = INVALID_SOCKET;
+    EnterCriticalSection(&mutex);
+    if (RFDToSocketInfoMap.find(rfd) != RFDToSocketInfoMap.end()) {
+        socket = RFDToSocketInfoMap[rfd].socket;
     }
+    LeaveCriticalSection(&mutex);
+    return socket;
 }
 
-bool RFDMap::GetSocketState( SOCKET s, RedisSocketState& state )
-{
-    S2StateIterator sit = SocketToStateMap.find(s);
-    if(sit != SocketToStateMap.end() ) {
-        state = SocketToStateMap[s];
-        return true;
-    } else {
-        return false;
+SocketInfo* RFDMap::lookupSocketInfo(RFD rfd) {
+    SocketInfo* socket_info = NULL;
+    EnterCriticalSection(&mutex);
+    if (RFDToSocketInfoMap.find(rfd) != RFDToSocketInfoMap.end()) {
+        socket_info = &RFDToSocketInfoMap[rfd];
     }
+    LeaveCriticalSection(&mutex);
+    return socket_info;
+}
+
+int RFDMap::lookupCrtFD(RFD rfd) {
+    int crt_fd = INVALID_FD;
+    EnterCriticalSection(&mutex);
+    if (RFDToCrtFDMap.find(rfd) != RFDToCrtFDMap.end()) {
+        crt_fd = RFDToCrtFDMap[rfd];
+    } else if (rfd >= RFDMap::FIRST_RESERVED_RFD_INDEX
+        && rfd <= RFDMap::LAST_RESERVED_RFD_INDEX) {
+        crt_fd = rfd;
+    }
+    LeaveCriticalSection(&mutex);
+    return crt_fd;
 }

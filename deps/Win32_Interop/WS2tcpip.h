@@ -30,8 +30,8 @@
 **
 **  To provide the backward compatibility, all the TCP/IP
 **  specific definitions that were included in the WINSOCK.H
-**   file are now included in WINSOCK2.H file. WS2TCPIP.H
-**  file includes only the definitions  introduced in the
+**  file are now included in WINSOCK2.H file. WS2TCPIP.H
+**  file includes only the definitions introduced in the
 **  "WinSock 2 Protocol-Specific Annex" document.
 **
 **  Rev 0.3 Nov 13, 1995
@@ -48,7 +48,7 @@
 #if WINVER <= _WIN32_WINNT_WS03
 #include "win32_winapifamily.h"
 #else
-#include "winapifamily.h"
+#include <winapifamily.h>
 #endif
 
 #pragma region Desktop Family
@@ -552,6 +552,7 @@ INT
 
 
 #if (NTDDI_VERSION >= NTDDI_VISTA)
+#if INCL_WINSOCK_API_TYPEDEFS
 WINSOCK_API_LINKAGE
 INT
 WSAAPI
@@ -569,8 +570,6 @@ InetPtonW(
     _Out_writes_bytes_(sizeof(IN6_ADDR))      PVOID           pAddrBuf
     );
 
-
-#if INCL_WINSOCK_API_TYPEDEFS
 PCSTR
 WSAAPI
 inet_ntop(

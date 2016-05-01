@@ -19,33 +19,7 @@
 * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "Win32_Common.h"
-
-namespace Globals
-{
-    size_t pageSize = 0;
-}
-
-/* This function is used to force the VEH on the entire size of the buffer length,
- * in the event that the buffer crosses the memory page boundaries */
-void EnsureMemoryIsMapped(const void *buffer, size_t size) {
-    // Use 'volatile' to make sure the compiler doesn't remove "c = *((char*) (p + offset));"
-    volatile char c;
-    char* p = (char*) buffer;
-    char* pStart = p - ((size_t) p % Globals::pageSize);
-    char* pEnd = p + size;
-    if ((size_t) (pEnd - pStart) > Globals::pageSize) {
-        size_t offset = 0;
-        while (offset < size) {
-            if (size < offset) {
-                offset = size;
-            } else {
-                offset += Globals::pageSize;
-            }
-            c = *((char*) (p + offset));
-        }
-    }
-}
+#include "win32_common.h"
 
 bool IsWindowsVersionAtLeast(WORD wMajorVersion, WORD wMinorVersion, WORD wServicePackMajor) {
     OSVERSIONINFOEXW osvi = {sizeof(osvi), 0, 0, 0, 0, {0}, 0, 0};

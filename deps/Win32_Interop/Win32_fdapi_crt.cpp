@@ -20,7 +20,8 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "Win32_fdapi_crt.h"
+#include "win32_fdapi_crt.h"
+#include "win32_common.h"
 #include <io.h>
 #include <stdlib.h>
 
@@ -29,61 +30,53 @@ int crt_pipe(int *pfds, unsigned int psize, int textmode) {
 }
 
 int crt_close(int fd) {
-	return _close(fd);
+    return _close(fd);
 }
 
 int crt_read(int fd, void *buffer, unsigned int count) {
-	return _read(fd, buffer, count);
+    return _read(fd, buffer, count);
 }
 
 int crt_write(int fd, const void *buffer, unsigned int count) {
-	return _write(fd, buffer, count);
+    return _write(fd, buffer, count);
 }
 
 int crt_open(const char *filename, int oflag, int pmode) {
-	return _open(filename, oflag, pmode);
+    return _open(filename, oflag, pmode);
 }
 
 int crt_open_osfhandle(intptr_t osfhandle, int flags) {
     return _open_osfhandle(osfhandle, flags);
 }
 
-intptr_t crtget_osfhandle(int fd) {
-	return _get_osfhandle(fd);
+intptr_t crt_get_osfhandle(int fd) {
+    return _get_osfhandle(fd);
 }
 
-int crtsetmode(int fd, int mode) {
-	return ::_setmode(fd, mode);
+int crt_setmode(int fd, int mode) {
+    return ::_setmode(fd, mode);
 }
 
-size_t crtfwrite(const void * _Str, size_t _Size, size_t _Count, FILE * _File) {
-    // fwrite() somehow locks its view of the buffer. If during a fork operation the buffer has not been loaded into the forkee's process space,
-    // the VEH will be called to load the missing pages. Although the page gets loaded, fwrite() will not see the loaded page. The result is
-    // that fwrite will fail with errno set to ERROR_INVALID_USER_BUFFER. The fix is to force the buffer into memory before fwrite(). This only
-    // impacts wirites that straddle page boundaries.
-    const intptr_t pageSize = 4096;
-    char* p = (char*)_Str;
-    char* pageStart = p - ((intptr_t)p % pageSize);
-    char* pEnd = p + _Size;
-    if ((intptr_t)(pEnd - pageStart) > pageSize)  {
-        for (size_t n = 0; n < _Size; n++) {
-            char x = *((char*)_Str + n);
-        }
-    }
-
-    return ::fwrite(_Str, _Size, _Count, _File);
+size_t crt_fwrite(const void *buffer, size_t size, size_t count, FILE *file) {
+    return ::fwrite(buffer, size, count, file);
 }
 
+int crt_fclose(FILE* file) {
+    return ::fclose(file);
+}
+
+int crt_fileno(FILE* file) {
+    return ::_fileno(file);
+}
 
 int crt_isatty(int fd) {
-	return _isatty(fd);
+    return _isatty(fd);
 }
 
 int crt_access(const char *pathname, int mode) {
-	return _access(pathname, mode);
+    return _access(pathname, mode);
 }
 
 __int64 crt_lseek64(int fd, __int64 offset, int origin) {
-	return _lseeki64(fd, offset, origin);
+    return _lseeki64(fd, offset, origin);
 }
-
