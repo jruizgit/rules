@@ -28,13 +28,14 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
+#ifdef _WIN32
+#include "win32_hiredis.h"
+#include "../Win32_Interop/win32_wsiocp2.h"
+#endif
 #include "fmacros.h"
 #include <stdlib.h>
 #include <string.h>
-#ifndef _WIN32
-#include <strings.h>
-#endif
+POSIX_ONLY(#include <strings.h>)
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -42,9 +43,6 @@
 #include "net.h"
 #include "dict.c"
 #include "sds.h"
-#ifdef _WIN32
-  #include "../win32_Interop/win32fixes.h"
-#endif
 
 #define _EL_ADD_READ(ctx) do { \
         if ((ctx)->ev.addRead) (ctx)->ev.addRead((ctx)->ev.data); \
@@ -165,13 +163,13 @@ static void __redisAsyncCopyError(redisAsyncContext *ac) {
     ac->errstr = c->errstr;
 }
 
-#ifdef WIN32_IOCP
+#ifdef _WIN32
 redisAsyncContext *redisAsyncConnect(const char *ip, int port) {
     SOCKADDR_STORAGE ss;
     redisContext *c = redisPreConnectNonBlock(ip, port, &ss);
     redisAsyncContext *ac = redisAsyncInitialize(c);
-    if (aeWinSocketConnect(ac->c.fd, &ss) != 0) {
-         ac->c.err = errno;
+    if (WSIOCP_SocketConnect(ac->c.fd, &ss) != 0) {
+        ac->c.err = errno;
         strerror_r(errno, ac->c.errstr, sizeof(ac->c.errstr));
     }
     __redisAsyncCopyError(ac);
@@ -182,7 +180,7 @@ redisAsyncContext *redisAsyncConnectBind(const char *ip, int port, const char *s
     SOCKADDR_STORAGE ss;
     redisContext *c = redisPreConnectNonBlock(ip, port, &ss);
     redisAsyncContext *ac = redisAsyncInitialize(c);
-    if (aeWinSocketConnectBind(ac->c.fd, &ss, source_addr) != 0) {
+    if (WSIOCP_SocketConnectBind(ac->c.fd, &ss, source_addr) != 0) {
         ac->c.err = errno;
         strerror_r(errno, ac->c.errstr, sizeof(ac->c.errstr));
     }
@@ -487,6 +485,7 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
             if (((redisReply*)reply)->type == REDIS_REPLY_ERROR) {
                 c->err = REDIS_ERR_OTHER;
                 snprintf(c->errstr,sizeof(c->errstr),"%s",((redisReply*)reply)->str);
+                c->reader->fn->freeObject(reply);
                 __redisAsyncDisconnect(ac);
                 return;
             }
@@ -649,7 +648,7 @@ static char *nextArgument(char *start, char **str, size_t *len) {
         if (p == NULL) return NULL;
     }
 
-    *len = (int)strtol(p+1,NULL,10);
+    *len = (int)PORT_STRTOL(p+1,NULL,10);
     p = strchr(p,'\r');
     assert(p);
     *str = p+2;

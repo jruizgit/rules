@@ -3,6 +3,15 @@
     {
       'target_name': 'win32_interop',
       'type': 'static_library',
+      'configurations': {
+        'Release': {
+          'msvs_settings': {
+            'VCCLCompilerTool': {
+              'ExceptionHandling': 1,
+            }
+          }
+        }
+      },
       'direct_dependent_settings': {
         'include_dirs': [ '.' ],
       },

@@ -20,42 +20,13 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <windows.h>
-#include <stdexcept>
-#include <map>
-#include "Win32_variadicFunctor.h"
-using namespace std;
+#pragma once
 
-DLLMap& DLLMap::getInstance() {
-	static DLLMap    instance; // Instantiated on first use. Guaranteed to be destroyed.
-	return instance;
-}
+#include "win32_types.h"
+#include <Windows.h>
 
-DLLMap::DLLMap() { };
+void StackTraceInit(void);
 
-LPVOID DLLMap::getProcAddress(string dll, string functionName)
-{
-	if (find(dll) == end()) {
-		HMODULE mod = LoadLibraryA(dll.c_str());
-		if (mod == NULL) {
-			throw system_error(GetLastError(), system_category(), "LoadLibrary failed");
-		}
-		(*this)[dll] = mod;
-	}
-
-	HMODULE mod = (*this)[dll];
-	LPVOID fp = GetProcAddress(mod, functionName.c_str());
-	if (fp == nullptr) {
-		throw system_error(GetLastError(), system_category(), "LoadLibrary failed");
-	}
-
-	return fp;
-}
-
-DLLMap::~DLLMap()
-{
-	for each(auto modPair in (*this))
-	{
-		FreeLibrary(modPair.second);
-	}
-}
+extern "C" typedef char *sds;
+extern "C" sds genRedisInfoString(char *section);
+extern "C" void bugReportStart(void);

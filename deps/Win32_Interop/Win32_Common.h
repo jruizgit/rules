@@ -20,42 +20,44 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <windows.h>
-#include <stdexcept>
-#include <map>
-#include "Win32_variadicFunctor.h"
-using namespace std;
+#ifndef WIN32_INTEROP_COMMON_H
+#define WIN32_INTEROP_COMMON_H
 
-DLLMap& DLLMap::getInstance() {
-	static DLLMap    instance; // Instantiated on first use. Guaranteed to be destroyed.
-	return instance;
+#include <Windows.h>
+
+namespace Globals {
+    // forward declarations only
+    extern size_t pageSize;
 }
 
-DLLMap::DLLMap() { };
+void EnsureMemoryIsMapped(const void *buffer, size_t size);
+bool IsWindowsVersionAtLeast(WORD wMajorVersion, WORD wMinorVersion, WORD wServicePackMajor);
 
-LPVOID DLLMap::getProcAddress(string dll, string functionName)
-{
-	if (find(dll) == end()) {
-		HMODULE mod = LoadLibraryA(dll.c_str());
-		if (mod == NULL) {
-			throw system_error(GetLastError(), system_category(), "LoadLibrary failed");
-		}
-		(*this)[dll] = mod;
-	}
+class WindowsVersion {
+private:
+    bool isAtLeast_6_0;
+    bool isAtLeast_6_2;
 
-	HMODULE mod = (*this)[dll];
-	LPVOID fp = GetProcAddress(mod, functionName.c_str());
-	if (fp == nullptr) {
-		throw system_error(GetLastError(), system_category(), "LoadLibrary failed");
-	}
+    WindowsVersion() {
+        isAtLeast_6_0 = IsWindowsVersionAtLeast(6, 0, 0);
+        isAtLeast_6_2 = IsWindowsVersionAtLeast(6, 2, 0);
+    }
 
-	return fp;
-}
+    WindowsVersion(WindowsVersion const&);      // Don't implement to guarantee singleton semantics
+    void operator=(WindowsVersion const&);      // Don't implement to guarantee singleton semantics
 
-DLLMap::~DLLMap()
-{
-	for each(auto modPair in (*this))
-	{
-		FreeLibrary(modPair.second);
-	}
-}
+public:
+    static WindowsVersion& getInstance() {
+        static WindowsVersion instance;         // Instantiated on first use. Guaranteed to be destroyed.
+        return instance;
+    }
+
+    bool IsAtLeast_6_0() {
+        return isAtLeast_6_0;
+    }
+
+    bool IsAtLeast_6_2() {
+        return isAtLeast_6_2;
+    }
+};
+#endif

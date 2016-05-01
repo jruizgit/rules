@@ -58,8 +58,8 @@
 #include "net.h"
 #include "sds.h"
 #ifdef _WIN32
-  #include "../win32_Interop/win32fixes.h"
-#include "mstcpip.h"
+  #include "win32_hiredis.h"
+  #include "mstcpip.h"
 #endif
 
 /* Defined in hiredis.c */
@@ -159,16 +159,15 @@ int redisKeepAlive(redisContext *c, int interval) {
         settings.keepalivetime = interval*1000;
         settings.keepaliveinterval = interval*1000/3;
         overlapped.hEvent = NULL;
-        WSAIoctl(
-            fd,
-            SIO_KEEPALIVE_VALS,
-            &settings,
-            sizeof(struct tcp_keepalive),
-            NULL,
-            0,
-            &bytesReturned,
-            &overlapped,
-            NULL);
+        FDAPI_WSAIoctl(fd,
+                       SIO_KEEPALIVE_VALS,
+                       &settings,
+                       sizeof(struct tcp_keepalive),
+                       NULL,
+                       0,
+                       &bytesReturned,
+                       &overlapped,
+                       NULL);
     }
 #else
     val = interval;
@@ -210,7 +209,7 @@ static int redisSetTcpNoDelay(redisContext *c) {
 
 static int redisContextWaitReady(redisContext *c, const struct timeval *timeout) {
     struct pollfd   wfd[1];
-    long msec;
+    PORT_LONG msec;
 
     msec          = -1;
     wfd[0].fd     = c->fd;
@@ -234,7 +233,7 @@ static int redisContextWaitReady(redisContext *c, const struct timeval *timeout)
     if (errno == EINPROGRESS) {
         int res;
 
-        if ((res = poll(wfd, 1, msec)) == -1) {
+        if ((res = poll(wfd, 1, (int) msec)) == -1) {                           WIN_PORT_FIX /* cast (int) */
             __redisSetErrorFromErrno(c, REDIS_ERR_IO, "poll(2)");
             redisContextCloseFd(c);
             return REDIS_ERR;
@@ -297,7 +296,7 @@ int redisContextPreConnectTcp(
     int blocking = (c->flags & REDIS_BLOCK);
 
     if (ParseStorageAddress(addr, port, ss) == FALSE) {
-        DebugBreak();
+        return REDIS_ERR;
     }
 
     if (REDIS_OK != redisCreateSocket(c, ss->ss_family)) {

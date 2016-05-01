@@ -20,42 +20,48 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <windows.h>
-#include <stdexcept>
-#include <map>
-#include "Win32_variadicFunctor.h"
+#pragma once
+
+#ifdef __cplusplus
+#include <string>
 using namespace std;
 
-DLLMap& DLLMap::getInstance() {
-	static DLLMap    instance; // Instantiated on first use. Guaranteed to be destroyed.
-	return instance;
+typedef class RedisEventLog {
+public:
+    ~RedisEventLog() {}
+
+    void InstallEventLogSource(string appPath);
+    void UninstallEventLogSource();
+
+    void SetEventLogIdentity(const char* identity);
+
+    void LogMessage(LPCSTR msg, const WORD type);
+    void LogError(string msg);
+
+    string GetEventLogIdentity();
+    void EnableEventLog(bool enabled);
+    bool IsEventLogEnabled();
+
+private:
+    const string eventLogName = "redis";
+    const string cEventLogPath = "SYSTEM\\CurrentControlSet\\Services\\EventLog\\";
+    const string cEventLogApplicitonPath = cEventLogPath + "Application\\";
+    const string cRedis = "redis";
+    const string cEventMessageFile = "EventMessageFile";
+    const string cRedisServer = "redis-server";
+    const string cTypesSupported = "TypesSupported";
+    const string cApplication = "Application";
+} RedisEventLog;
+
+extern "C" {
+#endif
+
+    void setSyslogEnabled(int enabled);
+    void setSyslogIdent(char* identity);
+    int IsEventLogEnabled();
+    void WriteEventLog(const char* msg);
+
+#ifdef __cplusplus
 }
+#endif
 
-DLLMap::DLLMap() { };
-
-LPVOID DLLMap::getProcAddress(string dll, string functionName)
-{
-	if (find(dll) == end()) {
-		HMODULE mod = LoadLibraryA(dll.c_str());
-		if (mod == NULL) {
-			throw system_error(GetLastError(), system_category(), "LoadLibrary failed");
-		}
-		(*this)[dll] = mod;
-	}
-
-	HMODULE mod = (*this)[dll];
-	LPVOID fp = GetProcAddress(mod, functionName.c_str());
-	if (fp == nullptr) {
-		throw system_error(GetLastError(), system_category(), "LoadLibrary failed");
-	}
-
-	return fp;
-}
-
-DLLMap::~DLLMap()
-{
-	for each(auto modPair in (*this))
-	{
-		FreeLibrary(modPair.second);
-	}
-}
