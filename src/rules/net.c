@@ -2307,12 +2307,15 @@ static unsigned int tryGetReply(redisContext *reContext,
 
     if (redisGetReply(reContext, (void**)reply) != REDIS_OK) {
         printf("getReply err %d, %d, %s\n", reContext->err, errno, reContext->errstr);
+        #ifndef _WIN32
         if (redisReconnect(reContext) != REDIS_OK) {
             printf("reconnect err %d, %d, %s\n", reContext->err, errno, reContext->errstr);
             return ERR_REDIS_ERROR;
         }
-
         return ERR_TRY_AGAIN;
+        #else
+        return ERR_REDIS_ERROR;
+        #endif
     }
 
     return RULES_OK;
