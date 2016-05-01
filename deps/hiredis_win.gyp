@@ -13,16 +13,15 @@
         './hiredis_win/sds.c',
         './hiredis_win/async.c',
       ],
-      'conditions': [
-        ['OS=="mac"', {
-          'xcode_settings': {
-            'GCC_C_LANGUAGE_STANDARD': 'c99'
+      'configurations': {
+        'Release': {
+          'msvs_settings': {
+            'VCCLCompilerTool': {
+              'ExceptionHandling': 1
+            }
           }
-        }],
-        ['OS=="solaris"', {
-          'cflags+': [ '-std=c99' ]
-        }]
-      ]
+        }
+      }
     }
   ]
 }

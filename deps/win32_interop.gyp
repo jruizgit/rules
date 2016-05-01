@@ -7,7 +7,7 @@
         'Release': {
           'msvs_settings': {
             'VCCLCompilerTool': {
-              'ExceptionHandling': 1,
+              'ExceptionHandling': 1
             }
           }
         }
@@ -16,12 +16,13 @@
         'include_dirs': [ '.' ],
       },
       'sources': [
-        './win32_interop/win32fixes.c',
-        './win32_interop/Win32_ANSI.c',
-        './win32_interop/Win32_FDAPI.cpp',
-        './win32_interop/Win32_fdapi_crt.cpp',
+        './win32_interop/win32_error.c',
+        './win32_interop/win32_ansi.c',
+        './win32_interop/win32_fdapi.cpp',
+        './win32_interop/win32_fdapi_crt.cpp',
         './win32_interop/win32_rfdmap.cpp',
-        './win32_interop/Win32_variadicFunctor.cpp',
+        './win32_interop/win32_variadic_functor.cpp',
+        './win32_interop/win32_common.cpp',
       ],
       'defines!' : [ '_HAS_EXCEPTIONS=0' ]
     }
