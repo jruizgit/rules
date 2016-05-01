@@ -23,6 +23,7 @@
         './win32_interop/win32_rfdmap.cpp',
         './win32_interop/Win32_variadicFunctor.cpp',
       ],
+      'defines!' : [ '_HAS_EXCEPTIONS=0' ]
     }
   ]
 }
