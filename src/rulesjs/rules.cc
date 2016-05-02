@@ -48,7 +48,7 @@ void jsCreateRuleset(const FunctionCallbackInfo<Value>& args) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
             }
         } else {
-            args.GetReturnValue().Set(static_cast<double>((long)output));
+            args.GetReturnValue().Set(static_cast<double>((long long)output));
         }
     }
 }
@@ -143,8 +143,8 @@ void jsStartAssertEvent(const FunctionCallbackInfo<v8::Value>& args) {
                                                &replyCount);
         if (result == RULES_OK) {
             Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, (long)rulesBinding));
-            array->Set(1, Number::New(isolate, (long)replyCount));
+            array->Set(0, Number::New(isolate, (long long)rulesBinding));
+            array->Set(1, Number::New(isolate, (long long)replyCount));
             args.GetReturnValue().Set(array);
         } else if (result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
@@ -212,8 +212,8 @@ void jsStartAssertEvents(const FunctionCallbackInfo<v8::Value>& args) {
             }
 
             Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, (long)rulesBinding));
-            array->Set(1, Number::New(isolate, (long)replyCount));
+            array->Set(0, Number::New(isolate, (long long)rulesBinding));
+            array->Set(1, Number::New(isolate, (long long)replyCount));
             args.GetReturnValue().Set(array);
         } else if (result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
@@ -340,8 +340,8 @@ void jsStartAssertFact(const FunctionCallbackInfo<v8::Value>& args) {
                                                &replyCount);
         if (result == RULES_OK) {
             Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, (long)rulesBinding));
-            array->Set(1, Number::New(isolate, (long)replyCount));
+            array->Set(0, Number::New(isolate, (long long)rulesBinding));
+            array->Set(1, Number::New(isolate, (long long)replyCount));
             args.GetReturnValue().Set(array);
         } else if (result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
@@ -409,8 +409,8 @@ void jsStartAssertFacts(const FunctionCallbackInfo<v8::Value>& args) {
             }
 
             Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, (long)rulesBinding));
-            array->Set(1, Number::New(isolate, (long)replyCount));
+            array->Set(0, Number::New(isolate, (long long)rulesBinding));
+            array->Set(1, Number::New(isolate, (long long)replyCount));
             args.GetReturnValue().Set(array);
         } else if (result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
@@ -486,8 +486,8 @@ void jsStartRetractFact(const FunctionCallbackInfo<v8::Value>& args) {
                                                &replyCount);
         if (result == RULES_OK) {
             Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, (long)rulesBinding));
-            array->Set(1, Number::New(isolate, (long)replyCount));
+            array->Set(0, Number::New(isolate, (long long)rulesBinding));
+            array->Set(1, Number::New(isolate, (long long)replyCount));
             args.GetReturnValue().Set(array);
         } else if (result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
@@ -555,8 +555,8 @@ void jsStartRetractFacts(const FunctionCallbackInfo<v8::Value>& args) {
             }
 
             Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, (long)rulesBinding));
-            array->Set(1, Number::New(isolate, (long)replyCount));
+            array->Set(0, Number::New(isolate, (long long)rulesBinding));
+            array->Set(1, Number::New(isolate, (long long)replyCount));
             args.GetReturnValue().Set(array);
         } else if (result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
@@ -660,8 +660,8 @@ void jsStartUpdateState(const FunctionCallbackInfo<v8::Value>& args) {
         
         if (result == RULES_OK) {
             Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, (long)rulesBinding));
-            array->Set(1, Number::New(isolate, (long)replyCount));
+            array->Set(0, Number::New(isolate, (long long)rulesBinding));
+            array->Set(1, Number::New(isolate, (long long)replyCount));
             args.GetReturnValue().Set(array);
         } else if (result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
@@ -700,8 +700,8 @@ void jsStartAction(const FunctionCallbackInfo<Value>& args) {
             Handle<Array> array = Array::New(isolate, 4);
             array->Set(0, String::NewFromUtf8(isolate, session));
             array->Set(1, String::NewFromUtf8(isolate, messages));
-            array->Set(2, Number::New(isolate, (long)actionHandle));
-            array->Set(3, Number::New(isolate, (long)actionBinding));
+            array->Set(2, Number::New(isolate, (long long)actionHandle));
+            array->Set(3, Number::New(isolate, (long long)actionBinding));
             args.GetReturnValue().Set(array);
         } else if (result != ERR_NO_ACTION_AVAILABLE) {
             char *message = NULL;
