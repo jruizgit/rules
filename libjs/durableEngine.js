@@ -51,14 +51,14 @@ exports = module.exports = durableEngine = function () {
         var completed = false;
 
         that.s = document;
-        
+
         if (output.constructor === Array) {
             that.m = output;
         } else {
             for (var name in output) {
                 that[name] = output[name];
             }
-        }            
+        }
 
         that.getRulesetName = function () {
             return rulesetName;
@@ -160,7 +160,7 @@ exports = module.exports = durableEngine = function () {
             if (!fact.sid) {
                 fact.sid = that.s.sid;
             }
-            
+
             var factsList;
             if (factsDirectory[rules]) {
                 factsList = factsDirectory[rules];
@@ -183,7 +183,7 @@ exports = module.exports = durableEngine = function () {
             if (!fact.sid) {
                 fact.sid = that.s.sid;
             }
-            
+
             var retractList;
             if (retractDirectory[rules]) {
                 retractList = retractDirectory[rules];
@@ -204,7 +204,7 @@ exports = module.exports = durableEngine = function () {
                 throw 'timer with id ' + id + ' already added';
             } else {
                 timerDirectory[id] = [{sid: that.s.sid, id: id, $t: name}, duration];
-                
+
             }
         };
 
@@ -341,7 +341,7 @@ exports = module.exports = durableEngine = function () {
                         c.retract(c.chart_context);
                     }
                 }
-                
+
                 if (assertState) {
                     c.assert({label: toState, chart: 1, id: Math.ceil(Math.random() * 1000000000 + 1)});
                 } else {
@@ -377,7 +377,7 @@ exports = module.exports = durableEngine = function () {
         var that = {};
         var actions = {};
         var handle;
-        
+
         that.bind = function (databases) {
             for (var i = 0; i < databases.length; ++i) {
                 var db = databases[i];
@@ -459,7 +459,7 @@ exports = module.exports = durableEngine = function () {
 
         that.cancelTimer = function (sid, timer) {
             return r.cancelTimer(handle, sid, JSON.stringify(timer));
-        };        
+        };
 
         that.getState = function (sid) {
             return JSON.parse(r.getState(handle, sid));
@@ -473,7 +473,7 @@ exports = module.exports = durableEngine = function () {
             return JSON.parse(r.getRulesetState(handle));
         }
 
-        that.dispatchTimers = function (complete) { 
+        that.dispatchTimers = function (complete) {
             try {
                 r.assertTimers(handle);
             } catch (reason) {
@@ -512,7 +512,7 @@ exports = module.exports = durableEngine = function () {
             } else {
                 try {
                     var result = r.startAction(handle);
-                    if (result) { 
+                    if (result) {
                         state = JSON.parse(result[0]);
                         resultContainer = {'message': JSON.parse(result[1])};
                         actionHandle = result[2];
@@ -523,7 +523,7 @@ exports = module.exports = durableEngine = function () {
                     return;
                 }
             }
-        
+
             while (resultContainer['message']) {
                 var actionName = null;
                 var message = null;
@@ -563,7 +563,7 @@ exports = module.exports = durableEngine = function () {
                                 var binding = 0;
                                 var replies = 0;
                                 var pending = {};
-                                
+
                                 var timers = c.getCancelledTimers();
                                 for (var timerId in timers) {
                                     that.cancelTimer(c.s.sid, timers[timerId]);
@@ -593,7 +593,7 @@ exports = module.exports = durableEngine = function () {
                                         that.queueRetractFact(messages[i].sid, targetRuleset, messages[i]);
                                     }
                                 }
-                                
+
                                 var retractFacts = c.getRetract();
                                 pending[actionBinding] = 0;
                                 for (rulesetName in retractFacts) {
@@ -669,7 +669,7 @@ exports = module.exports = durableEngine = function () {
                                                 }
                                             }
                                         }
-                                    }                                    
+                                    }
                                 }
                             } catch (reason) {
                                 r.abandonAction(handle, c.getHandle());
@@ -706,7 +706,7 @@ exports = module.exports = durableEngine = function () {
     }
 
     var stateChart = function (name, host, chartDefinition, stateCacheSize) {
-        
+
         var transform = function (parentName, parentTriggers, parentStartState, host, chart, rules) {
             var startState = {};
             var reflexiveStates = {};
@@ -789,7 +789,7 @@ exports = module.exports = durableEngine = function () {
                             rule.all = [stateTest, {m$any: trigger.any}];
                         } else {
                             rule.all = [stateTest];
-                        }    
+                        }
 
                         if (trigger.run) {
                             if (typeof(trigger.run) === 'string') {
@@ -862,7 +862,7 @@ exports = module.exports = durableEngine = function () {
     };
 
     var flowChart = function (name, host, chartDefinition, stateCacheSize) {
-        
+
         var transform = function (host, chart, rules) {
             var visited = {};
             var reflexiveStages = {};
@@ -941,7 +941,7 @@ exports = module.exports = durableEngine = function () {
                             }
 
                             if (transition.all) {
-                                rule.all = transition.all.concat(stageTest);   
+                                rule.all = transition.all.concat(stageTest);
                             } else if (transition.any) {
                                 rule.all = [stageTest, {m$any: transition.any}];
                             } else {
@@ -992,7 +992,7 @@ exports = module.exports = durableEngine = function () {
                         } else if (typeof(stage.run) === 'function' || stage.run.continueWith) {
                             rule.run = to(null, stageName, false).continueWith(stage.run);
                         }
-                    } 
+                    }
 
                     rules['$start.' + stageName] = rule;
                     started = true;
@@ -1054,7 +1054,7 @@ exports = module.exports = durableEngine = function () {
         var rulesList = [];
         databases = databases || [{host: 'localhost', port: 6379, password:null}];
         stateCacheSize = stateCacheSize || 1024;
-        
+
         that.getAction = function (actionName) {
             throw 'Action ' + actionName + ' not found';
         };
@@ -1070,7 +1070,7 @@ exports = module.exports = durableEngine = function () {
         that.ensureRuleset = function (rulesetName, complete) {
             if (rulesDirectory[rulesetName]) {
                 complete(null);
-            } else {   
+            } else {
                 that.loadRuleset(rulesetName, function (err, result) {
                     if (err) {
                         complete(err);
@@ -1350,7 +1350,7 @@ exports = module.exports = durableEngine = function () {
                 });
             });
 
-            that.post('/:rulesetName', function (request, response) {
+            that.post(basePath + '/:rulesetName', function (request, response) {
                 response.contentType = "application/json; charset=utf-8";
                 host.setRuleset(request.params.rulesetName, request.body, function (err, result) {
                     if (err) {
@@ -1364,7 +1364,7 @@ exports = module.exports = durableEngine = function () {
 
             that.listen(port, function () {
                 console.log('Listening on ' + port);
-            });    
+            });
         };
 
         return that;
