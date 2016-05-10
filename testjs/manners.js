@@ -550,4 +550,4 @@ with (d.statechart('missManners')) {
     });
 }
 
-d.runAll(['/tmp/redis0.sock']);
+d.runAll();

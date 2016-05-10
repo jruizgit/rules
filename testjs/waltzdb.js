@@ -857,5 +857,5 @@ with (d.statechart('waltzdb')) {
     });
 }
 
-d.runAll(['/tmp/redis0.sock']);
+d.runAll();
 

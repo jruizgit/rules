@@ -52,7 +52,7 @@ Durable.ruleset :fraud_detection do
 
     post "fraud_detection", {:id => s.c_count, :sid => 1, :t => "debit_cleared", :amount => s.c_count}
     post "fraud_detection", {:id => s.c_count + 1, :sid => 1, :t => "credit_cleared", :amount => (s.c_count - 100) * 2 + 100}
-    start_timer "customer", 1
+    start_timer "customer", 1, "c#{s.c_count}"
   end
 
   when_all timeout("fraudster") | (m.t == "fraudster") do
@@ -63,12 +63,12 @@ Durable.ruleset :fraud_detection do
     end
 
     post "fraud_detection", {:id => s.f_count, :sid => 1, :t => "debit_request", :amount => s.f_count - 800, :stamp => Time.now.to_i}
-    start_timer "fraudster", 2
+    start_timer "fraudster", 2, "f#{s.f_count}"
   end
 
   when_start do
-    start_timer "fraud_detection", {:id => "c_1", :sid => 1, :t => "customer"}
-    start_timer "fraud_detection", {:id => "f_1", :sid => 1, :t => "fraudster"}
+    post "fraud_detection", {:id => "c_1", :sid => 1, :t => "customer"}
+    post "fraud_detection", {:id => "f_1", :sid => 1, :t => "fraudster"}
   end
 end
 

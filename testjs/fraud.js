@@ -57,7 +57,7 @@ with (d.ruleset('fraudDetection')) {
 
         c.post('fraudDetection', {id: c.s.cCount, sid: 1, t: 'debitCleared', amount: c.s.cCount});
         c.post('fraudDetection', {id: c.s.cCount + 1, sid: 1, t: 'creditCleared', amount: (c.s.cCount - 100) * 2 + 100});
-        c.startTimer('customer', 1);
+        c.startTimer('customer', 1, 'c' + c.s.cCount);
     });
 
     whenAll(or(m.t.eq('fraudster'), timeout('fraudster')), 
@@ -69,7 +69,7 @@ with (d.ruleset('fraudDetection')) {
         }
 
         c.post('fraudDetection', {id: c.s.fCount, sid: 1, t: 'debitRequest', amount: c.s.fCount - 800, 'stamp': Date.now() / 1000});
-        c.startTimer('fraudster', 2);
+        c.startTimer('fraudster', 2, 'f' + c.s.cCount);
     });
 
     whenStart(function (host) {

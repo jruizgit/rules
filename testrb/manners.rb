@@ -541,7 +541,7 @@ Durable.statechart :miss_manners do
   end
 end
 
-Durable.run_all ["/tmp/redis0.sock"]
+Durable.run_all
 
    
     	
