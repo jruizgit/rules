@@ -371,7 +371,7 @@ Durable.ruleset :fact2 do
            none(m.t == "balance"),
            c.third = m.t == "withrawal",
            c.fourth = m.t == "chargeback" do
-    puts "fact2 " + first.t + " " + third.t + " " + fourth.t
+    puts "fact2 " + first.t + " " + third.t + " " + fourth.t + " from " + s.sid.to_s
   end
   when_start do
     post :fact2, {:id => 1, :sid => 1, :t => "deposit"}
@@ -384,6 +384,17 @@ Durable.ruleset :fact2 do
     retract :fact2, {:id => 4, :sid => 1, :t => "balance"}
   end
 end
+
+q = Durable.create_queue :fact2
+q.post({:id => 1, :sid => 2, :t => "deposit"})
+q.post({:id => 2, :sid => 2, :t => "withrawal"})
+q.post({:id => 3, :sid => 2, :t => "chargeback"})
+q.assert({:id => 4, :sid => 2, :t => "balance"})
+q.post({:id => 5, :sid => 2, :t => "deposit"})
+q.post({:id => 6, :sid => 2, :t => "withrawal"})
+q.post({:id => 7, :sid => 2, :t => "chargeback"})
+q.retract({:id => 4, :sid => 2, :t => "balance"})
+q.close
 
 Durable.ruleset :t0 do
   when_all (timeout :my_timer) | (m.count == 0) do
@@ -452,7 +463,7 @@ end
 Durable.ruleset :q0 do
   when_all m.start == "yes" do
     puts "q0 started"
-    queue :q0, {:id => 2, :sid => 1, :end => "yes"}
+    get_queue(:q0).post({:id => 2, :sid => 1, :end => "yes"})
   end
   when_all m.end == "yes" do
     puts "q0 ended"

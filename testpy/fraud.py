@@ -44,7 +44,7 @@ with ruleset('fraud_detection'):
     def second_rule(c):
         print('High Risk {0}, {1}, {2}'.format(c.first.amount, c.second.amount, c.third.amount))
 
-    @when_all(timeout('customer'))
+    @when_all(m.t == 'customer' | timeout('customer'))
     def start_timer(c):
         if not c.s.c_count:
             c.s.c_count = 100
@@ -55,7 +55,7 @@ with ruleset('fraud_detection'):
         c.post('fraud_detection', {'id': c.s.c_count + 1, 'sid': 1, 't': 'credit_cleared', 'amount': (c.s.c_count - 100) * 2 + 100})
         c.start_timer('customer', 1)
 
-    @when_all(timeout('fraudster'))
+    @when_all(m.t == 'fraudster' | timeout('fraudster'))
     def start_timer(c):
         if not c.s.f_count:
             c.s.f_count = 1000
@@ -67,7 +67,7 @@ with ruleset('fraud_detection'):
 
     @when_start
     def start(host):
-        host.start_timer('fraud_detection', 1, 'customer', 1)
-        host.start_timer('fraud_detection', 1, 'fraudster', 15)
+        host.post('fraud_detection', {'id': 'c_1' , 'sid': 1, 't': 'customer'})
+        host.post('fraud_detection', {'id': 'f_1' , 'sid': 1, 't': 'fraudster'})
 
 run_all()

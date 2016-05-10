@@ -5,22 +5,27 @@ module Durable
   @@rulesets = {}
   @@start_blocks = []
 
-  def self.run(ruleset_definitions = nil, databases = [{:host => 'localhost', :port => 6379, :password => nil}], start = nil)
-    main_host = Engine::Host.new ruleset_definitions, databases
-    start.call main_host if start
-    main_host.start!
-    Interface::Application.set_host main_host
-    Interface::Application.run!
+  def self.create_queue(ruleset_name, database = {:host => 'localhost', :port => 6379, :password => nil}, state_cache_size = 1024)
+    Engine::Queue.new ruleset_name, database, state_cache_size
   end
 
-  def self.run_all(databases = [{:host => 'localhost', :port => 6379, :password => nil}])
-    main_host = Engine::Host.new @@rulesets, databases
+  def self.create_host(databases = [{:host => 'localhost', :port => 6379, :password => nil}], state_cache_size = 1024)
+    main_host = Engine::Host.new @@rulesets, databases, state_cache_size
     for block in @@start_blocks
       main_host.instance_exec main_host, &block
     end
     main_host.start!
+    main_host
+  end
+
+  def self.run_all(databases = [{:host => 'localhost', :port => 6379, :password => nil}], host_name = nil, port = nil, run = nil, state_cache_size = 1024)
+    main_host = self.create_host databases, state_cache_size
     Interface::Application.set_host main_host
-    Interface::Application.run!
+    if run
+      run(main_host, Interface::Application)
+    else
+      Interface::Application.run!
+    end
   end
 
   def self.ruleset(name, &block) 

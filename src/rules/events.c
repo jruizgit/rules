@@ -1436,12 +1436,25 @@ static unsigned int handleTimers(void *handle,
             return result;
         }
 
+        unsigned int action;
+        switch (reply->element[i]->str[0]) {
+            case 'p':
+                action  = ACTION_ASSERT_EVENT;
+                break;
+            case 'a':
+                action  = ACTION_ASSERT_FACT;
+                break;
+            case 'r':
+                action  = ACTION_RETRACT_FACT;
+                break;
+        }
+
         commands[*commandCount] = command;
         ++*commandCount;
         result = handleMessage(handle, 
                                NULL,
-                               reply->element[i]->str, 
-                               ACTION_ASSERT_EVENT,
+                               reply->element[i]->str + 2, 
+                               action,
                                commands, 
                                commandCount, 
                                rulesBinding);
@@ -1847,14 +1860,14 @@ unsigned int abandonAction(void *handle, void *actionHandle) {
     return RULES_OK;
 }
 
-unsigned int queueMessage(void *handle, char *sid, char *destination, char *message) {
+unsigned int queueMessage(void *handle, unsigned int queueAction, char *sid, char *destination, char *message) {
     void *rulesBinding;
     unsigned int result = resolveBinding(handle, sid, &rulesBinding);
     if (result != RULES_OK) {
         return result;
     }
 
-    return registerMessage(rulesBinding, destination, message);
+    return registerMessage(rulesBinding, queueAction, destination, message);
 }
 
 unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *timer) {

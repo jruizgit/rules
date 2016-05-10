@@ -809,7 +809,7 @@ exports = module.exports = durableEngine = function () {
 
     var rulesets = [];
 
-    var runAll = function(databases, port, basePath, stateCacheSize) {
+    var createHost = function(databases, stateCacheSize) {
         var definitions = {};
         for (var i = 0; i < rulesets.length; ++ i) {
             definitions[rulesets[i].getName()] = rulesets[i].define(); 
@@ -818,27 +818,28 @@ exports = module.exports = durableEngine = function () {
 
         var rulesHost = d.host(databases, stateCacheSize);
         rulesHost.registerRulesets(null, definitions);
-        var app = d.application(rulesHost, port, basePath);
         for (var i = 0; i < rulesets.length; ++ i) {
             if (rulesets[i].getStart()) {
                 rulesets[i].getStart()(rulesHost);
             }
         }
 
-        app.run(); 
+        return rulesHost;
     } 
 
-    var run = function (rulesetDefinitions, start, databases, port, basePath, stateCacheSize) {
-        var rulesHost = d.host(databases, stateCacheSize);
-        rulesHost.registerRulesets(null, rulesetDefinitions);
-        
-        var app = d.application(rulesHost, port, basePath);
-        if (start) {
-            start(rulesHost, app);
-        }
-
-        app.run();
+    var createQueue = function(rulesetName, database, stateCacheSize) {
+        return d.queue(rulesetName, database, stateCacheSize);
     }
+
+    var runAll = function(databases, port, basePath, run, stateCacheSize) {
+        var rulesHost = createHost(databases, stateCacheSize);
+        var app = d.application(rulesHost, port, basePath);
+        if (run) {
+            run(rulesHost, app);
+        } else {
+            app.run(); 
+        }
+    } 
 
     return {
         state: state,
@@ -846,7 +847,8 @@ exports = module.exports = durableEngine = function () {
         stage: stage,
         flowchart: flowchart,
         ruleset: ruleset,
+        createHost: createHost,
+        createQueue: createQueue,
         runAll: runAll,
-        run: run,
     };
 }();

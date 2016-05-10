@@ -304,11 +304,233 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
     return RULES_OK;
 }
 
-static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
+static unsigned int loadPartitionCommand(ruleset *tree, binding *rulesBinding, char *name) {
     redisContext *reContext = rulesBinding->reContext;
     redisReply *reply;
+    char *lua = NULL;
+    if (asprintf(&lua, 
+"local partition_key = \"%s!p\"\n"
+"local res = redis.call(\"hget\", partition_key, ARGV[1])\n"
+"if (not res) then\n"
+"   res = redis.call(\"hincrby\", partition_key, \"index\", 1)\n"
+"   res = res %% tonumber(ARGV[2])\n"
+"   redis.call(\"hset\", partition_key, ARGV[1], res)\n"
+"end\n"
+"return tonumber(res)\n", name)  == -1) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua); 
+    redisGetReply(reContext, (void**)&reply);
+    if (reply->type == REDIS_REPLY_ERROR) {
+        printf("%s\n", reply->str);
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    }
+
+    strncpy(rulesBinding->partitionHash, reply->str, 40);
+    rulesBinding->partitionHash[40] = '\0';
+    freeReplyObject(reply);
+    free(lua);
+    return RULES_OK;
+}
+
+static unsigned int loadRemoveActionCommand(ruleset *tree, binding *rulesBinding, char *name) {
+    redisContext *reContext = rulesBinding->reContext;
+    redisReply *reply;
+    char *lua = NULL;
+    if (asprintf(&lua, 
+"local delete_frame = function(key, action_key)\n"
+"    local rule_action_key = redis.call(\"lpop\", key)\n"
+"    local raw_count = redis.call(\"lpop\", key)\n"
+"    local count = 1\n"
+"    if raw_count ~= \"single\" then\n"
+"        count = tonumber(raw_count)\n"
+"    end\n"
+"    if count == 0 then\n"
+"        local packed_frame = redis.call(\"lpop\", rule_action_key)\n"
+"        while packed_frame ~= \"0\" do\n"
+"            packed_frame = redis.call(\"lpop\", rule_action_key)\n"
+"        end\n"
+"    else\n"
+"        for i = 0, count - 1, 1 do\n"
+"            local packed_frame = redis.call(\"rpop\", rule_action_key)\n"
+"        end\n"
+"    end\n"
+"    return (redis.call(\"llen\", key) > 0)\n"
+"end\n"
+"local sid = ARGV[1]\n"
+"local max_score = tonumber(ARGV[2])\n"
+"local action_key = \"%s!a\"\n"
+"if delete_frame(action_key .. \"!\" .. sid, action_key) then\n"
+"    redis.call(\"zadd\", action_key , max_score, sid)\n"
+"else\n"
+"    redis.call(\"zrem\", action_key, sid)\n"
+"end\n", name)  == -1) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    redisGetReply(reContext, (void**)&reply);
+    if (reply->type == REDIS_REPLY_ERROR) {
+        printf("%s\n", reply->str);
+        freeReplyObject(reply);
+        free(lua);
+        return ERR_REDIS_ERROR;
+    }
+
+    strncpy(rulesBinding->removeActionHash, reply->str, 40);
+    rulesBinding->removeActionHash[40] = '\0';
+    freeReplyObject(reply);
+    free(lua);
+    return RULES_OK;
+}
+
+static unsigned int loadTimerCommand(ruleset *tree, binding *rulesBinding, char *name) {
+    redisContext *reContext = rulesBinding->reContext;
+    redisReply *reply;
+    char *lua = NULL;
+    if (asprintf(&lua,
+"local timer_key = \"%s!t\"\n"
+"local timestamp = tonumber(ARGV[1])\n"
+"local res = redis.call(\"zrangebyscore\", timer_key, 0, timestamp, \"limit\", 0, 10)\n"
+"if #res > 0 then\n"
+"  for i = 0, #res, 1 do\n"
+"    redis.call(\"zincrby\", timer_key, 10, res[i])\n"
+"  end\n"
+"  return res\n"
+"end\n"
+"return 0\n", name)  == -1) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    redisGetReply(reContext, (void**)&reply);
+    if (reply->type == REDIS_REPLY_ERROR) {
+        printf("%s\n", reply->str);
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    }
+
+    strncpy(rulesBinding->timersHash, reply->str, 40);
+    rulesBinding->timersHash[40] = '\0';
+    freeReplyObject(reply);
+    free(lua);
+    return RULES_OK;
+}
+
+static unsigned int loadUpdateActionCommand(ruleset *tree, binding *rulesBinding, char *name) {
+    redisContext *reContext = rulesBinding->reContext;
+    redisReply *reply;
+    char *lua = NULL;
+    if (asprintf(&lua,
+"local actions_key = \"%s!a\"\n"
+"local score = tonumber(ARGV[2])\n"
+"local sid = ARGV[1]\n"
+"if redis.call(\"zscore\", actions_key, sid) then\n"
+"    redis.call(\"zadd\", actions_key , score, sid)\n"
+"end\n", name)  == -1) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    redisGetReply(reContext, (void**)&reply);
+    if (reply->type == REDIS_REPLY_ERROR) {
+        printf("%s\n", reply->str);
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    }
+
+    strncpy(rulesBinding->updateActionHash, reply->str, 40);
+    rulesBinding->updateActionHash[40] = '\0';
+    freeReplyObject(reply);
+    free(lua);
+    return RULES_OK;
+}
+
+static unsigned int setNames(ruleset *tree, binding *rulesBinding, char *name) {
+    int nameLength = strlen(name);
+    char *sessionHashset = malloc((nameLength + 3) * sizeof(char));
+    if (!sessionHashset) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    strncpy(sessionHashset, name, nameLength);
+    sessionHashset[nameLength] = '!';
+    sessionHashset[nameLength + 1] = 's';
+    sessionHashset[nameLength + 2] = '\0';
+    rulesBinding->sessionHashset = sessionHashset;
+
+    char *factsHashset = malloc((nameLength + 3) * sizeof(char));
+    if (!factsHashset) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    strncpy(factsHashset, name, nameLength);
+    factsHashset[nameLength] = '!';
+    factsHashset[nameLength + 1] = 'f';
+    factsHashset[nameLength + 2] = '\0';
+    rulesBinding->factsHashset = factsHashset;
+
+    char *eventsHashset = malloc((nameLength + 3) * sizeof(char));
+    if (!eventsHashset) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    strncpy(eventsHashset, name, nameLength);
+    eventsHashset[nameLength] = '!';
+    eventsHashset[nameLength + 1] = 'e';
+    eventsHashset[nameLength + 2] = '\0';
+    rulesBinding->eventsHashset = eventsHashset;
+
+    char *timersSortedset = malloc((nameLength + 3) * sizeof(char));
+    if (!timersSortedset) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    strncpy(timersSortedset, name, nameLength);
+    timersSortedset[nameLength] = '!';
+    timersSortedset[nameLength + 1] = 't';
+    timersSortedset[nameLength + 2] = '\0';
+    rulesBinding->timersSortedset = timersSortedset;
+    return RULES_OK;
+}
+
+static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     char *name = &tree->stringPool[tree->nameOffset];
     int nameLength = strlen(name);
+    unsigned int result = loadPartitionCommand(tree, rulesBinding, name);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    // client queues have no commands to load, 
+    if (!tree->stringPool) {
+        return RULES_OK;
+    }
+
+    result = loadRemoveActionCommand(tree, rulesBinding, name);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    result = loadTimerCommand(tree, rulesBinding, name);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    result = loadUpdateActionCommand(tree, rulesBinding, name);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    result = setNames(tree, rulesBinding, name);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    redisContext *reContext = rulesBinding->reContext;
+    redisReply *reply;
 #ifdef _WIN32
     char *actionKey = (char *)_alloca(sizeof(char)*(nameLength + 3));
     sprintf_s(actionKey, nameLength + 3, "%s!a", name);
@@ -1449,7 +1671,7 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 "        for i = 1, #frame, 1 do\n"
 "            if type(frame[i]) == \"table\" then\n"
 "                redis.call(\"hsetnx\", events_hashset, frame[i][\"id\"], cmsgpack.pack(frame[i]))\n"
-"                redis.call(\"zadd\", timers_key, max_score, cjson.encode(frame[i]))\n"
+"                redis.call(\"zadd\", timers_key, max_score, \"p:\" .. cjson.encode(frame[i]))\n"
 "            end\n"
 "        end\n"
 "        full_frame = nil\n"
@@ -1665,170 +1887,6 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     rulesBinding->addMessageHash[40] = '\0';
     freeReplyObject(reply);
     free(lua);
-
-    if (asprintf(&lua, 
-"local delete_frame = function(key, action_key)\n"
-"    local rule_action_key = redis.call(\"lpop\", key)\n"
-"    local raw_count = redis.call(\"lpop\", key)\n"
-"    local count = 1\n"
-"    if raw_count ~= \"single\" then\n"
-"        count = tonumber(raw_count)\n"
-"    end\n"
-"    if count == 0 then\n"
-"        local packed_frame = redis.call(\"lpop\", rule_action_key)\n"
-"        while packed_frame ~= \"0\" do\n"
-"            packed_frame = redis.call(\"lpop\", rule_action_key)\n"
-"        end\n"
-"    else\n"
-"        for i = 0, count - 1, 1 do\n"
-"            local packed_frame = redis.call(\"rpop\", rule_action_key)\n"
-"        end\n"
-"    end\n"
-"    return (redis.call(\"llen\", key) > 0)\n"
-"end\n"
-"local sid = ARGV[1]\n"
-"local max_score = tonumber(ARGV[2])\n"
-"local action_key = \"%s!a\"\n"
-"if delete_frame(action_key .. \"!\" .. sid, action_key) then\n"
-"    redis.call(\"zadd\", action_key , max_score, sid)\n"
-"else\n"
-"    redis.call(\"zrem\", action_key, sid)\n"
-"end\n", name)  == -1) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
-    redisGetReply(reContext, (void**)&reply);
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("%s\n", reply->str);
-        freeReplyObject(reply);
-        free(lua);
-        return ERR_REDIS_ERROR;
-    }
-
-    strncpy(rulesBinding->removeActionHash, reply->str, 40);
-    rulesBinding->removeActionHash[40] = '\0';
-    freeReplyObject(reply);
-    free(lua);
-
-    if (asprintf(&lua, 
-"local partition_key = \"%s!p\"\n"
-"local res = redis.call(\"hget\", partition_key, ARGV[1])\n"
-"if (not res) then\n"
-"   res = redis.call(\"hincrby\", partition_key, \"index\", 1)\n"
-"   res = res %% tonumber(ARGV[2])\n"
-"   redis.call(\"hset\", partition_key, ARGV[1], res)\n"
-"end\n"
-"return tonumber(res)\n", name)  == -1) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua); 
-    redisGetReply(reContext, (void**)&reply);
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("%s\n", reply->str);
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-
-    strncpy(rulesBinding->partitionHash, reply->str, 40);
-    rulesBinding->partitionHash[40] = '\0';
-    freeReplyObject(reply);
-    free(lua);
-
-    if (asprintf(&lua,
-"local timer_key = \"%s!t\"\n"
-"local timestamp = tonumber(ARGV[1])\n"
-"local res = redis.call(\"zrangebyscore\", timer_key, 0, timestamp, \"limit\", 0, 10)\n"
-"if #res > 0 then\n"
-"  for i = 0, #res, 1 do\n"
-"    redis.call(\"zincrby\", timer_key, 10, res[i])\n"
-"  end\n"
-"  return res\n"
-"end\n"
-"return 0\n", name)  == -1) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
-    redisGetReply(reContext, (void**)&reply);
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("%s\n", reply->str);
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-
-    strncpy(rulesBinding->timersHash, reply->str, 40);
-    rulesBinding->timersHash[40] = '\0';
-    freeReplyObject(reply);
-    free(lua);
-
-    if (asprintf(&lua,
-"local actions_key = \"%s!a\"\n"
-"local score = tonumber(ARGV[2])\n"
-"local sid = ARGV[1]\n"
-"if redis.call(\"zscore\", actions_key, sid) then\n"
-"    redis.call(\"zadd\", actions_key , score, sid)\n"
-"end\n", name)  == -1) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
-    redisGetReply(reContext, (void**)&reply);
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("%s\n", reply->str);
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-
-    strncpy(rulesBinding->updateActionHash, reply->str, 40);
-    rulesBinding->updateActionHash[40] = '\0';
-    freeReplyObject(reply);
-    free(lua);
-
-    char *sessionHashset = malloc((nameLength + 3) * sizeof(char));
-    if (!sessionHashset) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    strncpy(sessionHashset, name, nameLength);
-    sessionHashset[nameLength] = '!';
-    sessionHashset[nameLength + 1] = 's';
-    sessionHashset[nameLength + 2] = '\0';
-    rulesBinding->sessionHashset = sessionHashset;
-
-    char *factsHashset = malloc((nameLength + 3) * sizeof(char));
-    if (!factsHashset) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    strncpy(factsHashset, name, nameLength);
-    factsHashset[nameLength] = '!';
-    factsHashset[nameLength + 1] = 'f';
-    factsHashset[nameLength + 2] = '\0';
-    rulesBinding->factsHashset = factsHashset;
-
-    char *eventsHashset = malloc((nameLength + 3) * sizeof(char));
-    if (!eventsHashset) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    strncpy(eventsHashset, name, nameLength);
-    eventsHashset[nameLength] = '!';
-    eventsHashset[nameLength + 1] = 'e';
-    eventsHashset[nameLength + 2] = '\0';
-    rulesBinding->eventsHashset = eventsHashset;
-
-    char *timersSortedset = malloc((nameLength + 3) * sizeof(char));
-    if (!timersSortedset) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    strncpy(timersSortedset, name, nameLength);
-    timersSortedset[nameLength] = '!';
-    timersSortedset[nameLength + 1] = 't';
-    timersSortedset[nameLength + 2] = '\0';
-    rulesBinding->timersSortedset = timersSortedset;
 
     return RULES_OK;
 }
@@ -2522,7 +2580,7 @@ unsigned int registerTimer(void *rulesBinding, unsigned int duration, char *time
     time_t currentTime = time(NULL);
 
     int result = redisAppendCommand(reContext, 
-                                    "zadd %s %ld %s", 
+                                    "zadd %s %ld p:%s", 
                                     currentBinding->timersSortedset, 
                                     currentTime + duration, 
                                     timer);
@@ -2551,7 +2609,7 @@ unsigned int removeTimer(void *rulesBinding, char *timer) {
     redisContext *reContext = currentBinding->reContext;   
     
     int result = redisAppendCommand(reContext, 
-                                    "zrem %s %s", 
+                                    "zrem %s p:%s", 
                                     currentBinding->timersSortedset,
                                     timer);
     if (result != REDIS_OK) {
@@ -2574,16 +2632,37 @@ unsigned int removeTimer(void *rulesBinding, char *timer) {
     return RULES_OK;
 }
 
-unsigned int registerMessage(void *rulesBinding, char *destination, char *message) {
+unsigned int registerMessage(void *rulesBinding, unsigned int queueAction, char *destination, char *message) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;   
     time_t currentTime = time(NULL);
 
-    int result = redisAppendCommand(reContext, 
-                                    "zadd %s!t %ld %s", 
-                                    destination, 
-                                    currentTime, 
-                                    message);
+    int result = REDIS_OK;
+
+    switch (queueAction) {
+        case QUEUE_ASSERT_FACT:
+            result = redisAppendCommand(reContext, 
+                                        "zadd %s!t %ld a:%s", 
+                                        destination, 
+                                        currentTime, 
+                                        message);
+            break;
+        case QUEUE_ASSERT_EVENT:
+            result = redisAppendCommand(reContext, 
+                                        "zadd %s!t %ld p:%s", 
+                                        destination, 
+                                        currentTime, 
+                                        message);
+            break;
+        case QUEUE_RETRACT_FACT:
+            result = redisAppendCommand(reContext, 
+                                        "zadd %s!t %ld r:%s", 
+                                        destination, 
+                                        currentTime, 
+                                        message);
+            break;
+    }
+    
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }

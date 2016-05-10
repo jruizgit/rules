@@ -90,19 +90,19 @@ with (d.ruleset('fraud5')) {
     whenAll(m.amount.gt(100),
             pri(3),
         function(c) {
-            console.log('fraud5 first ' + c.m.amount);
+            console.log('fraud5 first ' + c.m.amount + ' from ' + c.s.sid);
         }
     );
     whenAll(m.amount.gt(200),
             pri(2),
         function(c) {
-            console.log('fraud5 second ' + c.m.amount);
+            console.log('fraud5 second ' + c.m.amount + ' from ' + c.s.sid);
         }
     );
     whenAll(m.amount.gt(300),
             pri(1),
         function(c) {
-            console.log('fraud5 third ' + c.m.amount);
+            console.log('fraud5 third ' + c.m.amount + ' from ' + c.s.sid);
         }
     );
     whenStart(function (host) {
@@ -114,24 +114,45 @@ with (d.ruleset('fraud5')) {
     });
 }
 
+q = d.createQueue('fraud5');
+q.post({id: 1, sid: 2, amount: 101, location: 'US'});
+q.post({id: 2, sid: 2, amount: 201, location: 'CA'});
+q.post({id: 3, sid: 2, amount: 301, location: 'CA'});
+q.assert({id: 4, sid: 2, amount: 250, location: 'US'});
+q.assert({id: 5, sid: 2, amount: 500, location: 'CA'});
+q.close();
+
 with (d.ruleset('fraud6')) {
     whenAll(c.first = m.t.eq('deposit'),
-            none(m.t.eq('withrawal')), 
-            c.third = m.t.eq('chargeback'),
-            count(2),
+            none(m.t.eq('balance')), 
+            c.third = m.t.eq('withrawal'),
+            c.fourth = m.t.eq('chargeback'),
         function(c) {
-            console.log('fraud6 detected ' + JSON.stringify(c.m));
+            console.log('fraud6 detected ' + c.first.t + ' ' + c.third.t + ' ' + c.fourth.t + ' from ' + c.s.sid);
         }
     );
     whenStart(function (host) {
         host.post('fraud6', {id: 1, sid: 1, t: 'deposit'});
-        host.assert('fraud6', {id: 2, sid: 1, t: 'withrawal'});
+        host.post('fraud6', {id: 2, sid: 1, t: 'withrawal'});
         host.post('fraud6', {id: 3, sid: 1, t: 'chargeback'});
-        host.post('fraud6', {id: 4, sid: 1, t: 'deposit'});
-        host.post('fraud6', {id: 5, sid: 1, t: 'chargeback'});
-        host.retract('fraud6', {id: 2, sid: 1, t: 'withrawal'});
+        host.assert('fraud6', {id: 4, sid: 1, t: 'balance'});
+        host.post('fraud6', {id: 5, sid: 1, t: 'deposit'});
+        host.post('fraud6', {id: 6, sid: 1, t: 'withrawal'});
+        host.post('fraud6', {id: 7, sid: 1, t: 'chargeback'});
+        host.retract('fraud6', {id: 4, sid: 1, t: 'balance'});
     });
 }
+
+q = d.createQueue('fraud6');
+q.post({id: 1, sid: 2, t: 'deposit'});
+q.post({id: 2, sid: 2, t: 'withrawal'});
+q.post({id: 3, sid: 2, t: 'chargeback'});
+q.assert({id: 4, sid: 2, t: 'balance'});
+q.post({id: 5, sid: 2, t: 'deposit'});
+q.post({id: 6, sid: 2, t: 'withrawal'});
+q.post({id: 7, sid: 2, t: 'chargeback'});
+q.retract({id: 4, sid: 2, t: 'balance'});
+q.close();
 
 with (d.statechart('fraud7')) {
     with (state('first')) {
@@ -459,7 +480,7 @@ with (d.ruleset('t2')) {
 with (d.ruleset('q0')) {
     whenAll(m.start.eq('yes'), function (c) {
         console.log('q0 started');
-        c.queue('q0', {sid: 1, id: 2, end: 'yes'});
+        c.getQueue('q0').post({sid: 1, id: 2, end: 'yes'});
     });
     whenAll(m.end.eq('yes'), function (c) {
         console.log('q0 ended');

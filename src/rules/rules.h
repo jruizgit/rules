@@ -43,6 +43,10 @@
 #define BETA_LIST_LENGTH 16
 #define HASH_MASK 0x1F
 
+#define QUEUE_ASSERT_FACT 1
+#define QUEUE_ASSERT_EVENT 2
+#define QUEUE_RETRACT_FACT 3
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -53,6 +57,12 @@ unsigned int createRuleset(void **handle,
                            unsigned int stateCaheSize);
 
 unsigned int deleteRuleset(void *handle);
+
+unsigned int createClient(void **handle, 
+                          char *name,
+                          unsigned int stateCaheSize);
+
+unsigned int deleteClient(void *handle);
 
 unsigned int bindRuleset(void *handle, 
                          char *host, 
@@ -161,7 +171,8 @@ unsigned int cancelTimer(void *handle,
                          char *sid, 
                          char *timer);
 
-unsigned int queueMessage(void *handle, 
+unsigned int queueMessage(void *handle,
+                          unsigned int queueAction, 
                           char *sid, 
                           char *destination, 
                           char *message);

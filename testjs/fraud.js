@@ -47,7 +47,7 @@ with (d.ruleset('fraudDetection')) {
         console.log('High risk ' + c.first.amount + ' ,' + c.second.amount + ' ,' + c.third.amount);
     });
 
-    whenAll(timeout('customer'), 
+    whenAll(or(m.t.eq('customer'), timeout('customer')), 
     function(c) {
         if (!c.s.cCount) {
             c.s.cCount = 100;
@@ -55,12 +55,12 @@ with (d.ruleset('fraudDetection')) {
             c.s.cCount += 2;
         }
 
-        c.post('fraudDetection', {id: c.s.cCount, sid: 1, t: 'debitCleared', amount: c.s.cCount})
-        c.post('fraudDetection', {id: c.s.cCount + 1, sid: 1, t: 'creditCleared', amount: (c.s.cCount - 100) * 2 + 100})
-        c.startTimer('customer', 1)
+        c.post('fraudDetection', {id: c.s.cCount, sid: 1, t: 'debitCleared', amount: c.s.cCount});
+        c.post('fraudDetection', {id: c.s.cCount + 1, sid: 1, t: 'creditCleared', amount: (c.s.cCount - 100) * 2 + 100});
+        c.startTimer('customer', 1);
     });
 
-    whenAll(timeout('fraudster'), 
+    whenAll(or(m.t.eq('fraudster'), timeout('fraudster')), 
     function(c) {
         if (!c.s.fCount) {
             c.s.fCount = 1000;
@@ -68,13 +68,13 @@ with (d.ruleset('fraudDetection')) {
             c.s.fCount += 1;
         }
 
-        c.post('fraudDetection', {id: c.s.fCount, sid: 1, t: 'debitRequest', amount: c.s.fCount - 800, 'stamp': Date.now() / 1000})
-        c.startTimer('fraudster', 2)
+        c.post('fraudDetection', {id: c.s.fCount, sid: 1, t: 'debitRequest', amount: c.s.fCount - 800, 'stamp': Date.now() / 1000});
+        c.startTimer('fraudster', 2);
     });
 
     whenStart(function (host) {
-        host.startTimer('fraudDetection', 1, 'customer', 1)
-        host.startTimer('fraudDetection', 1, 'fraudster', 15)
+        host.post('fraudDetection', {id: 'c_1', sid: 1, t: 'customer'});
+        host.post('fraudDetection', {id: 'f_1', sid: 1, t: 'fraudster'});
     });
 }
 

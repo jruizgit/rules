@@ -4,11 +4,44 @@ exports = module.exports = durableEngine = function () {
     var stat = require('node-static');
     var r = require('bindings')('rulesjs.node');
 
+    var closureQueue = function () {
+        var queuedPosts = [];
+        var queuedAsserts = [];
+        var queuedRetracts = [];
+
+        that.getQueuedPosts = function () {
+            return queuedPosts;
+        };
+
+        that.getQueuedAsserts = function () {
+            return queuedAsserts;
+        };
+
+        that.getQueuedRetracts = function () {
+            return queuedRetracts;
+        };
+
+        that.post = function (message) {
+            message = copy(message);
+            queuedPosts.push(message);
+        };
+
+        that.assert = function (message) {
+            message = copy(message);
+            queuedAsserts.push(message);
+        };
+
+        that.retract = function (message) {
+            message = copy(message);
+            queuedRetracts.push(message);
+        };
+    } 
+
     var closure = function (host, document, output, handle, rulesetName) {
         var that = {};
         var targetRulesets = {};
         var eventsDirectory = {};
-        var queuedEventsDirectory = {};
+        var queuesDirectory = {};
         var factsDirectory = {};
         var retractDirectory = {};
         var timerDirectory = {};
@@ -51,8 +84,8 @@ exports = module.exports = durableEngine = function () {
             return eventsDirectory;
         };
 
-        that.getQueuedEvents = function () {
-            return queuedEventsDirectory;
+        that.getQueues = function () {
+            return queuesDirectory;
         };
 
         that.getFacts = function () {
@@ -70,6 +103,14 @@ exports = module.exports = durableEngine = function () {
         that.getCancelledTimers = function () {
             return cancelledTimerDirectory;
         };
+
+        that.getQueue = function (rules) {
+            if (!queuesDirectory[rules]) {
+                queuesDirectory[rules] = closureQueue();
+            }
+            
+            return queuesDirectory[rules];
+        }
 
         that.post = function (rules, message) {
             if (!message) {
@@ -95,7 +136,7 @@ exports = module.exports = durableEngine = function () {
             eventsList.push(message);
         };
 
-        that.queue = function (rules, message) {
+        that.queuePost = function (rules, message) {
             message = copy(message);
             var eventsList;
             if (queuedEventsDirectory[rules]) {
@@ -356,6 +397,10 @@ exports = module.exports = durableEngine = function () {
             return r.assertEvent(handle, JSON.stringify(message));
         };
 
+        that.queueAssertEvent = function (sid, rulesetName, message) {
+            return r.queueAssertEvent(handle, sid, rulesetName, JSON.stringify(message));
+        };
+
         that.startAssertEvents = function (messages) {
             return r.startAssertEvents(handle, JSON.stringify(messages));
         };
@@ -364,16 +409,16 @@ exports = module.exports = durableEngine = function () {
             return r.assertEvents(handle, JSON.stringify(messages));
         };
 
-        that.queueEvent = function (sid, rulesetName, message) {
-            return r.queueEvent(handle, sid, rulesetName, JSON.stringify(message));
-        };
-
         that.startAssertFact = function (fact) {
             return r.startAssertFact(handle, JSON.stringify(fact));
         };
 
         that.assertFact = function (fact) {
             return r.assertFact(handle, JSON.stringify(fact));
+        };
+
+        that.queueAssertFact = function (sid, rulesetName, message) {
+            return r.queueAssertFact(handle, sid, rulesetName, JSON.stringify(message));
         };
 
         that.startAssertFacts = function (facts) {
@@ -390,6 +435,10 @@ exports = module.exports = durableEngine = function () {
 
         that.retractFact = function (fact) {
             return r.retractFact(handle, JSON.stringify(fact));
+        };
+
+        that.queueRetractFact = function (sid, rulesetName, message) {
+            return r.queueRetractFact(handle, sid, rulesetName, JSON.stringify(message));
         };
 
         that.startRetractFacts = function (facts) {
@@ -526,11 +575,22 @@ exports = module.exports = durableEngine = function () {
                                     that.startTimer(c.s.sid, timerTuple[0], timerTuple[1]);
                                 }
 
-                                var queuedEvents = c.getQueuedEvents();
-                                for (var targetRuleset in queuedEvents) {
-                                    var messagesList = queuedEvents[targetRuleset];
-                                    for (var i = 0; i < messagesList.length; ++i) {
-                                        that.queueEvent(c.s.sid, targetRuleset, messagesList[i]);
+                                var queues = c.getQueues();
+                                for (var targetRuleset in queues) {
+                                    var q = queues[targetRuleset];
+                                    var messages = q.getQueuedPosts();
+                                    for (var i = 0; i < messages.length; ++i) {
+                                        that.queueAssertEvent(messages[i].sid, targetRuleset, messages[i]);
+                                    }
+
+                                    var messages = q.getQueuedAsserts();
+                                    for (var i = 0; i < messages.length; ++i) {
+                                        that.queueAssertFact(messages[i].sid, targetRuleset, messages[i]);
+                                    }
+
+                                    var messages = q.getQueuedRetracts();
+                                    for (var i = 0; i < messages.length; ++i) {
+                                        that.queueRetractFact(messages[i].sid, targetRuleset, messages[i]);
                                     }
                                 }
                                 
@@ -1091,10 +1151,6 @@ exports = module.exports = durableEngine = function () {
             return that.getRuleset(rulesetName).assertEvent(message);
         };
 
-        that.queue = function (rulesetName, message) {
-            return that.getRuleset(rulesetName).queueEvent(message.sid, message);
-        };
-
         that.startAssert = function (rulesetName, fact) {
             return that.getRuleset(rulesetName).startAssertFact(fact);
         };
@@ -1133,10 +1189,6 @@ exports = module.exports = durableEngine = function () {
 
         that.patchState = function (rulesetName, state) {
             return that.getRuleset(rulesetName).assertState(state);
-        };
-
-        that.startTimer = function (rulesetName, sid, timerName, timerDuration) {
-            return that.getRuleset(rulesetName).startTimer(sid, timerName, timerDuration);
         };
 
         that.renewActionLease = function (rulesetName, sid) {
@@ -1182,6 +1234,38 @@ exports = module.exports = durableEngine = function () {
 
         setTimeout(dispatchRules, 100, 1);
         setTimeout(dispatchTimers, 100, 1);
+        return that;
+    }
+
+    var queue = function(rulesetName, database, stateCacheSize) {
+        var that = {};
+        var handle;
+        database = database || {host: 'localhost', port: 6379, password:null};
+        stateCacheSize = stateCacheSize || 1024;
+
+        that.post = function (message) {
+            return r.queueAssertEvent(handle, message.sid, rulesetName, JSON.stringify(message));
+        };
+
+        that.assert = function (message) {
+            return r.queueAssertFact(handle, message.sid, rulesetName, JSON.stringify(message));
+        };
+
+        that.retract = function (message) {
+            return r.queueRetractFact(handle, message.sid, rulesetName, JSON.stringify(message));
+        };
+
+        that.close = function() {
+            return r.deleteClient(handle);
+        };
+
+        handle = r.createClient(rulesetName, stateCacheSize)
+        if (typeof(database) === 'string') {
+            r.bindRuleset(handle, database, 0, null);
+        } else {
+            r.bindRuleset(handle, database.host, database.port, database.password);
+        }
+
         return that;
     }
 
@@ -1289,6 +1373,7 @@ exports = module.exports = durableEngine = function () {
     return {
         promise: promise,
         host: host,
+        queue: queue,
         application: application
     };
 }();

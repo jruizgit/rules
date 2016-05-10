@@ -43,7 +43,7 @@ Durable.ruleset :fraud_detection do
     puts "High risk #{first.amount}, #{second.amount}, #{third.amount}"
   end
 
-  when_all timeout("customer") do
+  when_all timeout("customer") | (m.t == "customer") do
     if not s.c_count
         s.c_count = 100
     else
@@ -55,7 +55,7 @@ Durable.ruleset :fraud_detection do
     start_timer "customer", 1
   end
 
-  when_all timeout("fraudster") do
+  when_all timeout("fraudster") | (m.t == "fraudster") do
     if not s.f_count
         s.f_count = 1000
     else
@@ -67,8 +67,8 @@ Durable.ruleset :fraud_detection do
   end
 
   when_start do
-    start_timer "fraud_detection", 1, "customer", 1
-    start_timer "fraud_detection", 1, "fraudster", 15
+    start_timer "fraud_detection", {:id => "c_1", :sid => 1, :t => "customer"}
+    start_timer "fraud_detection", {:id => "f_1", :sid => 1, :t => "fraudster"}
   end
 end
 

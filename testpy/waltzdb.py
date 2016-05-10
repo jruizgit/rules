@@ -829,5 +829,5 @@ with statechart('waltzdb'):
         create_and_post(host, {'t':'line' ,'p1':500005 ,'p2':500006})
         create_and_post(host, {'t':'line' ,'p1':470008 ,'p2':480008})
 
-run_all(['/tmp/redis0.sock'])
+run_all()
 

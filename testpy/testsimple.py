@@ -5,7 +5,6 @@ import sys
 import threading
 import time
 
-
 with statechart('fraud0'):
     with state('start'):
         to('standby')
@@ -142,7 +141,7 @@ with ruleset('fraud7'):
               c.third << m.t == 'withrawal',
               c.fourth << m.t == 'chargeback')
     def detected(c):
-        print('fraud7 detected {0}, {1}, {2}'.format(c.first.t, c.third.t, c.fourth.t))
+        print('fraud7 detected {0}, {1}, {2} from {3}'.format(c.first.t, c.third.t, c.fourth.t, c.s.sid))
 
     @when_start
     def start(host):
@@ -155,6 +154,16 @@ with ruleset('fraud7'):
         host.post('fraud7', {'id': 7, 'sid': 1, 't': 'chargeback'})
         host.retract_fact('fraud7', {'id': 4, 'sid': 1, 't': 'balance'})
 
+q = create_queue('fraud7')
+q.post({'id': 1, 'sid': 2, 't': 'deposit'})
+q.post({'id': 2, 'sid': 2, 't': 'withrawal'})
+q.post({'id': 3, 'sid': 2, 't': 'chargeback'})
+q.assert_fact({'id': 4, 'sid': 2, 't': 'balance'})
+q.post({'id': 5, 'sid': 2, 't': 'deposit'})
+q.post({'id': 6, 'sid': 2, 't': 'withrawal'})
+q.post({'id': 7, 'sid': 2, 't': 'chargeback'})
+q.retract_fact({'id': 4, 'sid': 2, 't': 'balance'})
+q.close()
 
 t = None
 with statechart('fraud8'):
@@ -550,7 +559,7 @@ with ruleset('q0'):
     @when_all(m.start == 'yes')
     def start_queue(c):
         print('q0 started')
-        c.queue('q0', {'id': 2, 'sid': 1, 'end': 'yes'})
+        c.get_queue('q0').post({'id': 2, 'sid': 1, 'end': 'yes'})
 
     @when_all(m.end == 'yes')
     def end_timer(c):

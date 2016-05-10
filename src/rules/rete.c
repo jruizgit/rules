@@ -1722,5 +1722,62 @@ unsigned int deleteRuleset(void *handle) {
     return RULES_OK;
 }
 
+unsigned int createClient(void **handle, char *name, unsigned int stateCaheSize) {
+    ruleset *tree = malloc(sizeof(ruleset));
+    if (!tree) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    
+    tree->stringPool = NULL;
+    tree->stringPoolLength = 0;
+    tree->nodePool = NULL;
+    tree->nodeOffset = 0;
+    tree->nextPool = NULL;
+    tree->nextOffset = 0;
+    tree->expressionPool = NULL;
+    tree->expressionOffset = 0;
+    tree->idiomPool = NULL;
+    tree->idiomOffset = 0;
+    tree->joinPool = NULL;
+    tree->joinOffset = 0;
+    tree->actionCount = 0;
+    tree->bindingsList = NULL;
+    tree->stateLength = 0;
+    tree->state = calloc(stateCaheSize, sizeof(stateEntry));
+    tree->maxStateLength = stateCaheSize;
+    tree->stateBucketsLength = stateCaheSize / 4;
+    tree->stateBuckets = malloc(tree->stateBucketsLength * sizeof(unsigned int));
+    memset(tree->stateBuckets, 0xFF, tree->stateBucketsLength * sizeof(unsigned int));
+    tree->lruStateOffset = UNDEFINED_HASH_OFFSET;
+    tree->mruStateOffset = UNDEFINED_HASH_OFFSET;
+
+    unsigned int result = storeString(tree, name, &tree->nameOffset, strlen(name));
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    *handle = tree;
+    return RULES_OK;
+}
+
+unsigned int deleteClient(void *handle) {
+    ruleset *tree = (ruleset*)(handle);
+    deleteBindingsList(tree);
+    free(tree->stringPool);
+    free(tree->stateBuckets);
+    for (unsigned int i = 0; i < tree->stateLength; ++i) {
+        stateEntry *entry = &tree->state[i];
+        if (entry->state) {
+            free(entry->state);
+        }
+
+        if (entry->sid) {
+            free(entry->sid);
+        }
+    }
+    
+    free(tree);
+    return RULES_OK;
+}
 
 
