@@ -183,6 +183,9 @@ unsigned int getState(void *handle,
                       char *sid, 
                       char **state);
 
+unsigned int deleteState(void *handle, 
+                         char *sid);
+
 unsigned int renewActionLease(void *handle, 
                               char *sid);
 

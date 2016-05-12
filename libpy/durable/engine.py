@@ -61,11 +61,13 @@ class Closure(object):
         self._timer_directory = {}
         self._cancelled_timer_directory = {}
         self._message_directory = {}
-        self._queues_directory = {}
+        self._queue_directory = {}
         self._branch_directory = {}
         self._fact_directory = {}
+        self._delete_directory = {}
         self._retract_directory = {}
         self._completed = False
+        self._deleted = False
         self._start_time = _unix_now()
         if isinstance(message, dict): 
             self._m = message
@@ -90,7 +92,10 @@ class Closure(object):
         return self._message_directory
 
     def get_queues(self):
-        return self._queues_directory
+        return self._queue_directory
+
+    def get_deletes(self):
+        return self._delete_directory
 
     def get_facts(self):
         return self._fact_directory
@@ -99,10 +104,10 @@ class Closure(object):
         return self._retract_directory
 
     def get_queue(self, ruleset_name):
-        if not ruleset_name in self._queues_directory:
-            self._queues_directory[ruleset_name] = Closure_Queue()
+        if not ruleset_name in self._queue_directory:
+            self._queue_directory[ruleset_name] = Closure_Queue()
         
-        return self._queues_directory[ruleset_name]
+        return self._queue_directory[ruleset_name]
 
     def post(self, ruleset_name, message = None):
         if not message: 
@@ -122,6 +127,24 @@ class Closure(object):
             self._message_directory[ruleset_name] = message_list
 
         message_list.append(message)
+
+    def delete(self, ruleset_name = None, sid = None):
+        if not ruleset_name: 
+            ruleset_name = self.ruleset_name
+            
+        if not sid:
+            sid = self.s['sid']
+
+        if (ruleset_name == self.ruleset_name) and (sid == self.s['sid']):
+            self._deleted = True
+
+        sid_list = []
+        if  ruleset_name in self._delete_directory:
+            sid_list = self._delete_directory[ruleset_name]
+        else:
+            self._delete_directory[ruleset_name] = sid_list
+
+        sid_list.append(sid)
 
     def start_timer(self, timer_name, duration, timer_id = None):
         if not timer_id:
@@ -193,6 +216,9 @@ class Closure(object):
         value = self._completed
         self._completed = True
         return value
+
+    def _is_deleted(self):
+        return self._deleted
 
     def __getattr__(self, name):   
         if name in self._m:
@@ -432,6 +458,9 @@ class Ruleset(object):
         
     def get_state(self, sid):
         return json.loads(rules.get_state(self._handle, str(sid)))
+
+    def delete_state(self, sid):
+        rules.delete_state(self._handle, str(sid))
     
     def renew_action_lease(self, sid):
         rules.renew_action_lease(self._handle, str(sid))
@@ -535,6 +564,9 @@ class Ruleset(object):
                                 self.queue_retract_fact(message['sid'], ruleset_name, message)
 
   
+                        for ruleset_name, sid in c.get_deletes().iteritems():
+                            self._host.delete_state(ruleset_name, sid)
+
                         binding  = 0
                         replies = 0
                         pending = {action_binding: 0}
@@ -602,7 +634,13 @@ class Ruleset(object):
                         print('unknown exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                         rules.abandon_action(self._handle, c._handle)
                         complete('unknown error')
-            
+
+                    if c._is_deleted():
+                        try:
+                            self.delete_state(c.s.sid)
+                        except BaseException as error:
+                            complete(error)
+
             if 'async' in result_container:
                 del result_container['async']
                 
@@ -879,6 +917,9 @@ class Host(object):
 
     def get_state(self, ruleset_name, sid):
         return self.get_ruleset(ruleset_name).get_state(sid)
+
+    def delete_state(self, ruleset_name, sid):
+        self.get_ruleset(ruleset_name).delete_state(sid)
 
     def get_ruleset_state(self, ruleset_name):
         return self.get_ruleset(ruleset_name).get_ruleset_state(sid)

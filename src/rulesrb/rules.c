@@ -714,6 +714,21 @@ static VALUE rbGetState(VALUE self, VALUE handle, VALUE sid) {
     return output;
 }
 
+static VALUE rbDeleteState(VALUE self, VALUE handle, VALUE sid) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(sid, T_STRING);
+
+    unsigned int result = deleteState((void *)FIX2LONG(handle), RSTRING_PTR(sid));
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not delete state, error code: %d", result);
+        }
+    }
+
+    return Qnil;
+}
 
 static VALUE rbRenewActionLease(VALUE self, VALUE handle, VALUE sid) {
     Check_Type(handle, T_FIXNUM);
@@ -765,6 +780,7 @@ void Init_rules() {
     rb_define_singleton_method(rulesModule, "cancel_timer", rbCancelTimer, 3);
     rb_define_singleton_method(rulesModule, "assert_timers", rbAssertTimers, 1);
     rb_define_singleton_method(rulesModule, "get_state", rbGetState, 2);
+    rb_define_singleton_method(rulesModule, "delete_state", rbDeleteState, 2);
     rb_define_singleton_method(rulesModule, "renew_action_lease", rbRenewActionLease, 2);
 }
 

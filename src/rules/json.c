@@ -177,6 +177,15 @@ static unsigned int getValue(char *start, char **first, char **last, unsigned ch
             } else {
                 return ERR_PARSE_STRING;
             }
+        } else if (start[0] == 'n') {
+            if (strncmp(start, "null", 4) == 0) {
+                *first = start;
+                *last = start + 3;
+                *type = JSON_NIL;
+                return PARSE_OK;
+            } else {
+                return ERR_PARSE_STRING;
+            }
         } else if (start[0] == '{') {
             *type = JSON_OBJECT;
             unsigned int result = getObject(start, first, last);

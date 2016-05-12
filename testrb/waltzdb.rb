@@ -237,6 +237,7 @@ Durable.statechart :waltzdb do
     to :end, when_all(pri(2)) do
       total_time = Time.now - s.start_time
       puts "end total time: #{total_time}"
+      delete
     end
   end
 

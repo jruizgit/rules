@@ -234,6 +234,7 @@ with (d.statechart('waltzdb')) {
         to('end').whenAll(pri(2), 
         function (c) {
             console.log('end ' + (new Date() - c.s.startTime));
+            c.delete();
         });
     }
 

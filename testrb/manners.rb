@@ -94,6 +94,7 @@ Durable.statechart :miss_manners do
                      (m.t == "seating") & (m.right_seat == last_seat.seat)) do
       total_time = Time.now - s.start_time
       puts("end total time: #{total_time}")
+      delete
     end
     to :assign
   end

@@ -109,6 +109,7 @@ with statechart('miss_manners'):
                  (m.t == 'seating') & (m.right_seat == c.last_seat.seat))
         def done(c):
             print('end {0}'.format(unix_time_millis(datetime.datetime.now()) - c.s.start_time))
+            c.delete()
         
         to('assign')
 

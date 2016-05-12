@@ -410,3 +410,13 @@ unsigned int getState(void *handle, char *sid, char **state) {
 
     return getSession(rulesBinding, sid, state);
 }
+
+unsigned int deleteState(void *handle, char *sid) {
+    void *rulesBinding = NULL;
+    unsigned int result = resolveBinding(handle, sid, &rulesBinding);
+    if (result != RULES_OK) {
+      return result;
+    }
+
+    return deleteSession(rulesBinding, sid);
+}

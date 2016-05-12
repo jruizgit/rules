@@ -978,6 +978,27 @@ void jsGetState(const FunctionCallbackInfo<Value>& args) {
     }
 }
 
+void jsDeleteState(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        unsigned int result = deleteState((void *)args[0]->IntegerValue(), 
+                                          *v8::String::Utf8Value(args[1]->ToString())); 
+        if (result != RULES_OK) {
+            char *message = NULL;
+            if (asprintf(&message, "Could not delete state, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            }
+        }
+    }
+}
+
 void jsRenewActionLease(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
@@ -1151,6 +1172,9 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewFromUtf8(isolate, "getState", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsGetState)->GetFunction());
+
+    exports->Set(String::NewFromUtf8(isolate, "deleteState", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsDeleteState)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "renewActionLease", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsRenewActionLease)->GetFunction());

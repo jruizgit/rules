@@ -976,6 +976,33 @@ static PyObject *pyGetState(PyObject *self, PyObject *args) {
     return returnValue;
 }
 
+static PyObject *pyDeleteState(PyObject *self, PyObject *args) {
+    void *handle;
+    char *sid;
+    if (!PyArg_ParseTuple(args, "ls", &handle, &sid)) {
+        PyErr_SetString(RulesError, "pyDeleteState Invalid argument");
+        return NULL;
+    }
+
+    unsigned int result = deleteState(handle, sid);
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            if (asprintf(&message, "Could not delete state, error code: %d", result) == -1) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
+        }
+        return NULL;
+    }
+
+     Py_RETURN_NONE;
+}
+
 static PyObject *pyRenewActionLease(PyObject *self, PyObject *args) {
     void *handle;
     char *sid;
@@ -1035,6 +1062,7 @@ static PyMethodDef myModule_methods[] = {
     {"cancel_timer", pyCancelTimer, METH_VARARGS},
     {"assert_timers", pyAssertTimers, METH_VARARGS},
     {"get_state", pyGetState, METH_VARARGS},
+    {"delete_state", pyDeleteState, METH_VARARGS},
     {"renew_action_lease", pyRenewActionLease, METH_VARARGS},
     {NULL, NULL}
 };

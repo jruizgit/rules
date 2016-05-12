@@ -40,7 +40,7 @@ module Engine
   end
 
   class Closure
-    attr_reader :host, :handle, :ruleset_name, :_timers, :_cancelled_timers, :_branches, :_messages, :_queues, :_facts, :_retract
+    attr_reader :host, :handle, :ruleset_name, :_timers, :_cancelled_timers, :_branches, :_messages, :_queues, :_facts, :_retract, :_deletes, :_deleted
     attr_accessor :s
 
     def initialize(host, state, message, handle, ruleset_name)
@@ -52,11 +52,13 @@ module Engine
       @_cancelled_timers = {}
       @_messages = {}
       @_queues = {}
+      @_deletes = {}
       @_branches = {}
       @_facts = {}
       @_retract = {}
       @_start_time = Time.now
       @_completed = false
+      @_deleted = false
       if message.kind_of? Hash
         @m = message
       else
@@ -91,6 +93,28 @@ module Engine
         @_messages[ruleset_name] = message_list
       end
       message_list << message
+    end
+
+    def delete(ruleset_name = nil, sid = nil)
+      if !ruleset_name
+        ruleset_name = @ruleset_name
+      end
+
+      if !sid
+        sid = @s.sid
+      end
+
+      if (ruleset_name == @ruleset_name) && (sid == @s.sid)
+        @_deleted = true
+      end
+
+      sid_list = []
+      if @_deletes.key? ruleset_name
+        sid_list = @_deletes[ruleset_name]
+      else
+        @_deletes[ruleset_name] = sid_list
+      end
+      sid_list << sid
     end
 
     def get_queue(ruleset_name)
@@ -479,6 +503,10 @@ module Engine
       JSON.parse Rules.get_state(@handle, sid.to_s)
     end
 
+    def delete_state(sid)
+      Rules.delete_state(@handle, sid.to_s)
+    end
+
     def renew_action_lease(sid)
       Rules.renew_action_lease @handle, sid.to_s
     end 
@@ -588,6 +616,10 @@ module Engine
                 end
               end
 
+              for ruleset_name, sid in c._deletes do
+                @host.delete_state ruleset_name, sid
+              end
+
               binding  = 0
               replies = 0
               pending = {action_binding => 0}
@@ -656,6 +688,15 @@ module Engine
               puts e.backtrace
               complete.call e
             end
+
+            if c._deleted
+              begin
+                delete_state c.s.sid
+              rescue Exception => e
+                complete.call e
+              end
+            end
+
           end
         }
         result_container[:async] = true 
@@ -1071,6 +1112,10 @@ module Engine
 
     def get_state(ruleset_name, sid)
       get_ruleset(ruleset_name).get_state sid
+    end
+
+    def delete_state(ruleset_name, sid)
+      get_ruleset(ruleset_name).delete_state sid
     end
 
     def post_batch(ruleset_name, *events)
