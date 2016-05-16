@@ -546,7 +546,7 @@ exports = module.exports = durableEngine = function () {
         that.whenAll = function () {
             var newRule = rule('all', argsToArray(arguments));
             rules.push(newRule);
-            return newRule;
+            return that;
         };
 
         that.whenAny = function () {
@@ -561,6 +561,7 @@ exports = module.exports = durableEngine = function () {
 
         that.whenStart = function (func) {
             startFunc = func;
+            return that;
         };
 
         that.define = function () {
@@ -577,7 +578,7 @@ exports = module.exports = durableEngine = function () {
         return that;
     };
 
-    var to = function (stateName, flow) {
+    var stateTrigger = function (stateName, run, parent) {
         var that = {};
         var condition;
 
@@ -587,37 +588,32 @@ exports = module.exports = durableEngine = function () {
 
         that.whenAll = function () {
             condition = rule('all', argsToArray(arguments));
-            return condition;
+            return parent;
         };
 
         that.whenAny = function () {
             condition = rule('any', argsToArray(arguments));
-            return condition;
+            return parent;
         };
 
         that.define = function(name)  {
             if (!condition) {
-                if (!flow) {
+                if (!run) {
                     return {to: stateName};
-                } else if (typeof(flow) === 'function') {
-                    return {to: stateName, run: flow};
-                }
-                else {
-                    return stateName;
+                } else {
+                    return {to: stateName, run: run};
                 }
             } 
 
             var newDefinition = condition.define(name);
-            if (!flow) {
-                newDefinition['to'] = stateName;
-            }
+            newDefinition['to'] = stateName;
             return newDefinition;
         };
 
         return that;
     };
 
-    var state = function (name) {
+    var state = function (name, parent) {
         var that = {};
         var triggers = [];
         var states = [];
@@ -627,9 +623,13 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.to = function (stateName, func) {
-            var trigger = to(stateName, func);
+            var trigger = stateTrigger(stateName, func, that);
             triggers.push(trigger);
-            return trigger;
+            if (func) {
+                return that;
+            } else {
+                return trigger;
+            }
         };
 
         that.state = function(stateName) {
@@ -637,6 +637,10 @@ exports = module.exports = durableEngine = function () {
             states.push(newState);
             return newState;
         };
+
+        that.end = function() {
+            return parent;
+        }
 
         that.define = function() {
             var newDefinition = {};
@@ -674,7 +678,7 @@ exports = module.exports = durableEngine = function () {
         }
 
         that.state = function (name) {
-            var s = state(name);
+            var s = state(name, that);
             states.push(s);
             return s;
         };
@@ -697,7 +701,37 @@ exports = module.exports = durableEngine = function () {
         return that;
     };
 
-    var stage = function (name) {
+    var stageTrigger = function (stageName, parent) {
+        var that = {};
+        var condition;
+
+        that.getName = function() {
+            return stageName;
+        };
+
+        that.whenAll = function () {
+            condition = rule('all', argsToArray(arguments));
+            return parent;
+        };
+
+        that.whenAny = function () {
+            condition = rule('any', argsToArray(arguments));
+            return parent;
+        };
+
+        that.define = function(name)  {
+            if (!condition) {
+                return stageName;
+            } 
+
+            return condition.define(name);
+        };
+
+        return that;
+    };
+
+
+    var stage = function (name, parent) {
         var that = {};
         var switches = [];
         var runFunc;
@@ -709,34 +743,18 @@ exports = module.exports = durableEngine = function () {
 
         that.run = function (func) {
             runFunc = func;
+            return that;
         };
 
-        that.ruleset = function(name) {
-            var newRuleset = ruleset(name);
-            rulesets.pop();
-            rulesetArray.push(newRuleset);
-            return newRuleset;
-        }
-
-        that.statechart = function(name) {
-            var newRuleset = statechart(name);
-            rulesets.pop();
-            rulesetArray.push(newRuleset);
-            return newRuleset;
-        }
-
-        that.flowchart = function(name) {
-            var newRuleset = flowchart(name);
-            rulesets.pop();
-            rulesetArray.push(newRuleset);
-            return newRuleset;
-        }
-
         that.to = function (stageName) {
-            var sw = to(stageName, true);
+            var sw = stageTrigger(stageName, that);
             switches.push(sw);
             return sw;
         };
+
+        that.end = function() {
+            return parent;
+        }
 
         that.define = function () {
             var newDefinition = {};
@@ -784,7 +802,7 @@ exports = module.exports = durableEngine = function () {
         }
 
         that.stage = function (name) {
-            var s = stage(name);
+            var s = stage(name, that);
             stages.push(s);
             return s;
         };
@@ -841,7 +859,7 @@ exports = module.exports = durableEngine = function () {
         }
     } 
 
-    return {
+    var ex = {
         state: state,
         statechart: statechart,
         stage: stage,
@@ -850,5 +868,8 @@ exports = module.exports = durableEngine = function () {
         createHost: createHost,
         createQueue: createQueue,
         runAll: runAll,
-    };
+    }; 
+    extend(ex);
+
+    return ex;
 }();

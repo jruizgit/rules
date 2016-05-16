@@ -247,7 +247,7 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
-        that.cancelTimer = function (name, duration, id) {
+        that.cancelTimer = function (name, id) {
             if (!id) {
                 id = name;
             }
@@ -1414,7 +1414,7 @@ exports = module.exports = durableEngine = function () {
                 });
             });
 
-            that.post('/:rulesetName', function (request, response) {
+            that.post(basePath + '/:rulesetName', function (request, response) {
                 response.contentType = "application/json; charset=utf-8";
                 host.setRuleset(request.params.rulesetName, request.body, function (err, result) {
                     if (err) {
