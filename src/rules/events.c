@@ -1076,7 +1076,6 @@ static unsigned int handleMessageCore(ruleset *tree,
         commands[*commandCount] = storeCommand;
         ++*commandCount;
     }
-
     char *removeCommand = NULL;
     char *addKeys[MAX_ADD_COUNT];
     unsigned int addCount = 0;

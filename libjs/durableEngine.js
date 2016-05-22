@@ -1305,7 +1305,7 @@ exports = module.exports = durableEngine = function () {
         var that = {};
         var handle;
         database = database || {host: 'localhost', port: 6379, password:null};
-        stateCacheSize = stateCacheSize || 1024;
+        stateCacheSize = stateCacheSize || 5000;
 
         that.post = function (message) {
             return r.queueAssertEvent(handle, message.sid, rulesetName, JSON.stringify(message));

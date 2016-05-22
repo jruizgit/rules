@@ -397,7 +397,7 @@ static unsigned int loadTimerCommand(ruleset *tree, binding *rulesBinding) {
     if (asprintf(&lua,
 "local timer_key = \"%s!t\"\n"
 "local timestamp = tonumber(ARGV[1])\n"
-"local res = redis.call(\"zrangebyscore\", timer_key, 0, timestamp, \"limit\", 0, 10)\n"
+"local res = redis.call(\"zrangebyscore\", timer_key, 0, timestamp, \"limit\", 0, 50)\n"
 "if #res > 0 then\n"
 "  for i = 0, #res, 1 do\n"
 "    redis.call(\"zincrby\", timer_key, 10, res[i])\n"
@@ -1755,6 +1755,10 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "                end\n"
 "                result = result + count\n"
 "                if not is_pure_fact(frame, index) then\n"
+// the mid list might not be cleaned up if the first mid is always valid.
+"                    if (#new_mids %% 10) == 0 then\n"
+"                        cleanup = true\n"
+"                    end\n"
 "                    break\n"
 "                end\n"
 "            end\n"

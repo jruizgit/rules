@@ -40,6 +40,10 @@ static unsigned int evictEntry(ruleset *tree) {
 
                 free(current->sid);
                 current->sid = NULL;
+                current->sidHash = 0;
+                current->bindingIndex = 0;
+                current->lastRefresh = 0;
+                current->propertiesLength = 0;
                 found = 1;
             }
         }
@@ -95,6 +99,7 @@ static unsigned char ensureEntry(ruleset *tree, char *sid, unsigned int sidHash,
     unsigned int offset = tree->stateBuckets[bucket];
     stateEntry *current = NULL;
     unsigned char found = 0;
+    // find state entry by sid in hash table
     while (offset != UNDEFINED_HASH_OFFSET) {
         current = &tree->state[offset];
         if (current->sidHash == sidHash) {
@@ -106,28 +111,38 @@ static unsigned char ensureEntry(ruleset *tree, char *sid, unsigned int sidHash,
 
         offset = current->nextHashOffset;
     }  
+
+    // create entry if not found
     if (offset == UNDEFINED_HASH_OFFSET) {
         offset = addEntry(tree, sid, sidHash);
         current = &tree->state[offset];
     }
 
+    // remove entry from lru double linked list
     if (current->prevLruOffset != UNDEFINED_HASH_OFFSET) {
         tree->state[current->prevLruOffset].nextLruOffset = current->nextLruOffset;
+        if (tree->mruStateOffset == offset) {
+            tree->mruStateOffset = current->prevLruOffset;
+        }
     }
 
     if (current->nextLruOffset != UNDEFINED_HASH_OFFSET) {
         tree->state[current->nextLruOffset].prevLruOffset = current->prevLruOffset;
+        if (tree->lruStateOffset == offset) {
+            tree->lruStateOffset = current->nextLruOffset;
+        }
     }
 
-    current->prevLruOffset = tree->mruStateOffset;
+    // attach entry to end of linked list
     current->nextLruOffset = UNDEFINED_HASH_OFFSET;
+    current->prevLruOffset = tree->mruStateOffset;
     if (tree->mruStateOffset == UNDEFINED_HASH_OFFSET) {
         tree->lruStateOffset = offset;
     } else {
         tree->state[tree->mruStateOffset].nextLruOffset = offset;
     }
-
     tree->mruStateOffset = offset;
+
     *result = current;
     return found;
 }
@@ -317,7 +332,7 @@ static unsigned int resolveBindingAndEntry(ruleset *tree,
 
 unsigned int resolveBinding(void *handle, 
                             char *sid, 
-                            void **rulesBinding) {   
+                            void **rulesBinding) {  
     stateEntry *entry = NULL;
     return resolveBindingAndEntry(handle, sid, &entry, rulesBinding);
 }
