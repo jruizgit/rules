@@ -194,22 +194,13 @@ declare interface IDurableBase {
     statechart(name: string): IStatechart;
     flowchart(name: string): IFlowchart;
     createQueue: {
-        (rulesetName: string): IQueue;
-        (rulesetName: string, db: database | string): IQueue;
-        (rulesetName: string, db: database | string, stateCacheSize: number): IQueue;
+        (rulesetName: string, db?: database | string, stateCacheSize?: number): IQueue;
     };
     createHost: {
-        (): IHost;
-        (dbs: [database | string]): IHost;
-        (dbs: [database | string], stateCacheSize: number): IHost;
+        (dbs?: [database | string], stateCacheSize?: number): IHost;
     };
     runAll: {
-        ();
-        (dbs: [database | string]);
-        (dbs: [database | string], port: number);
-        (dbs: [database | string], port: number, basePath: string);
-        (dbs: [database | string], port: number, basePath: string, run: (host: IHost, app: any) => void);
-        (dbs: [database | string], port: number, basePath: string, run: (host: IHost, app: any) => void, stateCacheSize: number);
+        (dbs?: [database | string], port?: number, basePath?: string, run?: (host: IHost, app: any) => void, stateCacheSize?: number);
     };
 }
 
