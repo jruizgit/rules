@@ -334,6 +334,40 @@ exports = module.exports = durableEngine = function () {
 
         that.define = function(name) {
             var newDefinition = {};
+            if (!lexp) {
+                var argRule = op;
+                if (argRule.whenAll) {
+                    op = 'all';
+                    if (!argRule.whenAll.push) {
+                        lexp = [argRule.whenAll];
+                    } else {
+                        lexp = argRule.whenAll;
+                    }
+                }
+                if (argRule.whenAny) {
+                    op = 'any';
+                    if (!argRule.whenAny.push) {
+                        lexp = [argRule.whenAny];
+                    } else {
+                        lexp = argRule.whenAny;
+                    }
+                }
+                if (argRule.pri) {
+                    newDefinition['pri'] = argRule.pri;
+                }
+                if (argRule.count) {
+                    newDefinition['count'] = argRule.count;
+                }
+                if (argRule.span) {
+                    newDefinition['span'] = argRule.span;
+                }
+                if (argRule.cap) {
+                    newDefinition['cap'] = argRule.cap;
+                }
+                if (argRule.run) {
+                    newDefinition['run'] = argRule.run;
+                }
+            } 
             var expDefinition;
             var func;
 
@@ -398,6 +432,7 @@ exports = module.exports = durableEngine = function () {
             if (func) {
                 newDefinition['run'] = func;
             }   
+            
 
             return newDefinition;
         };
@@ -450,13 +485,13 @@ exports = module.exports = durableEngine = function () {
     );
 
     var m = r.createProxy(
-            function(name) {
-                return term('$m', name);
-            },
-            function(name, value) {
-                return;
-            }
-        );
+        function(name) {
+            return term('$m', name);
+        },
+        function(name, value) {
+            return;
+        }
+    );
 
     var s = r.createProxy(
         function(name) {
@@ -530,10 +565,11 @@ exports = module.exports = durableEngine = function () {
         }
     };
 
-    var ruleset = function (name) {
+    var ruleset = function () {
         var that = {};
         var rules = [];
         var startFunc;
+        var name = arguments[0];
 
         that.getName = function () {
             return name;
@@ -575,10 +611,21 @@ exports = module.exports = durableEngine = function () {
 
         extend(that);
         rulesets.push(that);
+
+        for (var i = 1; i < arguments.length; ++i) {
+            if (typeof(arguments[i]) === 'object') {
+                rules.push(rule(arguments[i]));
+            } else if (typeof(arguments[i]) === 'function') {
+                startFunc = arguments[i];
+            } else {
+                throw 'invalid ruleset input type ' + arguments[i];
+            }   
+        }
+
         return that;
     };
 
-    var stateTrigger = function (stateName, run, parent) {
+    var stateTrigger = function (stateName, run, parent, triggerObject) {
         var that = {};
         var condition;
 
@@ -610,10 +657,14 @@ exports = module.exports = durableEngine = function () {
             return newDefinition;
         };
 
+        if (triggerObject && (triggerObject.whenAll || triggerObject.whenAny)) {
+            condition = rule(triggerObject);
+        }
+
         return that;
     };
 
-    var state = function (name, parent) {
+    var state = function (name, parent, triggerObjects) {
         var that = {};
         var triggers = [];
         var states = [];
@@ -633,7 +684,7 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.state = function(stateName) {
-            var newState = state(stateName);
+            var newState = state(stateName, that);
             states.push(newState);
             return newState;
         };
@@ -661,14 +712,32 @@ exports = module.exports = durableEngine = function () {
         };
 
         extend(that);
+
+        if (triggerObjects) {
+            for (var i = 0; i < triggerObjects.length; ++i) {
+                var triggerStatesObject = triggerObjects[i];
+                if (triggerStatesObject.to) {
+                    triggers.push(stateTrigger(triggerStatesObject.to, null, that, triggerStatesObject));
+                } else {
+                    for (var stateName in triggerStatesObject) {
+                        if (triggerStatesObject[stateName].length) {
+                            states.push(state(stateName, that, triggerStatesObject[stateName]));
+                        } else {
+                            states.push(state(stateName, that, [triggerStatesObject[stateName]])); 
+                        }
+                    }    
+                }
+            }
+        }
+
         return that;
     };
 
-    var statechart = function (name) {
+    var statechart = function (name, stateObjects) {
         var that = {};
         var states = [];
         var startFunc;
-
+        
         that.getName = function () {
             return name + '$state';
         } 
@@ -698,10 +767,24 @@ exports = module.exports = durableEngine = function () {
 
         extend(that);
         rulesets.push(that);
+        if (stateObjects) {
+            for (var stateName in stateObjects) {
+                if (stateName === 'whenStart') {
+                    startFunc = stateObjects[stateName];
+                } else {
+                    if (stateObjects[stateName].length) {
+                        states.push(state(stateName, that, stateObjects[stateName]));
+                    } else {
+                        states.push(state(stateName, that, [stateObjects[stateName]]));
+                    }
+                }
+            }    
+        }
+        
         return that;
     };
 
-    var stageTrigger = function (stageName, parent) {
+    var stageTrigger = function (stageName, parent, triggerObject) {
         var that = {};
         var condition;
 
@@ -727,16 +810,19 @@ exports = module.exports = durableEngine = function () {
             return condition.define(name);
         };
 
+        if (triggerObject) {
+            condition = rule(triggerObject);
+        }
+
         return that;
     };
 
 
-    var stage = function (name, parent) {
+    var stage = function (name, parent, triggerObjects) {
         var that = {};
         var switches = [];
         var runFunc;
-        var rulesetArray = [];
-
+        
         that.getName = function() {
             return name;
         }
@@ -760,13 +846,6 @@ exports = module.exports = durableEngine = function () {
             var newDefinition = {};
             if (runFunc) {
                 newDefinition['run'] = runFunc;
-            } else if (rulesetArray.length) {
-                var rulesetDefinitions = {};
-                for (var i = 0; i < rulesetArray.length; ++i) {
-                    rulesetDefinitions[rulesetArray[i].getName()] = rulesetArray[i].define();
-                }
-
-                newDefinition['run'] =  rulesetDefinitions;   
             }
 
             var switchesDefinition = {};
@@ -785,10 +864,20 @@ exports = module.exports = durableEngine = function () {
         }
 
         extend(that);
+        if (triggerObjects) {
+            for (var stageName in triggerObjects) {
+                if (stageName === 'run') {
+                    runFunc = triggerObjects['run'];
+                } else {
+                    switches.push(stageTrigger(stageName, that, triggerObjects[stageName]));
+                }
+            }
+        }
+
         return that;
     };
 
-    var flowchart = function (name) {
+    var flowchart = function (name, stageObjects) {
         var that = {};
         var stages = [];
         var startFunc;
@@ -822,6 +911,15 @@ exports = module.exports = durableEngine = function () {
 
         extend(that);
         rulesets.push(that);
+        if (stageObjects) {
+            for (var stageName in stageObjects) {
+                if (stageName === 'whenStart') {
+                    startFunc = stageObjects[stageName];
+                } else {
+                    stages.push(stage(stageName, that, stageObjects[stageName]));
+                }
+            }    
+        }
         return that;
     };
 

@@ -1,4 +1,135 @@
 var d = require('../libjs/durable');
+var m = d.m, s = d.s, c = d.c; timeout = d.timeout;
+
+d.ruleset('fraud1_1', {
+        whenAll: [
+            c.first = m.amount.gt(100),
+            c.second = m.location.neq(c.first.location)
+        ],
+        run: function(c) {
+            console.log('fraud1_1 detected ' + c.first.location + ' ' + c.second.location);
+        }
+    },
+    function (host) {
+        host.post('fraud1_1', {id: 1, sid: 1, amount: 200, location: 'US'});
+        host.post('fraud1_1', {id: 2, sid: 1, amount: 200, location: 'CA'});
+    }
+);
+
+d.ruleset('fraud5_1', {
+        whenAll: m.amount.gt(100),
+        pri: 3,
+        run: function(c) {
+            console.log('fraud5_1 first ' + c.m.amount + ' from ' + c.s.sid);
+        }
+    }, {
+        whenAll: m.amount.gt(200),
+        pri: 2,
+        run: function(c) {
+            console.log('fraud5_1 second ' + c.m.amount + ' from ' + c.s.sid);
+        }
+    }, {
+        whenAll: m.amount.gt(300),
+        pri: 1,
+        run: function(c) {
+            console.log('fraud5_1 third ' + c.m.amount + ' from ' + c.s.sid);
+        }
+    },
+    function (host) {
+        host.post('fraud5_1', {id: 1, sid: 1, amount: 101, location: 'US'});
+        host.post('fraud5_1', {id: 2, sid: 1, amount: 201, location: 'CA'});
+        host.post('fraud5_1', {id: 3, sid: 1, amount: 301, location: 'CA'});
+        host.assert('fraud5_1', {id: 4, sid: 1, amount: 250, location: 'US'});
+        host.assert('fraud5_1', {id: 5, sid: 1, amount: 500, location: 'CA'});
+    }
+);
+
+d.statechart('fraud0_1', {
+    start: {
+        to: 'standby',
+    },
+    standby: {
+        to: 'metering',
+        whenAll: m.amount.gt(100),
+        run: function (c) { c.startTimer('velocity', 30); }
+    },
+    metering: [{
+        to: 'fraud',
+        count: 3,
+        whenAll: m.amount.gt(100),
+        run: function (c) { console.log('fraud0_1 detected'); }
+    }, {
+        to: 'standby',
+        whenAll: timeout('velocity'),
+        run: function (c) { console.log('fraud0_1 cleared'); }
+    }],
+    fraud: {},
+    whenStart: function (host) {
+        host.post('fraud0_1', {id: 1, sid: 1, amount: 200});
+        host.post('fraud0_1', {id: 2, sid: 1, amount: 200});
+        host.post('fraud0_1', {id: 3, sid: 1, amount: 200});
+        host.post('fraud0_1', {id: 4, sid: 1, amount: 200});
+    }
+});
+
+d.statechart('a6_0', {
+    work: [{
+        enter: {
+            to: 'process',
+            whenAll: m.subject.eq('enter'),
+            run: function (c) { console.log('a6_0 continue process'); }
+        },
+        process: {
+            to: 'process',
+            whenAll: m.subject.eq('continue'),
+            run: function (c) { console.log('a6_0 processing'); }
+        }
+    }, {
+        to: 'canceled',
+        pri: 1,
+        whenAll: m.subject.eq('cancel'),
+        run: function (c) { console.log('a6_0 canceling');}
+    }],
+    canceled: {},
+    whenStart: function (host) {
+        host.post('a6_0', {id: 1, sid: 1, subject: 'enter'});
+        host.post('a6_0', {id: 2, sid: 1, subject: 'continue'});
+        host.post('a6_0', {id: 3, sid: 1, subject: 'continue'});
+        host.post('a6_0', {id: 4, sid: 1, subject: 'cancel'});
+    }
+});
+
+d.flowchart('a3_0', {
+    input: {
+        request: { whenAll: m.subject.eq('approve').and(m.amount.lte(1000)) }, 
+        deny: { whenAll: m.subject.eq('approve').and(m.amount.gt(1000)) }, 
+    },
+    request: {
+        run: function (c) {
+            console.log('a3_0 request approval from: ' + c.s.sid);
+            if (c.s.status) 
+                c.s.status = 'approved';
+            else
+                c.s.status = 'pending';
+        },
+        approve: { whenAll: s.status.eq('approved') },
+        deny: { whenAll: m.subject.eq('denied') },
+        request: { whenAll: m.subject.eq('approved') }
+    },
+    approve: {
+        run: function (c) { console.log('a3_0 approved from: ' + c.s.sid); }
+    },
+    deny: {
+        run: function (c) { console.log('a3_0 denied from: ' + c.s.sid); }
+    },
+    whenStart: function (host) {
+        host.post('a3_0', {id: 1, sid: 1, subject: 'approve', amount: 100});
+        host.post('a3_0', {id: 2, sid: 1, subject: 'approved'});
+        host.post('a3_0', {id: 3, sid: 2, subject: 'approve', amount: 100});
+        host.post('a3_0', {id: 4, sid: 2, subject: 'denied'});
+        host.post('a3_0', {id: 5, sid: 3, subject: 'approve', amount: 10000});
+    }
+});
 
 with (d.statechart('fraud0')) {
     with (state('start')) {

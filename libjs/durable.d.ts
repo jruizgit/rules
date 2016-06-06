@@ -1,35 +1,35 @@
 
 
-declare interface json {
-    [propName: string]: string | number | boolean | json;
+declare interface Json {
+    [propName: string]: string | number | boolean | Json;
 }
 
 declare interface IQueue {
-    post(message: json);
-    assert(fact: json);
-    retract(fact: json);
+    post(message: Json);
+    assert(fact: Json);
+    retract(fact: Json);
     close();
 }
 
 declare interface IHost {
-    post(rulesetName: string, message: json);
-    postBatch(rulesetName: string, messages: json[]);
-    assert(rulesetName: string, fact: json);
-    assertFacts(rulesetName: string, facts: json[]);
-    retract(rulesetName: string, fact: json);
-    retractFacts(rulesetName: string, facts: json[]);
-    getState(rulesetName: string, sid: number | string): json;
+    post(rulesetName: string, message: Json);
+    postBatch(rulesetName: string, messages: Json[]);
+    assert(rulesetName: string, fact: Json);
+    assertFacts(rulesetName: string, facts: Json[]);
+    retract(rulesetName: string, fact: Json);
+    retractFacts(rulesetName: string, facts: Json[]);
+    getState(rulesetName: string, sid: number | string): Json;
     deleteState(rulesetName: string, sid: number | string);
-    patchState(rulesetName: string, state: json);
+    patchState(rulesetName: string, state: Json);
 }
 
 declare interface IClosure {
-    s: json;
-    m: json;
+    s: Json;
+    m: Json;
     getQueue(rulesetName: string): IQueue;
-    post(rulesetName: string, message: json);
-    assert(rulesetName: string, fact: json);
-    retract(rulesetName: string, fact: json);
+    post(rulesetName: string, message: Json);
+    assert(rulesetName: string, fact: Json);
+    retract(rulesetName: string, fact: Json);
     delete(rulesetName: string, sid: number | string);
     startTimer(rulesetName: string, duration: number, id?: number | string);
     cancelTimer(rulesetName: string, id?: number | string);
@@ -37,170 +37,102 @@ declare interface IClosure {
     [propName: string]: any;
 }
 
-
-declare interface decorator {
-    (modifier: number): decorator;
+declare interface Expression {
+    gt(value: string | number | Expression): Expression;
+    gte(value: string | number | Expression): Expression;
+    lt(value: string | number | Expression): Expression;
+    lte(value: string | number | Expression): Expression;
+    eq(value: string | number | Expression): Expression;
+    neq(value: string | number | Expression): Expression;
+    ex(): Expression;
+    nex(): Expression;
+    and(...ex: Expression[]): Expression;
+    or(...ex: Expression[]): Expression;
+    add(number): Expression;
+    sub(number): Expression;
+    mul(number): Expression;
+    div(number): Expression;
 }
 
-declare interface expression {
-    gt(value: string | number | expression): expression;
-    gte(value: string | number | expression): expression;
-    lt(value: string | number | expression): expression;
-    lte(value: string | number | expression): expression;
-    eq(value: string | number | expression): expression;
-    neq(value: string | number | expression): expression;
-    ex(): expression;
-    nex(): expression;
-    and(...ex: expression[]): expression;
-    or(...ex: expression[]): expression;
-    add(number): expression;
-    sub(number): expression;
-    mul(number): expression;
-    div(number): expression;
+declare interface Model {
+    [propName: string]: Expression;
 }
 
-declare interface model {
-    [propName: string]: expression;
+declare interface Action {
+    (c: IClosure): void;
 }
 
-declare interface IRule<T> {
-    whenAll: {
-        (ex1: expression, run: (c: IClosure) => void): T;
-        (ex1: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (ex1: expression, ex2: expression, run: (c: IClosure) => void): T;
-        (ex1: expression, ex2: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (ex1: expression, ex2: expression, ex3: expression, run: (c: IClosure) => void): T;
-        (ex1: expression, ex2: expression, ex3: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (ex1: expression, ex2: expression, ex3: expression, ex4: expression, run: (c: IClosure) => void): T;
-        (ex1: expression, ex2: expression, ex3: expression, ex4: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (ex1: expression, ex2: expression, ex3: expression, ex4: expression, ex5: expression, run: (c: IClosure) => void): T;
-        (ex1: expression, ex2: expression, ex3: expression, ex4: expression, ex5: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, ex1: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, ex1: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, ex3: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, ex3: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, ex5: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, ex5: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, ex3: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, ex3: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, ex5: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, ex5: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-    };
-    whenAny: {
-        (ex1: expression, run: (c: IClosure) => void): T;
-        (ex1: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (ex1: expression, ex2: expression, run: (c: IClosure) => void): T;
-        (ex1: expression, ex2: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (ex1: expression, ex2: expression, ex3: expression, run: (c: IClosure) => void): T;
-        (ex1: expression, ex2: expression, ex3: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (ex1: expression, ex2: expression, ex3: expression, ex4: expression, run: (c: IClosure) => void): T;
-        (ex1: expression, ex2: expression, ex3: expression, ex4: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (ex1: expression, ex2: expression, ex3: expression, ex4: expression, ex5: expression, run: (c: IClosure) => void): T;
-        (ex1: expression, ex2: expression, ex3: expression, ex4: expression, ex5: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, ex1: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, ex1: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, ex3: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, ex3: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, ex5: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, ex5: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, ex3: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, ex3: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, ex5: expression, run: (c: IClosure) => void): T;
-        (d1: decorator, d2: decorator, ex1: expression, ex2: expression, ex3: expression, ex4: expression, ex5: expression, run: (c: IClosure, complete: (err: string) => void) => void): T;
-    };
+declare interface AsyncAction {
+    (c: IClosure, complete: (err: string) => void): void;
 }
 
-declare interface IStageRule {
-    whenAll: {
-        (...ex: expression[]): IStage;
-        (d1: decorator, ...ex: expression[]): IStage;
-        (d1: decorator, d2: decorator, ...ex: expression[]): IStage;
-    };
-    whenAny: {
-        (...ex: expression[]): IStage;
-        (d1: decorator, ...ex: expression[]): IStage;
-        (d1: decorator, d2: decorator, ...ex: expression[]): IStage;
-    };
+declare interface Start {
+    (host: IHost): void;
 }
 
-declare interface IRuleset extends IRule<IRuleset> {
-    whenStart(run: (host: IHost) => void);
+declare interface Rule {
+    whenAll?: Expression | Expression[];
+    whenAny?: Expression | Expression[];
+    pri?: number;
+    count?: number;
+    span?: number;
+    cap?: number;
+    run?: Action | AsyncAction;
 }
 
-declare interface IState {
-    to(stateName: string): IRule<IState>;
-    to(stateName: string, run: (c: IClosure) => void): IState;
-    to(stateName: string, run: (c: IClosure, complete: (err: string) => void) => void): IState;
-    state(stateName: string): IState;
-    end(): IStatechart;
+declare interface Trigger extends Rule {
+    to?: string;
 }
 
-declare interface IStatechart {
-    state(stateName: string): IState;
-    whenStart(run: (host: IHost) => void);   
+declare interface StateChart {
+    whenStart?: Start;
+    [propName: string]: (StateChart | Trigger)[] | Start | Trigger;
 }
 
-declare interface IStage {
-    run(func: (c: IClosure) => void): IStage;
-    run(func: (c: IClosure, complete: (err: string) => void) => void): IStage;
-    to(stageName: string): IStageRule;
-    end(): IFlowchart;
+declare interface StageTrigger {
+    whenAll?: Expression | Expression[];
+    whenAny?: Expression | Expression[];
+    pri?: number;
+    count?: number;
+    span?: number;
+    cap?: number;
 }
 
-declare interface IFlowchart {
-    stage(stageName: string): IStage;
-    whenStart(run: (host: IHost) => void);
+declare interface Stage {
+    run?: Action | AsyncAction;
+    [propName: string]: StageTrigger;
 }
 
-declare interface database {
+declare interface FlowChart {
+    whenStart?: Start;
+    [propName: string]: Stage | Start;
+}
+
+declare interface Database {
     host: string;
     port: number;
     password?: string;
 }
 
 declare interface IDurableBase {
-    m: model;
-    s: model;
-    c: model;
-    pri: decorator;
-    count: decorator;
-    span: decorator;
-    cap: decorator;
-    none(expression): expression;
-    any(...ex: expression[]): expression;
-    all(...ex: expression[]): expression;
-    timeout(duration: number): expression;
-    ruleset(name: string): IRuleset;
-    statechart(name: string): IStatechart;
-    flowchart(name: string): IFlowchart;
+    m: Model;
+    s: Model;
+    c: Model;
+    none(Expression): Expression;
+    any(...ex: Expression[]): Expression;
+    all(...ex: Expression[]): Expression;
+    timeout(duration: number): Expression;
+    ruleset(name: string, ...rules: (Rule | Start)[]);
+    statechart(name: string, states?: StateChart);
+    flowchart(name: string, stages?: FlowChart);
     createQueue: {
-        (rulesetName: string, db?: database | string, stateCacheSize?: number): IQueue;
+        (rulesetName: string, db?: Database | string, stateCacheSize?: number): IQueue;
     };
     createHost: {
-        (dbs?: [database | string], stateCacheSize?: number): IHost;
+        (dbs?: [Database | string], stateCacheSize?: number): IHost;
     };
     runAll: {
-        (dbs?: [database | string], port?: number, basePath?: string, run?: (host: IHost, app: any) => void, stateCacheSize?: number);
+        (dbs?: [Database | string], port?: number, basePath?: string, run?: (host: IHost, app: any) => void, stateCacheSize?: number);
     };
 }
 
