@@ -31,7 +31,7 @@ declare interface IClosure {
     assert(rulesetName: string, fact: Json);
     retract(rulesetName: string, fact: Json);
     delete(rulesetName: string, sid: number | string);
-    startTimer(rulesetName: string, duration: number, id?: number | string);
+    startTimer(timerName: string, duration: number, id?: number | string);
     cancelTimer(rulesetName: string, id?: number | string);
     renewActionLease();
     [propName: string]: any;
@@ -121,7 +121,7 @@ declare interface IDurableBase {
     none(Expression): Expression;
     any(...ex: Expression[]): Expression;
     all(...ex: Expression[]): Expression;
-    timeout(duration: number): Expression;
+    timeout(name: string): Expression;
     ruleset(name: string, ...rules: (Rule | Start)[]);
     statechart(name: string, states?: StateChart);
     flowchart(name: string, stages?: FlowChart);
