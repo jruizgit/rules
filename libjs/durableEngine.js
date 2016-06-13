@@ -522,13 +522,15 @@ exports = module.exports = durableEngine = function () {
 
         that.dispatchTimers = function (complete) { 
             try {
-                r.assertTimers(handle);
+                if (!r.assertTimers(handle)) {
+                    complete(null, true);
+                } else {
+                    complete(null, false);
+                }
             } catch (reason) {
                 complete(reason);
                 return;
             }
-
-            complete();
         };
 
         var ensureRulesets = function (names, index, c, complete) {
@@ -559,7 +561,10 @@ exports = module.exports = durableEngine = function () {
             } else {
                 try {
                     var result = r.startAction(handle);
-                    if (result) { 
+                    if (!result) {
+                        complete(null, true);
+                        return;
+                    } else { 
                         state = JSON.parse(result[0]);
                         resultContainer = {'message': JSON.parse(result[1])};
                         actionHandle = result[2];
@@ -742,7 +747,7 @@ exports = module.exports = durableEngine = function () {
                 resultContainer['async'] = true;
             }
 
-            complete(null);
+            complete(null, false);
         };
 
         that.getDefinition = function () {
@@ -1260,44 +1265,61 @@ exports = module.exports = durableEngine = function () {
             return that.getRuleset(rulesetName).renewActionLease(sid);
         };
 
-        var dispatchRules = function (index) {
+        var dispatchRules = function (index, wait) {
             if (!rulesList.length) {
-                setTimeout(dispatchRules, 100, index);
+                setTimeout(dispatchRules, 500, index);
             } else {
-                var rules = rulesList[index % rulesList.length];
-                rules.dispatch(function (err) {
+                var rules = rulesList[index];
+                if (!index) {
+                    wait = true;
+                }
+                rules.dispatch(function (err, w) {
                     if (err) {
+                        console.log(err);
                         if (String(err).search('306') == -1) {
                             console.log('Exiting ' + err);
                             process.exit(1);
                         }
+                    } else if (!w) {
+                        wait = false;
                     }
-                    setImmediate(dispatchRules, index + 1);
+
+                    if ((index == (rulesList.length -1)) && (wait)) {
+                        setTimeout(dispatchRules, 250, (index + 1) % rulesList.length, wait);
+                    } else {
+                        setImmediate(dispatchRules, (index + 1) % rulesList.length, wait);
+                    }
                 });
             }
         };
 
-        var dispatchTimers = function (index) {
+        var dispatchTimers = function (index, wait) {
             if (!rulesList.length) {
-                setTimeout(dispatchTimers, 100, index);
+                setTimeout(dispatchTimers, 500, index);
             } else {
-                var rules = rulesList[index % rulesList.length];
-                rules.dispatchTimers(function (err) {
+                var rules = rulesList[index];
+                if (!index) {
+                    wait = true;
+                }
+
+                rules.dispatchTimers(function (err, w) {
                     if (err) {
                         console.log(err);
+                    } else if (!w) {
+                        wait = false;
                     }
-                    if (index % 10) {
-                        dispatchTimers(index + 1);
-                    }
-                    else {
-                        setTimeout(dispatchTimers, 50, index + 1);
+
+                    if ((index === (rulesList.length -1)) && wait) {
+                        setTimeout(dispatchTimers, 250, (index + 1) % rulesList.length, wait);
+                    } else {
+                        setImmediate(dispatchTimers, (index + 1) % rulesList.length, wait);
                     }
                 });
             }
         };
 
-        setTimeout(dispatchRules, 100, 1);
-        setTimeout(dispatchTimers, 100, 1);
+        setTimeout(dispatchRules, 100, 0);
+        setTimeout(dispatchTimers, 100, 0);
         return that;
     }
 
