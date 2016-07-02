@@ -58,6 +58,12 @@ declare interface Model {
     [propName: string]: Expression;
 }
 
+declare interface Closure {
+    [propName: string]: Expression | Model;
+    s: Model;
+    m: Model;
+}
+
 declare interface Action {
     (c: IClosure): void;
 }
@@ -117,7 +123,7 @@ declare interface Database {
 declare interface IDurableBase {
     m: Model;
     s: Model;
-    c: Model;
+    c: Closure;
     none(Expression): Expression;
     any(...ex: Expression[]): Expression;
     all(...ex: Expression[]): Expression;
