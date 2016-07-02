@@ -139,11 +139,7 @@ exports = module.exports = durableEngine = function () {
         that.define = function (proposedAlias) {
             var newDefinition = {};
             if (!op) {
-                if (sid) {
-                    newDefinition[type] = {name: left, id: sid};
-                } else {
-                    newDefinition[type] = left;
-                }
+                newDefinition[type] = left;
             } else {
                 var rightDefinition = right;
                 if (typeof(right) === 'object') {
