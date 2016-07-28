@@ -2016,7 +2016,7 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "    expressions_count = context[\"expressions_count\"]\n"
 "    local process_key = context[\"process_key\"]\n"
 "    local process_key_count = context[\"process_key_count\"]\n"
-"    queue_action = process_key(message, process_key_count)\n"
+"    queue_action = process_key(message, process_key_count) or queue_action\n"
 "    if assert_fact == 0 and events_message_cache[tostring(message[\"id\"])] == false then\n"
 "        break\n"
 "    end\n"
