@@ -283,7 +283,7 @@ exports = module.exports = durableEngine = function () {
             return div.apply(this, idioms);
         }
 
-        that.id = function (refid) {
+        that.refId = function (refid) {
             sid = refid;
             return r.createProxy(
                 function(name) {
@@ -310,8 +310,8 @@ exports = module.exports = durableEngine = function () {
 
         return r.createProxy(
             function(name) {
-                if (name === 'id') {
-                    return that.id;
+                if (name === 'refId') {
+                    return that.refId;
                 }
 
                 left = name;

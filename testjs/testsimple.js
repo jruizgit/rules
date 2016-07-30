@@ -482,7 +482,7 @@ with (d.ruleset('a7')) {
 }
 
 with (d.ruleset('a8')) {
-    whenAll(m.amount.lt(c.s.maxAmount).and(m.amount.gt(c.s.id('global').minAmount)), function (c) {
+    whenAll(m.amount.lt(c.s.maxAmount).and(m.amount.gt(c.s.refId('global').minAmount)), function (c) {
         console.log('a8 approved ' +  c.m.amount);
     });
     whenStart(function (host) {
@@ -494,7 +494,7 @@ with (d.ruleset('a8')) {
 }
 
 with (d.ruleset('a9')) {
-    whenAll(m.amount.gt(c.s.maxAmount.add(c.s.id('global').minAmount)), function (c) {
+    whenAll(m.amount.gt(c.s.maxAmount.add(c.s.refId('global').minAmount)), function (c) {
         console.log('a9 approved ' +  c.m.amount);
     });
     whenStart(function (host) {
