@@ -403,7 +403,7 @@ class Ruleset(object):
                 rules.bind_ruleset(db['password'], db['port'], db['host'], self._handle)
 
     def assert_event(self, message):
-        rules.assert_event(self._handle, json.dumps(message))
+        return rules.assert_event(self._handle, json.dumps(message))
 
     def queue_assert_event(self, sid, ruleset_name, message):
         rules.queue_assert_event(self._handle, str(sid), ruleset_name, json.dumps(message))
@@ -412,13 +412,13 @@ class Ruleset(object):
         return rules.start_assert_event(self._handle, json.dumps(message))
 
     def assert_events(self, messages):
-        rules.assert_events(self._handle, json.dumps(messages))
+        return rules.assert_events(self._handle, json.dumps(messages))
     
     def start_assert_events(self, messages):
         return rules.start_assert_events(self._handle, json.dumps(messages))
 
     def assert_fact(self, fact):
-        rules.assert_fact(self._handle, json.dumps(fact))
+        return rules.assert_fact(self._handle, json.dumps(fact))
 
     def queue_assert_fact(self, sid, ruleset_name, message):
         rules.queue_assert_fact(self._handle, str(sid), ruleset_name, json.dumps(message))
@@ -427,13 +427,13 @@ class Ruleset(object):
         return rules.start_assert_fact(self._handle, json.dumps(fact))
 
     def assert_facts(self, facts):
-        rules.assert_facts(self._handle, json.dumps(facts))
+        return rules.assert_facts(self._handle, json.dumps(facts))
 
     def start_assert_facts(self, facts):
         return rules.start_assert_facts(self._handle, json.dumps(facts))
 
     def retract_fact(self, fact):
-        rules.retract_fact(self._handle, json.dumps(fact))
+        return rules.retract_fact(self._handle, json.dumps(fact))
 
     def queue_retract_fact(self, sid, ruleset_name, message):
         rules.queue_retract_fact(self._handle, str(sid), ruleset_name, json.dumps(message))
@@ -442,7 +442,7 @@ class Ruleset(object):
         return rules.start_retract_fact(self._handle, json.dumps(fact))
 
     def retract_facts(self, facts):
-        rules.retract_facts(self._handle, json.dumps(facts))
+        return rules.retract_facts(self._handle, json.dumps(facts))
 
     def start_retract_facts(self, facts):
         return rules.start_retract_facts(self._handle, json.dumps(facts))
@@ -454,7 +454,7 @@ class Ruleset(object):
         rules.cancel_timer(self._handle, str(sid), json.dumps(timer))
 
     def assert_state(self, state):
-        rules.assert_state(self._handle, json.dumps(state))
+        return rules.assert_state(self._handle, json.dumps(state))
         
     def get_state(self, sid):
         return json.loads(rules.get_state(self._handle, str(sid)))
@@ -929,46 +929,43 @@ class Host(object):
         return self.get_ruleset(ruleset_name).get_ruleset_state(sid)
 
     def post_batch(self, ruleset_name, messages):
-        self.get_ruleset(ruleset_name).assert_events(messages)
+        return self.get_ruleset(ruleset_name).assert_events(messages)
 
     def start_post_batch(self, ruleset_name, messages):
         return self.get_ruleset(ruleset_name).start_assert_events(messages)
 
     def post(self, ruleset_name, message):
-        self.get_ruleset(ruleset_name).assert_event(message)
+        return self.get_ruleset(ruleset_name).assert_event(message)
 
     def start_post(self, ruleset_name, message):
         return self.get_ruleset(ruleset_name).start_assert_event(message)
 
     def assert_fact(self, ruleset_name, fact):
-        self.get_ruleset(ruleset_name).assert_fact(fact)
+        return self.get_ruleset(ruleset_name).assert_fact(fact)
 
     def start_assert_fact(self, ruleset_name, fact):
         return self.get_ruleset(ruleset_name).start_assert_fact(fact)
 
     def assert_facts(self, ruleset_name, facts):
-        self.get_ruleset(ruleset_name).assert_facts(facts)
+        return self.get_ruleset(ruleset_name).assert_facts(facts)
 
     def start_assert_facts(self, ruleset_name, facts):
         return self.get_ruleset(ruleset_name).start_assert_facts(facts)
 
     def retract_fact(self, ruleset_name, fact):
-        self.get_ruleset(ruleset_name).retract_fact(fact)
+        return self.get_ruleset(ruleset_name).retract_fact(fact)
 
     def start_retract_fact(self, ruleset_name, fact):
         return self.get_ruleset(ruleset_name).start_retract_fact(fact)
 
     def retract_facts(self, ruleset_name, facts):
-        self.get_ruleset(ruleset_name).retract_facts(facts)
+        return self.get_ruleset(ruleset_name).retract_facts(facts)
 
     def start_retract_facts(self, ruleset_name, facts):
         return self.get_ruleset(ruleset_name).start_retract_facts(facts)
 
     def patch_state(self, ruleset_name, state):
-        self.get_ruleset(ruleset_name).assert_state(state)
-
-    def patch_ruleset_state(self, ruleset_name, state):
-        self.get_ruleset(ruleset_name).set_ruleset_state(state)
+        return self.get_ruleset(ruleset_name).assert_state(state)
 
     def renew_action_lease(self, ruleset_name, sid):
         self.get_ruleset(ruleset_name).renew_action_lease(sid)

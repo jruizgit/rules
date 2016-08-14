@@ -1293,18 +1293,9 @@ static unsigned int handleMessages(void *handle,
                                    char *messages, 
                                    char **commands,
                                    unsigned int *commandCount,
-                                   unsigned int *resultsLength,  
-                                   unsigned int **results,
                                    void **rulesBinding) {
-    unsigned int messagesLength = 64;
-    unsigned int *resultsArray = malloc(sizeof(unsigned int) * messagesLength);
-    if (!resultsArray) {
-        return ERR_OUT_OF_MEMORY;
-    }
-
-    *results = resultsArray;
-    *resultsLength = 0;
     unsigned int result;
+    unsigned int returnResult = RULES_OK;
     jsonProperty properties[MAX_EVENT_PROPERTIES];
     unsigned int propertiesLength = 0;
     unsigned int propertiesMidIndex = UNDEFINED_INDEX;
@@ -1348,21 +1339,13 @@ static unsigned int handleMessages(void *handle,
         
         *last = lastTemp;
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-            free(resultsArray);
             return result;
         }
 
-        if (*resultsLength >= messagesLength) {
-            messagesLength = messagesLength * 2;
-            resultsArray = realloc(resultsArray, sizeof(unsigned int) * messagesLength);
-            if (!resultsArray) {
-                return ERR_OUT_OF_MEMORY;
-            }
-            *results = resultsArray;
+        if (result == ERR_EVENT_NOT_HANDLED) {
+            returnResult = ERR_EVENT_NOT_HANDLED;
         }
 
-        resultsArray[*resultsLength] = result;
-        ++*resultsLength;
         propertiesLength = 0;
         propertiesMidIndex = UNDEFINED_INDEX;
         propertiesSidIndex = UNDEFINED_INDEX;        
@@ -1373,7 +1356,7 @@ static unsigned int handleMessages(void *handle,
         }
     }
 
-    return RULES_OK;
+    return returnResult;
 }
 
 static unsigned int handleState(ruleset *tree, 
@@ -1523,8 +1506,6 @@ static unsigned int executeHandleMessage(void *handle,
 static unsigned int startHandleMessages(void *handle, 
                                         char *messages, 
                                         unsigned char actionType,
-                                        unsigned int *resultsLength, 
-                                        unsigned int **results,
                                         void **rulesBinding,
                                         unsigned int *replyCount) {
     char *commands[MAX_COMMAND_COUNT];
@@ -1534,8 +1515,6 @@ static unsigned int startHandleMessages(void *handle,
                                          messages,
                                          commands,
                                          &commandCount,
-                                         resultsLength,
-                                         results,
                                          rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         freeCommands(commands, commandCount);
@@ -1552,9 +1531,7 @@ static unsigned int startHandleMessages(void *handle,
 
 static unsigned int executeHandleMessages(void *handle, 
                                           char *messages, 
-                                          unsigned char actionType,
-                                          unsigned int *resultsLength, 
-                                          unsigned int **results) {
+                                          unsigned char actionType) {
     char *commands[MAX_COMMAND_COUNT];
     unsigned int commandCount = 0;
     void *rulesBinding = NULL;
@@ -1563,8 +1540,6 @@ static unsigned int executeHandleMessages(void *handle,
                                          messages,
                                          commands,
                                          &commandCount,
-                                         resultsLength,
-                                         results,
                                          &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         freeCommands(commands, commandCount);
@@ -1580,7 +1555,12 @@ static unsigned int executeHandleMessages(void *handle,
 }
 
 unsigned int complete(void *rulesBinding, unsigned int replyCount) {
-    return completeNonBlockingBatch(rulesBinding, replyCount);
+    unsigned int result = completeNonBlockingBatch(rulesBinding, replyCount);
+    if (result != RULES_OK && result != ERR_EVENT_OBSERVED) {
+        return result;
+    }
+
+    return RULES_OK;
 }
 
 unsigned int assertEvent(void *handle, char *message) {
@@ -1595,19 +1575,15 @@ unsigned int startAssertEvent(void *handle,
 }
 
 unsigned int assertEvents(void *handle, 
-                          char *messages, 
-                          unsigned int *resultsLength, 
-                          unsigned int **results) {
-    return executeHandleMessages(handle, messages, ACTION_ASSERT_EVENT, resultsLength, results);
+                          char *messages) {
+    return executeHandleMessages(handle, messages, ACTION_ASSERT_EVENT);
 }
 
 unsigned int startAssertEvents(void *handle, 
                               char *messages, 
-                              unsigned int *resultsLength, 
-                              unsigned int **results, 
                               void **rulesBinding, 
                               unsigned int *replyCount) {
-    return startHandleMessages(handle, messages, ACTION_ASSERT_EVENT, resultsLength, results, rulesBinding, replyCount);
+    return startHandleMessages(handle, messages, ACTION_ASSERT_EVENT, rulesBinding, replyCount);
 }
 
 unsigned int retractEvent(void *handle, char *message) {
@@ -1627,18 +1603,14 @@ unsigned int assertFact(void *handle, char *message) {
 
 unsigned int startAssertFacts(void *handle, 
                               char *messages, 
-                              unsigned int *resultsLength, 
-                              unsigned int **results, 
                              void **rulesBinding, 
                              unsigned int *replyCount) {
-    return startHandleMessages(handle, messages, ACTION_ASSERT_FACT, resultsLength, results, rulesBinding, replyCount);
+    return startHandleMessages(handle, messages, ACTION_ASSERT_FACT, rulesBinding, replyCount);
 }
 
 unsigned int assertFacts(void *handle, 
-                          char *messages, 
-                          unsigned int *resultsLength, 
-                          unsigned int **results) {
-    return executeHandleMessages(handle, messages, ACTION_ASSERT_FACT, resultsLength, results);
+                          char *messages) {
+    return executeHandleMessages(handle, messages, ACTION_ASSERT_FACT);
 }
 
 unsigned int retractFact(void *handle, char *message) {
@@ -1653,19 +1625,15 @@ unsigned int startRetractFact(void *handle,
 }
 
 unsigned int retractFacts(void *handle, 
-                          char *messages, 
-                          unsigned int *resultsLength, 
-                          unsigned int **results) {
-    return executeHandleMessages(handle, messages, ACTION_REMOVE_FACT, resultsLength, results);
+                          char *messages) {
+    return executeHandleMessages(handle, messages, ACTION_REMOVE_FACT);
 }
 
 unsigned int startRetractFacts(void *handle, 
                               char *messages, 
-                              unsigned int *resultsLength, 
-                              unsigned int **results, 
                               void **rulesBinding, 
                               unsigned int *replyCount) {
-    return startHandleMessages(handle, messages, ACTION_REMOVE_FACT, resultsLength, results, rulesBinding, replyCount);
+    return startHandleMessages(handle, messages, ACTION_REMOVE_FACT, rulesBinding, replyCount);
 }
 
 unsigned int assertState(void *handle, char *state) {
@@ -1703,7 +1671,12 @@ unsigned int assertTimers(void *handle) {
         return result;
     }
 
-    return executeBatch(rulesBinding, commands, commandCount);
+    result = executeBatch(rulesBinding, commands, commandCount);
+    if (result != RULES_OK && result != ERR_EVENT_OBSERVED) {
+        return result;
+    }
+
+    return RULES_OK;
 }
 
 unsigned int startAction(void *handle, 
@@ -1786,14 +1759,14 @@ unsigned int completeAction(void *handle,
     }
 
     result = executeBatch(rulesBinding, commands, commandCount); 
-    if (result != RULES_OK) {
+    if (result != RULES_OK && result != ERR_EVENT_OBSERVED) {
         //reply object should be freed by the app during abandonAction
         return result;
     }
 
     freeReplyObject(reply);
     free(actionHandle);
-    return result;
+    return RULES_OK;
 }
 
 unsigned int completeAndStartAction(void *handle, 
@@ -1837,7 +1810,7 @@ unsigned int completeAndStartAction(void *handle,
                                    commands, 
                                    commandCount, 
                                    &newReply);  
-    if (result != RULES_OK) {
+    if (result != RULES_OK && result != ERR_EVENT_OBSERVED) {
         //reply object should be freed by the app during abandonAction
         return result;
     }

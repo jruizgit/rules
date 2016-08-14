@@ -181,10 +181,8 @@ static PyObject *pyAssertEvent(PyObject *self, PyObject *args) {
     }
 
     unsigned int result = assertEvent(handle, event);
-    if (result == RULES_OK) {
-        return Py_BuildValue("i", 1);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("i", 0);    
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return Py_BuildValue("i", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -241,10 +239,8 @@ static PyObject *pyStartAssertEvent(PyObject *self, PyObject *args) {
     unsigned int replyCount;
     void *rulesBinding = NULL;
     unsigned int result = startAssertEvent(handle, event, &rulesBinding, &replyCount);
-    if (result == RULES_OK) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
         return Py_BuildValue("li", rulesBinding, replyCount);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("li", 0, 0);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -269,21 +265,13 @@ static PyObject *pyAssertEvents(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    unsigned int *results = NULL;
-    unsigned int resultsLength;
-    unsigned int result = assertEvents(handle, events, &resultsLength, &results);
-    if (result == RULES_OK) {
-        if (results) {
-            free(results);
-        }
-        return Py_BuildValue("i", resultsLength);
+    unsigned int result = assertEvents(handle, events);
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return Py_BuildValue("i", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else { 
-            if (results) {
-                free(results);
-            }
             char *message;
             if (asprintf(&message, "Could not assert events, error code: %d", result) == -1) {
                 PyErr_NoMemory();
@@ -306,16 +294,9 @@ static PyObject *pyStartAssertEvents(PyObject *self, PyObject *args) {
 
     unsigned int replyCount;
     void *rulesBinding = NULL;
-    unsigned int *results = NULL;
-    unsigned int resultsLength;
-    unsigned int result = startAssertEvents(handle, events, &resultsLength, &results, &rulesBinding, &replyCount);
-    if (result == RULES_OK) {  
-        if (results) {
-            free(results);
-        }
+    unsigned int result = startAssertEvents(handle, events, &rulesBinding, &replyCount);
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) { 
         return Py_BuildValue("li", rulesBinding, replyCount);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("li", 0, 0);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -341,10 +322,8 @@ static PyObject *pyRetractEvent(PyObject *self, PyObject *args) {
     }
 
     unsigned int result = retractEvent(handle, event);
-    if (result == RULES_OK) {
-        return Py_BuildValue("i", 1);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("i", 0);    
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return Py_BuildValue("i", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -370,10 +349,8 @@ static PyObject *pyAssertFact(PyObject *self, PyObject *args) {
     }
 
     unsigned int result = assertFact(handle, fact);
-    if (result == RULES_OK) {
-        return Py_BuildValue("i", 1);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("i", 0);    
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return Py_BuildValue("i", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -430,10 +407,8 @@ static PyObject *pyStartAssertFact(PyObject *self, PyObject *args) {
     unsigned int replyCount;
     void *rulesBinding = NULL;
     unsigned int result = startAssertFact(handle, fact, &rulesBinding, &replyCount);
-    if (result == RULES_OK) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
         return Py_BuildValue("li", rulesBinding, replyCount);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("li", 0, 0);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -458,21 +433,13 @@ static PyObject *pyAssertFacts(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    unsigned int *results = NULL;
-    unsigned int resultsLength;
-    unsigned int result = assertFacts(handle, facts, &resultsLength, &results);
-    if (result == RULES_OK) {   
-        if (results) {
-            free(results);
-        }
-        return Py_BuildValue("i", resultsLength);
+    unsigned int result = assertFacts(handle, facts);
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return Py_BuildValue("i", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else {
-            if (results) {
-                free(results);
-            } 
             char *message;
             if (asprintf(&message, "Could not assert facts, error code: %d", result) == -1) {
                 PyErr_NoMemory();
@@ -495,16 +462,9 @@ static PyObject *pyStartAssertFacts(PyObject *self, PyObject *args) {
 
     unsigned int replyCount;
     void *rulesBinding = NULL;
-    unsigned int *results = NULL;
-    unsigned int resultsLength;
-    unsigned int result = startAssertFacts(handle, facts, &resultsLength, &results, &rulesBinding, &replyCount);
-    if (result == RULES_OK) {  
-        if (results) {
-            free(results);
-        }
+    unsigned int result = startAssertFacts(handle, facts, &rulesBinding, &replyCount);
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {  
         return Py_BuildValue("li", rulesBinding, replyCount);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("li", 0, 0);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -530,10 +490,8 @@ static PyObject *pyRetractFact(PyObject *self, PyObject *args) {
     }
 
     unsigned int result = retractFact(handle, fact);
-    if (result == RULES_OK) {
-        return Py_BuildValue("i", 1);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("i", 0);    
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return Py_BuildValue("i", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -590,10 +548,8 @@ static PyObject *pyStartRetractFact(PyObject *self, PyObject *args) {
     unsigned int replyCount;
     void *rulesBinding = NULL;
     unsigned int result = startRetractFact(handle, fact, &rulesBinding, &replyCount);
-    if (result == RULES_OK) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
         return Py_BuildValue("li", rulesBinding, replyCount);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("li", 0, 0);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -618,21 +574,13 @@ static PyObject *pyRetractFacts(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    unsigned int *results = NULL;
-    unsigned int resultsLength;
-    unsigned int result = retractFacts(handle, facts, &resultsLength, &results);
-    if (result == RULES_OK) {   
-        if (results) {
-            free(results);
-        }
-        return Py_BuildValue("i", resultsLength);
+    unsigned int result = retractFacts(handle, facts);
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return Py_BuildValue("i", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
         } else {
-            if (results) {
-                free(results);
-            } 
             char *message;
             if (asprintf(&message, "Could not retract facts, error code: %d", result) == -1) {
                 PyErr_NoMemory();
@@ -655,16 +603,9 @@ static PyObject *pyStartRetractFacts(PyObject *self, PyObject *args) {
 
     unsigned int replyCount;
     void *rulesBinding = NULL;
-    unsigned int *results = NULL;
-    unsigned int resultsLength;
-    unsigned int result = startRetractFacts(handle, facts, &resultsLength, &results, &rulesBinding, &replyCount);
-    if (result == RULES_OK) {  
-        if (results) {
-            free(results);
-        }
+    unsigned int result = startRetractFacts(handle, facts, &rulesBinding, &replyCount);
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {  
         return Py_BuildValue("li", rulesBinding, replyCount);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("li", 0, 0);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -690,10 +631,8 @@ static PyObject *pyAssertState(PyObject *self, PyObject *args) {
     }
 
     unsigned int result = assertState(handle, state);
-    if (result == RULES_OK) {
-        return Py_BuildValue("i", 1);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("i", 0);    
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return Py_BuildValue("i", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -722,10 +661,8 @@ static PyObject *pyStartUpdateState(PyObject *self, PyObject *args) {
     unsigned int replyCount;
     void *rulesBinding = NULL;
     unsigned int result = startUpdateState(handle, actionHandle, state, &rulesBinding, &replyCount);
-    if (result == RULES_OK) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
         return Py_BuildValue("li", rulesBinding, replyCount);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("li", 0, 0);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();

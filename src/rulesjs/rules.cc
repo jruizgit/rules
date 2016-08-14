@@ -184,15 +184,10 @@ void jsStartAssertEvent(const FunctionCallbackInfo<v8::Value>& args) {
                                                *String::Utf8Value(args[1]->ToString()),
                                                &rulesBinding,
                                                &replyCount);
-        if (result == RULES_OK) {
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
             array->Set(0, Number::New(isolate, (long long)rulesBinding));
             array->Set(1, Number::New(isolate, (long long)replyCount));
-            args.GetReturnValue().Set(array);
-        } else if (result == ERR_EVENT_NOT_HANDLED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, 0));
-            array->Set(1, Number::New(isolate, 0));
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
@@ -216,10 +211,8 @@ void jsAssertEvent(const FunctionCallbackInfo<Value>& args) {
         unsigned int result = assertEvent((void *)args[0]->IntegerValue(),
                                            *String::Utf8Value(args[1]->ToString()));
         
-        if (result == RULES_OK) {
-            args.GetReturnValue().Set(1);
-        } else if (result == ERR_EVENT_NOT_HANDLED) {
-            args.GetReturnValue().Set(0);
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+            args.GetReturnValue().Set(result);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not assert event, error code: %d", result) == -1) {
@@ -267,26 +260,14 @@ void jsStartAssertEvents(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int replyCount;
         void *rulesBinding = NULL;
         unsigned int *results = NULL;
-        unsigned int resultsLength;
         unsigned int result = startAssertEvents((void *)args[0]->IntegerValue(), 
-                                                *String::Utf8Value(args[1]->ToString()), 
-                                                &resultsLength, 
-                                                &results,
+                                                *String::Utf8Value(args[1]->ToString()),
                                                 &rulesBinding,
                                                 &replyCount);
-        if (result == RULES_OK) {
-            if (results) {
-                free(results);
-            }
-
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
             array->Set(0, Number::New(isolate, (long long)rulesBinding));
             array->Set(1, Number::New(isolate, (long long)replyCount));
-            args.GetReturnValue().Set(array);
-        } else if (result == ERR_EVENT_NOT_HANDLED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, 0));
-            array->Set(1, Number::New(isolate, 0));
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
@@ -312,21 +293,11 @@ void jsAssertEvents(const FunctionCallbackInfo<Value>& args) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int *results = NULL;
-        unsigned int resultsLength;
         unsigned int result = assertEvents((void *)args[0]->IntegerValue(), 
-                                           *String::Utf8Value(args[1]->ToString()), 
-                                           &resultsLength, 
-                                           &results);
+                                           *String::Utf8Value(args[1]->ToString()));
         
-        if (result == RULES_OK) {
-            Handle<Array> array = Array::New(isolate, resultsLength);
-            for (unsigned int i = 0; i < resultsLength; ++i) {
-                array->Set(i, Number::New(isolate, results[i]));
-            }
-            if (results) {
-                free(results);
-            }
-            args.GetReturnValue().Set(array);
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+            args.GetReturnValue().Set(result);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not assert events, error code: %d", result) == -1) {
@@ -353,10 +324,8 @@ void jsRetractEvent(const FunctionCallbackInfo<Value>& args) {
         unsigned int result = retractEvent((void *)args[0]->IntegerValue(),
                                            *String::Utf8Value(args[1]->ToString()));
         
-        if (result == RULES_OK) {
-            args.GetReturnValue().Set(1);
-        } else if (result == ERR_EVENT_NOT_HANDLED) {
-            args.GetReturnValue().Set(0);
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+            args.GetReturnValue().Set(result);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not retract event, error code: %d", result) == -1) {
@@ -382,15 +351,10 @@ void jsStartAssertFact(const FunctionCallbackInfo<v8::Value>& args) {
                                                *String::Utf8Value(args[1]->ToString()),
                                                &rulesBinding,
                                                &replyCount);
-        if (result == RULES_OK) {
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
             array->Set(0, Number::New(isolate, (long long)rulesBinding));
             array->Set(1, Number::New(isolate, (long long)replyCount));
-            args.GetReturnValue().Set(array);
-        } else if (result == ERR_EVENT_NOT_HANDLED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, 0));
-            array->Set(1, Number::New(isolate, 0));
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
@@ -414,10 +378,8 @@ void jsAssertFact(const FunctionCallbackInfo<Value>& args) {
         unsigned int result = assertFact((void *)args[0]->IntegerValue(),
                                           *String::Utf8Value(args[1]->ToString()));
         
-        if (result == RULES_OK) {
-            args.GetReturnValue().Set(1);
-        } else if (result == ERR_EVENT_NOT_HANDLED) {
-            args.GetReturnValue().Set(0);
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+            args.GetReturnValue().Set(result);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not assert fact, error code: %d", result) == -1) {
@@ -465,26 +427,14 @@ void jsStartAssertFacts(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int replyCount;
         void *rulesBinding = NULL;
         unsigned int *results = NULL;
-        unsigned int resultsLength;
         unsigned int result = startAssertFacts((void *)args[0]->IntegerValue(), 
-                                               *String::Utf8Value(args[1]->ToString()), 
-                                               &resultsLength, 
-                                               &results,
+                                               *String::Utf8Value(args[1]->ToString()),
                                                &rulesBinding,
                                                &replyCount);
-        if (result == RULES_OK) {
-            if (results) {
-                free(results);
-            }
-
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
             array->Set(0, Number::New(isolate, (long long)rulesBinding));
             array->Set(1, Number::New(isolate, (long long)replyCount));
-            args.GetReturnValue().Set(array);
-        } else if (result == ERR_EVENT_NOT_HANDLED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, 0));
-            array->Set(1, Number::New(isolate, 0));
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
@@ -510,21 +460,11 @@ void jsAssertFacts(const FunctionCallbackInfo<Value>& args) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int *results = NULL;
-        unsigned int resultsLength;
         unsigned int result = assertFacts((void *)args[0]->IntegerValue(), 
-                                           *String::Utf8Value(args[1]->ToString()), 
-                                           &resultsLength, 
-                                           &results);
+                                           *String::Utf8Value(args[1]->ToString()));
         
-        if (result == RULES_OK) {
-            Handle<Array> array = Array::New(isolate, resultsLength);
-            for (unsigned int i = 0; i < resultsLength; ++i) {
-                array->Set(i, Number::New(isolate, results[i]));
-            }
-            if (results) {
-                free(results);
-            }
-            args.GetReturnValue().Set(array);
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+            args.GetReturnValue().Set(result);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not assert facts, error code: %d", result) == -1) {
@@ -553,15 +493,10 @@ void jsStartRetractFact(const FunctionCallbackInfo<v8::Value>& args) {
                                                *String::Utf8Value(args[1]->ToString()),
                                                &rulesBinding,
                                                &replyCount);
-        if (result == RULES_OK) {
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
             array->Set(0, Number::New(isolate, (long long)rulesBinding));
             array->Set(1, Number::New(isolate, (long long)replyCount));
-            args.GetReturnValue().Set(array);
-        } else if (result == ERR_EVENT_NOT_HANDLED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, 0));
-            array->Set(1, Number::New(isolate, 0));
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
@@ -585,10 +520,8 @@ void jsRetractFact(const FunctionCallbackInfo<Value>& args) {
         unsigned int result = retractFact((void *)args[0]->IntegerValue(),
                                            *String::Utf8Value(args[1]->ToString()));
         
-        if (result == RULES_OK) {
-            args.GetReturnValue().Set(1);
-        } else if (result == ERR_EVENT_NOT_HANDLED) {
-            args.GetReturnValue().Set(0);
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED  || result == ERR_EVENT_OBSERVED) {
+            args.GetReturnValue().Set(result);
         } else {
             char * message;
             if (asprintf(&message, "Could not retract fact, error code: %d", result) == -1) {
@@ -636,26 +569,14 @@ void jsStartRetractFacts(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int replyCount;
         void *rulesBinding = NULL;
         unsigned int *results = NULL;
-        unsigned int resultsLength;
         unsigned int result = startRetractFacts((void *)args[0]->IntegerValue(), 
                                                 *String::Utf8Value(args[1]->ToString()), 
-                                                &resultsLength, 
-                                                &results,
                                                 &rulesBinding,
                                                 &replyCount);
-        if (result == RULES_OK) {
-            if (results) {
-                free(results);
-            }
-
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
             array->Set(0, Number::New(isolate, (long long)rulesBinding));
             array->Set(1, Number::New(isolate, (long long)replyCount));
-            args.GetReturnValue().Set(array);
-        } else if (result == ERR_EVENT_NOT_HANDLED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, 0));
-            array->Set(1, Number::New(isolate, 0));
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
@@ -681,21 +602,11 @@ void jsRetractFacts(const FunctionCallbackInfo<Value>& args) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int *results = NULL;
-        unsigned int resultsLength;
         unsigned int result = retractFacts((void *)args[0]->IntegerValue(), 
-                                           *String::Utf8Value(args[1]->ToString()), 
-                                           &resultsLength, 
-                                           &results);
+                                           *String::Utf8Value(args[1]->ToString()));
         
-        if (result == RULES_OK) {
-            Handle<Array> array = Array::New(isolate, resultsLength);
-            for (unsigned int i = 0; i < resultsLength; ++i) {
-                array->Set(i, Number::New(isolate, results[i]));
-            }
-            if (results) {
-                free(results);
-            }
-            args.GetReturnValue().Set(array);
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+            args.GetReturnValue().Set(result);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not retract facts, error code: %d", result) == -1) {
@@ -721,10 +632,8 @@ void jsAssertState(const FunctionCallbackInfo<Value>& args) {
         unsigned int result = assertState((void *)args[0]->IntegerValue(),
                                            *String::Utf8Value(args[1]->ToString()));
         
-        if (result == RULES_OK) {
-            args.GetReturnValue().Set(1);
-        } else if (result == ERR_EVENT_NOT_HANDLED) {
-            args.GetReturnValue().Set(0);
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+            args.GetReturnValue().Set(result);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not assert state, error code: %d", result) == -1) {
@@ -752,15 +661,10 @@ void jsStartUpdateState(const FunctionCallbackInfo<v8::Value>& args) {
                                                &rulesBinding,
                                                &replyCount);
         
-        if (result == RULES_OK) {
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
             array->Set(0, Number::New(isolate, (long long)rulesBinding));
             array->Set(1, Number::New(isolate, (long long)replyCount));
-            args.GetReturnValue().Set(array);
-        } else if (result == ERR_EVENT_NOT_HANDLED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, 0));
-            array->Set(1, Number::New(isolate, 0));
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
@@ -822,7 +726,6 @@ void jsCompleteAndStartAction(const FunctionCallbackInfo<v8::Value>& args) {
                                                      (void *)args[2]->IntegerValue(),
                                                      &messages);
         if (result == RULES_OK) {
-
             args.GetReturnValue().Set(String::NewFromUtf8(isolate, messages));
         } else if (result != ERR_NO_ACTION_AVAILABLE) {
             char *message = NULL;

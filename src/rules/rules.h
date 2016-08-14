@@ -26,6 +26,7 @@
 #define ERR_MAX_COMMAND_COUNT 209
 #define ERR_MAX_ADD_COUNT 210
 #define ERR_MAX_EVAL_COUNT 211
+#define ERR_EVENT_OBSERVED 212
 #define ERR_CONNECT_REDIS 301
 #define ERR_REDIS_ERROR 302
 #define ERR_NO_ACTION_AVAILABLE 303
@@ -81,14 +82,10 @@ unsigned int startAssertEvent(void *handle,
                              unsigned int *replyCount);
 
 unsigned int assertEvents(void *handle, 
-                          char *messages, 
-                          unsigned int *resultsLength, 
-                          unsigned int **results);
+                          char *messages);
 
 unsigned int startAssertEvents(void *handle, 
                               char *messages, 
-                              unsigned int *resultsLength, 
-                              unsigned int **results, 
                               void **rulesBinding, 
                               unsigned int *replyCount);
 
@@ -105,15 +102,11 @@ unsigned int assertFact(void *handle,
 
 unsigned int startAssertFacts(void *handle, 
                               char *messages, 
-                              unsigned int *resultsLength, 
-                              unsigned int **results, 
                               void **rulesBinding, 
                               unsigned int *replyCount);
 
 unsigned int assertFacts(void *handle, 
-                         char *messages, 
-                         unsigned int *resultsLength, 
-                         unsigned int **results);
+                         char *messages);
 
 unsigned int retractFact(void *handle, 
                          char *message);
@@ -124,14 +117,10 @@ unsigned int startRetractFact(void *handle,
                              unsigned int *replyCount);
 
 unsigned int retractFacts(void *handle, 
-                          char *messages, 
-                          unsigned int *resultsLength, 
-                          unsigned int **results);
+                          char *messages);
 
 unsigned int startRetractFacts(void *handle, 
                               char *messages, 
-                              unsigned int *resultsLength, 
-                              unsigned int **results, 
                               void **rulesBinding, 
                               unsigned int *replyCount);
 

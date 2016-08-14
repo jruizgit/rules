@@ -115,16 +115,11 @@ static VALUE rbStartAssertEvent(VALUE self, VALUE handle, VALUE event) {
     unsigned int replyCount;
     void *rulesBinding = NULL;
     unsigned int result = startAssertEvent((void *)FIX2LONG(handle), RSTRING_PTR(event), &rulesBinding, &replyCount);
-    if (result == RULES_OK) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
         VALUE output = rb_ary_new(); 
         rb_ary_push(output, INT2FIX(rulesBinding));
         rb_ary_push(output, INT2FIX(replyCount));
         return output;  
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        VALUE output = rb_ary_new(); 
-        rb_ary_push(output, INT2FIX(0));
-        rb_ary_push(output, INT2FIX(0));
-        return output; 
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -141,10 +136,8 @@ static VALUE rbAssertEvent(VALUE self, VALUE handle, VALUE event) {
     Check_Type(event, T_STRING);
 
     unsigned int result = assertEvent((void *)FIX2LONG(handle), RSTRING_PTR(event));
-    if (result == RULES_OK) {
-        return INT2FIX(1);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return INT2FIX(0);    
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return INT2FIX(result);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -178,31 +171,18 @@ static VALUE rbStartAssertEvents(VALUE self, VALUE handle, VALUE events) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(events, T_STRING);
 
-    unsigned int *results = NULL;
-    unsigned int resultsLength = 0;
     unsigned int replyCount;
     void *rulesBinding = NULL;
-    unsigned int result = startAssertEvents((void *)FIX2LONG(handle), RSTRING_PTR(events), &resultsLength, &results, &rulesBinding, &replyCount);
-    if (result == RULES_OK) {
-        if (results) {
-            free(results);
-        }
+    unsigned int result = startAssertEvents((void *)FIX2LONG(handle), RSTRING_PTR(events), &rulesBinding, &replyCount);
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
         VALUE output = rb_ary_new(); 
         rb_ary_push(output, INT2FIX(rulesBinding));
         rb_ary_push(output, INT2FIX(replyCount));
         return output;  
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        VALUE output = rb_ary_new(); 
-        rb_ary_push(output, INT2FIX(0));
-        rb_ary_push(output, INT2FIX(0));
-        return output; 
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
-            if (results) {
-                free(results);
-            }
             rb_raise(rb_eException, "Could not assert events, error code: %d", result);
         }
     }
@@ -214,21 +194,11 @@ static VALUE rbAssertEvents(VALUE self, VALUE handle, VALUE events) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(events, T_STRING);
 
-    unsigned int *results = NULL;
-    unsigned int resultsLength = 0;
-    unsigned int result = assertEvents((void *)FIX2LONG(handle), RSTRING_PTR(events), &resultsLength, &results);
-    if (result == RULES_OK) {
-        if (results) {
-            free(results);
-        }
-        return INT2FIX(resultsLength);   
-    } else {
+    unsigned int result = assertEvents((void *)FIX2LONG(handle), RSTRING_PTR(events));
+    if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
-            if (results) {
-                free(results);
-            }
             rb_raise(rb_eException, "Could not assert events, error code: %d", result);
         }
     }
@@ -241,10 +211,8 @@ static VALUE rbRetractEvent(VALUE self, VALUE handle, VALUE event) {
     Check_Type(event, T_STRING);
 
     unsigned int result = retractEvent((void *)FIX2LONG(handle), RSTRING_PTR(event));
-    if (result == RULES_OK) {
-        return INT2FIX(1);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return INT2FIX(0);    
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return INT2FIX(result);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -263,16 +231,11 @@ static VALUE rbStartAssertFact(VALUE self, VALUE handle, VALUE fact) {
     unsigned int replyCount;
     void *rulesBinding = NULL;
     unsigned int result = startAssertFact((void *)FIX2LONG(handle), RSTRING_PTR(fact), &rulesBinding, &replyCount);
-    if (result == RULES_OK) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
         VALUE output = rb_ary_new(); 
         rb_ary_push(output, INT2FIX(rulesBinding));
         rb_ary_push(output, INT2FIX(replyCount));
         return output;  
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        VALUE output = rb_ary_new(); 
-        rb_ary_push(output, INT2FIX(0));
-        rb_ary_push(output, INT2FIX(0));
-        return output; 
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -289,10 +252,8 @@ static VALUE rbAssertFact(VALUE self, VALUE handle, VALUE fact) {
     Check_Type(fact, T_STRING);
 
     unsigned int result = assertFact((void *)FIX2LONG(handle), RSTRING_PTR(fact));
-    if (result == RULES_OK) {
-        return INT2FIX(1);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return INT2FIX(0);    
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return INT2FIX(result);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -326,31 +287,18 @@ static VALUE rbStartAssertFacts(VALUE self, VALUE handle, VALUE facts) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(facts, T_STRING);
 
-    unsigned int *results = NULL;
-    unsigned int resultsLength = 0;
     unsigned int replyCount;
     void *rulesBinding = NULL;
-    unsigned int result = startAssertFacts((void *)FIX2LONG(handle), RSTRING_PTR(facts), &resultsLength, &results, &rulesBinding, &replyCount);
-    if (result == RULES_OK) {
-        if (results) {
-            free(results);
-        }
+    unsigned int result = startAssertFacts((void *)FIX2LONG(handle), RSTRING_PTR(facts), &rulesBinding, &replyCount);
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
         VALUE output = rb_ary_new(); 
         rb_ary_push(output, INT2FIX(rulesBinding));
         rb_ary_push(output, INT2FIX(replyCount));
         return output;  
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        VALUE output = rb_ary_new(); 
-        rb_ary_push(output, INT2FIX(0));
-        rb_ary_push(output, INT2FIX(0));
-        return output; 
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
-            if (results) {
-                free(results);
-            }
             rb_raise(rb_eException, "Could not assert facts, error code: %d", result);
         }
     }
@@ -362,21 +310,11 @@ static VALUE rbAssertFacts(VALUE self, VALUE handle, VALUE facts) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(facts, T_STRING);
 
-    unsigned int *results = NULL;
-    unsigned int resultsLength = 0;
-    unsigned int result = assertFacts((void *)FIX2LONG(handle), RSTRING_PTR(facts), &resultsLength, &results);
-    if (result == RULES_OK) {
-        if (results) {
-            free(results);
-        }
-        return INT2FIX(resultsLength);   
-    } else {
+    unsigned int result = assertFacts((void *)FIX2LONG(handle), RSTRING_PTR(facts));
+    if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
-            if (results) {
-                free(results);
-            }
             rb_raise(rb_eException, "Could not assert facts, error code: %d", result);
         }
     }
@@ -391,16 +329,11 @@ static VALUE rbStartRetractFact(VALUE self, VALUE handle, VALUE fact) {
     unsigned int replyCount;
     void *rulesBinding = NULL;
     unsigned int result = startRetractFact((void *)FIX2LONG(handle), RSTRING_PTR(fact), &rulesBinding, &replyCount);
-    if (result == RULES_OK) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
         VALUE output = rb_ary_new(); 
         rb_ary_push(output, INT2FIX(rulesBinding));
         rb_ary_push(output, INT2FIX(replyCount));
         return output;  
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        VALUE output = rb_ary_new(); 
-        rb_ary_push(output, INT2FIX(0));
-        rb_ary_push(output, INT2FIX(0));
-        return output; 
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -417,10 +350,8 @@ static VALUE rbRetractFact(VALUE self, VALUE handle, VALUE fact) {
     Check_Type(fact, T_STRING);
 
     unsigned int result = retractFact((void *)FIX2LONG(handle), RSTRING_PTR(fact));
-    if (result == RULES_OK) {
-        return INT2FIX(1);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return INT2FIX(0);    
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return INT2FIX(result);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -454,31 +385,18 @@ static VALUE rbStartRetractFacts(VALUE self, VALUE handle, VALUE facts) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(facts, T_STRING);
 
-    unsigned int *results = NULL;
-    unsigned int resultsLength = 0;
     unsigned int replyCount;
     void *rulesBinding = NULL;
-    unsigned int result = startRetractFacts((void *)FIX2LONG(handle), RSTRING_PTR(facts), &resultsLength, &results, &rulesBinding, &replyCount);
-    if (result == RULES_OK) {
-        if (results) {
-            free(results);
-        }
+    unsigned int result = startRetractFacts((void *)FIX2LONG(handle), RSTRING_PTR(facts), &rulesBinding, &replyCount);
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
         VALUE output = rb_ary_new(); 
         rb_ary_push(output, INT2FIX(rulesBinding));
         rb_ary_push(output, INT2FIX(replyCount));
         return output;  
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        VALUE output = rb_ary_new(); 
-        rb_ary_push(output, INT2FIX(0));
-        rb_ary_push(output, INT2FIX(0));
-        return output; 
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
-            if (results) {
-                free(results);
-            }
             rb_raise(rb_eException, "Could not retract facts, error code: %d", result);
         }
     }
@@ -490,21 +408,11 @@ static VALUE rbRetractFacts(VALUE self, VALUE handle, VALUE facts) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(facts, T_STRING);
 
-    unsigned int *results = NULL;
-    unsigned int resultsLength = 0;
-    unsigned int result = retractFacts((void *)FIX2LONG(handle), RSTRING_PTR(facts), &resultsLength, &results);
-    if (result == RULES_OK) {
-        if (results) {
-            free(results);
-        }
-        return INT2FIX(resultsLength);   
-    } else {
+    unsigned int result = retractFacts((void *)FIX2LONG(handle), RSTRING_PTR(facts));
+    if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
-            if (results) {
-                free(results);
-            }
             rb_raise(rb_eException, "Could not retract facts, error code: %d", result);
         }
     }
@@ -517,10 +425,8 @@ static VALUE rbAssertState(VALUE self, VALUE handle, VALUE state) {
     Check_Type(state, T_STRING);
 
     unsigned int result = assertState((void *)FIX2LONG(handle), RSTRING_PTR(state));
-    if (result == RULES_OK) {
-        return INT2FIX(1);    
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        return INT2FIX(0);    
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return INT2FIX(result);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -540,16 +446,11 @@ static VALUE rbStartUpdateState(VALUE self, VALUE handle, VALUE actionHandle, VA
     unsigned int replyCount;
     void *rulesBinding = NULL;
     unsigned int result = startUpdateState((void *)FIX2LONG(handle), (void *)FIX2LONG(actionHandle), RSTRING_PTR(state), &rulesBinding, &replyCount);
-    if (result == RULES_OK) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
         VALUE output = rb_ary_new(); 
         rb_ary_push(output, INT2FIX(rulesBinding));
         rb_ary_push(output, INT2FIX(replyCount));
         return output;  
-    } else if (result == ERR_EVENT_NOT_HANDLED) {
-        VALUE output = rb_ary_new(); 
-        rb_ary_push(output, INT2FIX(0));
-        rb_ary_push(output, INT2FIX(0));
-        return output;   
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");

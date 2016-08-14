@@ -59,9 +59,14 @@
             server = d3.xhr('http://localhost:5000/' + rulesetName + '/sample')
                        .header('content-type', 'application/json; charset=utf-8');
 
-            server.post(messageText, function(err) {
+            server.post(messageText, function(err, result) {
                 if (err) {
                     alert('Server error ' + err.responseText);
+                } else {
+                    result = JSON.parse(result.responseText);
+                    if (result.outcome != 0) {
+                        alert('Server response ' + result.outcome);
+                    }
                 }
             });
         } catch (err) {

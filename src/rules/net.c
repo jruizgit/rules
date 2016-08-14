@@ -667,11 +667,11 @@ static unsigned int loadAddMessageCommand(ruleset *tree, binding *rulesBinding) 
 "if redis.call(\"hsetnx\", visited_hashset, message[\"id\"], 1) == 0 then\n"
 "    if assert_fact == 0 then\n"
 "        if not redis.call(\"hget\", events_hashset, mid) then\n"
-"            return false\n"
+"            return %d\n"
 "        end\n"
 "    else\n"
 "        if not redis.call(\"hget\", facts_hashset, mid) then\n"
-"            return false\n"
+"            return %d\n"
 "        end\n"
 "    end\n"
 "end\n"
@@ -692,7 +692,9 @@ static unsigned int loadAddMessageCommand(ruleset *tree, binding *rulesBinding) 
 "end\n",
                 name,
                 name,
-                name, 
+                name,
+                ERR_EVENT_OBSERVED,
+                ERR_EVENT_OBSERVED,
                 addMessageLua)  == -1) {
         return ERR_OUT_OF_MEMORY;
     }
@@ -1988,11 +1990,11 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "if redis.call(\"hsetnx\", visited_hashset, mid, 1) == 0 then\n"
 "    if assert_fact == 0 then\n"
 "        if message and redis.call(\"hexists\", events_hashset, mid) == 0 then\n"
-"            return false\n"
+"            return %d\n"
 "        end\n"
 "    else\n"
 "        if message and redis.call(\"hexists\", facts_hashset, mid) == 0 then\n"
-"            return false\n"
+"            return %d\n"
 "        end\n"
 "    end\n"
 "end\n"
@@ -2025,13 +2027,14 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "    if not redis.call(\"zscore\", actions_key, sid) then\n"
 "        redis.call(\"zadd\", actions_key , score, sid)\n"
 "    end\n"
-"end\n"
-"return nil\n",
+"end\n",
                  name,
                  name,
                  name,
                  name,
                  name,
+                 ERR_EVENT_OBSERVED,
+                 ERR_EVENT_OBSERVED,
                  lua)  == -1) {
         return ERR_OUT_OF_MEMORY;
     }
@@ -2662,6 +2665,10 @@ unsigned int completeNonBlockingBatch(void *rulesBinding,
             if (reply->type == REDIS_REPLY_ERROR) {
                 printf("complete non blocking batch error %d %s\n", i, reply->str);
                 result = ERR_REDIS_ERROR;
+            } else if (reply->type == REDIS_REPLY_INTEGER) {
+                if (reply->integer == ERR_EVENT_OBSERVED && result == RULES_OK) {
+                    result = ERR_EVENT_OBSERVED;
+                }
             }
 
             freeReplyObject(reply);    
@@ -2725,6 +2732,12 @@ unsigned int executeBatchWithReply(void *rulesBinding,
 
                     *lastReply = reply;
                 }
+            } else if (reply->type == REDIS_REPLY_INTEGER) {
+                if (reply->integer == ERR_EVENT_OBSERVED && result == RULES_OK) {
+                    result = ERR_EVENT_OBSERVED;
+                }
+
+                freeReplyObject(reply);
             } else {
                 freeReplyObject(reply);    
             }

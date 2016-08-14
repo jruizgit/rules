@@ -436,7 +436,7 @@ module Engine
     end
 
     def start_assert_event(message)
-      return Rules.start_assert_event @handle, JSON.generate(message)
+      Rules.start_assert_event @handle, JSON.generate(message)
     end
 
     def assert_events(messages)
@@ -444,7 +444,7 @@ module Engine
     end
 
     def start_assert_events(messages)
-      return Rules.start_assert_events @handle, JSON.generate(messages)
+      Rules.start_assert_events @handle, JSON.generate(messages)
     end
 
     def start_timer(sid, timer, timer_duration)
@@ -464,7 +464,7 @@ module Engine
     end
 
     def start_assert_fact(fact)
-      return Rules.start_assert_fact @handle, JSON.generate(fact)
+      Rules.start_assert_fact @handle, JSON.generate(fact)
     end
 
     def assert_facts(facts)
@@ -472,7 +472,7 @@ module Engine
     end
 
     def start_assert_facts(facts)
-      return Rules.start_assert_facts @handle, JSON.generate(facts)
+      Rules.start_assert_facts @handle, JSON.generate(facts)
     end
 
     def retract_fact(fact)
@@ -484,7 +484,7 @@ module Engine
     end
 
     def start_retract_fact(fact)
-      return Rules.start_retract_fact @handle, JSON.generate(fact)
+      Rules.start_retract_fact @handle, JSON.generate(fact)
     end
 
     def retract_facts(facts)
@@ -492,7 +492,7 @@ module Engine
     end
 
     def start_retract_facts(facts)
-      return Rules.start_retract_facts @handle, JSON.generate(facts)
+      Rules.start_retract_facts @handle, JSON.generate(facts)
     end
 
     def assert_state(state)
@@ -883,9 +883,9 @@ module Engine
         started = true
 
         if parent_name
-          rules[parent_name + "$start"] = {:all => [{:chart_context => {:$and => [{:label => parent_name}, {:chart => 1}]}}], run: To.new(nil, state_name, false)};
+          rules[parent_name + "$start"] = {:all => [{:chart_context => {:$and => [{:label => parent_name}, {:chart => 1}]}}], :run => To.new(nil, state_name, false)};
         else
-          rules[:$start] = {:all => [{:chart_context => {:$and => [{:$nex => {:running => 1}}, {:$s => 1}]}}], run: To.new(nil, state_name, false)};
+          rules[:$start] = {:all => [{:chart_context => {:$and => [{:$nex => {:running => 1}}, {:$s => 1}]}}], :run => To.new(nil, state_name, false)};
         end
       end
 
@@ -1123,7 +1123,7 @@ module Engine
     end
 
     def start_post_batch(ruleset_name, *events)
-      return get_ruleset(ruleset_name).start_assert_events events
+      get_ruleset(ruleset_name).start_assert_events events
     end
 
     def post(ruleset_name, event)
@@ -1131,7 +1131,7 @@ module Engine
     end
 
     def start_post(ruleset_name, event)
-      return get_ruleset(ruleset_name).start_assert_event event
+      get_ruleset(ruleset_name).start_assert_event event
     end
 
     def assert(ruleset_name, fact)
@@ -1139,7 +1139,7 @@ module Engine
     end
 
     def start_assert(ruleset_name, fact)
-      return get_ruleset(ruleset_name).start_assert_fact fact
+      get_ruleset(ruleset_name).start_assert_fact fact
     end
 
     def assert_facts(ruleset_name, *facts)
@@ -1147,7 +1147,7 @@ module Engine
     end
 
     def start_assert_facts(ruleset_name, *facts)
-      return get_ruleset(ruleset_name).start_assert_facts facts
+      get_ruleset(ruleset_name).start_assert_facts facts
     end
 
     def retract(ruleset_name, fact)
@@ -1155,7 +1155,7 @@ module Engine
     end
 
     def start_retract(ruleset_name, fact)
-      return get_ruleset(ruleset_name).start_retract_fact fact
+      get_ruleset(ruleset_name).start_retract_fact fact
     end
 
     def retract_facts(ruleset_name, *facts)
@@ -1163,7 +1163,7 @@ module Engine
     end
 
     def start_retract_facts(ruleset_name, *facts)
-      return get_ruleset(ruleset_name).start_retract_facts facts
+      get_ruleset(ruleset_name).start_retract_facts facts
     end
 
     def patch_state(ruleset_name, state)

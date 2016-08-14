@@ -1,6 +1,6 @@
 {
   "name": "durable",
-  "version": "0.36.38",
+  "version": "0.36.39",
   "description": "A lightweight rules engine for real-time, consistent and scalable coordination of events.",
   "keywords": ["business rules", "rules engine", "rete", "forward chaining", "streaming analytics", "complex event processing", "state machine", "workflow"],
   "dependencies": { "express": "3.4.x" , "node-static": "0.7.x", "body-parser": "1.12.x", "bindings": "*", "nan": "~1.1.0"},

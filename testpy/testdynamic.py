@@ -57,5 +57,6 @@ class Application(interface.Application):
 
 if __name__ == '__main__':
     main_host = Host()
+    main_host.run()
     main_app = Application(main_host)
     main_app.run()

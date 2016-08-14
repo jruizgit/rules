@@ -1394,8 +1394,8 @@ exports = module.exports = durableEngine = function () {
                     }
                     else {
                         try {
-                            host.post(request.params.rulesetName, message)
-                            response.send();
+                            var result = host.post(request.params.rulesetName, message);
+                            response.send({ outcome: result }, 200);
                         } catch (reason) {
                             response.send({ error: reason }, 500);
                         }
@@ -1412,8 +1412,8 @@ exports = module.exports = durableEngine = function () {
                         response.send({ error: err }, 500);
                     else {
                         try {
-                            host.patchState(request.params.rulesetName, document);
-                            response.send();
+                            var result = host.patchState(request.params.rulesetName, document);
+                            response.send({ outcome: result }, 200);
                         } catch (reason) {
                             response.send({ error: reason }, 500);
                         }

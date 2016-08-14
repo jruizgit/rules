@@ -23,7 +23,8 @@ module Interface
         request.body.rewind
         message = JSON.parse request.body.read
         message["sid"] = params["sid"]
-        @@host.post params["ruleset_name"], message
+        result = @@host.post(params["ruleset_name"], message)
+        JSON.generate({:outcome => result})
       rescue Exception => e
         status 500
         e.to_s
@@ -35,7 +36,8 @@ module Interface
         request.body.rewind
         state = JSON.parse request.body.read
         state["id"] = params["sid"]
-        @@host.patch_state params["ruleset_name"], state
+        result = @@host.patch_state(params["ruleset_name"], state)
+        JSON.generate({:outcome => result})
       rescue Exception => e
         status 500
         e.to_s
