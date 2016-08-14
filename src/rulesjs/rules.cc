@@ -6,10 +6,10 @@
 
 using namespace v8;
 
-class Proxy {
+class ObjectProxy {
 public:
 
-    explicit Proxy(Handle<Function> gvalue, Handle<Function> svalue) { 
+    explicit ObjectProxy(Handle<Function> gvalue, Handle<Function> svalue) { 
         Isolate* isolate = Isolate::GetCurrent();
         _gfunc.Reset(isolate, gvalue); 
         _sfunc.Reset(isolate, svalue); 
@@ -18,7 +18,7 @@ public:
 
 private:
 
-    static Proxy* Unwrap(Local<Object> obj);
+    static ObjectProxy* Unwrap(Local<Object> obj);
     static void Get(Local<String> name, const PropertyCallbackInfo<Value>& info);
     static void Set(Local<String> name, Local<Value> value, const PropertyCallbackInfo<Value>& info);
     
@@ -1028,15 +1028,15 @@ void jsCreateProxy(const FunctionCallbackInfo<Value>& args) {
     } else if (!args[0]->IsFunction() || !args[1]->IsFunction()) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
-        Proxy *p = new Proxy(Handle<Function>::Cast(args[0]), Handle<Function>::Cast(args[1]));
+        ObjectProxy *p = new ObjectProxy(Handle<Function>::Cast(args[0]), Handle<Function>::Cast(args[1]));
         args.GetReturnValue().Set(p->Wrap());
     }
 }
 
-void Proxy::Get(Local<String> name, const PropertyCallbackInfo<Value>& info) {
+void ObjectProxy::Get(Local<String> name, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate;
     isolate = info.GetIsolate();
-    Proxy* p = Unwrap(info.Holder());
+    ObjectProxy* p = Unwrap(info.Holder());
     Local<Value> args[1];
     args[0] = name;
     Local<Function> gfunc = Local<Function>::New(isolate, p->_gfunc);
@@ -1044,10 +1044,10 @@ void Proxy::Get(Local<String> name, const PropertyCallbackInfo<Value>& info) {
     info.GetReturnValue().Set(result);
 }
 
-void Proxy::Set(Local<String> name, Local<Value> value, const PropertyCallbackInfo<Value>& info) {
+void ObjectProxy::Set(Local<String> name, Local<Value> value, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate;
     isolate = info.GetIsolate();
-    Proxy* p = Unwrap(info.Holder());
+    ObjectProxy* p = Unwrap(info.Holder());
     Local<Value> args[2];
     args[0] = name;
     args[1] = value;
@@ -1056,7 +1056,7 @@ void Proxy::Set(Local<String> name, Local<Value> value, const PropertyCallbackIn
     info.GetReturnValue().Set(result);
 }
 
-Handle<Object> Proxy::Wrap() { 
+Handle<Object> ObjectProxy::Wrap() { 
     Isolate* isolate = Isolate::GetCurrent();
     Local<ObjectTemplate> proxyTempl = ObjectTemplate::New(isolate);
     proxyTempl->SetInternalFieldCount(1);
@@ -1068,10 +1068,10 @@ Handle<Object> Proxy::Wrap() {
     return result;
 }
 
-Proxy* Proxy::Unwrap(Local<Object> obj) {
+ObjectProxy* ObjectProxy::Unwrap(Local<Object> obj) {
     Local<External> field = Local<External>::Cast(obj->GetInternalField(0));
     void* ptr = field->Value();
-    return static_cast<Proxy*>(ptr);
+    return static_cast<ObjectProxy*>(ptr);
 }
 
 
