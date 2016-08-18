@@ -3,7 +3,6 @@ require "timers"
 require_relative "../src/rulesrb/rules"
 
 module Engine
-    @@timers = nil
 
     class Closure_Queue
       attr_reader :_queued_posts, :_queued_asserts, :_queued_retracts
