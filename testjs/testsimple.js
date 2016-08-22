@@ -545,6 +545,29 @@ with (d.ruleset('a12')) {
     }); 
 }
 
+with (d.ruleset('a13')) {
+    whenAll(m.invoice.amount.gte(100), function (c) {
+        console.log('a13 approved ->' + JSON.stringify(c.m));
+    });
+    whenStart(function (host) {
+        host.post('a13', {id: 1, sid: 1, invoice: {amount: 100}});           
+    }); 
+}
+
+with (d.ruleset('a14')) {
+    whenAll(c.first = m.t.eq('bill'),
+            c.second = and(m.t.eq('payment'), m.invoice.amount.eq(c.first.invoice.amount)), 
+        function(c) {
+            console.log('a14 approved ->' + JSON.stringify(c.first));
+            console.log('a14 approved ->' + JSON.stringify(c.second));
+        }
+    );
+    whenStart(function (host) {
+        host.post('a14', {id: 1, sid: 1, t: 'bill', invoice: {amount: 100}});  
+        host.post('a14', {id: 2, sid: 1, t: 'payment', invoice: {amount: 100}});  
+    });
+}
+
 with (d.ruleset('t0')) {
     whenAll(or(m.count.eq(0), timeout('myTimer')), function (c) {
         c.s.count += 1;

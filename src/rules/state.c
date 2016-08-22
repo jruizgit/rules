@@ -164,7 +164,8 @@ static stateEntry *getEntry(ruleset *tree, char *sid, unsigned int sidHash) {
     return NULL;
 }
 
-unsigned int constructObject(char *parentName, 
+unsigned int constructObject(char *root,
+                             char *parentName, 
                              char *object,
                              char createHashtable,
                              unsigned int maxProperties,
@@ -180,16 +181,61 @@ unsigned int constructObject(char *parentName,
     unsigned char type;
     unsigned int hash;
     int parentNameLength = (parentName ? strlen(parentName): 0);
+    object = (object ? object : root);
     unsigned int result = readNextName(object, &firstName, &lastName, &hash);
     while (result == PARSE_OK) {
         result = readNextValue(lastName, &first, &last, &type);
         if (result != PARSE_OK) {
             return result;
         }
+
+        jsonProperty *property = NULL;
+        if (type != JSON_OBJECT) {
+            if (!createHashtable) {
+                property = &properties[*propertiesLength];
+                if (hash == HASH_ID) {
+                    *midIndex = *propertiesLength;
+                } else if (hash == HASH_SID) {
+                    *sidIndex = *propertiesLength;
+                }
+            } else {
+                unsigned int candidate = hash % maxProperties;
+                while (properties[candidate].type != 0) {
+                    candidate = (candidate + 1) % maxProperties;
+                }
+
+                if (hash == HASH_ID) {
+                    *midIndex = candidate;
+                } else if (hash == HASH_SID) {
+                    *sidIndex = candidate;
+                }
+
+                property = &properties[candidate];
+            } 
+
+            *propertiesLength = *propertiesLength + 1;
+            if (*propertiesLength == maxProperties) {
+                return ERR_EVENT_MAX_PROPERTIES;
+            }
+
+            property->isMaterial = 0;
+            property->valueOffset = first - root;
+            property->valueLength = last - first;
+            property->type = type;
+        }
         
         if (!parentName) {
-            if (type == JSON_OBJECT) {
-                int nameLength = lastName - firstName;
+            int nameLength = lastName - firstName;
+            if (nameLength > MAX_NAME_LENGTH) {
+                return ERR_MAX_PROPERTY_NAME_LENGTH;
+            }
+
+            if (type != JSON_OBJECT) {
+                strncpy(property->name, firstName, nameLength);
+                property->nameLength = nameLength;
+                property->hash = hash;
+            } else {
+                
 #ifdef _WIN32
 				char *newParent = (char *)_alloca(sizeof(char)*(nameLength + 1));
 #else
@@ -197,7 +243,8 @@ unsigned int constructObject(char *parentName,
 #endif
                 strncpy(newParent, firstName, nameLength);
                 newParent[nameLength] = '\0';
-                return constructObject(newParent, 
+                return constructObject(root,
+                                       newParent, 
                                        first, 
                                        createHashtable, 
                                        maxProperties, 
@@ -210,18 +257,28 @@ unsigned int constructObject(char *parentName,
         } else {
             int nameLength = lastName - firstName;
             int fullNameLength = nameLength + parentNameLength + 1;
+            if (fullNameLength > MAX_NAME_LENGTH) {
+                return ERR_MAX_PROPERTY_NAME_LENGTH;
+            }
+
+            if (type != JSON_OBJECT) {
+                strncpy(property->name, parentName, parentNameLength);
+                property->name[parentNameLength] = '.';
+                strncpy(&property->name[parentNameLength + 1], firstName, nameLength);
+                property->nameLength = fullNameLength;
+                property->hash = djbHash(property->name, fullNameLength);
+            } else {
 #ifdef _WIN32
-			char *fullName = (char *)_alloca(sizeof(char)*(fullNameLength + 1));
+                char *fullName = (char *)_alloca(sizeof(char)*(fullNameLength + 1));
 #else
-			char fullName[fullNameLength + 1];
+			    char fullName[fullNameLength + 1];
 #endif
-            strncpy(fullName, firstName, nameLength);
-            fullName[nameLength] = '.';
-            strncpy(&fullName[nameLength + 1], parentName, parentNameLength);
-            fullName[fullNameLength] = '\0';
-            hash = djbHash(fullName, fullNameLength);
-            if (type == JSON_OBJECT) {
-                return constructObject(fullName, 
+                strncpy(fullName, parentName, parentNameLength);
+                fullName[parentNameLength] = '.';
+                strncpy(&fullName[parentNameLength + 1], firstName, nameLength);
+                fullName[fullNameLength] = '\0';
+                return constructObject(root,
+                                       fullName, 
                                        first, 
                                        createHashtable, 
                                        maxProperties, 
@@ -232,44 +289,7 @@ unsigned int constructObject(char *parentName,
                                        next);
             }
         }
-
-        jsonProperty *property = NULL;
-        if (!createHashtable) {
-            property = &properties[*propertiesLength];
-            if (hash == HASH_ID) {
-                *midIndex = *propertiesLength;
-            } else if (hash == HASH_SID) {
-                *sidIndex = *propertiesLength;
-            }
-        } else {
-            unsigned int candidate = hash % maxProperties;
-            while (properties[candidate].type != 0) {
-                candidate = (candidate + 1) % maxProperties;
-            }
-
-            if (hash == HASH_ID) {
-                *midIndex = candidate;
-            } else if (hash == HASH_SID) {
-                *sidIndex = candidate;
-            }
-
-            property = &properties[candidate];
-        } 
-
         
-
-        *propertiesLength = *propertiesLength + 1;
-        if (*propertiesLength == maxProperties) {
-            return ERR_EVENT_MAX_PROPERTIES;
-        }
-        
-        property->isMaterial = 0;
-        property->hash = hash;
-        property->valueOffset = first - object;
-        property->valueLength = last - first;
-        property->nameOffset = firstName - object;
-        property->nameLength = lastName - firstName;
-        property->type = type;
         *next = last;
         result = readNextName(last, &firstName, &lastName, &hash);
     }
@@ -365,8 +385,9 @@ unsigned int refreshState(void *handle,
     char *next;
     unsigned int midIndex = UNDEFINED_INDEX;
     unsigned int sidIndex = UNDEFINED_INDEX;
-    result =  constructObject(NULL, 
-                             entry->state, 
+    result =  constructObject(entry->state,
+                             NULL, 
+                             NULL, 
                              1, 
                              MAX_STATE_PROPERTIES, 
                              entry->properties, 

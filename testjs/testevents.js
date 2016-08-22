@@ -1314,6 +1314,89 @@ r.completeAction(handle, result[2], result[0]);
 
 r.deleteRuleset(handle);
 
+console.log('approval5');
+
+handle = r.createRuleset('approval5', 
+    JSON.stringify({
+        r1: { 
+            all: [{m: {'invoice.amount': 100}}]
+        }
+    })
+, 4);
+
+r.bindRuleset(handle, 'localhost', 6379, null);
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 1,
+        sid: 1,
+        invoice: {
+            amount: 100
+        }
+    })
+));
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 2,
+        sid: 1,
+        amount: 10
+    })
+));
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[0]));
+console.log(JSON.parse(result[1]));
+r.completeAction(handle, result[2], result[0]);
+
+r.deleteRuleset(handle);
+
+console.log('approval6');
+
+handle = r.createRuleset('approval6',  
+    JSON.stringify({
+        r1: {
+            all: [
+                {first: {t: 'bill'}},
+                {second: {$and: [{t: 'payment'}, {'invoice.amount': {first: 'invoice.amount'}}]}},
+            ],
+        }
+    })
+, 4);
+
+r.bindRuleset(handle, 'localhost', 6379, null);
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 1,
+        sid: 1,
+        t: 'bill',
+        invoice: {
+            amount: 100,
+            address: 'Seattle',
+        }
+    })
+));
+
+console.log(r.assertEvent(handle,
+    JSON.stringify({
+        id: 2,
+        sid: 1,
+        t: 'payment',
+        invoice: {
+            amount: 100,
+            address: 'Seattle',
+        }
+    })
+));
+
+result = r.startAction(handle);
+console.log(JSON.parse(result[0]));
+console.log(JSON.parse(result[1]));
+r.completeAction(handle, result[2], result[0]);
+
+r.deleteRuleset(handle);
+
 console.log('span0');
 
 handle = r.createRuleset('span0',  

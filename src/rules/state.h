@@ -3,6 +3,7 @@
 #define HASH_SID 193505797
 #define UNDEFINED_INDEX 0xFFFFFFFF
 #define MAX_STATE_PROPERTIES 64
+#define MAX_NAME_LENGTH 256
 #define UNDEFINED_HASH_OFFSET 0xFFFFFFFF
 
 typedef struct jsonProperty {
@@ -11,7 +12,7 @@ typedef struct jsonProperty {
     unsigned char isMaterial;
     unsigned short valueOffset;
     unsigned short valueLength;
-    unsigned short nameOffset;
+    char name[MAX_NAME_LENGTH];
     unsigned short nameLength;
     union {
         long i; 
@@ -36,7 +37,8 @@ typedef struct stateEntry {
 unsigned int djbHash(char *str, unsigned int len);
 void rehydrateProperty(jsonProperty *property, char *state);
 unsigned int refreshState(void *tree, char *sid);
-unsigned int constructObject(char *parentName, 
+unsigned int constructObject(char *root,
+                             char *parentName, 
                              char *object,
                              char createHashtable,
                              unsigned int maxProperties,

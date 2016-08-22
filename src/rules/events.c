@@ -1262,8 +1262,9 @@ static unsigned int handleMessage(ruleset *tree,
     unsigned int midIndex = UNDEFINED_INDEX;
     unsigned int sidIndex = UNDEFINED_INDEX;
     jsonProperty properties[MAX_EVENT_PROPERTIES];
-    int result = constructObject(NULL, 
-                                 message, 
+    int result = constructObject(message,
+                                 NULL, 
+                                 NULL, 
                                  0, 
                                  MAX_EVENT_PROPERTIES,
                                  properties, 
@@ -1309,8 +1310,9 @@ static unsigned int handleMessages(void *handle,
         ++first;
     }
 
-    while (constructObject(NULL, 
-                           first, 
+    while (constructObject(first,
+                           NULL, 
+                           NULL, 
                            0,
                            MAX_EVENT_PROPERTIES,
                            properties, 

@@ -2339,7 +2339,7 @@ unsigned int formatEvalMessage(void *rulesBinding,
 
     unsigned int offset = 8 + keysLength;
     for (unsigned int i = 0; i < propertiesLength; ++i) {
-        argv[offset + i * 3] = message + allProperties[i].nameOffset;
+        argv[offset + i * 3] = allProperties[i].name;
         argvl[offset + i * 3] = allProperties[i].nameLength;
         argv[offset + i * 3 + 1] = message + allProperties[i].valueOffset;
         if (allProperties[i].type == JSON_STRING) {
@@ -2419,7 +2419,7 @@ unsigned int formatStoreMessage(void *rulesBinding,
 
     unsigned int offset = 6 + keysLength;
     for (unsigned int i = 0; i < propertiesLength; ++i) {
-        argv[offset +  i * 3] = message + allProperties[i].nameOffset;
+        argv[offset +  i * 3] = allProperties[i].name;
         argvl[offset + i * 3] = allProperties[i].nameLength;
         argv[offset + i * 3 + 1] = message + allProperties[i].valueOffset;
         if (allProperties[i].type == JSON_STRING) {
