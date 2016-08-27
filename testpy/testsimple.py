@@ -4,6 +4,7 @@ import random
 import sys
 import threading
 import time
+import json
 
 with statechart('fraud0'):
     with state('start'):
@@ -546,6 +547,29 @@ with ruleset('a12'):
                                 {'id': 2, 'sid': 1, 'subject': 'approve'},
                                 {'id': 3, 'sid': 1, 'subject': 'approve'},
                                 {'id': 4, 'sid': 1, 'subject': 'approve'}])
+
+
+with ruleset('a13'):
+    @when_all(m.invoice.amount >= 100)
+    def approved(c):
+        print ('a13 approved ->{0}'.format(c.m['invoice.amount']))
+        
+    @when_start
+    def start(host):
+        host.post('a13', {'id': 1, 'sid': 1, 'invoice': {'amount': 1000}})
+
+
+with ruleset('a14'):
+    @when_all(c.first << m.t == 'bill',
+              c.second << (m.t == 'payment') & (m.invoice.amount == c.first.invoice.amount))
+    def approved(c):
+        print ('a14 approved ->{0}'.format(c.first['invoice.amount']))
+        print ('a14 approved ->{0}'.format(c.second['invoice.amount']))
+        
+    @when_start
+    def start(host):
+        host.post('a14', {'id': 1, 'sid': 1, 't': 'bill', 'invoice': {'amount': 100}})
+        host.post('a14', {'id': 2, 'sid': 1, 't': 'payment', 'invoice': {'amount': 100}})
 
 
 with ruleset('t0'):

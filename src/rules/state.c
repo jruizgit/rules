@@ -243,7 +243,7 @@ unsigned int constructObject(char *root,
 #endif
                 strncpy(newParent, firstName, nameLength);
                 newParent[nameLength] = '\0';
-                return constructObject(root,
+                result = constructObject(root,
                                        newParent, 
                                        first, 
                                        createHashtable, 
@@ -253,6 +253,9 @@ unsigned int constructObject(char *root,
                                        midIndex, 
                                        sidIndex, 
                                        next);
+                if (result != RULES_OK) {
+                    return result;
+                }
             }
         } else {
             int nameLength = lastName - firstName;
@@ -277,7 +280,7 @@ unsigned int constructObject(char *root,
                 fullName[parentNameLength] = '.';
                 strncpy(&fullName[parentNameLength + 1], firstName, nameLength);
                 fullName[fullNameLength] = '\0';
-                return constructObject(root,
+                result = constructObject(root,
                                        fullName, 
                                        first, 
                                        createHashtable, 
@@ -287,6 +290,9 @@ unsigned int constructObject(char *root,
                                        midIndex, 
                                        sidIndex, 
                                        next);
+                if (result != RULES_OK) {
+                    return result;
+                }
             }
         }
         

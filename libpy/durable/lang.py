@@ -27,7 +27,11 @@ class avalue(object):
         return other
 
     def __getattr__(self, name):
-        self._left = name
+        if self._left:
+            self._left = '{0}.{1}'.format(self._left, name)
+        else:    
+            self._left = name
+
         return self
 
     def _set_right(self, op, other):
@@ -129,7 +133,10 @@ class value(object):
 
     def __getattr__(self, name):
         if self._type:
-            return value(self._type, name)
+            if self._left:
+                return value(self._type, '{0}.{1}'.format(self._left, name))
+            else:
+                return value(self._type, name)
         else:
             return value(self.alias, name)
 

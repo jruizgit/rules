@@ -1275,7 +1275,7 @@ static unsigned int handleMessage(ruleset *tree,
     if (result != RULES_OK) {
         return result;
     }
-
+    
     return handleMessageCore(tree,
                             state, 
                             message, 
