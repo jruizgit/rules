@@ -310,14 +310,37 @@ with (d.statechart('fraud7')) {
     });
 }
 
-with (d.ruleset('a0')) {
-    whenAll(or(m.amount.lt(100), m.subject.eq('approve'), m.subject.eq('ok')), function (c) {
-        console.log('a0 approved from ' + c.s.sid);
+with (d.ruleset('a0_0')) {
+    whenAll(or(m.subject.eq('go'), m.subject.eq('approve'), m.subject.eq('ok')), function (c) {
+        console.log('a0_0 approved ' + c.m.subject);
     });
     whenStart(function (host) {
-        host.post('a0', {id: 1, sid: 1, amount: 10});
-        host.post('a0', {id: 2, sid: 2, subject: 'approve'});
-        host.post('a0', {id: 3, sid: 3, subject: 'ok'});
+        host.post('a0_0', {id: 1, sid: 1, subject: 'go'});
+        host.post('a0_0', {id: 2, sid: 1, subject: 'approve'});
+        host.post('a0_0', {id: 3, sid: 1, subject: 'ok'});
+        host.post('a0_0', {id: 4, sid: 1, subject: 'not ok'});
+    });
+}
+
+with (d.ruleset('a0_1')) {
+    whenAll(and(m.subject.eq('go'), or(m.amount.lt(100), m.amount.gt(1000))), function (c) {
+        console.log('a0_1 approved  ' + c.m.subject + ' ' + c.m.amount);
+    });
+    whenStart(function (host) {
+        host.post('a0_1', {id: 1, sid: 1, subject: 'go', amount: 50});
+        host.post('a0_1', {id: 2, sid: 1, subject: 'go', amount: 500});
+        host.post('a0_1', {id: 3, sid: 1, subject: 'go', amount: 5000});
+    });
+}
+
+with (d.ruleset('a0_2')) {
+    whenAll(and(m.subject.eq('go'), or(m.amount.lt(100), and(m.amount.eq(500), m.status.eq('waived')))), function (c) {
+        console.log('a0_2 approved  ' + c.m.subject + ' ' + c.m.amount);
+    });
+    whenStart(function (host) {
+        host.post('a0_2', {id: 1, sid: 1, subject: 'go', amount: 50});
+        host.post('a0_2', {id: 2, sid: 1, subject: 'go', amount: 500, status: 'waived'});
+        host.post('a0_2', {id: 3, sid: 1, subject: 'go', amount: 5000});
     });
 }
 

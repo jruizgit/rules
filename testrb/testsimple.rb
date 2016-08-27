@@ -1,13 +1,35 @@
 require "durable"
 
-Durable.ruleset :a0 do
-  when_all (m.amount < 100) | (m.subject == "approve") | (m.subject == "ok") do
-    puts "a0 approved"
+Durable.ruleset :a0_0 do
+  when_all (m.subject == "go") | (m.subject == "approve") | (m.subject == "ok") do
+    puts "a0_0 approved #{m.subject}"
   end
   when_start do
-    post :a0, {:id => 1, :sid => 1, :amount => 10}
-    post :a0, {:id => 2, :sid => 2, :subject => 'approve'}
-    post :a0, {:id => 3, :sid => 3, :subject => 'ok'}
+    post :a0_0, {:id => 1, :sid => 1, :subject => "go"}
+    post :a0_0, {:id => 2, :sid => 1, :subject => "approve"}
+    post :a0_0, {:id => 3, :sid => 1, :subject => "ok"}
+  end
+end
+
+Durable.ruleset :a0_1 do
+  when_all ((m.subject == "go") & ((m.amount < 100) | (m.amount > 1000))) do
+    puts "a0_1 approved #{m.subject} #{m.amount}"
+  end
+  when_start do
+    post :a0_1, {:id => 1, :sid => 1, :subject => "go", :amount => 50}
+    post :a0_1, {:id => 2, :sid => 1, :subject => "go", :amount => 500}
+    post :a0_1, {:id => 3, :sid => 1, :subject => "go", :amount => 50000}
+  end
+end
+
+Durable.ruleset :a0_2 do
+  when_all ((m.subject == "go") & ((m.amount < 100) | ((m.amount == 500) & (m.status == "waived")))) do
+    puts "a0_2 approved #{m.subject} #{m.amount}"
+  end
+  when_start do
+    post :a0_2, {:id => 1, :sid => 1, :subject => "go", :amount => 50}
+    post :a0_2, {:id => 2, :sid => 1, :subject => "go", :amount => 500, :status => "waived"}
+    post :a0_2, {:id => 3, :sid => 1, :subject => "go", :amount => 50000}
   end
 end
 
@@ -22,27 +44,27 @@ Durable.ruleset :a1 do
   end
   when_start do
     post :a1, {:id => 1, :sid => 1, :amount => 100}
-    post :a1, {:id => 2, :sid => 1, :subject => 'approved'}
+    post :a1, {:id => 2, :sid => 1, :subject => "approved"}
   end
 end
 
 Durable.statechart :a2 do
   state :input do
-    to :denied, when_all((m.subject == 'approve') & (m.amount > 1000)) do
+    to :denied, when_all((m.subject == "approve") & (m.amount > 1000)) do
       puts "a2 state denied: #{s.sid}"
     end
-    to :pending, when_all((m.subject == 'approve') & (m.amount <= 1000)) do
+    to :pending, when_all((m.subject == "approve") & (m.amount <= 1000)) do
       puts "a2 state request approval from: #{s.sid}"
       s.status? ? s.status = "approved": s.status = "pending"
     end
   end  
   state :pending do
-    to :pending, when_any(m.subject == 'approved', m.subject == 'ok') do
+    to :pending, when_any(m.subject == "approved", m.subject == "ok") do
       puts "a2 state received approval for: #{s.sid}"
       s.status = "approved"
     end
-    to :approved, when_all(s.status == 'approved')
-    to :denied, when_all(m.subject == 'denied') do
+    to :approved, when_all(s.status == "approved")
+    to :denied, when_all(m.subject == "denied") do
       puts "a2 state denied: #{s.sid}"
     end
   end
@@ -59,16 +81,16 @@ end
 
 Durable.flowchart :a3 do
   stage :input
-  to :request, when_all((m.subject == 'approve') & (m.amount <= 1000))
-  to :deny, when_all((m.subject == 'approve') & (m.amount > 1000))
+  to :request, when_all((m.subject == "approve") & (m.amount <= 1000))
+  to :deny, when_all((m.subject == "approve") & (m.amount > 1000))
   
   stage :request do
     puts "a3 flow requesting approval for: #{s.sid}"
     s.status? ? s.status = "approved": s.status = "pending"
   end
-  to :approve, when_all(s.status == 'approved')
-  to :deny, when_all(m.subject == 'denied')
-  to :request, when_any(m.subject == 'approved', m.subject == 'ok')
+  to :approve, when_all(s.status == "approved")
+  to :deny, when_all(m.subject == "denied")
+  to :request, when_any(m.subject == "approved", m.subject == "ok")
   
   stage :approve do
     puts "a3 flow aprroved: #{s.sid}"

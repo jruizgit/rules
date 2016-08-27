@@ -32,6 +32,7 @@
 #define HASH_DIV 2087879820 // $div
 #define HASH_L 5861205 // $l
 #define HASH_R 5861211 //$r
+#define HASH_FORWARD 1810358942 // $forward
 
 typedef struct path {
     unsigned char operator;
@@ -995,7 +996,7 @@ static unsigned int findAlpha(ruleset *tree,
     if (result != RULES_OK) {
         return result;
     }
-    
+
     newAlpha->nameOffset = stringOffset;
     newAlpha->type = NODE_ALPHA;
     newAlpha->value.a.hash = hash;
@@ -1048,6 +1049,22 @@ static void getSetting(unsigned int settingHash, char *rule, unsigned short *val
     }
 }
 
+static unsigned int createForwardAlpha(ruleset *tree,
+                                       unsigned int *newOffset) {
+    node *newAlpha;
+    unsigned int result = storeAlpha(tree, &newAlpha, newOffset);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    newAlpha->nameOffset = 0;
+    newAlpha->type = NODE_ALPHA;
+    newAlpha->value.a.hash = HASH_FORWARD;
+    newAlpha->value.a.operator = OP_NEX;
+
+    return RULES_OK;
+}
+
 static unsigned int createAlpha(ruleset *tree, 
                                 char *rule, 
                                 expression *expr,
@@ -1097,18 +1114,33 @@ static unsigned int createAlpha(ruleset *tree,
             unsigned int resultOffset = parentOffset;
             result = readNextArrayValue(first, &first, &last, &type);
             while (result == PARSE_OK) {
-                createAlpha(tree, first, expr, 0, &resultOffset);
+                result = createAlpha(tree, first, expr, 0, &resultOffset);
+                if (result != RULES_OK) {
+                    return result;
+                }
+
                 previousOffset = resultOffset;
                 result = readNextArrayValue(last, &first, &last, &type);   
             }
+            *newOffset = previousOffset;
 
             result = appendTerm(expr, tree->endNodeOffset);
             if (result != RULES_OK) {
                 return result;
             }
-            return linkAlpha(tree, previousOffset, nextOffset);
+
+            if (nextOffset != 0) {
+                return linkAlpha(tree, previousOffset, nextOffset);
+            }
+
+            return RULES_OK;
         case HASH_OR:
             result = appendTerm(expr, tree->orNodeOffset);
+            if (result != RULES_OK) {
+                return result;
+            }
+
+            result = createForwardAlpha(tree, newOffset);
             if (result != RULES_OK) {
                 return result;
             }
@@ -1117,7 +1149,16 @@ static unsigned int createAlpha(ruleset *tree,
             result = readNextArrayValue(first, &first, &last, &type);
             while (result == PARSE_OK) {
                 unsigned int single_offset = parentOffset;
-                createAlpha(tree, first, expr, nextOffset, &single_offset);
+                result = createAlpha(tree, first, expr, 0, &single_offset);
+                if (result != RULES_OK) {
+                    return result;
+                }
+
+                result = linkAlpha(tree, single_offset, *newOffset);
+                if (result != RULES_OK) {
+                    return result;
+                }
+
                 result = readNextArrayValue(last, &first, &last, &type);   
             }
 
@@ -1125,6 +1166,11 @@ static unsigned int createAlpha(ruleset *tree,
             if (result != RULES_OK) {
                 return result;
             }
+
+            if (nextOffset != 0) {
+                return linkAlpha(tree, *newOffset, nextOffset);
+            }
+
             return RULES_OK;
     }
 
