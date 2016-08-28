@@ -591,6 +591,15 @@ with (d.ruleset('a14')) {
     });
 }
 
+with (d.ruleset('a15')) {
+    whenAll(m.payment.invoice.amount.gte(100), function (c) {
+        console.log('a15 approved ->' + JSON.stringify(c.m));
+    });
+    whenStart(function (host) {
+        host.post('a15', {id: 1, sid: 1, payment: {invoice: {amount: 100}}});           
+    }); 
+}
+
 with (d.ruleset('t0')) {
     whenAll(or(m.count.eq(0), timeout('myTimer')), function (c) {
         c.s.count += 1;

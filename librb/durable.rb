@@ -154,7 +154,11 @@ module Durable
     end
 
     def default(name, value=nil)
-      @left = name
+      if @left
+        @left = "#{@left}.#{name}"
+      else
+        @left = name
+      end
       self
     end
 
@@ -262,7 +266,11 @@ module Durable
     private 
 
     def default(name, value=nil)
-      @left = name
+      if @left
+        @left = "#{@left}.#{name}"
+      else
+        @left = name
+      end
       self
     end
 
