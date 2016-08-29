@@ -226,7 +226,7 @@ end
 
 Durable.ruleset :a12 do
   when_all m.invoice.amount >= 100 do
-    puts "a12 approved " + m["invoice.amount"].to_s
+    puts "a12 approved " + m.invoice.amount.to_s
   end
   when_start do
     post :a12, {:id => 1, :sid => 1, :invoice => {:amount => 1000}}
@@ -236,8 +236,8 @@ end
 Durable.ruleset :a13 do
   when_all c.first = m.t == "bill",
            c.second = (m.t == "payment") & (m.invoice.amount == first.invoice.amount) do
-    puts "a13 approved " + first["invoice.amount"].to_s
-    puts "a13 approved " + second["invoice.amount"].to_s
+    puts "a13 approved " + first.invoice.amount.to_s
+    puts "a13 approved " + second.invoice.amount.to_s
   end
   when_start do
     post :a13, {:id => 1, :sid => 1, t:"bill", :invoice => {:amount => 1000}}
@@ -247,7 +247,7 @@ end
 
 Durable.ruleset :a14 do
   when_all m.payment.invoice.amount >= 100 do
-    puts "a14 approved " + m["payment.invoice.amount"].to_s
+    puts "a14 approved " + m.payment.invoice.amount.to_s
   end
   when_start do
     post :a14, {:id => 1, :sid => 1, :payment => {:invoice => {:amount => 1000}}}

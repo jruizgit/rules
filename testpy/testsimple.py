@@ -552,7 +552,7 @@ with ruleset('a12'):
 with ruleset('a13'):
     @when_all(m.invoice.amount >= 100)
     def approved(c):
-        print ('a13 approved ->{0}'.format(c.m['invoice.amount']))
+        print ('a13 approved ->{0}'.format(c.m.invoice.amount))
         
     @when_start
     def start(host):
@@ -563,8 +563,8 @@ with ruleset('a14'):
     @when_all(c.first << m.t == 'bill',
               c.second << (m.t == 'payment') & (m.invoice.amount == c.first.invoice.amount))
     def approved(c):
-        print ('a14 approved ->{0}'.format(c.first['invoice.amount']))
-        print ('a14 approved ->{0}'.format(c.second['invoice.amount']))
+        print ('a14 approved ->{0}'.format(c.first.invoice.amount))
+        print ('a14 approved ->{0}'.format(c.second.invoice.amount))
         
     @when_start
     def start(host):
@@ -575,7 +575,7 @@ with ruleset('a14'):
 with ruleset('a15'):
     @when_all(m.payment.invoice.amount >= 100)
     def approved(c):
-        print ('a15 approved ->{0}'.format(c.m['payment.invoice.amount']))
+        print ('a15 approved ->{0}'.format(c.m.payment.invoice.amount))
         
     @when_start
     def start(host):

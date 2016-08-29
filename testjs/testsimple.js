@@ -570,7 +570,7 @@ with (d.ruleset('a12')) {
 
 with (d.ruleset('a13')) {
     whenAll(m.invoice.amount.gte(100), function (c) {
-        console.log('a13 approved ->' + JSON.stringify(c.m));
+        console.log('a13 approved ->' + c.m.invoice.amount);
     });
     whenStart(function (host) {
         host.post('a13', {id: 1, sid: 1, invoice: {amount: 100}});           
@@ -581,8 +581,8 @@ with (d.ruleset('a14')) {
     whenAll(c.first = m.t.eq('bill'),
             c.second = and(m.t.eq('payment'), m.invoice.amount.eq(c.first.invoice.amount)), 
         function(c) {
-            console.log('a14 approved ->' + JSON.stringify(c.first));
-            console.log('a14 approved ->' + JSON.stringify(c.second));
+            console.log('a14 approved ->' + c.first.invoice.amount);
+            console.log('a14 approved ->' + c.second.invoice.amount);
         }
     );
     whenStart(function (host) {
@@ -593,7 +593,7 @@ with (d.ruleset('a14')) {
 
 with (d.ruleset('a15')) {
     whenAll(m.payment.invoice.amount.gte(100), function (c) {
-        console.log('a15 approved ->' + JSON.stringify(c.m));
+        console.log('a15 approved ->' + c.m.payment.invoice.amount);
     });
     whenStart(function (host) {
         host.post('a15', {id: 1, sid: 1, payment: {invoice: {amount: 100}}});           
