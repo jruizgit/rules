@@ -1789,7 +1789,7 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "                result = result + count\n"
 "                if not is_pure_fact(frame, index) then\n"
 // the mid list might not be cleaned up if the first mid is always valid.
-"                    if (#new_mids %% 10) == 0 then\n"
+"                    if (#new_mids == 1) or ((#new_mids %% 10) == 0) then\n"
 "                        cleanup = true\n"
 "                    end\n"
 "                    break\n"

@@ -1377,15 +1377,15 @@ static unsigned int handleState(ruleset *tree,
 
     char *stateMessagePostfix = state + 1;
 #ifdef _WIN32
-	char *stateMessage = (char *)_alloca(sizeof(char)*(30 + stateLength - 1));
+	char *stateMessage = (char *)_alloca(sizeof(char)*(35 + stateLength - 1));
 #else
-	char stateMessage[30 + stateLength - 1];
+	char stateMessage[35 + stateLength - 1];
 #endif
     int randomMid = rand();
 #ifdef _WIN32
-    sprintf_s(stateMessage, 30 + stateLength - 1, "{\"id\":%d, \"$s\":1, %s", randomMid, stateMessagePostfix);
+    sprintf_s(stateMessage, 35 + stateLength - 1, "{\"id\":\"$v-%d\", \"$s\":1, %s", randomMid, stateMessagePostfix);
 #else
-	snprintf(stateMessage, 30 + stateLength - 1, "{\"id\":%d, \"$s\":1, %s", randomMid, stateMessagePostfix);
+	snprintf(stateMessage, 35 + stateLength - 1, "{\"id\":\"$v-%d\", \"$s\":1, %s", randomMid, stateMessagePostfix);
 #endif
     unsigned int result = handleMessage(tree, 
                                         state,
