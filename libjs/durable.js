@@ -469,13 +469,18 @@ exports = module.exports = durableEngine = function () {
                 }
 
                 expObject = {};
-                expDefinition = newArray[i].define(refName);   
+                if (name === undefined) {
+                    expDefinition = newArray[i].define(refName);   
+                } else {
+                    expDefinition = newArray[i].define(name + '.' + refName);      
+                }
+
                 if (expDefinition[refName + '$all']) {
                     expObject[refName + '$all'] = expDefinition[refName + '$all'];
                 } else if (expDefinition[refName + '$any']) {
                     expObject[refName + '$any'] = expDefinition[refName + '$any'];
                 } else if (expDefinition[refName + '$not']) {
-                    expObject[refName + '$not'] = expDefinition[refName + '$not'][0]['m'];
+                    expObject[refName + '$not'] = expDefinition[refName + '$not'][0][refName + '.m'];
                 } else {
                     expObject = expDefinition;
                 }

@@ -763,8 +763,9 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
                 for (unsigned int iii = 0; iii < currentJoin->expressionsLength; ++iii) {
                     unsigned int expressionOffset = tree->nextPool[currentJoin->expressionsOffset + iii];
                     expression *expr = &tree->expressionPool[expressionOffset];
-                    char *currentAlias = &tree->stringPool[expr->aliasOffset];
                     char *currentKey = &tree->stringPool[expr->nameOffset];
+                    char *currentAlias = &tree->stringPool[expr->aliasOffset];
+                
                     
                     if (iii == 0) {
                         if (expr->not) { 
@@ -1083,13 +1084,23 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
 "    return sid, name, frame\n"
 "end\n"
 "local fixup_frame = function(frame)\n"
+"    local new_frame = {}\n"
 "    for message_name, message in pairs(frame) do\n"
-"        if message ~= \"$n\" then\n"
+"        if message_name == 1 then\n"
+"            return frame\n"
+"        end\n"
+"        local start\n"
+"        local name\n"
+"        local next\n"
+"        local new_message = {}\n"
+"        if message == \"$n\" then\n"
+"            new_message = message\n"
+"        else\n"
 "            for key, value in pairs(message) do\n"
-"                local start = 1\n"
-"                local sub_message = message\n"
-"                local name = key\n"
-"                local next = nil\n"
+"                local sub_message = new_message\n"
+"                start = 1\n"
+"                name = key\n"
+"                next = nil\n"
 "                repeat\n"
 "                    next = string.find(key, \"%%.\", start)\n"
 "                    if next then\n"
@@ -1106,12 +1117,32 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
 "                        name = string.sub(key, start)\n"
 "                    end\n"
 "                until not next\n"
-"                message[key] = nil\n"
 "                sub_message[name] = value\n"
 "            end\n"
 "        end\n"
+"        local sub_frame = new_frame\n"
+"        name = message_name\n"
+"        next = nil\n"
+"        start = 1\n"
+"        repeat\n"
+"            next = string.find(message_name, \"%%.\", start)\n"
+"            if next then\n"
+"                name = string.sub(message_name, start, next - 1)\n"
+"                if sub_frame[name] then\n"
+"                    sub_frame = sub_frame[name]\n"
+"                else\n"
+"                    local new_sub_frame = {}\n"
+"                    sub_frame[name] = new_sub_frame\n"
+"                    sub_frame = new_sub_frame\n"
+"                end\n"
+"                start = next + 1\n"
+"            else\n"
+"                name = string.sub(message_name, start)\n"
+"            end\n"
+"        until not next\n"
+"        sub_frame[name] = new_message\n"
 "    end\n"
-"    return frame\n"
+"    return new_frame\n"
 "end\n"
 "get_context = function(action_key)\n"
 "    if context_directory[action_key] then\n"
@@ -1168,7 +1199,7 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
     char *lua = NULL;
     char *oldLua;
     
-    #ifdef _WIN32
+#ifdef _WIN32
     char *actionKey = (char *)_alloca(sizeof(char)*(nameLength + 3));
     sprintf_s(actionKey, nameLength + 3, "%s!a", name);
 #else
@@ -1206,6 +1237,7 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
                 oldLua = lua;
                 if (asprintf(&lua, 
 "%stoggle = false\n"
+"context_directory = {}\n"
 "context = {}\n"
 "reviewers = {}\n"
 "context[\"reviewers\"] = reviewers\n"
@@ -1236,9 +1268,10 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
                 for (unsigned int iii = 0; iii < currentJoin->expressionsLength; ++iii) {
                     unsigned int expressionOffset = tree->nextPool[currentJoin->expressionsOffset + iii];
                     expression *expr = &tree->expressionPool[expressionOffset];
-                    char *currentAlias = &tree->stringPool[expr->aliasOffset];
                     char *currentKey = &tree->stringPool[expr->nameOffset];
+                    char *currentAlias = &tree->stringPool[expr->aliasOffset];
                     char *nextKeyTest;
+
                     if (iii == (currentJoin->expressionsLength - 1)) {
                         nextKeyTest = (char*)calloc(1, sizeof(char));
                         if (!nextKeyTest) {
@@ -1384,6 +1417,7 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
                         char *test = NULL;
                         char *primaryKeyLua = NULL;
                         char *primaryFrameKeyLua = NULL;
+                        
                         unsigned int result = createTest(tree, expr, &test, &primaryKeyLua, &primaryFrameKeyLua);
                         if (result != RULES_OK) {
                             return result;
@@ -1569,6 +1603,9 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "%sif toggle then\n"
 "    context[\"process_key\"] = process_key_with_span\n"
 "    context[\"process_key_count\"] = %d\n"
+"    if not process_message(message) then\n"
+"        return\n"
+"    end\n"
 "end\n",
                                  lua,
                                  currentNode->value.c.span)  == -1) {
@@ -1582,6 +1619,9 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "%sif toggle then\n"
 "    context[\"process_key\"] = process_key_with_cap\n"
 "    context[\"process_key_count\"] = %d\n"
+"    if not process_message(message) then\n"
+"        return\n"
+"    end\n"
 "end\n",
                                  lua,
                                  currentNode->value.c.cap)  == -1) {
@@ -1595,6 +1635,9 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "%sif toggle then\n"
 "    context[\"process_key\"] = process_key_with_window\n"
 "    context[\"process_key_count\"] = %d\n"
+"    if not process_message(message) then\n"
+"        return\n"
+"    end\n"
 "end\n",
                                  lua,
                                  currentNode->value.c.count)  == -1) {
@@ -1998,6 +2041,41 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "    end\n"
 "    return queue_lock\n"
 "end\n"
+"local process_message = function(message)\n"
+"    for index = 6, 5 + keys_count, 1 do\n"
+"        results = {}\n"
+"        unpacked_results = {}\n"
+"        key = ARGV[index]\n"
+"        context = context_directory[key]\n"
+"        if context then\n"
+"        keys = context[\"keys\"]\n"
+"        reviewers = context[\"reviewers\"]\n"
+"        frame_packers = context[\"frame_packers\"]\n"
+"        frame_unpackers = context[\"frame_unpackers\"]\n"
+"        primary_message_keys = context[\"primary_message_keys\"]\n"
+"        primary_frame_keys = context[\"primary_frame_keys\"]\n"
+"        directory = context[\"directory\"]\n"
+"        results_key = context[\"results_key\"]\n"
+"        inverse_directory = context[\"inverse_directory\"]\n"
+"        expressions_count = context[\"expressions_count\"]\n"
+"        local process_key = context[\"process_key\"]\n"
+"        local process_key_count = context[\"process_key_count\"]\n"
+"        queue_action = process_key(message, process_key_count) or queue_action\n"
+"        if assert_fact == 0 and events_message_cache[tostring(message[\"id\"])] == false then\n"
+"            break\n"
+"        end\n"
+"        end\n"
+"    end\n"
+"    if queue_action then\n"
+"        if not redis.call(\"zscore\", actions_key, sid) then\n"
+"            redis.call(\"zadd\", actions_key , score, sid)\n"
+"        end\n"
+"        if assert_fact == 0 then\n"
+"            return false\n"
+"        end\n"
+"    end\n"
+"    return true\n"
+"end\n"
 "local message = nil\n"
 "if #ARGV > (6 + keys_count) then\n"
 "    message = {}\n"
@@ -2032,33 +2110,7 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "for index = 6, 5 + keys_count, 1 do\n"
 "    input_keys[ARGV[index]] = true\n"
 "end\n"
-"%sfor index = 6, 5 + keys_count, 1 do\n"
-"    results = {}\n"
-"    unpacked_results = {}\n"
-"    key = ARGV[index]\n"
-"    context = context_directory[key]\n"
-"    keys = context[\"keys\"]\n"
-"    reviewers = context[\"reviewers\"]\n"
-"    frame_packers = context[\"frame_packers\"]\n"
-"    frame_unpackers = context[\"frame_unpackers\"]\n"
-"    primary_message_keys = context[\"primary_message_keys\"]\n"
-"    primary_frame_keys = context[\"primary_frame_keys\"]\n"
-"    directory = context[\"directory\"]\n"
-"    results_key = context[\"results_key\"]\n"
-"    inverse_directory = context[\"inverse_directory\"]\n"
-"    expressions_count = context[\"expressions_count\"]\n"
-"    local process_key = context[\"process_key\"]\n"
-"    local process_key_count = context[\"process_key_count\"]\n"
-"    queue_action = process_key(message, process_key_count) or queue_action\n"
-"    if assert_fact == 0 and events_message_cache[tostring(message[\"id\"])] == false then\n"
-"        break\n"
-"    end\n"
-"end\n"
-"if queue_action then\n"
-"    if not redis.call(\"zscore\", actions_key, sid) then\n"
-"        redis.call(\"zadd\", actions_key , score, sid)\n"
-"    end\n"
-"end\n",
+"%s\n",
                  name,
                  name,
                  name,

@@ -416,7 +416,10 @@ with ruleset('a4'):
     @when_any(all(m.subject == 'approve', m.amount == 1000), 
               all(m.subject == 'jumbo', m.amount == 10000))
     def action(c):
-        print ('a4 action {0}'.format(c.s.sid))
+        if c.m_0:
+            print ('a4 action {0}, {1}, {2}'.format(c.s.sid, c.m_0.m_0.subject, c.m_0.m_1.amount))
+        else:
+            print ('a4 action {0}, {1}, {2}'.format(c.s.sid, c.m_1.m_0.subject, c.m_1.m_1.amount))
     
     @when_start
     def start(host):
@@ -426,11 +429,39 @@ with ruleset('a4'):
         host.post('a4', {'id': 4, 'sid': 2, 'amount': 10000})
 
 
+with ruleset('a4_1'):
+    @when_any(all(c.first << m.subject == 'approve', 
+                  c.second << m.amount == 1000), 
+              all(c.third << m.subject == 'jumbo', 
+                  c.fourth << m.amount == 10000))
+    def action(c):
+        if c.first:
+            print ('a4_1 action {0}, {1}, {2}'.format(c.s.sid, c.first.subject, c.second.amount))
+        else:
+            print ('a4_1 action {0}, {1}, {2}'.format(c.s.sid, c.third.subject, c.fourth.amount))
+    
+    @when_start
+    def start(host):
+        host.post('a4_1', {'id': 1, 'sid': 1, 'subject': 'approve'})
+        host.post('a4_1', {'id': 2, 'sid': 1, 'amount': 1000})
+        host.post('a4_1', {'id': 3, 'sid': 2, 'subject': 'jumbo'})
+        host.post('a4_1', {'id': 4, 'sid': 2, 'amount': 10000})
+
+
 with ruleset('a5'):
     @when_all(any(m.subject == 'approve', m.subject == 'jumbo'), 
               any(m.amount == 100, m.amount == 10000))
     def action(c):
-        print ('a5 action {0}'.format(c.s.sid))
+        if c.m_0.m_0:
+            if c.m_1.m_0:
+                print ('a5 action {0}, {1}, {2}'.format(c.s.sid, c.m_0.m_0.subject, c.m_1.m_0.amount))
+            else:
+                print ('a5 action {0}, {1}, {2}'.format(c.s.sid, c.m_0.m_0.subject, c.m_1.m_1.amount))
+        else:
+            if c.m_1.m_0:
+                print ('a5 action {0}, {1}, {2}'.format(c.s.sid, c.m_0.m_1.subject, c.m_1.m_0.amount))
+            else:
+                print ('a5 action {0}, {1}, {2}'.format(c.s.sid, c.m_0.m_1.subject, c.m_1.m_1.amount))        
     
     @when_start
     def start(host):
@@ -438,6 +469,31 @@ with ruleset('a5'):
         host.post('a5', {'id': 2, 'sid': 1, 'amount': 100})
         host.post('a5', {'id': 3, 'sid': 2, 'subject': 'jumbo'})
         host.post('a5', {'id': 4, 'sid': 2, 'amount': 10000})
+
+
+with ruleset('a5_1'):
+    @when_all(any(c.first << m.subject == 'approve', 
+                  c.second << m.subject == 'jumbo'), 
+              any(c.third << m.amount == 100, 
+                  c.fourth << m.amount == 10000))
+    def action(c):
+        if c.first:
+            if c.third:
+                print ('a5_1 action {0}, {1}, {2}'.format(c.s.sid, c.first.subject, c.third.amount))
+            else:
+                print ('a5_1 action {0}, {1}, {2}'.format(c.s.sid, c.first.subject, c.fourth.amount))
+        else:
+            if c.m_1.m_0:
+                print ('a5_1 action {0}, {1}, {2}'.format(c.s.sid, c.second.subject, c.third.amount))
+            else:
+                print ('a5_1 action {0}, {1}, {2}'.format(c.s.sid, c.second.subject, c.fourth.amount))        
+    
+    @when_start
+    def start(host):
+        host.post('a5_1', {'id': 1, 'sid': 1, 'subject': 'approve'})
+        host.post('a5_1', {'id': 2, 'sid': 1, 'amount': 100})
+        host.post('a5_1', {'id': 3, 'sid': 2, 'subject': 'jumbo'})
+        host.post('a5_1', {'id': 4, 'sid': 2, 'amount': 10000})
 
 
 with statechart('a6'):

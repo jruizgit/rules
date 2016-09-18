@@ -445,7 +445,11 @@ with (d.flowchart('a3')) {
 with (d.ruleset('a4')) {
     whenAny(all(m.subject.eq('approve'), m.amount.eq(1000)), 
             all(m.subject.eq('jumbo'), m.amount.eq(10000)), function (c) {
-        console.log('a4 action from: ' + c.s.sid);
+        if (c.m_0) {
+            console.log('a4 action from: ' + c.s.sid + ' ' + c.m_0.m_0.subject + ' ' + c.m_0.m_1.amount);     
+        } else {
+            console.log('a4 action from: ' + c.s.sid + ' ' + c.m_1.m_0.subject + ' ' + c.m_1.m_1.amount);        
+        }
     });
     whenStart(function (host) {
         host.post('a4', {id: 1, sid: 1, subject: 'approve'});
@@ -455,16 +459,74 @@ with (d.ruleset('a4')) {
     });
 }
 
+with (d.ruleset('a4_1')) {
+    whenAny(all(c.first = m.subject.eq('approve'), 
+                c.second = m.amount.eq(1000)), 
+            all(c.third = m.subject.eq('jumbo'), 
+                c.fourth = m.amount.eq(10000)), function (c) {
+        if (c.first) {
+            console.log('a4_1 action from: ' + c.s.sid + ' ' + c.first.subject + ' ' + c.second.amount);     
+        } else {
+            console.log('a4_1 action from: ' + c.s.sid + ' ' + c.third.subject + ' ' + c.fourth.amount);        
+        }
+    });
+    whenStart(function (host) {
+        host.post('a4_1', {id: 1, sid: 1, subject: 'approve'});
+        host.post('a4_1', {id: 2, sid: 1, amount: 1000});
+        host.post('a4_1', {id: 3, sid: 2, subject: 'jumbo'});
+        host.post('a4_1', {id: 4, sid: 2, amount: 10000});
+    });
+}
+
 with (d.ruleset('a5')) {
     whenAll(any(m.subject.eq('approve'), m.subject.eq('jumbo')), 
             any(m.amount.eq(100), m.amount.eq(10000)), function (c) {
-        console.log('a5 action from: ' + c.s.sid);
+        if (c.m_0.m_0) {
+            if (c.m_1.m_0) {
+                console.log('a5 action from: ' + c.s.sid + ' ' + c.m_0.m_0.subject + ' ' + c.m_1.m_0.amount);        
+            } else {
+                console.log('a5 action from: ' + c.s.sid + ' ' + c.m_0.m_0.subject + ' ' + c.m_1.m_1.amount);
+            }
+        } else {
+            if (c.m_1.m_0) {
+                console.log('a5 action from: ' + c.s.sid + ' ' + c.m_0.m_1.subject + ' ' + c.m_1.m_0.amount);        
+            } else {
+                console.log('a5 action from: ' + c.s.sid + ' ' + c.m_0.m_1.subject + ' ' + c.m_1.m_1.amount);
+            }
+        }
     });
     whenStart(function (host) {
         host.post('a5', {id: 1, sid: 1, subject: 'approve'});
         host.post('a5', {id: 2, sid: 1, amount: 100});
         host.post('a5', {id: 3, sid: 2, subject: 'jumbo'});
         host.post('a5', {id: 4, sid: 2, amount: 10000});
+    });
+}
+
+with (d.ruleset('a5_1')) {
+    whenAll(any(c.first = m.subject.eq('approve'), 
+                c.second = m.subject.eq('jumbo')), 
+            any(c.third = m.amount.eq(100), 
+                c.fourth = m.amount.eq(10000)), function (c) {
+        if (c.first) {
+            if (c.third) {
+                console.log('a5_1 action from: ' + c.s.sid + ' ' + c.first.subject + ' ' + c.third.amount);        
+            } else {
+                console.log('a5_1 action from: ' + c.s.sid + ' ' + c.first.subject + ' ' + c.fourth.amount);
+            }
+        } else {
+            if (c.third) {
+                console.log('a5_1 action from: ' + c.s.sid + ' ' + c.second.subject + ' ' + c.third.amount);        
+            } else {
+                console.log('a5_1 action from: ' + c.s.sid + ' ' + c.second.subject + ' ' + c.fourth.amount);
+            }
+        }
+    });
+    whenStart(function (host) {
+        host.post('a5_1', {id: 1, sid: 1, subject: 'approve'});
+        host.post('a5_1', {id: 2, sid: 1, amount: 100});
+        host.post('a5_1', {id: 3, sid: 2, subject: 'jumbo'});
+        host.post('a5_1', {id: 4, sid: 2, amount: 10000});
     });
 }
 

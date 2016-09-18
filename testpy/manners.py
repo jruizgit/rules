@@ -75,6 +75,16 @@ with statechart('miss_manners'):
             c.s.g_count += 3
 
     with state('make'):
+        @to('check')
+        @when_all(pri(1), (m.t == 'seating') & (m.path == False))
+        def path_done(c):
+            c.retract_fact(c.m)
+            c.m.id = c.s.g_count
+            c.m.path = True
+            c.assert_fact(c.m)
+            c.s.g_count += 1
+            print('path sid: {0}, pid: {1}, left guest: {2}, right guest {3}'.format(c.m.s_id, c.m.p_id, c.m.left_guest_name, c.m.right_guest_name))
+
         @to('make')
         @when_all(cap(1000),
                   c.seating << (m.t == 'seating') & 
@@ -93,16 +103,6 @@ with statechart('miss_manners'):
                                'guest_name': frame.path.guest_name})
                 c.s.g_count += 1
             
-        @to('check')
-        @when_all(pri(1), (m.t == 'seating') & (m.path == False))
-        def path_done(c):
-            c.retract_fact(c.m)
-            c.m.id = c.s.g_count
-            c.m.path = True
-            c.assert_fact(c.m)
-            c.s.g_count += 1
-            print('path sid: {0}, pid: {1}, left guest: {2}, right guest {3}'.format(c.m.s_id, c.m.p_id, c.m.left_guest_name, c.m.right_guest_name))
-
     with state('check'):
         @to('end')
         @when_all(c.last_seat << m.t == 'last_seat', 

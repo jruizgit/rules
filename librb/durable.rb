@@ -178,7 +178,7 @@ module Durable
       @__name = nil
     end
     
-    def definition
+    def definition(parent_name=nil)
       new_definition = nil
       if @__op == :$or || @__op == :$and
         new_definition = {@__op => @definitions}
@@ -297,25 +297,33 @@ module Durable
       @expressions = expressions
     end
 
-    def definition
+    def definition(parent_name=nil)
       index = 0
       new_definition = []
       for expression in @expressions do
         if (expression.kind_of? Expression) && expression.__name
           expression_name = expression.__name
         elsif @expressions.length == 1 
-          expression_name = "m"
+          if parent_name
+            expression_name = "#{parent_name}.m"
+          else
+            expression_name = "m"
+          end
         else
-          expression_name = "m_#{index}"
+          if parent_name
+            expression_name = "#{parent_name}.m_#{index}"
+          else
+            expression_name = "m_#{index}"
+          end
         end
         if expression.__type == :$all
-          new_definition << {expression_name + "$all" => expression.definition()}
+          new_definition << {expression_name + "$all" => expression.definition(expression_name)}
         elsif expression.__type == :$any
-          new_definition << {expression_name + "$any" => expression.definition()}
+          new_definition << {expression_name + "$any" => expression.definition(expression_name)}
         elsif  expression.__type == :$not
           new_definition << {expression_name + "$not" => expression.definition()[0]["m"]}
         else
-          new_definition << {expression_name => expression.definition()}
+          new_definition << {expression_name => expression.definition(expression_name)}
         end
         index += 1
       end

@@ -96,6 +96,11 @@ with statechart('waltzdb'):
             c.s.start_time = unix_time_millis(datetime.datetime.now())
 
     with state('duplicate'):
+        @to('detect_junctions')
+        @when_all(pri(1))
+        def done_reversing(c):
+            print('detect_junctions')
+
         @to('duplicate')
         @when_all(cap(1000),
                   c.line << m.t == 'line')
@@ -106,11 +111,6 @@ with statechart('waltzdb'):
                 c.post({'id': c.s.gid, 't': 'edge', 'p1': frame.line.p1, 'p2': frame.line.p2, 'joined': False})
                 c.post({'id': c.s.gid + 1, 't': 'edge', 'p1': frame.line.p2, 'p2': frame.line.p1, 'joined': False})
                 c.s.gid += 2
-
-        @to('detect_junctions')
-        @when_all(pri(1))
-        def done_reversing(c):
-            print('detect_junctions')
 
     with state('detect_junctions'):
         @to('detect_junctions')

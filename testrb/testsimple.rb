@@ -109,10 +109,66 @@ Durable.flowchart :a3 do
   end
 end
 
+Durable.ruleset :a5 do
+  when_all any(m.subject == "jumbo", m.subject == "approve"), 
+           any(m.amount == 10000, m.amount == 100) do
+    if m_0.m_0
+      if m_1.m_0
+        puts "a5 action #{s.sid} #{m_0.m_0.subject} #{m_1.m_0.amount}"
+      else
+        puts "a5 action #{s.sid} #{m_0.m_0.subject} #{m_1.m_1.amount}"
+      end
+    else
+      if m_1.m_0
+        puts "a5 action #{s.sid} #{m_0.m_1.subject} #{m_1.m_0.amount}"
+      else
+        puts "a5 action #{s.sid} #{m_0.m_1.subject} #{m_1.m_1.amount}"
+      end
+    end
+  end
+  when_start do
+    post :a5, {:id => 3, :sid => 1, :subject => "jumbo"}
+    post :a5, {:id => 4, :sid => 1, :amount => 10000}
+    post :a5, {:id => 1, :sid => 1, :subject => "approve"}
+    post :a5, {:id => 2, :sid => 1, :amount => 100}
+  end
+end
+
+Durable.ruleset :a5_1 do
+  when_all any(c.first = m.subject == "jumbo", 
+               c.second = m.subject == "approve"), 
+           any(c.third = m.amount == 10000, 
+               c.fourth = m.amount == 100) do
+    if first
+      if third
+        puts "a5 action #{s.sid} #{first.subject} #{third.amount}"
+      else
+        puts "a5 action #{s.sid} #{first.subject} #{fourth.amount}"
+      end
+    else
+      if third
+        puts "a5 action #{s.sid} #{second.subject} #{third.amount}"
+      else
+        puts "a5 action #{s.sid} #{second.subject} #{fourth.amount}"
+      end
+    end
+  end
+  when_start do
+    post :a5_1, {:id => 3, :sid => 1, :subject => "jumbo"}
+    post :a5_1, {:id => 4, :sid => 1, :amount => 10000}
+    post :a5_1, {:id => 1, :sid => 1, :subject => "approve"}
+    post :a5_1, {:id => 2, :sid => 1, :amount => 100}
+  end
+end
+
 Durable.ruleset :a4 do
   when_any all(m.subject == "approve", m.amount == 1000),
            all(m.subject == "jumbo", m.amount == 10000) do
-    puts "a4 action #{s.sid}"
+    if m_0
+      puts "a4 action #{s.sid} #{m_0.m_0.subject} #{m_0.m_1.amount}"
+    else
+      puts "a4 action #{s.sid} #{m_1.m_0.subject} #{m_1.m_1.amount}"
+    end
   end
   when_start do
     post :a4, {:id => 1, :sid => 1, :subject => "approve"}
@@ -121,17 +177,23 @@ Durable.ruleset :a4 do
     post :a4, {:id => 4, :sid => 2, :amount => 10000}
   end
 end
-   
-Durable.ruleset :a5 do
-  when_all any(m.subject == "approve", m.subject == "jumbo"),
-           any(m.amount == 100, m.amount == 10000) do
-    puts "a5 action #{s.sid}"
+
+Durable.ruleset :a4_1 do
+  when_any all(c.first = m.subject == "approve", 
+               c.second = m.amount == 1000),
+           all(c.third = m.subject == "jumbo", 
+               c.fourth = m.amount == 10000) do
+    if first
+      puts "a4 action #{s.sid} #{first.subject} #{second.amount}"
+    else
+      puts "a4 action #{s.sid} #{third.subject} #{fourth.amount}"
+    end
   end
   when_start do
-    post :a5, {:id => 1, :sid => 1, :subject => "approve"}
-    post :a5, {:id => 2, :sid => 1, :amount => 100}
-    post :a5, {:id => 3, :sid => 2, :subject => "jumbo"}
-    post :a5, {:id => 4, :sid => 2, :amount => 10000}
+    post :a4_1, {:id => 1, :sid => 1, :subject => "approve"}
+    post :a4_1, {:id => 2, :sid => 1, :amount => 1000}
+    post :a4_1, {:id => 3, :sid => 2, :subject => "jumbo"}
+    post :a4_1, {:id => 4, :sid => 2, :amount => 10000}
   end
 end
 
