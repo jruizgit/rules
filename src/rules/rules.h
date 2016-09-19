@@ -131,7 +131,8 @@ unsigned int startUpdateState(void *handle,
                               void **rulesBinding,
                               unsigned int *replyCount);
 
-unsigned int assertState(void *handle, 
+unsigned int assertState(void *handle,
+                         char *sid, 
                          char *state);
 
 unsigned int startAction(void *handle, 

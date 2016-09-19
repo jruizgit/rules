@@ -420,11 +420,12 @@ static VALUE rbRetractFacts(VALUE self, VALUE handle, VALUE facts) {
     return Qnil;
 }
 
-static VALUE rbAssertState(VALUE self, VALUE handle, VALUE state) {
+static VALUE rbAssertState(VALUE self, VALUE handle, VALUE sid, VALUE state) {
     Check_Type(handle, T_FIXNUM);
+    Check_Type(sid, T_STRING);
     Check_Type(state, T_STRING);
 
-    unsigned int result = assertState((void *)FIX2LONG(handle), RSTRING_PTR(state));
+    unsigned int result = assertState((void *)FIX2LONG(handle), RSTRING_PTR(sid), RSTRING_PTR(state));
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
         return INT2FIX(result);    
     } else {
@@ -671,7 +672,7 @@ void Init_rules() {
     rb_define_singleton_method(rulesModule, "queue_retract_fact", rbQueueRetractFact, 4);
     rb_define_singleton_method(rulesModule, "start_retract_facts", rbStartRetractFacts, 2);
     rb_define_singleton_method(rulesModule, "retract_facts", rbRetractFacts, 2);
-    rb_define_singleton_method(rulesModule, "assert_state", rbAssertState, 2);
+    rb_define_singleton_method(rulesModule, "assert_state", rbAssertState, 3);
     rb_define_singleton_method(rulesModule, "start_update_state", rbStartUpdateState, 3);
     rb_define_singleton_method(rulesModule, "start_action", rbStartAction, 1);
     rb_define_singleton_method(rulesModule, "complete_action", rbCompleteAction, 3);

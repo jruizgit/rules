@@ -493,7 +493,7 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.assertState = function (state) {
-            return r.assertState(handle, JSON.stringify(state));
+            return r.assertState(handle, state.sid, JSON.stringify(state));
         };
 
         that.startTimer = function (sid, timer, timerDuration) {

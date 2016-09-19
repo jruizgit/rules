@@ -33,6 +33,7 @@
 #define OP_STRING_STRING 0x0101
 
 typedef struct actionContext {
+    unsigned long stateVersion;
     void *rulesBinding;
     redisReply *reply;
 } actionContext;
@@ -1029,6 +1030,7 @@ static unsigned int handleMessageCore(ruleset *tree,
     jsonProperty *sidProperty;
     int sidLength;
     char *storeCommand;
+    char *versionCommand;
     int result = getId(properties, sidIndex, &sidProperty, &sidLength);
     if (result != RULES_OK) {
         return result;
@@ -1064,16 +1066,19 @@ static unsigned int handleMessageCore(ruleset *tree,
             }
         }
 
-        if (*commandCount == MAX_COMMAND_COUNT) {
-            return ERR_MAX_COMMAND_COUNT;
-        }
-
-        result = formatStoreSession(*rulesBinding, sid, state, 0, &storeCommand);
+        result = formatStoreSession(*rulesBinding, sid, state, 0, &storeCommand, &versionCommand);
         if (result != RULES_OK) {
             return result;
         }
 
         commands[*commandCount] = storeCommand;
+        ++*commandCount;
+
+        if (*commandCount == MAX_COMMAND_COUNT) {
+            return ERR_MAX_COMMAND_COUNT;
+        }
+
+        commands[*commandCount] = versionCommand;
         ++*commandCount;
     }
     char *removeCommand = NULL;
@@ -1220,12 +1225,19 @@ static unsigned int handleMessageCore(ruleset *tree,
                 return ERR_MAX_COMMAND_COUNT;
             }
 
-            result = formatStoreSession(*rulesBinding, sid, newState, 1, &storeCommand);
+            result = formatStoreSession(*rulesBinding, sid, newState, 1, &storeCommand, &versionCommand);
             if (result != RULES_OK) {
                 return result;
             }
 
             commands[*commandCount] = storeCommand;
+            ++*commandCount;
+
+            if (*commandCount == MAX_COMMAND_COUNT) {
+                return ERR_MAX_COMMAND_COUNT;
+            }
+
+            commands[*commandCount] = versionCommand;
             ++*commandCount;
 
             result = handleMessage(tree, 
@@ -1362,7 +1374,8 @@ static unsigned int handleMessages(void *handle,
 }
 
 static unsigned int handleState(ruleset *tree, 
-                                char *state, 
+                                char *state,
+                                unsigned long stateVersion, 
                                 char **commands,
                                 unsigned int *commandCount,
                                 void **rulesBinding) {
@@ -1377,15 +1390,15 @@ static unsigned int handleState(ruleset *tree,
 
     char *stateMessagePostfix = state + 1;
 #ifdef _WIN32
-	char *stateMessage = (char *)_alloca(sizeof(char)*(35 + stateLength - 1));
+	char *stateMessage = (char *)_alloca(sizeof(char)*(40 + stateLength - 1));
 #else
-	char stateMessage[35 + stateLength - 1];
+	char stateMessage[40 + stateLength - 1];
 #endif
-    int randomMid = rand();
+    
 #ifdef _WIN32
-    sprintf_s(stateMessage, 35 + stateLength - 1, "{\"id\":\"$v-%d\", \"$s\":1, %s", randomMid, stateMessagePostfix);
+    sprintf_s(stateMessage, 40 + stateLength - 1, "{\"id\":\"$v-%016lu\", \"$s\":1, %s", stateVersion, stateMessagePostfix);
 #else
-	snprintf(stateMessage, 35 + stateLength - 1, "{\"id\":\"$v-%d\", \"$s\":1, %s", randomMid, stateMessagePostfix);
+	snprintf(stateMessage, 40 + stateLength - 1, "{\"id\":\"$v-%016lu\", \"$s\":1, %s", stateVersion, stateMessagePostfix);
 #endif
     unsigned int result = handleMessage(tree, 
                                         state,
@@ -1638,15 +1651,22 @@ unsigned int startRetractFacts(void *handle,
     return startHandleMessages(handle, messages, ACTION_REMOVE_FACT, rulesBinding, replyCount);
 }
 
-unsigned int assertState(void *handle, char *state) {
+unsigned int assertState(void *handle, char *sid, char *state) {
     char *commands[MAX_COMMAND_COUNT];
     unsigned int commandCount = 0;
     void *rulesBinding = NULL;
-    unsigned int result = handleState(handle, 
-                                      state, 
-                                      commands,
-                                      &commandCount,
-                                      &rulesBinding);
+    unsigned long stateVersion;
+    unsigned int result = getStateVersion(handle, sid, &stateVersion);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    result = handleState(handle, 
+                         state,
+                         stateVersion, 
+                         commands,
+                         &commandCount,
+                         &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         freeCommands(commands, commandCount);
         return result;
@@ -1693,13 +1713,14 @@ unsigned int startAction(void *handle,
         return result;
     }
 
-    *state = reply->element[1]->str;
-    *messages = reply->element[2]->str;
+    *state = reply->element[2]->str;
+    *messages = reply->element[3]->str;
     actionContext *context = malloc(sizeof(actionContext));
     if (!context) {
         return ERR_OUT_OF_MEMORY;
     }
     
+    context->stateVersion = reply->element[1]->integer;
     context->reply = reply;
     context->rulesBinding = rulesBinding;
     *actionHandle = context;
@@ -1715,8 +1736,10 @@ unsigned int startUpdateState(void *handle,
     char *commands[MAX_COMMAND_COUNT];
     unsigned int result = RULES_OK;
     unsigned int commandCount = 0;
+    unsigned long stateVersion = ((actionContext*)actionHandle)->stateVersion;
     result = handleState(handle, 
                          state, 
+                         stateVersion,
                          commands,
                          &commandCount,
                          rulesBinding);
@@ -1750,7 +1773,8 @@ unsigned int completeAction(void *handle,
 
     ++commandCount;
     result = handleState(handle, 
-                         state, 
+                         state,
+                         context->stateVersion, 
                          commands,
                          &commandCount,
                          &rulesBinding);
@@ -1823,7 +1847,8 @@ unsigned int completeAndStartAction(void *handle,
         return ERR_NO_ACTION_AVAILABLE;
     }
 
-    *messages = newReply->element[1]->str;
+    *messages = newReply->element[2]->str;
+    context->stateVersion = newReply->element[1]->integer;
     context->reply = newReply;
     return RULES_OK;
 }

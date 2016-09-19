@@ -624,13 +624,14 @@ void jsRetractFacts(const FunctionCallbackInfo<Value>& args) {
 void jsAssertState(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
-    if (args.Length() < 2) {
+    if (args.Length() < 3) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+    } else if (!args[0]->IsNumber() || !args[2]->IsString()) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int result = assertState((void *)args[0]->IntegerValue(),
-                                           *String::Utf8Value(args[1]->ToString()));
+                                           *String::Utf8Value(args[1]->ToString()),
+                                           *String::Utf8Value(args[2]->ToString()));
         
         if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
             args.GetReturnValue().Set(result);

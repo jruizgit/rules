@@ -495,7 +495,11 @@ module Engine
     end
 
     def assert_state(state)
-      Rules.assert_state @handle, JSON.generate(state)
+      if state.key? :sid 
+        Rules.assert_state @handle, state[:sid].to_s, JSON.generate(state)
+      else
+        Rules.assert_state @handle, state["sid"].to_s, JSON.generate(state)
+      end
     end
 
     def get_state(sid)

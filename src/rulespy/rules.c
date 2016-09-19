@@ -625,12 +625,13 @@ static PyObject *pyStartRetractFacts(PyObject *self, PyObject *args) {
 static PyObject *pyAssertState(PyObject *self, PyObject *args) {
     void *handle;
     char *state;
-    if (!PyArg_ParseTuple(args, "ls", &handle, &state)) {
+    char *sid;
+    if (!PyArg_ParseTuple(args, "lss", &handle, &sid, &state)) {
         PyErr_SetString(RulesError, "pyAssertState Invalid argument");
         return NULL;
     }
 
-    unsigned int result = assertState(handle, state);
+    unsigned int result = assertState(handle, sid, state);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
         return Py_BuildValue("i", result);
     } else {

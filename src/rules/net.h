@@ -74,7 +74,8 @@ unsigned int formatStoreSession(void *rulesBinding,
                                 char *sid, 
                                 char *state, 
                                 unsigned char tryExists,
-                                char **command);
+                                char **storeCommand,
+                                char **versionCommand);
 
 unsigned int formatStoreSessionFact(void *rulesBinding, 
                                     char *sid, 
@@ -147,6 +148,10 @@ unsigned int deleteBindingsList(ruleset *tree);
 unsigned int getSession(void *rulesBinding, 
                         char *sid, 
                         char **state);
+
+unsigned int getSessionVersion(void *rulesBinding, 
+                               char *sid, 
+                               unsigned long *stateVersion);
 
 unsigned int deleteSession(void *rulesBinding, 
                            char *sid);

@@ -453,6 +453,17 @@ unsigned int getState(void *handle, char *sid, char **state) {
     return getSession(rulesBinding, sid, state);
 }
 
+unsigned int getStateVersion(void *handle, char *sid, unsigned long *stateVersion) {
+    void *rulesBinding = NULL;
+    unsigned int result = resolveBinding(handle, sid, &rulesBinding);
+    if (result != RULES_OK) {
+      return result;
+    }
+
+    return getSessionVersion(rulesBinding, sid, stateVersion);
+}
+
+
 unsigned int deleteState(void *handle, char *sid) {
     void *rulesBinding = NULL;
     unsigned int result = resolveBinding(handle, sid, &rulesBinding);

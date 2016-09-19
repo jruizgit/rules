@@ -528,11 +528,13 @@ static unsigned int loadDeleteSessionCommand(ruleset *tree, binding *rulesBindin
 "    end\n"
 "end\n"
 "redis.call(\"hdel\", \"%s!s\", sid)\n"
+"redis.call(\"hdel\", \"%s!s!v\", sid)\n"
 "redis.call(\"zrem\", \"%s!a\", sid)\n"
 "redis.call(\"del\", \"%s!a!\" .. sid)\n"
 "redis.call(\"del\", \"%s!e!\" .. sid)\n"
 "redis.call(\"del\", \"%s!f!\" .. sid)\n"
 "redis.call(\"del\", \"%s!v!\" .. sid)\n%s",
+                name,
                 name,
                 name,
                 name, 
@@ -1167,11 +1169,12 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
 "end\n"
 "if frame then\n"
 "    redis.call(\"zadd\", action_key, tonumber(ARGV[1]), new_sid)\n"
+"    local state_version = redis.call(\"hget\", state_key .. \"!v\", new_sid)\n"
 "    if #ARGV == 2 then\n"
 "        local state = redis.call(\"hget\", state_key, new_sid)\n"
-"        return {new_sid, state, cjson.encode({[action_name] = fixup_frame(frame)})}\n"
+"        return {new_sid, tonumber(state_version), state, cjson.encode({[action_name] = fixup_frame(frame)})}\n"
 "    else\n"
-"        return {new_sid, cjson.encode({[action_name] = fixup_frame(frame)})}\n"
+"        return {new_sid, tonumber(state_version), cjson.encode({[action_name] = fixup_frame(frame)})}\n"
 "    end\n"
 "end\n",
                 name,
@@ -2557,22 +2560,40 @@ unsigned int formatStoreSession(void *rulesBinding,
                                 char *sid, 
                                 char *state,
                                 unsigned char tryExists, 
-                                char **command) {
+                                char **storeCommand,
+                                char **versionCommand) {
     binding *currentBinding = (binding*)rulesBinding;
 
     int result;
     if (tryExists) {
-        result = redisFormatCommand(command,
+        result = redisFormatCommand(storeCommand,
                                     "hsetnx %s %s %s", 
                                     currentBinding->sessionHashset, 
                                     sid, 
                                     state);
+        if (result == 0) {
+            return ERR_OUT_OF_MEMORY;
+        }
+
+        result = redisFormatCommand(versionCommand,
+                                    "hsetnx %s!v %s 0", 
+                                    currentBinding->sessionHashset, 
+                                    sid);
     } else {
-        result = redisFormatCommand(command,
+        result = redisFormatCommand(storeCommand,
                                     "hset %s %s %s", 
                                     currentBinding->sessionHashset, 
                                     sid, 
                                     state);
+
+        if (result == 0) {
+            return ERR_OUT_OF_MEMORY;
+        }
+
+        result = redisFormatCommand(versionCommand,
+                                    "hincrby %s!v %s 1", 
+                                    currentBinding->sessionHashset, 
+                                    sid);
     }
 
     if (result == 0) {
@@ -3088,6 +3109,38 @@ unsigned int getSession(void *rulesBinding, char *sid, char **state) {
         return ERR_OUT_OF_MEMORY;
     }
     strcpy(*state, reply->str);
+    freeReplyObject(reply); 
+    return REDIS_OK;
+}
+
+unsigned int getSessionVersion(void *rulesBinding, char *sid, unsigned long *stateVersion) {
+    binding *currentBinding = (binding*)rulesBinding;
+    redisContext *reContext = currentBinding->reContext; 
+    unsigned int result = redisAppendCommand(reContext, 
+                                             "hget %s!v %s", 
+                                             currentBinding->sessionHashset, 
+                                             sid);
+    if (result != REDIS_OK) {
+        return ERR_REDIS_ERROR;
+    }
+
+    redisReply *reply;
+    result = tryGetReply(reContext, &reply);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    if (reply->type == REDIS_REPLY_ERROR) {
+        freeReplyObject(reply);
+        return ERR_REDIS_ERROR;
+    }
+
+    if (reply->type != REDIS_REPLY_INTEGER) {
+        *stateVersion = 0;
+    } else {
+        *stateVersion = reply->integer;
+    }
+
     freeReplyObject(reply); 
     return REDIS_OK;
 }
