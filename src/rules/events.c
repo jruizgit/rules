@@ -19,18 +19,27 @@
 #define OP_BOOL_INT 0x0402
 #define OP_BOOL_DOUBLE 0x0403
 #define OP_BOOL_STRING 0x0401
+#define OP_BOOL_NIL 0x0407
 #define OP_INT_BOOL 0x0204
 #define OP_INT_INT 0x0202
 #define OP_INT_DOUBLE 0x0203
 #define OP_INT_STRING 0x0201
+#define OP_INT_NIL 0x0207
 #define OP_DOUBLE_BOOL 0x0304
 #define OP_DOUBLE_INT 0x0302
 #define OP_DOUBLE_DOUBLE 0x0303
 #define OP_DOUBLE_STRING 0x0301
+#define OP_DOUBLE_NIL 0x0307
 #define OP_STRING_BOOL 0x0104
 #define OP_STRING_INT 0x0102
 #define OP_STRING_DOUBLE 0x0103
 #define OP_STRING_STRING 0x0101
+#define OP_STRING_NIL 0x0107
+#define OP_NIL_BOOL 0x0704
+#define OP_NIL_INT 0x0702
+#define OP_NIL_DOUBLE 0x0703
+#define OP_NIL_STRING 0x0701
+#define OP_NIL_NIL 0x0707
 
 typedef struct actionContext {
     unsigned long stateVersion;
@@ -864,6 +873,25 @@ static unsigned int isMatch(ruleset *tree,
                                                             rightState + rightProperty->valueOffset,
                                                             rightProperty->valueLength,
                                                             alphaOp);
+            break;
+        case OP_BOOL_NIL:
+        case OP_INT_NIL:
+        case OP_DOUBLE_NIL:
+        case OP_STRING_NIL:
+            if (alphaOp == OP_NEQ) {
+                *propertyMatch = 1;
+            } else {
+                *propertyMatch = 0;
+            }
+
+            break;
+        case OP_NIL_NIL:
+            if (alphaOp == OP_EQ) {
+                *propertyMatch = 1;
+            } else {
+                *propertyMatch = 0;
+            }
+
             break;
     }
     

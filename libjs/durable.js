@@ -142,7 +142,7 @@ exports = module.exports = durableEngine = function () {
                 newDefinition[type] = left;
             } else {
                 var rightDefinition = right;
-                if (typeof(right) === 'object') {
+                if (typeof(right) === 'object' && right !== null) {
                     rightDefinition = right.define();
                 }
 

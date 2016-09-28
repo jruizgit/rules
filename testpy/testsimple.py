@@ -638,6 +638,17 @@ with ruleset('a15'):
         host.post('a15', {'id': 1, 'sid': 1, 'payment': {'invoice': {'amount': 1000}}})
 
 
+with ruleset('a16'):
+    @when_all(m.amount == None)
+    def approved(c):
+        print ('a16 approved ->{0}'.format(c.m.amount))
+        
+    @when_start
+    def start(host):
+        host.post('a16', {'id': 1, 'sid': 1, 'amount': 1000})
+        host.post('a16', {'id': 2, 'sid': 1, 'amount': None})
+
+
 with ruleset('t0'):
     @when_all(timeout('my_timer') | (s.count == 0))
     def start_timer(c):

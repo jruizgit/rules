@@ -1,6 +1,19 @@
 var d = require('../libjs/durable');
 var m = d.m, s = d.s, c = d.c; timeout = d.timeout;
 
+d.ruleset('fraud1_0', {
+        whenAll: [ m.amount.eq(null) ],
+        run: function(c) {
+
+            console.log('fraud1_0 detected ' + c.m.amount);
+        }
+    },
+    function (host) {
+        host.post('fraud1_0', {id: 1, sid: 1, amount: 200});
+        host.post('fraud1_0', {id: 2, sid: 1, amount: null});
+    }
+);
+
 d.ruleset('fraud1_1', {
         whenAll: [
             c.first = m.amount.gt(100),

@@ -316,6 +316,16 @@ Durable.ruleset :a14 do
   end
 end
 
+Durable.ruleset :a15 do
+  when_all m.amount == nil do
+    puts "a15 approved " + m.id.to_s
+  end
+  when_start do
+    post :a15, {:id => 1, :sid => 1, :amount => 1000}
+    post :a15, {:id => 2, :sid => 1, :amount => nil}
+  end
+end
+
 Durable.statechart :fraud0 do
   state :start do
     to :standby
