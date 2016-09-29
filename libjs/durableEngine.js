@@ -403,7 +403,7 @@ exports = module.exports = durableEngine = function () {
             if (!filter || filter(pName)) {
                 var propertyType = typeof(object[pName]);
                 if (propertyType !== 'function') {
-                    if (propertyType === 'object') {
+                    if (propertyType === 'object' && object[pName] !== null) {
                         newObject[pName] = copy(object[pName]);
                     }
                     else {
