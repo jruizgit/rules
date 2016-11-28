@@ -2293,11 +2293,12 @@ unsigned int bindRuleset(void *handle,
         return ERR_CONNECT_REDIS;
     }
 
+    int result = REDIS_OK;
     #ifndef _WIN32
     struct timeval tv;
     tv.tv_sec = 10;
     tv.tv_usec = 0;
-    int result = redisSetTimeout(reContext, tv);
+    result = redisSetTimeout(reContext, tv);
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
