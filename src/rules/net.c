@@ -2293,6 +2293,7 @@ unsigned int bindRuleset(void *handle,
         return ERR_CONNECT_REDIS;
     }
 
+    #ifndef _WIN32
     struct timeval tv;
     tv.tv_sec = 10;
     tv.tv_usec = 0;
@@ -2300,6 +2301,7 @@ unsigned int bindRuleset(void *handle,
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
+    #endif
 
     if (password != NULL) {
         result = redisAppendCommand(reContext, "auth %s", password);
