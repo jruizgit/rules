@@ -6,6 +6,7 @@
 #include "rules.h"
 #include "net.h"
 #include "json.h"
+#include "regex.h"
 
 #define HASH_ALL 193486302 // all
 #define HASH_ANY 193486381 // any
@@ -20,6 +21,7 @@
 #define HASH_GTE 2087883433 // $gte
 #define HASH_EQ 193419647 // $eq
 #define HASH_NEQ 2087890573 // $neq
+#define HASH_MT 193419914 // $mt
 #define HASH_EX 193419654 // $ex
 #define HASH_NEX 2087890580 // $nex
 #define HASH_OR 193419978 // $or
@@ -290,13 +292,14 @@ static unsigned int ensureBetaList(ruleset *tree, node *newNode) {
     return RULES_OK;
 }
 
-static void copyValue(ruleset *tree, 
-                      jsonValue *right, 
-                      char *first, 
-                      char *last,
-                      unsigned int idiomOffset,
-                      reference *ref,
-                      unsigned char type) {
+static unsigned int copyValue(ruleset *tree, 
+                              jsonValue *right, 
+                              char *first, 
+                              char *last,
+                              unsigned int idiomOffset,
+                              reference *ref,
+                              unsigned char type) {
+    unsigned int result = RULES_OK;
     right->type = type;
     unsigned int leftLength;
     char temp;
@@ -313,7 +316,7 @@ static void copyValue(ruleset *tree,
             break;
         case JSON_STRING:
             leftLength = last - first;
-            storeString(tree, first, &right->value.stringOffset, leftLength);
+            result = storeString(tree, first, &right->value.stringOffset, leftLength);
             break;
         case JSON_INT:
             temp = last[1];
@@ -335,7 +338,23 @@ static void copyValue(ruleset *tree,
             }
             right->value.b = leftb;
             break;
+        case JSON_REGEX:
+            leftLength = last - first;
+            result = storeString(tree, first, &right->value.regex.stringOffset, leftLength);
+            if (result != RULES_OK) {
+                return result;
+            }
+
+            result = compileRegex(tree, 
+                                  first, 
+                                  last,
+                                  &right->value.regex.vocabularyLength,
+                                  &right->value.regex.statesLength,
+                                  &right->value.regex.stateMachineOffset);
+            break;
     }
+
+    return result;
 }
 
 static unsigned char compareValue(ruleset *tree, 
@@ -364,10 +383,18 @@ static unsigned char compareValue(ruleset *tree,
         case JSON_EVENT_IDIOM:
             return 0;
         case JSON_STRING:
-            leftLength = last - first;
-            char *rightString = &tree->stringPool[right->value.stringOffset];
-            unsigned int rightLength = strlen(rightString);
-            return (leftLength == rightLength ? !strncmp(rightString, first, rightLength): 0);
+            {
+                char *rightString;
+                if (right->type == JSON_REGEX) {
+                    rightString = &tree->stringPool[right->value.regex.stringOffset];
+                } else {
+                    rightString = &tree->stringPool[right->value.stringOffset];
+                }
+
+                leftLength = last - first;
+                unsigned int rightLength = strlen(rightString);
+                return (leftLength == rightLength ? !strncmp(rightString, first, rightLength): 0);
+            }
         case JSON_INT:
             temp = last[1];
             last[1] = '\0';
@@ -560,6 +587,9 @@ static unsigned int validateExpression(char *rule) {
         case HASH_NEX:
             operator = OP_NEX;
             break;
+        case HASH_MT:
+            operator = OP_MT;
+            break;
         case HASH_LT:
             operator = OP_LT;
             break;
@@ -608,6 +638,17 @@ static unsigned int validateExpression(char *rule) {
     result = readNextValue(last, &first, &last, &type);
     if (result != PARSE_OK) {
         return result;
+    }
+
+    if (operator == OP_MT) {
+        if (type != JSON_STRING) {
+            return ERR_UNEXPECTED_TYPE; 
+        }  
+
+        result = validateRegex(first, last);
+        if (result != PARSE_OK) {
+            return result;
+        }
     }
 
     if (type == JSON_ARRAY) {
@@ -807,42 +848,62 @@ static unsigned int linkAlpha(ruleset *tree,
     return RULES_OK;
 }
 
-static unsigned char readReference(ruleset *tree, char *rule, reference *ref) {
+static unsigned int readReference(ruleset *tree, char *rule, unsigned char *idiomType, reference *ref) {
     char *first;
     char *last;
     unsigned char type;
     unsigned int hash;
-    unsigned char returnType = JSON_EVENT_PROPERTY;
+    unsigned int result;
+    *idiomType = JSON_EVENT_PROPERTY;
     
     ref->idOffset = 0;
     readNextName(rule, &first, &last, &hash);
     if (hash != HASH_S) {
-        storeString(tree, first, &ref->idOffset, last - first);   
+        result = storeString(tree, first, &ref->idOffset, last - first); 
+        if (result != RULES_OK) {
+            return result;
+        }  
+
         readNextString(last, &first, &last, &hash);
         ref->hash = hash;
-        storeString(tree, first, &ref->nameOffset, last - first);
+        result = storeString(tree, first, &ref->nameOffset, last - first);
+        if (result != RULES_OK) {
+            return result;
+        } 
     } else {
-        returnType = JSON_STATE_PROPERTY;
+        *idiomType = JSON_STATE_PROPERTY;
         if (readNextString(last, &first, &last, &hash) == PARSE_OK) {
             ref->hash = hash;
-            storeString(tree, first, &ref->nameOffset, last - first);
+            result = storeString(tree, first, &ref->nameOffset, last - first);
+            if (result != RULES_OK) {
+                return result;
+            } 
         }
         else {
             readNextValue(last, &first, &last, &type);
-            unsigned int result = readNextName(first, &first, &last, &hash);
+            result = readNextName(first, &first, &last, &hash);
             while (result == PARSE_OK) {
                 switch (hash) {
                     case HASH_NAME:
                         readNextString(last, &first, &last, &hash);
                         ref->hash = hash;
-                        storeString(tree, first, &ref->nameOffset, last - first);
+                        result = storeString(tree, first, &ref->nameOffset, last - first);
+                        if (result != RULES_OK) {
+                            return result;
+                        } 
                         break;
                     case HASH_ID:
                         readNextValue(last, &first, &last, &type);
                         if (type == JSON_STRING) {
-                            storeString(tree, first, &ref->idOffset, last - first);
+                            result = storeString(tree, first, &ref->idOffset, last - first);
+                            if (result != RULES_OK) {
+                                return result;
+                            } 
                         } else{
-                            storeString(tree, first, &ref->idOffset, last - first + 1);
+                            result = storeString(tree, first, &ref->idOffset, last - first + 1);
+                            if (result != RULES_OK) {
+                                return result;
+                            } 
                         }
 
                         break;
@@ -856,7 +917,7 @@ static unsigned char readReference(ruleset *tree, char *rule, reference *ref) {
         }
     }
 
-    return returnType;
+    return RULES_OK;
 }
 
 static unsigned int readIdiom(ruleset *tree, char *rule, unsigned char *idiomType, unsigned int *idiomOffset, reference *ref) {
@@ -884,7 +945,10 @@ static unsigned int readIdiom(ruleset *tree, char *rule, unsigned char *idiomTyp
     }
 
     if (operator == OP_NOP) {
-        *idiomType = readReference(tree, rule, ref);
+        result = readReference(tree, rule, idiomType, ref);
+        if (result != RULES_OK) {
+            return result;
+        }
     } else {
         idiom *newIdiom = NULL;
         result = storeIdiom(tree, &newIdiom, idiomOffset);
@@ -1001,13 +1065,21 @@ static unsigned int findAlpha(ruleset *tree,
     newAlpha->type = NODE_ALPHA;
     newAlpha->value.a.hash = hash;
     newAlpha->value.a.operator = operator;
-    copyValue(tree, &newAlpha->value.a.right, first, last, idiomOffset, &ref, type);
+    if (operator == OP_MT) {
+        type = JSON_REGEX;
+    }
+
+    result = copyValue(tree, &newAlpha->value.a.right, first, last, idiomOffset, &ref, type);
+    if (result != RULES_OK) {
+        return result;
+    }
+
     if (type == JSON_EVENT_PROPERTY || type == JSON_EVENT_IDIOM) {
         result = appendTerm(expr, *resultOffset);
         if (result != RULES_OK) {
             return result;
         }
-    }
+    } 
 
     return linkAlpha(tree, parentOffset, *resultOffset);
 }
@@ -1096,6 +1168,9 @@ static unsigned int createAlpha(ruleset *tree,
             break;
         case HASH_NEX:
             operator = OP_NEX;
+            break;
+        case HASH_MT:
+            operator = OP_MT;
             break;
         case HASH_LT:
             operator = OP_LT;
@@ -1682,6 +1757,8 @@ unsigned int createRuleset(void **handle, char *name, char *rules, unsigned int 
     tree->idiomOffset = 0;
     tree->joinPool = NULL;
     tree->joinOffset = 0;
+    tree->regexStateMachinePool = NULL;
+    tree->regexStateMachineOffset = 0;
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     tree->stateLength = 0;

@@ -25,7 +25,7 @@ class install_lib(_install_lib.install_lib):
 
 rules_lib = ('rules_py', 
              {'sources': ['deps/hiredis/%s.c' % src for src in ('hiredis', 'net', 'sds', 'read')] + 
-             ['src/rules/%s.c' % src for src in ('json', 'net', 'rete', 'state', 'events')]})
+             ['src/rules/%s.c' % src for src in ('json', 'net', 'rete', 'state', 'events', 'regex')]})
 
 rules = Extension('rules',
                   sources = ['src/rulespy/rules.c'],

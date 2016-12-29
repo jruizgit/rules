@@ -20,6 +20,7 @@
 #define OP_DIV 0x11
 #define OP_TYPE 0x12
 #define OP_NOT 0x13
+#define OP_MT 0x14
 
 #define NODE_ALPHA 0
 #define NODE_BETA_CONNECTOR 1
@@ -32,6 +33,13 @@ typedef struct reference {
     unsigned int idOffset;
 } reference;
 
+typedef struct regexReference {
+    unsigned int stringOffset;
+    unsigned int stateMachineOffset;
+    unsigned short statesLength;
+    unsigned short vocabularyLength;
+} regexReference;
+
 typedef struct jsonValue {
     unsigned char type;
     union { 
@@ -40,6 +48,7 @@ typedef struct jsonValue {
         unsigned char b; 
         unsigned int stringOffset;
         unsigned int idiomOffset;
+        regexReference regex;
         reference property;
     } value;
 } jsonValue;
@@ -102,6 +111,7 @@ typedef struct node {
     } value;
 } node;
 
+
 typedef struct ruleset {
     unsigned int nameOffset;
     node *nodePool;
@@ -116,6 +126,8 @@ typedef struct ruleset {
     unsigned int idiomOffset;
     join *joinPool;
     unsigned int joinOffset;
+    char *regexStateMachinePool;
+    unsigned int regexStateMachineOffset;
     unsigned int actionCount;
     void *bindingsList;
     unsigned int *stateBuckets;

@@ -13,7 +13,8 @@
             'rete.c',
             'net.c',
             'events.c',
-            'state.c'
+            'state.c',
+            'regex.c'
         ],
         'conditions': [
         ['OS=="win"', {

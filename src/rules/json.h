@@ -14,6 +14,7 @@
 #define JSON_EVENT_PROPERTY 0x09
 #define JSON_STATE_IDIOM 0x0A
 #define JSON_EVENT_IDIOM 0x0B
+#define JSON_REGEX 0x0C
 
 unsigned int readNextName(char *start, char **first, char **last, unsigned int *hash);
 unsigned int readNextValue(char *start, char **first, char **last, unsigned char *type);

@@ -5,6 +5,7 @@
 #include "rules.h"
 #include "net.h"
 #include "json.h"
+#include "regex.h"
 
 #define MAX_EVENT_PROPERTIES 64
 #define MAX_RESULT_NODES 32
@@ -35,6 +36,7 @@
 #define OP_STRING_DOUBLE 0x0103
 #define OP_STRING_STRING 0x0101
 #define OP_STRING_NIL 0x0107
+#define OP_STRING_REGEX 0x010C
 #define OP_NIL_BOOL 0x0704
 #define OP_NIL_INT 0x0702
 #define OP_NIL_DOUBLE 0x0703
@@ -893,6 +895,15 @@ static unsigned int isMatch(ruleset *tree,
             }
 
             break;
+        case OP_STRING_REGEX:
+            *propertyMatch = evaluateRegex(tree,
+                                           message + currentProperty->valueOffset, 
+                                           currentProperty->valueLength, 
+                                           currentAlpha->right.value.regex.vocabularyLength,
+                                           currentAlpha->right.value.regex.statesLength,
+                                           currentAlpha->right.value.regex.stateMachineOffset);
+            break;
+
     }
     
     if (releaseRightState) {
