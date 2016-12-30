@@ -1,6 +1,20 @@
 var d = require('../libjs/durable');
 var m = d.m, s = d.s, c = d.c; timeout = d.timeout;
 
+d.ruleset('match1', {
+        whenAll: [ m.subject.mt('a+(bc|de?)*') ],
+        run: function(c) {
+            console.log('match 1 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match1', {id: 1, sid: 1, subject: 'abcbc'});
+        host.post('match1', {id: 2, sid: 1, subject: 'addd'});
+        host.post('match1', {id: 3, sid: 1, subject: 'ddd'});
+        host.post('match1', {id: 4, sid: 1, subject: 'adee'});
+    }
+);
+
 d.ruleset('fraud1_0', {
         whenAll: [ m.amount.eq(null) ],
         run: function(c) {

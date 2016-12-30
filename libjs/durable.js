@@ -107,6 +107,12 @@ exports = module.exports = durableEngine = function () {
             return that;
         };
 
+        var mt = function (rvalue) {
+            op = '$mt';
+            right = rvalue;
+            return that;
+        };
+
         var ex = function () {
             op = '$ex';
             right  = 1;
@@ -184,6 +190,8 @@ exports = module.exports = durableEngine = function () {
                         return eq;
                     case 'neq':
                         return neq;
+                    case 'mt':
+                        return mt;
                     case 'ex':
                         return ex;
                     case 'nex':

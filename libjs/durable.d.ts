@@ -44,6 +44,7 @@ declare interface Expression {
     lte(value: string | number | Expression): Expression;
     eq(value: string | number | Expression): Expression;
     neq(value: string | number | Expression): Expression;
+    mt(value: string): Expression;
     ex(): Expression;
     nex(): Expression;
     and(...ex: Expression[]): Expression;

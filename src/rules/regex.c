@@ -175,6 +175,9 @@ static unsigned int linkStates(state *previousState,
 static unsigned int unlinkStates(state *previousState, unsigned short linkIndex) {
     state *nextState = previousState->transitions[linkIndex].next;
     --nextState->refCount;
+    if (!nextState->refCount) {
+        free(nextState);
+    }
 
     for (unsigned short i = linkIndex + 1; i < previousState->transitionsLength; ++i) {
         previousState->transitions[i - 1].symbol = previousState->transitions[i].symbol;
@@ -253,6 +256,7 @@ static unsigned int readNextToken(char **first,
     return result;
 }
 
+#ifdef _PRINT
 static unsigned int printGraph(state *start) {
     CREATE_STATE_QUEUE();
     unsigned char visited[MAX_STATES] = {0};
@@ -274,6 +278,7 @@ static unsigned int printGraph(state *start) {
 
     return RULES_OK;
 }
+#endif
 
 static unsigned int createGraph(char **first, 
                                 char *last, 
@@ -359,6 +364,38 @@ static unsigned int createGraph(char **first,
     return result;
 }
 
+static unsigned int validateGraph(char **first, char *last) {
+    token currentToken;
+    unsigned int result = readNextToken(first, last, &currentToken);
+    while (result == REGEX_PARSE_OK) {
+        switch (currentToken.type) {
+            case REGEX_SYMBOL:
+            case REGEX_UNION:
+            case REGEX_STAR:
+            case REGEX_PLUS:
+            case REGEX_QUESTION:
+                break;
+            case REGEX_REGEX:
+                result = validateGraph(first, last);
+                if (result != REGEX_PARSE_OK) {
+                    return result;
+                }
+                    
+                break;
+        }
+
+        if (result == REGEX_PARSE_OK) {
+            result = readNextToken(first, last, &currentToken);
+        }
+    }
+
+    if (result == REGEX_PARSE_END) {
+        return REGEX_PARSE_OK;
+    }
+
+    return REGEX_PARSE_OK;
+}
+
 static unsigned int ensureState(unsigned short *id, 
                                 state **list, 
                                 unsigned short stateListLength, 
@@ -393,6 +430,9 @@ static unsigned int consolidateStates(state *currentState,
                 for (unsigned short ii = 0; ii < nextState->transitionsLength; ++ii) {
                     transition *nextTransition = &nextState->transitions[ii];
                     LINK_STATES(currentState, nextTransition->next, nextTransition->symbol);
+                    if (nextState->refCount == 1) {
+                        --nextTransition->next->refCount;
+                    }
                 }
             }
 
@@ -509,12 +549,8 @@ static unsigned int packGraph(state *start,
     CREATE_STATE_QUEUE();
     unsigned short visited[MAX_STATES] = {0};
     char *vocabulary = stateMachine;
-    printf("StateMachine %d\n", stateMachine);
     unsigned short *stateTable = (unsigned short *)(stateMachine + 256);
-    printf("StateTable %d\n", stateTable);
-    printf("DIM %d, %d, %d\n", vocabularyLength, statesLength, sizeof(unsigned short));
     unsigned char *acceptVector = (unsigned char *)(stateTable + (vocabularyLength * statesLength));
-    printf("AcceptVector %d\n", acceptVector);
     unsigned short stateNumber = 1;
     unsigned short vocabularyNumber = 1;
     state *currentState = start;
@@ -524,7 +560,6 @@ static unsigned int packGraph(state *start,
         unsigned short targetStateNumber = visited[currentState->id];
         if (currentState->isAccept) {
             acceptVector[targetStateNumber - 1] = 1;
-            printf("State %d accept\n", targetStateNumber);
         }
 
         for (int i = 0; i < currentState->transitionsLength; ++ i) {
@@ -541,7 +576,6 @@ static unsigned int packGraph(state *start,
             }
 
             unsigned short targetSymbolNumber = vocabulary[(unsigned short)currentTransition->symbol];
-            printf("State %d, symbol %d, to %d\n", targetStateNumber, targetSymbolNumber, visited[currentTransition->next->id]);
             stateTable[(targetSymbolNumber - 1) * statesLength + (targetStateNumber - 1)] = visited[currentTransition->next->id];
         }
 
@@ -551,10 +585,9 @@ static unsigned int packGraph(state *start,
     return RULES_OK;
 }
 
-
 unsigned int validateRegex(char *first, 
-                          char *last) {
-    return REGEX_PARSE_OK;
+                           char *last) {
+    return validateGraph(&first, last);
 }
 
 unsigned int compileRegex(void *tree, 
@@ -572,13 +605,15 @@ unsigned int compileRegex(void *tree,
     }
 
     ++start->refCount;
-    ++end->refCount;
     result = transformToDFA(start, &id);
     if (result != RULES_OK) {
         return result;
     }
 
+#ifdef _PRINT
     printGraph(start);
+#endif
+    
     result = calculateGraphDimensions(start, 
                                  vocabularyLength, 
                                  statesLength);
@@ -608,25 +643,21 @@ unsigned char evaluateRegex(void *tree,
                             unsigned short vocabularyLength,
                             unsigned short statesLength,
                             unsigned int regexStateMachineOffset) {
-    printf("Evaluating\n");
     char *vocabulary = &((ruleset *)tree)->regexStateMachinePool[regexStateMachineOffset];
     unsigned short *stateTable = (unsigned short *)(vocabulary + 256);
     unsigned char *acceptVector = (unsigned char *)(stateTable + (vocabularyLength * statesLength));
     unsigned short currentState = 1;
     for (int i = 0; i < length; ++i) {
         char currentSymbol = vocabulary[(unsigned short) first[i]];
-        printf("Symbol %d\n", currentSymbol);
         if (!currentSymbol) {
             return 0;
         }
 
         currentState = stateTable[statesLength * (currentSymbol - 1) + (currentState - 1)];
-        printf("State %d\n", currentState);
         if (!currentState) {
             return 0;
         }
     }
 
-    printf("Accept %d\n", acceptVector[currentState - 1]);
     return acceptVector[currentState - 1];
 }
