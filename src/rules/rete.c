@@ -1717,6 +1717,10 @@ static unsigned int createTree(ruleset *tree, char *rules) {
                     result = createBeta(tree, first, OP_ALL, actionOffset, NULL, &betaPath);
                     break;
             }
+            if (result != RULES_OK) {
+                return result;
+            }
+            
             result = readNextName(last, &first, &last, &hash);
         }
 

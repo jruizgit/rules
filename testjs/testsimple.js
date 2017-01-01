@@ -15,6 +15,63 @@ d.ruleset('match1', {
     }
 );
 
+d.ruleset('match2', {
+        whenAll: [ m.subject.mt('[0-9]+-[a-z]+') ],
+        run: function(c) {
+            console.log('match 2 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match2', {id: 1, sid: 1, subject: '0-a'});
+        host.post('match2', {id: 2, sid: 1, subject: '43-bcd'});
+        host.post('match2', {id: 3, sid: 1, subject: 'a-3'});
+        host.post('match2', {id: 4, sid: 1, subject: '0a'});
+    }
+);
+
+d.ruleset('match3', {
+        whenAll: [ m.subject.mt('[adfzx-]+[5678]+') ],
+        run: function(c) {
+            console.log('match 3 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match3', {id: 1, sid: 1, subject: 'ad-567'});
+        host.post('match3', {id: 2, sid: 1, subject: 'ac-78'});
+        host.post('match3', {id: 3, sid: 1, subject: 'zx12'});
+        host.post('match3', {id: 4, sid: 1, subject: 'xxxx-8888'});
+    }
+);
+
+d.ruleset('match4', {
+        whenAll: [ m.subject.mt('[z-a]+-[9-0]+') ],
+        run: function(c) {
+            console.log('match 4 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match4', {id: 1, sid: 1, subject: 'ed-56'});
+        host.post('match4', {id: 2, sid: 1, subject: 'ac-ac'});
+        host.post('match4', {id: 3, sid: 1, subject: 'az-90'});
+        host.post('match4', {id: 4, sid: 1, subject: 'AZ-90'});
+    }
+);
+
+d.ruleset('match5', {
+        whenAll: [ m.subject.mt('.+b') ],
+        run: function(c) {
+            console.log('match 5 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match5', {id: 1, sid: 1, subject: 'ab'});
+        host.post('match5', {id: 2, sid: 1, subject: 'bbb'});
+        host.post('match5', {id: 3, sid: 1, subject: 'adfb0'});
+        host.post('match5', {id: 4, sid: 1, subject: 'abbbcd'});
+        host.post('match5', {id: 5, sid: 1, subject: 'xyz.b'});
+    }
+);
+
 d.ruleset('fraud1_0', {
         whenAll: [ m.amount.eq(null) ],
         run: function(c) {
