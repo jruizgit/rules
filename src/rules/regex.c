@@ -11,12 +11,14 @@
 #define REGEX_STAR 0x02
 #define REGEX_PLUS 0x03
 #define REGEX_QUESTION 0x04
-#define REGEX_REGEX 0x05
+#define REGEX_INTERVAL 0x05
+#define REGEX_REGEX 0x06
 
 #define MAX_TRANSITIONS 1024
 #define MAX_QUEUE 1024
 #define MAX_STATES 1024
 #define MAX_LIST 1024
+#define MAX_INTERVAL 100
 
 #define CREATE_STATE(stateId, newState) do { \
     unsigned int result = createState(stateId, newState); \
@@ -99,6 +101,8 @@ typedef struct state {
 typedef struct token {
     unsigned char type;
     unsigned short symbolsLength;
+    unsigned short low;
+    unsigned short high;
     char symbols[256];
 } token;
 
@@ -179,6 +183,55 @@ static unsigned int readRange(char **first,
     return REGEX_PARSE_OK;
 }
 
+static unsigned int readInterval(char **first,
+                                   char *last,
+                                   unsigned short *low,
+                                   unsigned short *high) {
+
+    ++*first;
+    unsigned char parseBegin = 1;
+    char *numberBegin = *first;
+    while (*first[0] != '}') {
+        if (*first == last) {
+            return ERR_PARSE_REGEX;
+        }
+        
+        if (parseBegin) {    
+            if (*first[0] == ',' && numberBegin != *first) {
+                parseBegin = 0;
+                *first[0] = '\0';
+                *low = atoi(numberBegin);
+                *first[0] = ',';
+                numberBegin = *first + 1; 
+            }  else if (*first[0] > '9' || *first[0] < 0) {
+                return ERR_PARSE_REGEX;
+            }
+        } else if (*first[0] > '9' || *first[0] < 0) {
+            return ERR_PARSE_REGEX;
+        }
+
+        ++*first;
+    }
+
+    if (numberBegin == *first) {
+        *high = 0;
+    } else {
+        *first[0] = '\0';
+        *high = atoi(numberBegin);
+        *first[0] = '}';
+
+        if (parseBegin) {
+            *low = *high;  
+        }
+    } 
+
+    if ((*high && *low > *high) || *high > MAX_INTERVAL) {
+        return ERR_PARSE_REGEX;
+    }
+
+    return REGEX_PARSE_OK;
+}
+
 static unsigned int readNextToken(char **first, 
                                   char *last, 
                                   token *nextToken) {
@@ -210,6 +263,13 @@ static unsigned int readNextToken(char **first,
         case '[':
             nextToken->type = REGEX_SYMBOL;
             result = readRange(first, last, &nextToken->symbolsLength, (char *)&nextToken->symbols);
+            if (result != REGEX_PARSE_OK) {
+                return result;
+            }
+            break;
+        case '{':
+            nextToken->type = REGEX_INTERVAL;
+            result = readInterval(first, last, &nextToken->low, &nextToken->high);
             if (result != REGEX_PARSE_OK) {
                 return result;
             }
@@ -355,6 +415,39 @@ static unsigned int printGraph(state *start) {
 }
 #endif
 
+static unsigned int cloneGraph(state *startState,
+                               state *endState,
+                               unsigned short *id,
+                               state **newStart,
+                               state **newEnd) {
+    CREATE_STATE_QUEUE();
+    state *visited[MAX_STATES] = { NULL };
+    state *currentState = startState;
+    CREATE_STATE(id, &visited[currentState->id]);
+    while (currentState) {
+        if (currentState->isAccept) {
+            visited[currentState->id]->isAccept = 1;
+        }
+
+        for (int i = 0; i < currentState->transitionsLength; ++ i) {
+            transition *currentTransition = &currentState->transitions[i];
+            
+            if (!visited[currentTransition->next->id]) {
+                CREATE_STATE(id, &visited[currentTransition->next->id]);
+                ENQUEUE_STATE(currentTransition->next);
+            }
+
+            LINK_STATES(visited[currentState->id], visited[currentTransition->next->id], currentTransition->symbol);
+        }
+
+        DEQUEUE_STATE(&currentState);    
+    }
+
+    *newStart = visited[startState->id];
+    *newEnd = visited[endState->id];
+    return RULES_OK;
+}
+
 static unsigned int createGraph(char **first, 
                                 char *last, 
                                 unsigned short *id, 
@@ -375,42 +468,43 @@ static unsigned int createGraph(char **first,
                 for (unsigned short i = 0; i < currentToken.symbolsLength; ++i) {
                     LINK_STATES(previousState, currentState, currentToken.symbols[i]);
                 }
-                
+
                 break;
             case REGEX_UNION:
                 LINK_STATES(currentState, *endState, EMPTY);
+                CREATE_STATE(id, &currentState);
                 previousState = *startState;
-                currentState = *startState;
+                LINK_STATES(previousState, currentState, EMPTY);
                 break;
             case REGEX_STAR:
                 {
-                    state *newState;
-                    CREATE_STATE(id, &newState);
+                    state *anchorState;
+                    CREATE_STATE(id, &anchorState);
                     LINK_STATES(currentState, previousState, EMPTY);
-                    LINK_STATES(currentState, newState, EMPTY);
-                    LINK_STATES(previousState, newState, EMPTY);
+                    LINK_STATES(currentState, anchorState, EMPTY);
+                    LINK_STATES(previousState, anchorState, EMPTY);
                     previousState = currentState;
-                    currentState = newState;
+                    currentState = anchorState;
                 }
                 break;
             case REGEX_PLUS:
                 {
-                    state *newState;
-                    CREATE_STATE(id, &newState);
+                    state *anchorState;
+                    CREATE_STATE(id, &anchorState);
                     LINK_STATES(currentState, previousState, EMPTY);
-                    LINK_STATES(currentState, newState, EMPTY);
+                    LINK_STATES(currentState, anchorState, EMPTY);
                     previousState = currentState;
-                    currentState = newState;
+                    currentState = anchorState;
                 }
                 break;
             case REGEX_QUESTION:
                 {
-                    state *newState;
-                    CREATE_STATE(id, &newState);
-                    LINK_STATES(currentState, newState, EMPTY);
-                    LINK_STATES(previousState, newState, EMPTY);
+                    state *anchorState;
+                    CREATE_STATE(id, &anchorState);
+                    LINK_STATES(currentState, anchorState, EMPTY);
+                    LINK_STATES(previousState, anchorState, EMPTY);
                     previousState = currentState;
-                    currentState = newState;
+                    currentState = anchorState;
                 }
                 break;
             case REGEX_REGEX:
@@ -425,6 +519,52 @@ static unsigned int createGraph(char **first,
                     LINK_STATES(currentState, subStart, EMPTY);
                     previousState = currentState;
                     currentState = subEnd;
+                }
+                break;
+            case REGEX_INTERVAL: 
+                {
+                    state *newCurrent = NULL;
+                    state *newPrevious = NULL;
+                    state *subStart = previousState;
+                    state *subEnd = currentState;
+                    state *anchorState;
+                    CREATE_STATE(id, &anchorState);
+                    for (unsigned short i = 1; i < (!currentToken.high? currentToken.low: currentToken.high); ++i) {
+                        result = cloneGraph(previousState, currentState, id, &subStart, &subEnd);
+                        if (result != REGEX_PARSE_OK) {
+                            return result;
+                        }
+
+                        if (newCurrent) {
+                            LINK_STATES(newCurrent, subStart, EMPTY);
+                        } else {
+                            newPrevious = subStart;
+                        }
+                        
+                        if (i >= currentToken.low) {
+                            LINK_STATES(subStart, anchorState, EMPTY);
+                        }
+
+                        newCurrent = subEnd;
+                    }
+
+                    if (!currentToken.high) {
+                        LINK_STATES(subEnd, subStart, EMPTY);
+                    }
+                     
+                    if (!currentToken.low) {
+                        LINK_STATES(previousState, anchorState, EMPTY);
+                    }
+
+                    if (!newPrevious) {
+                        LINK_STATES(currentState, anchorState, EMPTY);
+                        previousState = currentState;
+                    } else {
+                        LINK_STATES(currentState, newPrevious, EMPTY); 
+                        LINK_STATES(newCurrent, anchorState, EMPTY); 
+                        previousState = newCurrent;
+                    } 
+                    currentState = anchorState;     
                 }
                 break;
         }

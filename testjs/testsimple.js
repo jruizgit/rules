@@ -65,17 +65,130 @@ d.ruleset('match5', {
     },
     function (host) {
         host.post('match5', {id: 1, sid: 1, subject: 'ab'});
-        host.post('match5', {id: 2, sid: 1, subject: 'bbb'});
-        host.post('match5', {id: 3, sid: 1, subject: 'adfb0'});
-        host.post('match5', {id: 4, sid: 1, subject: 'abbbcd'});
-        host.post('match5', {id: 5, sid: 1, subject: 'xyz.b'});
+        host.post('match5', {id: 2, sid: 1, subject: 'adfb0'});
+        host.post('match5', {id: 3, sid: 1, subject: 'abbbcd'});
+        host.post('match5', {id: 4, sid: 1, subject: 'xyz.b'});
+    }
+);
+
+d.ruleset('match6', {
+        whenAll: [ m.subject.mt('[a-z]{3}') ],
+        run: function(c) {
+            console.log('match 6 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match6', {id: 1, sid: 1, subject: 'ab'});
+        host.post('match6', {id: 2, sid: 1, subject: 'bbb'});
+        host.post('match6', {id: 3, sid: 1, subject: 'azc'});
+        host.post('match6', {id: 4, sid: 1, subject: 'abbbcd'});
+    }
+);
+
+d.ruleset('match7', {
+        whenAll: [ m.subject.mt('[a-z]{2,4}') ],
+        run: function(c) {
+            console.log('match 7 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match7', {id: 1, sid: 1, subject: 'ar'});
+        host.post('match7', {id: 2, sid: 1, subject: 'bxbc'});
+        host.post('match7', {id: 3, sid: 1, subject: 'a'});
+        host.post('match7', {id: 4, sid: 1, subject: 'abbbc'});
+    }
+);
+
+d.ruleset('match8', {
+        whenAll: [ m.subject.mt('(a|bc){2,}') ],
+        run: function(c) {
+            console.log('match 8 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match8', {id: 1, sid: 1, subject: 'aa'});
+        host.post('match8', {id: 2, sid: 1, subject: 'abcbc'});
+        host.post('match8', {id: 3, sid: 1, subject: 'bc'});
+        host.post('match8', {id: 4, sid: 1, subject: 'a'});
+    }
+);
+
+
+d.ruleset('match9', {
+        whenAll: [ m.subject.mt('a{1,2}') ],
+        run: function(c) {
+            console.log('match 9 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match9', {id: 1, sid: 1, subject: 'a'});
+        host.post('match9', {id: 2, sid: 1, subject: 'b'});
+        host.post('match9', {id: 3, sid: 1, subject: 'aa'});
+        host.post('match9', {id: 4, sid: 1, subject: 'aaa'});
+    }
+);
+
+d.ruleset('match10', {
+        whenAll: [ m.subject.mt('cba{1,}') ],
+        run: function(c) {
+            console.log('match 10 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match10', {id: 1, sid: 1, subject: 'cba'});
+        host.post('match10', {id: 2, sid: 1, subject: 'b'});
+        host.post('match10', {id: 3, sid: 1, subject: 'cb'});
+        host.post('match10', {id: 4, sid: 1, subject: 'cbaaa'});
+    }
+);
+
+d.ruleset('match11', {
+        whenAll: [ m.subject.mt('cba{0,}') ],
+        run: function(c) {
+            console.log('match 11 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match11', {id: 1, sid: 1, subject: 'cb'});
+        host.post('match11', {id: 2, sid: 1, subject: 'b'});
+        host.post('match11', {id: 3, sid: 1, subject: 'cbab'});
+        host.post('match11', {id: 4, sid: 1, subject: 'cbaaa'});
+    }
+);
+
+d.ruleset('match12', {
+        whenAll: [ m.user.mt('[a-z0-9_-]{3,16}') ],
+        run: function(c) {
+            console.log('match 12 user ' + c.m.user);
+        }
+    },
+    function (host) {
+        host.post('match12', {id: 1, sid: 1, user: 'git-9'});
+        host.post('match12', {id: 2, sid: 1, user: 'git_9'});
+        host.post('match12', {id: 3, sid: 1, user: 'GIT-9'});
+        host.post('match12', {id: 4, sid: 1, user: '01234567890123456789'});
+        host.post('match12', {id: 5, sid: 1, user: 'gi'});
+    }
+);
+
+d.ruleset('match13', {
+        whenAll: [ m.number.mt('[a-b]{2}|[c-d]{3}') ],
+        run: function(c) {
+            console.log('match 13 ' + c.m.number);
+        }
+    },
+    function (host) {
+        host.post('match13', {id: 1, sid: 1, number: 'bbb'});
+        host.post('match13', {id: 2, sid: 1, number: 'ba'});
+        host.post('match13', {id: 3, sid: 1, number: 'cdc'});
+        host.post('match13', {id: 4, sid: 1, number: 'dd'});
+        host.post('match13', {id: 5, sid: 1, number: 'bab'});
     }
 );
 
 d.ruleset('fraud1_0', {
         whenAll: [ m.amount.eq(null) ],
         run: function(c) {
-
             console.log('fraud1_0 detected ' + c.m.amount);
         }
     },
