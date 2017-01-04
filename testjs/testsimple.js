@@ -172,17 +172,48 @@ d.ruleset('match12', {
 );
 
 d.ruleset('match13', {
-        whenAll: [ m.number.mt('[a-b]{2}|[c-d]{3}') ],
+        whenAll: [ m.number.mt('#?([a-f0-9]{6}|[a-f0-9]{3})') ],
         run: function(c) {
-            console.log('match 13 ' + c.m.number);
+            console.log('match 13 hex ' + c.m.number);
         }
     },
     function (host) {
-        host.post('match13', {id: 1, sid: 1, number: 'bbb'});
-        host.post('match13', {id: 2, sid: 1, number: 'ba'});
-        host.post('match13', {id: 3, sid: 1, number: 'cdc'});
-        host.post('match13', {id: 4, sid: 1, number: 'dd'});
-        host.post('match13', {id: 5, sid: 1, number: 'bab'});
+        host.post('match13', {id: 1, sid: 1, number: 'fff'});
+        host.post('match13', {id: 2, sid: 1, number: '#45'});
+        host.post('match13', {id: 3, sid: 1, number: 'abcdex'});
+        host.post('match13', {id: 4, sid: 1, number: '#54ba45'});
+        host.post('match13', {id: 5, sid: 1, number: '#9999'});
+    }
+);
+
+d.ruleset('match14', {
+        whenAll: [ m.alias.mt('([a-z0-9_.-]+)@([0-9a-z.-]+)\\.([a-z]{2,6})') ],
+        run: function(c) {
+            console.log('match 14 email ' + c.m.alias);
+        }
+    },
+    function (host) {
+        host.post('match14', {id: 1, sid: 1, alias: 'john_59@mail.mx'});
+        host.post('match14', {id: 2, sid: 1, alias: 'j#5@mail.com'});
+        host.post('match14', {id: 3, sid: 1, alias: 'abcd.abcd@mail.mx.com'});
+        host.post('match14', {id: 4, sid: 1, alias: 'dd@dd.'});
+        host.post('match14', {id: 5, sid: 1, alias: 'dd@dd.c'});
+    }
+);
+
+
+d.ruleset('match15', {
+        whenAll: [ m.url.mt('(https?://)?([0-9a-z.-]+)\\.[a-z]{2,6}(/[A-z0-9_.-]+/?)*') ],
+        run: function(c) {
+            console.log('match 15 url ' + c.m.url);
+        }
+    },
+    function (host) {
+        host.post('match15', {id: 1, sid: 1, url: 'https://github.com'});
+        host.post('match15', {id: 2, sid: 1, url: 'http://github.com/jruizgit/rul!es'});
+        host.post('match15', {id: 3, sid: 1, url: 'https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md'});
+        host.post('match15', {id: 4, sid: 1, url: '//rules'});
+        host.post('match15', {id: 5, sid: 1, url: 'https://github.c/jruizgit/rules'});
     }
 );
 

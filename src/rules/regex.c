@@ -16,9 +16,78 @@
 
 #define MAX_TRANSITIONS 1024
 #define MAX_QUEUE 1024
-#define MAX_STATES 1024
+#define MAX_STATES 512
+#define MAX_SET 1024
 #define MAX_LIST 1024
 #define MAX_INTERVAL 100
+
+
+#define CREATE_QUEUE(type) \
+    type queue[MAX_QUEUE]; \
+    unsigned short first = 0; \
+    unsigned short last = 0; \
+
+#define ENQUEUE(value) do { \
+    if ((last + 1) == first) { \
+        return ERR_REGEX_QUEUE_FULL; \
+    } \
+    queue[last] = value; \
+    last = (last + 1) % MAX_QUEUE; \
+} while(0)
+
+#define DEQUEUE(value) do { \
+    if (first == last) { \
+        *value = 0; \
+    } else { \
+        *value = queue[first]; \
+        first = (first + 1) % MAX_QUEUE; \
+    } \
+} while(0)
+
+#define CREATE_LIST(type) \
+    type list[MAX_QUEUE]; \
+    unsigned short top = 0;
+
+#define LIST_EMPTY() !top
+
+#define ADD(value) do { \
+    if ((top + 1) == MAX_LIST) { \
+        return ERR_REGEX_LIST_FULL; \
+    } \
+    list[top++] = value; \
+    for (unsigned short i = top - 1; (i > 0) && (list[i]->id < list[i - 1]->id); --i) {\
+        state *temp = list[i]; list[i] = list[i - 1]; list[i - 1] = temp; \
+    } \
+} while(0)
+
+#define LIST list, top
+
+#define CREATE_HASHSET(type) \
+    type set[MAX_SET] = {NULL}; \
+
+#define SET(value) do { \
+    unsigned short index = value->hash % MAX_SET; \
+    while (set[index]) { \
+        ++index; \
+        if (index >= MAX_SET) { \
+            return ERR_REGEX_SET_FULL; \
+        } \
+    } \
+    set[index] = value; \
+} while(0)
+
+#define GET(stateHash, value) do { \
+    unsigned short index = stateHash % MAX_SET; \
+    *value = NULL; \
+    while (set[index] && !*value) { \
+        if (set[index]->hash == stateHash) { \
+            *value = set[index]; \
+        } \
+        ++index; \
+    } \
+} while(0)
+
+#define HASHSET set
 
 #define CREATE_STATE(stateId, newState) do { \
     unsigned int result = createState(stateId, newState); \
@@ -34,55 +103,6 @@
     } \
 } while (0)
 
-#define UNLINK_STATES(previousState, linkIndex) do { \
-    unsigned int result = unlinkStates(previousState, linkIndex); \
-    if (result != RULES_OK) { \
-        return result; \
-    } \
-} while (0)
-
-#define CREATE_STATE_QUEUE() \
-    state *queue[MAX_QUEUE]; \
-    unsigned short first = 0; \
-    unsigned short last = 0; 
-
-#define ENQUEUE_STATE(value) do { \
-    if ((last + 1) == first) { \
-        return ERR_REGEX_QUEUE_FULL; \
-    } \
-    queue[last] = value; \
-    last = (last + 1) % MAX_QUEUE; \
-} while(0)
-
-#define DEQUEUE_STATE(value) do { \
-    if (first == last) { \
-        *value = NULL; \
-    } else { \
-        *value = queue[first]; \
-        first = (first + 1) % MAX_QUEUE; \
-    } \
-} while(0)
-
-#define CREATE_STATE_STACK() \
-    state *list[MAX_QUEUE]; \
-    unsigned short top = 0;
-
-#define STATE_STACK_EMPTY() !top
-
-#define PUSH_STATE(value) do { \
-    if ((top + 1) == MAX_LIST) { \
-        return ERR_REGEX_LIST_FULL; \
-    } \
-    list[top++] = value; \
-} while(0)
-
-#define ENSURE_STATE(id, newState) do { \
-    unsigned int result = ensureState(id, list, top, newState); \
-    if (result != RULES_OK) { \
-        return result; \
-    } \
-} while(0)
-
 struct state;
 
 typedef struct transition {
@@ -91,6 +111,7 @@ typedef struct transition {
 } transition;
 
 typedef struct state {
+    unsigned int hash;
     unsigned short refCount;
     unsigned short id;
     unsigned short transitionsLength;
@@ -346,6 +367,7 @@ static unsigned int createState(unsigned short *stateId,
     (*newState)->transitionsLength = 0;
     (*newState)->refCount = 0;
     (*newState)->isAccept = 0;
+    (*newState)->hash = 0;
     ++*stateId;
 
     return RULES_OK;
@@ -372,27 +394,36 @@ static unsigned int linkStates(state *previousState,
     return RULES_OK;
 }
 
-static unsigned int unlinkStates(state *previousState, unsigned short linkIndex) {
-    state *nextState = previousState->transitions[linkIndex].next;
+static void deleteTransition(state *previousState, unsigned short index) {
+    state *nextState = previousState->transitions[index].next;
     --nextState->refCount;
     if (!nextState->refCount) {
         free(nextState);
     }
 
-    for (unsigned short i = linkIndex + 1; i < previousState->transitionsLength; ++i) {
+    for (unsigned short i = index + 1; i < previousState->transitionsLength; ++i) {
         previousState->transitions[i - 1].symbol = previousState->transitions[i].symbol;
         previousState->transitions[i - 1].next = previousState->transitions[i].next;
     }
     --previousState->transitionsLength; 
+}
 
-    return RULES_OK;
+static void unlinkStates(state *previousState, 
+                         state *nextState, 
+                         char tokenSymbol) {
+    for (int i = 0; i < previousState->transitionsLength; ++i) {
+        if (previousState->transitions[i].symbol == tokenSymbol && 
+            previousState->transitions[i].next->id == nextState->id) {
+            deleteTransition(previousState, i);
+        }
+    }
 }
 
 #ifdef _PRINT
 static unsigned int printGraph(state *start) {
-    CREATE_STATE_QUEUE();
+    CREATE_QUEUE(state*);
     unsigned char visited[MAX_STATES] = {0};
-    state *currentState = start;
+    state *currentState = start;        
     visited[currentState->id] = 1;
     while (currentState) {
         printf("State %d\n", currentState->id);
@@ -404,11 +435,11 @@ static unsigned int printGraph(state *start) {
             printf("    transition %d to state %d\n", (unsigned char)currentTransition->symbol, currentTransition->next->id);
             if (!visited[currentTransition->next->id]) {
                 visited[currentTransition->next->id] = 1;
-                ENQUEUE_STATE(currentTransition->next);
+                ENQUEUE(currentTransition->next);
             }
         }
 
-        DEQUEUE_STATE(&currentState);    
+        DEQUEUE(&currentState);    
     }
 
     return RULES_OK;
@@ -420,7 +451,7 @@ static unsigned int cloneGraph(state *startState,
                                unsigned short *id,
                                state **newStart,
                                state **newEnd) {
-    CREATE_STATE_QUEUE();
+    CREATE_QUEUE(state*);
     state *visited[MAX_STATES] = { NULL };
     state *currentState = startState;
     CREATE_STATE(id, &visited[currentState->id]);
@@ -434,13 +465,13 @@ static unsigned int cloneGraph(state *startState,
             
             if (!visited[currentTransition->next->id]) {
                 CREATE_STATE(id, &visited[currentTransition->next->id]);
-                ENQUEUE_STATE(currentTransition->next);
+                ENQUEUE(currentTransition->next);
             }
 
             LINK_STATES(visited[currentState->id], visited[currentTransition->next->id], currentTransition->symbol);
         }
 
-        DEQUEUE_STATE(&currentState);    
+        DEQUEUE(&currentState);    
     }
 
     *newStart = visited[startState->id];
@@ -614,6 +645,16 @@ static unsigned int validateGraph(char **first, char *last) {
     return REGEX_PARSE_OK;
 }
 
+static unsigned short calculateHash(state **list, 
+                                    unsigned short stateListLength) {
+    unsigned int hash = 5381;
+    for (unsigned short i = 0; i < stateListLength; ++i) {
+        hash = ((hash << 5) + hash) + list[i]->id;
+    }   
+
+    return hash;
+}
+
 static unsigned int ensureState(unsigned short *id, 
                                 state **list, 
                                 unsigned short stateListLength, 
@@ -628,11 +669,6 @@ static unsigned int ensureState(unsigned short *id,
 
         if (targetState->isAccept) {
             (*newState)->isAccept = 1;
-        }
-
-        --targetState->refCount;
-        if (!targetState->refCount) {
-            free(targetState);
         }
     }
 
@@ -659,7 +695,7 @@ static unsigned int consolidateStates(state *currentState,
                 currentState->isAccept = 1;
             }
 
-            UNLINK_STATES(currentState, i);
+            deleteTransition(currentState, i);
             --i;
         }
     }
@@ -668,45 +704,65 @@ static unsigned int consolidateStates(state *currentState,
 }
 
 static unsigned int consolidateTransitions(state *currentState, 
-                                           unsigned short *id) {
+                                           unsigned short *id, 
+                                           state **set) {
+    transition oldTransitions[MAX_TRANSITIONS];
+    unsigned short oldTransitionsLength = 0;
+    transition newTransitions[MAX_TRANSITIONS];
+    unsigned short newTransitionsLength = 0;
+    unsigned char visited[256] = {0};
+
     for (unsigned short i = 0; i < currentState->transitionsLength; ++i) {
         transition *currentTransition = &currentState->transitions[i];
-        CREATE_STATE_STACK();
-        char reflexiveSymbol = 0;
-        char targetSymbol = 0;
-        for (unsigned short ii = i + 1; ii < currentState->transitionsLength; ++ ii) {
-            transition *targetTransition = &currentState->transitions[ii];
-            if (currentTransition->symbol == targetTransition->symbol) {
-                if (currentTransition->next == currentState) {
-                    reflexiveSymbol = currentTransition->symbol;
-                }
+        CREATE_LIST(state*);
+        char foundSymbol = 0;
+        if (!visited[(unsigned char)currentTransition->symbol]) {
+            visited[(unsigned char)currentTransition->symbol] = 1;
+            for (unsigned short ii = i + 1; ii < currentState->transitionsLength; ++ ii) {
+                transition *targetTransition = &currentState->transitions[ii];
+                if (currentTransition->symbol == targetTransition->symbol) {
+                    foundSymbol = currentTransition->symbol;
+                    if (LIST_EMPTY()) {
+                        ADD(currentTransition->next);
+                        oldTransitions[oldTransitionsLength].symbol = currentTransition->symbol;
+                        oldTransitions[oldTransitionsLength].next = currentTransition->next;
+                        ++oldTransitionsLength;
+                    }
 
-                if (targetTransition->next == currentState) {
-                    reflexiveSymbol = targetTransition->symbol;
+                    ADD(targetTransition->next);
+                    oldTransitions[oldTransitionsLength].symbol = targetTransition->symbol;
+                    oldTransitions[oldTransitionsLength].next = targetTransition->next;
+                    ++oldTransitionsLength;
                 }
+            }
 
-                targetSymbol = targetTransition->symbol;
-                if (STATE_STACK_EMPTY()) {
-                    PUSH_STATE(currentTransition->next);
-                    ++currentTransition->next->refCount;
-                    UNLINK_STATES(currentState, i);
-                }
+            if (!LIST_EMPTY()) {
+                state *newState;
+                unsigned int newStateHash = calculateHash(LIST);
+                GET(newStateHash, &newState);
+                if (!newState) {
+                    unsigned int result = ensureState(id, LIST, &newState);
+                    if (result != REGEX_PARSE_OK) {
+                        return result;
+                    }
 
-                PUSH_STATE(targetTransition->next);
-                ++targetTransition->next->refCount;
-                UNLINK_STATES(currentState, ii);
-                
+                    newState->hash = newStateHash;
+                    SET(newState);
+                } 
+
+                newTransitions[newTransitionsLength].symbol = foundSymbol;
+                newTransitions[newTransitionsLength].next = newState;
+                ++newTransitionsLength;
             }
         }
+    }
 
-        if (!STATE_STACK_EMPTY()) {
-            state *newState;
-            ENSURE_STATE(id, &newState);
-            LINK_STATES(currentState, newState, targetSymbol);
-            if (reflexiveSymbol) {
-                LINK_STATES(newState, newState, reflexiveSymbol);
-            }
-        }
+    for (unsigned short i = 0; i < oldTransitionsLength; ++i) {
+        unlinkStates(currentState, oldTransitions[i].next, oldTransitions[i].symbol);
+    }
+
+    for (unsigned short i = 0; i < newTransitionsLength; ++i) {
+        LINK_STATES(currentState, newTransitions[i].next, newTransitions[i].symbol);
     }
 
     return RULES_OK;
@@ -714,7 +770,14 @@ static unsigned int consolidateTransitions(state *currentState,
 
 static unsigned int transformToDFA(state *nfa, 
                                    unsigned short *id) {
-    CREATE_STATE_QUEUE();
+
+#ifdef _PRINT
+    printf("*** NFA ***\n");
+    printGraph(nfa);
+#endif
+
+    CREATE_HASHSET(state*);
+    CREATE_QUEUE(state*);
     unsigned char visited[MAX_STATES] = {0};
     state *currentState = nfa;
     visited[currentState->id] = 1;
@@ -724,21 +787,26 @@ static unsigned int transformToDFA(state *nfa,
             return result;
         }
 
-        result = consolidateTransitions(currentState, id);
-        if (result != RULES_OK) {
+        result = consolidateTransitions(currentState, id, HASHSET);
+        if (result != REGEX_PARSE_OK) {
             return result;
         }
-
+        
         for (int i = 0; i < currentState->transitionsLength; ++ i) {
             transition *currentTransition = &currentState->transitions[i];
             if (!visited[currentTransition->next->id]) {
                 visited[currentTransition->next->id] = 1;
-                ENQUEUE_STATE(currentTransition->next);
+                ENQUEUE(currentTransition->next);
             }
         }
 
-        DEQUEUE_STATE(&currentState);    
+        DEQUEUE(&currentState);    
     }
+
+#ifdef _PRINT
+    printf("*** DFA ***\n");
+    printGraph(nfa);
+#endif
 
     return RULES_OK;
 }
@@ -748,7 +816,7 @@ static unsigned int calculateGraphDimensions(state *start,
                                         unsigned short *statesLength) {
     *vocabularyLength = 0;
     *statesLength = 0;
-    CREATE_STATE_QUEUE();
+    CREATE_QUEUE(state*);
     unsigned char visited[MAX_STATES] = {0};
     unsigned char vocabulary[256] = {0};
     state *currentState = start;
@@ -764,11 +832,11 @@ static unsigned int calculateGraphDimensions(state *start,
 
             if (!visited[currentTransition->next->id]) {
                 visited[currentTransition->next->id] = 1;
-                ENQUEUE_STATE(currentTransition->next);
+                ENQUEUE(currentTransition->next);
             }
         }
 
-        DEQUEUE_STATE(&currentState);    
+        DEQUEUE(&currentState);    
     }
 
     return RULES_OK;
@@ -780,7 +848,7 @@ static unsigned int packGraph(state *start,
                               unsigned short vocabularyLength,
                               unsigned short statesLength) {
 
-    CREATE_STATE_QUEUE();
+    CREATE_QUEUE(state*);
     unsigned short visited[MAX_STATES] = {0};
     char *vocabulary = stateMachine;
     unsigned short *stateTable = (unsigned short *)(stateMachine + 256);
@@ -806,14 +874,14 @@ static unsigned int packGraph(state *start,
             if (!visited[currentTransition->next->id]) {
                 visited[currentTransition->next->id] = stateNumber;
                 ++stateNumber;
-                ENQUEUE_STATE(currentTransition->next);
+                ENQUEUE(currentTransition->next);
             }
 
             unsigned short targetSymbolNumber = vocabulary[(unsigned char)currentTransition->symbol];
             stateTable[(targetSymbolNumber - 1) * statesLength + (targetStateNumber - 1)] = visited[currentTransition->next->id];
         }
 
-        DEQUEUE_STATE(&currentState);    
+        DEQUEUE(&currentState);    
     }
 
     return RULES_OK;
@@ -840,21 +908,10 @@ unsigned int compileRegex(void *tree,
     end->isAccept = 1;
     ++start->refCount;
     
-#ifdef _PRINT
-    printf("*** NFA ***\n");
-    printGraph(start);
-#endif
-
     result = transformToDFA(start, &id);
     if (result != RULES_OK) {
-        printf("Error %d\n", result);
         return result;
     }
-
-#ifdef _PRINT
-    printf("*** DFA ***\n");
-    printGraph(start);
-#endif
 
     result = calculateGraphDimensions(start, 
                                  vocabularyLength, 
