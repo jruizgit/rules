@@ -201,7 +201,6 @@ d.ruleset('match14', {
     }
 );
 
-
 d.ruleset('match15', {
         whenAll: [ m.url.mt('(https?://)?([0-9a-z.-]+)\\.[a-z]{2,6}(/[A-z0-9_.-]+/?)*') ],
         run: function(c) {
@@ -214,6 +213,21 @@ d.ruleset('match15', {
         host.post('match15', {id: 3, sid: 1, url: 'https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md'});
         host.post('match15', {id: 4, sid: 1, url: '//rules'});
         host.post('match15', {id: 5, sid: 1, url: 'https://github.c/jruizgit/rules'});
+    }
+);
+
+d.ruleset('match16', {
+        whenAll: [ m.ip.mt('((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)') ],
+        run: function(c) {
+            console.log('match 16 ip ' + c.m.ip);
+        }
+    },
+    function (host) {
+        host.post('match16', {id: 1, sid: 1, ip: '73.60.124.136'});
+        host.post('match16', {id: 2, sid: 1, ip: '256.60.124.136'});
+        host.post('match16', {id: 3, sid: 1, ip: '250.60.124.256'});
+        host.post('match16', {id: 4, sid: 1, ip: '73.60.124'});
+        host.post('match16', {id: 5, sid: 1, ip: '127.0.0.1'});
     }
 );
 

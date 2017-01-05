@@ -220,6 +220,47 @@ with ruleset('test'):
         host.post('test', {'id': 1, 'sid': 1, 'action': 'open', 'path':'test1'})
 
 
+with ruleset('match1'):
+    @when_all(m.subject.matches('a+(bc|de?)*'))
+    def approved(c):
+        print ('match1 ->{0}'.format(c.m.subject))
+
+    @when_start
+    def start(host):
+        host.post('match1', {'id': 1, 'sid': 1, 'subject': 'abcbc'})
+        host.post('match1', {'id': 2, 'sid': 1, 'subject': 'addd'})
+        host.post('match1', {'id': 3, 'sid': 1, 'subject': 'ddd'})
+        host.post('match1', {'id': 4, 'sid': 1, 'subject': 'adee'})
+
+
+with ruleset('match2'):
+    @when_all(m.ip.matches('((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)'))
+    def approved(c):
+        print ('match2 ip ->{0}'.format(c.m.ip))
+
+    @when_start
+    def start(host):
+        host.post('match2', {'id': 1, 'sid': 1, 'ip': '73.60.124.136'})
+        host.post('match2', {'id': 2, 'sid': 1, 'ip': '256.60.124.136'})
+        host.post('match2', {'id': 3, 'sid': 1, 'ip': '250.60.124.256'})
+        host.post('match2', {'id': 4, 'sid': 1, 'ip': '73.60.124'})
+        host.post('match2', {'id': 5, 'sid': 1, 'ip': '127.0.0.1'})
+
+
+with ruleset('match3'):
+    @when_all(m.url.matches('(https?://)?([0-9a-z.-]+)\\.[a-z]{2,6}(/[A-z0-9_.-]+/?)*'))
+    def approved(c):
+        print ('match3 url ->{0}'.format(c.m.url))
+
+    @when_start
+    def start(host):
+        host.post('match3', {'id': 1, 'sid': 1, 'url': 'https://github.com'})
+        host.post('match3', {'id': 2, 'sid': 1, 'url': 'http://github.com/jruizgit/rul!es'})
+        host.post('match3', {'id': 3, 'sid': 1, 'url': 'https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md'})
+        host.post('match3', {'id': 4, 'sid': 1, 'url': '//rules'})
+        host.post('match3', {'id': 5, 'sid': 1, 'url': 'https://github.c/jruizgit/rules'})
+
+
 with ruleset('a0_0'):
     @when_all((m.subject == 'go') | (m.subject == 'approve') | (m.subject == 'ok'))
     def approved(c):

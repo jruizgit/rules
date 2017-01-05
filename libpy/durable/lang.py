@@ -125,11 +125,16 @@ class value(object):
         self._op = '$ex'
         return self
 
+    def matches(self, other):
+        self._op = '$mt'
+        self._right = other
+        return self
+
     def __and__(self, other):
         return value(self._type, self, '$and', other, self.alias)
     
     def __or__(self, other):
-        return value(self._type, self, '$or', other, self.alias)
+        return value(self._type, self, '$or', other, self.alias)    
 
     def __getattr__(self, name):
         if self._type:
