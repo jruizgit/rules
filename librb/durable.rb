@@ -241,6 +241,12 @@ module Durable
       self
     end
 
+    def matches(other)
+      @__op = :$mt
+      @right = other
+      self
+    end
+
     def -@
       @__op = :$nex
       @right = 1

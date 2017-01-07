@@ -1,4 +1,4 @@
-OBJ=events.o json.o net.o rete.o state.o
+OBJ=events.o json.o net.o rete.o state.o regex.o
 LIBNAME=librules
 
 # Fallback to gcc when $CC is not in $PATH.
@@ -16,7 +16,7 @@ STLIB_MAKE_CMD=ld $(ARCH) -o $(STLIBNAME) -L../../deps/hiredis/ -lhiredis -r
 all: $(STLIBNAME)
 
 # Deps (use make dep to generate this)
-events.o: events.c rules.h net.h json.h
+events.o: events.c rules.h net.h json.h regex.h
 json.o: json.c json.h rules.h
 net.o: net.c net.h rules.h json.h rete.h
 rete.o: rete.c rete.h net.h json.h state.h regex.h
