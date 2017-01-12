@@ -14,7 +14,7 @@ Durable.ruleset :match1 do
 end
 
 Durable.ruleset :match2 do
-  when_all (m.ip.matches("((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)")) do
+  when_all (m.ip.matches("((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)%.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)")) do
     puts "match2 -> #{m.ip}"
   end
   when_start do
@@ -27,7 +27,7 @@ Durable.ruleset :match2 do
 end
 
 Durable.ruleset :match3 do
-  when_all (m.url.matches("(https?://)?([0-9a-z.-]+)\\.[a-z]{2,6}(/[A-z0-9_.-]+/?)*")) do
+  when_all (m.url.matches("(https?://)?([0-9a-z.-]+)%.[a-z]{2,6}(/[A-z0-9_.-]+/?)*")) do
     puts "match3 -> #{m.url}"
   end
   when_start do

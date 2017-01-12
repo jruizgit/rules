@@ -234,7 +234,7 @@ with ruleset('match1'):
 
 
 with ruleset('match2'):
-    @when_all(m.ip.matches('((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)'))
+    @when_all(m.ip.matches('((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)%.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)'))
     def approved(c):
         print ('match2 ip ->{0}'.format(c.m.ip))
 
@@ -248,7 +248,7 @@ with ruleset('match2'):
 
 
 with ruleset('match3'):
-    @when_all(m.url.matches('(https?://)?([0-9a-z.-]+)\\.[a-z]{2,6}(/[A-z0-9_.-]+/?)*'))
+    @when_all(m.url.matches('(https?://)?([0-9a-z.-]+)%.[a-z]{2,6}(/[A-z0-9_.-]+/?)*'))
     def approved(c):
         print ('match3 url ->{0}'.format(c.m.url))
 
@@ -259,6 +259,29 @@ with ruleset('match3'):
         host.post('match3', {'id': 3, 'sid': 1, 'url': 'https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md'})
         host.post('match3', {'id': 4, 'sid': 1, 'url': '//rules'})
         host.post('match3', {'id': 5, 'sid': 1, 'url': 'https://github.c/jruizgit/rules'})
+
+with ruleset('match4'):
+    @when_all(m.subject.matches('%u+'))
+    def approved(c):
+        print ('match4 ->{0}'.format(c.m.subject))
+
+    @when_start
+    def start(host):
+        host.post('match4', {'id': 1, 'sid': 1, 'subject': 'ABCDZ'})
+        host.post('match4', {'id': 2, 'sid': 1, 'subject': 'W\u00D2\u00D3'})
+        host.post('match4', {'id': 3, 'sid': 1, 'subject': 'abcz'})
+
+        
+with ruleset('match5'):
+    @when_all(m.subject.matches('%l+'))
+    def approved(c):
+        print ('match5 ->{0}'.format(c.m.subject))
+
+    @when_start
+    def start(host):
+        host.post('match5', {'id': 1, 'sid': 1, 'subject': 'abcz'})
+        host.post('match5', {'id': 2, 'sid': 1, 'subject': 'w\u00E2\u00E3'})
+        host.post('match5', {'id': 3, 'sid': 1, 'subject': 'AbcZ'})
 
 
 with ruleset('a0_0'):

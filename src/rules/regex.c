@@ -13,8 +13,9 @@
 #define REGEX_QUESTION 0x04
 #define REGEX_INTERVAL 0x05
 #define REGEX_REGEX 0x06
+#define REGEX_DOT 0xFFFE
 
-#define MAX_TRANSITIONS 1024
+#define MAX_TRANSITIONS 0xFFFF
 #define MAX_QUEUE 1024
 #define MAX_STATES 512
 #define MAX_SET 1024
@@ -65,25 +66,27 @@
 #define CREATE_HASHSET(type) \
     type set[MAX_SET] = {NULL}; \
 
-#define SET(value) do { \
+#define HSET(value) do { \
+    unsigned int size = 0; \
     unsigned short index = value->hash % MAX_SET; \
     while (set[index]) { \
-        ++index; \
-        if (index >= MAX_SET) { \
+        index = (index + 1) % MAX_SET; \
+        ++size; \
+        if (size == MAX_SET) { \
             return ERR_REGEX_SET_FULL; \
         } \
     } \
     set[index] = value; \
 } while(0)
 
-#define GET(stateHash, value) do { \
-    unsigned short index = stateHash % MAX_SET; \
+#define HGET(valueHash, value) do { \
+    unsigned short index = valueHash % MAX_SET; \
     *value = NULL; \
     while (set[index] && !*value) { \
-        if (set[index]->hash == stateHash) { \
+        if (set[index]->hash == valueHash) { \
             *value = set[index]; \
         } \
-        ++index; \
+        index = (index + 1) % MAX_SET; \
     } \
 } while(0)
 
@@ -106,7 +109,7 @@
 struct state;
 
 typedef struct transition {
-    char symbol;
+    unsigned short symbol;
     struct state *next;
 } transition;
 
@@ -115,24 +118,76 @@ typedef struct state {
     unsigned short refCount;
     unsigned short id;
     unsigned short transitionsLength;
-    char isAccept;
+    unsigned char isAccept;
+    unsigned char isReject;
     transition transitions[MAX_TRANSITIONS];
 } state;
 
 typedef struct token {
     unsigned char type;
-    unsigned short symbolsLength;
     unsigned short low;
     unsigned short high;
-    char symbols[256];
+    unsigned short symbolsLength;
+    unsigned short symbols[MAX_TRANSITIONS];
+    unsigned short inverseSymbolsLength;
+    unsigned short inverseSymbols[MAX_TRANSITIONS];
 } token;
 
-static char EMPTY = 0;
+static const unsigned int UTF8_OFFSETS[6] = {
+    0x00000000UL, 0x00003080UL, 0x000E2080UL,
+    0x03C82080UL, 0xFA082080UL, 0x82082080UL
+};
+
+static const char UTF8_TRAILING[256] = {
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, 3,3,3,3,3,3,3,3,4,4,4,4,5,5,5,5
+};
+
+static const unsigned short EMPTY = 0;
+
+unsigned int utf8ToUnicode(char **first, char *last, unsigned short *result) {
+    unsigned char byteNumber = UTF8_TRAILING[(unsigned char)*first[0]];
+    if (*first + byteNumber >= last) {
+        return ERR_PARSE_REGEX;
+    }
+    
+    *result = 0;
+    switch (byteNumber) {
+        case 3: 
+            *result += (unsigned char)*first[0]; 
+            *result <<= 6;
+            ++*first;
+        case 2: 
+            *result += (unsigned char)*first[0]; 
+            *result <<= 6;
+            ++*first;
+        case 1:
+            *result += (unsigned char)*first[0]; 
+            *result <<= 6;
+            ++*first;
+        case 0:
+            *result += (unsigned char)*first[0];
+            ++*first;
+    }
+    *result -= UTF8_OFFSETS[byteNumber];
+    return REGEX_PARSE_OK;
+}
+
+static unsigned int readInternalRange(char *first,
+                                      unsigned short *rangeLength,
+                                      unsigned short *range);
 
 static unsigned int readEscapedSymbol(char **first, 
-                                   char *last, 
-                                   char *symbol) {
-    *first += 2;
+                                      char *last,
+                                      unsigned short *rangeLength, 
+                                      unsigned short *range) {
+    ++*first;
     if (*first >= last) {
         return ERR_PARSE_REGEX;
     }
@@ -149,9 +204,41 @@ static unsigned int readEscapedSymbol(char **first,
         case ']':
         case '{':
         case '}':
-        case '\\':
-            *symbol = *first[0];
+        case '%':
+            range[*rangeLength] = *first[0];
+            ++*rangeLength;
+            ++*first;
             return REGEX_PARSE_OK;
+        case 'a':
+            ++*first;
+            return readInternalRange("[\x41-\x5A\x61-\x7A\xC3\x80-\xC3\x96\xC3\x98-\xC3\xB6\xC3\xB8-\xC3\xBF]", rangeLength, range);
+        case 'c':
+            ++*first;
+            return readInternalRange("[\x00-\x1F\x7F\xC2\x80-\xC2\x9F]", rangeLength, range);
+        case 'd':
+            ++*first;
+            return readInternalRange("[0-9]", rangeLength, range);
+        case 'g':
+            ++*first;
+            return readInternalRange("[\x21-\x7E]", rangeLength, range);
+        case 'l':
+            ++*first;
+            return readInternalRange("[\x61-\x7A\xC3\x9F-\xC3\xB6\xC3\xB8-\xC3\xBF]", rangeLength, range);
+        case 'p':
+            ++*first;
+            return readInternalRange("[.,;:?!'\"()\xC2\xA1\xC2\xBF-]", rangeLength, range);
+        case 's':
+            ++*first;
+            return readInternalRange("[\x09-\x0D\x20]", rangeLength, range);
+        case 'u':
+            ++*first;
+            return readInternalRange("[\x41-\x5A\xC3\x80-\xC3\x96\xC3\x98-\xC3\x9E]", rangeLength, range);
+        case 'w':
+            ++*first;
+            return readInternalRange("[A-Za-z0-9]", rangeLength, range);
+        case 'x':
+            ++*first;
+            return readInternalRange("[0-9A-Fa-f]", rangeLength, range);       
     }
 
     return ERR_PARSE_REGEX;
@@ -160,54 +247,136 @@ static unsigned int readEscapedSymbol(char **first,
 static unsigned int readRange(char **first,
                               char *last, 
                               unsigned short *rangeLength,
-                              char *range) {
-    ++*first;
+                              unsigned short *range,
+                              unsigned short *inverseRangeLength,
+                              unsigned short *inverseRange) {
     unsigned char parseBegin = 1;
-    char lastSymbol;
+    unsigned short lastSymbol = 0;
+    unsigned short currentSymbol;
+    unsigned char inverse = 0;
+    unsigned int result;
     *rangeLength = 0;
+    if (inverseRangeLength) {
+        *inverseRangeLength = 0;
+    }
+
+    ++*first;
+    if (*first[0] == '^') {
+        if (*first == last) {
+            return ERR_PARSE_REGEX;
+        }
+
+        inverse = 1;
+        ++*first;
+    }
+
+    if (*first[0] == ']') {
+        if (*first == last) {
+            return ERR_PARSE_REGEX;
+        }
+        
+        if (inverse) {
+            inverseRange[*inverseRangeLength] = (unsigned short)']';
+            ++*inverseRangeLength;
+        } else {
+            range[*rangeLength] = (unsigned short)']';
+            ++*rangeLength;
+        } 
+    }
+
     while (*first[0] != ']') {
         if (*first == last) {
             return ERR_PARSE_REGEX;
         }
 
-        if (parseBegin) {
-            if (*first[0] == '-') {
-                parseBegin = 0;
-            } else {
-                range[*rangeLength] = *first[0];
-                lastSymbol = *first[0];
-                ++*rangeLength;
+        if (!parseBegin) {
+            if (!lastSymbol) {
+                return ERR_PARSE_REGEX;
             }
-        } else {
-            char currentSymbol = *first[0];
+
+            result = utf8ToUnicode(first, last, &currentSymbol);
+            if (result != REGEX_PARSE_OK) {
+                return result;
+            }
+
             while (currentSymbol != lastSymbol) {
-                range[*rangeLength] = currentSymbol;
-                ++*rangeLength;
+                if (inverse) {
+                    inverseRange[*inverseRangeLength] = currentSymbol;
+                    ++*inverseRangeLength;
+                } else {
+                    range[*rangeLength] = currentSymbol;
+                    ++*rangeLength;
+                } 
+
                 if (currentSymbol > lastSymbol) {
                     --currentSymbol;
                 } else {
                     ++currentSymbol;
                 }
             }
-
             parseBegin = 1;
-        }
+        } else {
+            if (*first[0] == '-') {
+                parseBegin = 0;
+                ++*first;
+            } else {
+                if (*first[0] != '%') {
+                    result = utf8ToUnicode(first, last, &currentSymbol);
+                    if (result != REGEX_PARSE_OK) {
+                        return result;
+                    }
 
-        ++*first;
+                    if (inverse) {
+                        inverseRange[*inverseRangeLength] = currentSymbol;
+                        ++*inverseRangeLength;
+                    } else {
+                        range[*rangeLength] = currentSymbol;
+                        ++*rangeLength;
+                    } 
+                    lastSymbol = currentSymbol;
+                } else {
+                    if (inverse) {
+                        unsigned int result = readEscapedSymbol(first, last, inverseRangeLength, inverseRange);
+                        if (result != REGEX_PARSE_OK) {
+                            return result;
+                        }
+                    } else {
+                        unsigned int result = readEscapedSymbol(first, last, rangeLength, range);
+                        if (result != REGEX_PARSE_OK) {
+                            return result;
+                        }
+                    }
+                    lastSymbol = 0;
+                }
+            }
+        } 
     }
 
     if (!parseBegin) {
-        range[*rangeLength] = '-';
-        ++*rangeLength;
+        if (inverse) {
+            inverseRange[*inverseRangeLength] = (unsigned short)'-';
+            ++*inverseRangeLength;
+        } else {
+            range[*rangeLength] = (unsigned short)'-';
+            ++*rangeLength;
+        } 
     }
 
+    ++*first;
     return REGEX_PARSE_OK;
 }
 
+static unsigned int readInternalRange(char *first,
+                                      unsigned short *rangeLength,
+                                      unsigned short *range) {
+    unsigned int length = strlen(first);
+    return readRange(&first, first + length - 1, rangeLength, range, NULL, NULL);
+}
+
 static unsigned int readInterval(char **first,
-                                   char *last,
-                                   unsigned short *low,
-                                   unsigned short *high) {
+                                 char *last,
+                                 unsigned short *low,
+                                 unsigned short *high) {
 
     ++*first;
     unsigned char parseBegin = 1;
@@ -250,6 +419,7 @@ static unsigned int readInterval(char **first,
         return ERR_PARSE_REGEX;
     }
 
+    ++*first;
     return REGEX_PARSE_OK;
 }
 
@@ -283,37 +453,25 @@ static unsigned int readNextToken(char **first,
             break;
         case '[':
             nextToken->type = REGEX_SYMBOL;
-            result = readRange(first, last, &nextToken->symbolsLength, (char *)&nextToken->symbols);
-            if (result != REGEX_PARSE_OK) {
-                return result;
-            }
-            break;
+            return readRange(first, last, &nextToken->symbolsLength, 
+                                          (unsigned short *)&nextToken->symbols,
+                                          &nextToken->inverseSymbolsLength, 
+                                          (unsigned short *)&nextToken->inverseSymbols);
         case '{':
             nextToken->type = REGEX_INTERVAL;
-            result = readInterval(first, last, &nextToken->low, &nextToken->high);
-            if (result != REGEX_PARSE_OK) {
-                return result;
-            }
-            break;
-        case '\\':
+            return readInterval(first, last, &nextToken->low, &nextToken->high);
+        case '%':
             nextToken->type = REGEX_SYMBOL;
-            result = readEscapedSymbol(first, last, &nextToken->symbols[0]);
-            nextToken->symbolsLength = 1;
-            if (result != REGEX_PARSE_OK) {
-                return result;
-            }
-            break;
+            return readEscapedSymbol(first, last, &nextToken->symbolsLength, (unsigned short *)&nextToken->symbols);
         case '.':
             nextToken->type = REGEX_SYMBOL;
-            nextToken->symbolsLength = 255;
-            for (unsigned short i = 0; i < 255; ++i) {
-                nextToken->symbols[i] = i + 1;
-            }
+            nextToken->symbolsLength = 1;
+            nextToken->symbols[0] = REGEX_DOT;
             break;
         default:
             nextToken->type = REGEX_SYMBOL;
-            nextToken->symbols[0] = *first[0];
             nextToken->symbolsLength = 1;
+            return utf8ToUnicode(first, last, &nextToken->symbols[0]);
     }
 
     ++*first;
@@ -326,7 +484,7 @@ static unsigned int storeRegexStateMachine(ruleset *tree,
                                            char **newStateMachine, 
                                            unsigned int *stateMachineOffset) {
 
-    unsigned int stateMachinelength = sizeof(char) * 256;
+    unsigned int stateMachinelength = sizeof(unsigned short) * MAX_TRANSITIONS;
     stateMachinelength = stateMachinelength + sizeof(unsigned short) * statesLength * vocabularyLength;
     stateMachinelength = stateMachinelength + sizeof(unsigned char) * statesLength;
     if (!tree->regexStateMachinePool) {
@@ -367,6 +525,7 @@ static unsigned int createState(unsigned short *stateId,
     (*newState)->transitionsLength = 0;
     (*newState)->refCount = 0;
     (*newState)->isAccept = 0;
+    (*newState)->isReject = 0;
     (*newState)->hash = 0;
     ++*stateId;
 
@@ -375,7 +534,7 @@ static unsigned int createState(unsigned short *stateId,
 
 static unsigned int linkStates(state *previousState, 
                                state *nextState, 
-                               char tokenSymbol) {
+                               unsigned short tokenSymbol) {
     for (int i = 0; i < previousState->transitionsLength; ++i) {
         if (previousState->transitions[i].symbol == tokenSymbol && 
             previousState->transitions[i].next->id == nextState->id) {
@@ -430,9 +589,12 @@ static unsigned int printGraph(state *start) {
         if (currentState->isAccept) {
             printf("    Accept\n");
         }
+        if (currentState->isReject) {
+            printf("    Reject\n");
+        }
         for (int i = 0; i < currentState->transitionsLength; ++ i) {
             transition *currentTransition = &currentState->transitions[i];
-            printf("    transition %d to state %d\n", (unsigned char)currentTransition->symbol, currentTransition->next->id);
+            printf("    transition %x to state %d\n", currentTransition->symbol, currentTransition->next->id);
             if (!visited[currentTransition->next->id]) {
                 visited[currentTransition->next->id] = 1;
                 ENQUEUE(currentTransition->next);
@@ -458,6 +620,10 @@ static unsigned int cloneGraph(state *startState,
     while (currentState) {
         if (currentState->isAccept) {
             visited[currentState->id]->isAccept = 1;
+        }
+
+        if (currentState->isReject) {
+            visited[currentState->id]->isReject = 1;
         }
 
         for (int i = 0; i < currentState->transitionsLength; ++ i) {
@@ -495,10 +661,23 @@ static unsigned int createGraph(char **first,
         switch (currentToken.type) {
             case REGEX_SYMBOL:
                 previousState = currentState;
-                CREATE_STATE(id, &currentState);
-                for (unsigned short i = 0; i < currentToken.symbolsLength; ++i) {
-                    LINK_STATES(previousState, currentState, currentToken.symbols[i]);
-                }
+                if (currentToken.symbolsLength) {
+                    CREATE_STATE(id, &currentState);
+                    for (unsigned short i = 0; i < currentToken.symbolsLength; ++i) {
+                        LINK_STATES(previousState, currentState, currentToken.symbols[i]);
+                    }
+                } 
+
+                if (currentToken.inverseSymbolsLength) {
+                    CREATE_STATE(id, &currentState);
+                    currentState->isReject = 1;
+                    for (unsigned short i = 0; i < currentToken.inverseSymbolsLength; ++i) {
+                        LINK_STATES(previousState, currentState, currentToken.inverseSymbols[i]);
+                    }
+
+                    CREATE_STATE(id, &currentState);
+                    LINK_STATES(previousState, currentState, REGEX_DOT);    
+                }                
 
                 break;
             case REGEX_UNION:
@@ -670,6 +849,14 @@ static unsigned int ensureState(unsigned short *id,
         if (targetState->isAccept) {
             (*newState)->isAccept = 1;
         }
+
+        if (targetState->isReject) {
+            (*newState)->isReject = 1;
+        }
+
+        if ((*newState)->isReject && (*newState)->isAccept) {
+            return ERR_REGEX_CONFLICT;
+        }        
     }
 
     return RULES_OK;
@@ -695,6 +882,14 @@ static unsigned int consolidateStates(state *currentState,
                 currentState->isAccept = 1;
             }
 
+            if (nextState->isReject) {
+                currentState->isReject = 1;
+            }
+
+            if (currentState->isAccept && currentState->isReject) {
+                return ERR_REGEX_CONFLICT;
+            }
+
             deleteTransition(currentState, i);
             --i;
         }
@@ -710,18 +905,24 @@ static unsigned int consolidateTransitions(state *currentState,
     unsigned short oldTransitionsLength = 0;
     transition newTransitions[MAX_TRANSITIONS];
     unsigned short newTransitionsLength = 0;
-    unsigned char visited[256] = {0};
+    unsigned char visited[MAX_TRANSITIONS] = {0};
 
     for (unsigned short i = 0; i < currentState->transitionsLength; ++i) {
         transition *currentTransition = &currentState->transitions[i];
         CREATE_LIST(state*);
-        char foundSymbol = 0;
-        if (!visited[(unsigned char)currentTransition->symbol]) {
-            visited[(unsigned char)currentTransition->symbol] = 1;
+        unsigned short foundSymbol = 0;
+        if (!visited[(unsigned short)currentTransition->symbol]) {
+            visited[(unsigned short)currentTransition->symbol] = 1;
             for (unsigned short ii = i + 1; ii < currentState->transitionsLength; ++ ii) {
                 transition *targetTransition = &currentState->transitions[ii];
-                if (currentTransition->symbol == targetTransition->symbol) {
+                if ((currentTransition->symbol == targetTransition->symbol) ||
+                    (currentTransition->symbol == REGEX_DOT && !targetTransition->next->isReject) ||
+                    (targetTransition->symbol == REGEX_DOT && !currentTransition->next->isReject)) {
                     foundSymbol = currentTransition->symbol;
+                    if (foundSymbol == REGEX_DOT) {
+                        foundSymbol = targetTransition->symbol;
+                    }
+                    
                     if (LIST_EMPTY()) {
                         ADD(currentTransition->next);
                         oldTransitions[oldTransitionsLength].symbol = currentTransition->symbol;
@@ -739,7 +940,7 @@ static unsigned int consolidateTransitions(state *currentState,
             if (!LIST_EMPTY()) {
                 state *newState;
                 unsigned int newStateHash = calculateHash(LIST);
-                GET(newStateHash, &newState);
+                HGET(newStateHash, &newState);
                 if (!newState) {
                     unsigned int result = ensureState(id, LIST, &newState);
                     if (result != REGEX_PARSE_OK) {
@@ -747,7 +948,7 @@ static unsigned int consolidateTransitions(state *currentState,
                     }
 
                     newState->hash = newStateHash;
-                    SET(newState);
+                    HSET(newState);
                 } 
 
                 newTransitions[newTransitionsLength].symbol = foundSymbol;
@@ -818,15 +1019,15 @@ static unsigned int calculateGraphDimensions(state *start,
     *statesLength = 0;
     CREATE_QUEUE(state*);
     unsigned char visited[MAX_STATES] = {0};
-    unsigned char vocabulary[256] = {0};
+    unsigned char vocabulary[MAX_TRANSITIONS] = {0};
     state *currentState = start;
     visited[currentState->id] = 1;
     while (currentState) {
         ++*statesLength;
         for (int i = 0; i < currentState->transitionsLength; ++ i) {
             transition *currentTransition = &currentState->transitions[i];
-            if (!vocabulary[(unsigned char)currentTransition->symbol]) {
-                vocabulary[(unsigned char)currentTransition->symbol] = 1;
+            if (!vocabulary[(unsigned short)currentTransition->symbol]) {
+                vocabulary[(unsigned short)currentTransition->symbol] = 1;
                 ++*vocabularyLength;
             }
 
@@ -850,8 +1051,8 @@ static unsigned int packGraph(state *start,
 
     CREATE_QUEUE(state*);
     unsigned short visited[MAX_STATES] = {0};
-    char *vocabulary = stateMachine;
-    unsigned short *stateTable = (unsigned short *)(stateMachine + 256);
+    unsigned short *vocabulary = (unsigned short *)stateMachine;
+    unsigned short *stateTable = (unsigned short *)(stateMachine + MAX_TRANSITIONS * sizeof(unsigned short));
     unsigned char *acceptVector = (unsigned char *)(stateTable + (vocabularyLength * statesLength));
     unsigned short stateNumber = 1;
     unsigned short vocabularyNumber = 1;
@@ -866,8 +1067,8 @@ static unsigned int packGraph(state *start,
 
         for (int i = 0; i < currentState->transitionsLength; ++ i) {
             transition *currentTransition = &currentState->transitions[i];
-            if (!vocabulary[(unsigned char)currentTransition->symbol]) {
-                vocabulary[(unsigned char)currentTransition->symbol] = vocabularyNumber;
+            if (!vocabulary[currentTransition->symbol]) {
+                vocabulary[currentTransition->symbol] = vocabularyNumber;
                 ++vocabularyNumber;
             }
 
@@ -877,8 +1078,8 @@ static unsigned int packGraph(state *start,
                 ENQUEUE(currentTransition->next);
             }
 
-            unsigned short targetSymbolNumber = vocabulary[(unsigned char)currentTransition->symbol];
-            stateTable[(targetSymbolNumber - 1) * statesLength + (targetStateNumber - 1)] = visited[currentTransition->next->id];
+            unsigned short targetSymbolNumber = vocabulary[currentTransition->symbol];
+            stateTable[statesLength * (targetSymbolNumber - 1) + (targetStateNumber - 1)] = visited[currentTransition->next->id];
         }
 
         DEQUEUE(&currentState);    
@@ -907,19 +1108,16 @@ unsigned int compileRegex(void *tree,
     }
     end->isAccept = 1;
     ++start->refCount;
-    
     result = transformToDFA(start, &id);
     if (result != RULES_OK) {
         return result;
     }
-
     result = calculateGraphDimensions(start, 
                                  vocabularyLength, 
                                  statesLength);
     if (result != RULES_OK) {
         return result;
     }
-
     char *newStateMachine;    
     result = storeRegexStateMachine((ruleset *)tree, 
                                     *vocabularyLength, 
@@ -929,7 +1127,6 @@ unsigned int compileRegex(void *tree,
     if (result != RULES_OK) {
         return result;
     }
-
     return packGraph(start, 
                      newStateMachine, 
                      *vocabularyLength,
@@ -942,21 +1139,43 @@ unsigned char evaluateRegex(void *tree,
                             unsigned short vocabularyLength,
                             unsigned short statesLength,
                             unsigned int regexStateMachineOffset) {
-    char *vocabulary = &((ruleset *)tree)->regexStateMachinePool[regexStateMachineOffset];
-    unsigned short *stateTable = (unsigned short *)(vocabulary + 256);
+
+    unsigned short *vocabulary = (unsigned short *)&((ruleset *)tree)->regexStateMachinePool[regexStateMachineOffset];
+    unsigned short *stateTable = (unsigned short *)(vocabulary + MAX_TRANSITIONS);
     unsigned char *acceptVector = (unsigned char *)(stateTable + (vocabularyLength * statesLength));
     unsigned short currentState = 1;
-    for (int i = 0; i < length; ++i) {
-        char currentSymbol = vocabulary[(unsigned char) first[i]];
-        if (!currentSymbol) {
+    char *last = first + length;
+    while (first < last) {
+        unsigned short unicodeSymbol;
+        if (utf8ToUnicode(&first, last, &unicodeSymbol) != REGEX_PARSE_OK) {
             return 0;
-        }
+        } else {
+            unsigned short currentSymbol = vocabulary[unicodeSymbol];
+            if (!currentSymbol) {
+                currentSymbol = vocabulary[REGEX_DOT];
+                if (!currentSymbol) {
+                    return 0;
+                }
 
-        currentState = stateTable[statesLength * (currentSymbol - 1) + (currentState - 1)];
-        if (!currentState) {
-            return 0;
+                currentState = stateTable[statesLength * (currentSymbol - 1) + (currentState - 1)];
+                if (!currentState) {
+                    return 0;
+                }
+            } else {
+                currentState = stateTable[statesLength * (currentSymbol - 1) + (currentState - 1)];
+                if (!currentState) {
+                    currentSymbol = vocabulary[REGEX_DOT];
+                    if (!currentSymbol) {
+                        return 0;
+                    }
+
+                    currentState = stateTable[statesLength * (currentSymbol - 1) + (currentState - 1)];
+                    if (!currentState) {
+                        return 0;
+                    }
+                }
+            }
         }
     }
-
     return acceptVector[currentState - 1];
 }

@@ -67,7 +67,7 @@ d.ruleset('match5', {
         host.post('match5', {id: 1, sid: 1, subject: 'ab'});
         host.post('match5', {id: 2, sid: 1, subject: 'adfb0'});
         host.post('match5', {id: 3, sid: 1, subject: 'abbbcd'});
-        host.post('match5', {id: 4, sid: 1, subject: 'xyz.b'});
+        host.post('match5', {id: 4, sid: 1, subject: 'xybz.b'});
     }
 );
 
@@ -187,7 +187,7 @@ d.ruleset('match13', {
 );
 
 d.ruleset('match14', {
-        whenAll: [ m.alias.mt('([a-z0-9_.-]+)@([0-9a-z.-]+)\\.([a-z]{2,6})') ],
+        whenAll: [ m.alias.mt('([a-z0-9_.-]+)@([0-9a-z.-]+)%.([a-z]{2,6})') ],
         run: function(c) {
             console.log('match 14 email ' + c.m.alias);
         }
@@ -202,7 +202,7 @@ d.ruleset('match14', {
 );
 
 d.ruleset('match15', {
-        whenAll: [ m.url.mt('(https?://)?([0-9a-z.-]+)\\.[a-z]{2,6}(/[A-z0-9_.-]+/?)*') ],
+        whenAll: [ m.url.mt('(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*') ],
         run: function(c) {
             console.log('match 15 url ' + c.m.url);
         }
@@ -217,7 +217,7 @@ d.ruleset('match15', {
 );
 
 d.ruleset('match16', {
-        whenAll: [ m.ip.mt('((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)') ],
+        whenAll: [ m.ip.mt('((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)%.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)') ],
         run: function(c) {
             console.log('match 16 ip ' + c.m.ip);
         }
@@ -228,6 +228,73 @@ d.ruleset('match16', {
         host.post('match16', {id: 3, sid: 1, ip: '250.60.124.256'});
         host.post('match16', {id: 4, sid: 1, ip: '73.60.124'});
         host.post('match16', {id: 5, sid: 1, ip: '127.0.0.1'});
+    }
+);
+
+d.ruleset('match17', {
+        whenAll: [ m.subject.mt('(a?){30}a{30}') ],
+        run: function(c) {
+            console.log('match 17 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match17', {id: 1, sid: 1, subject: 'aaaaaaaaaa'});
+        host.post('match17', {id: 2, sid: 1, subject: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'});
+        host.post('match17', {id: 3, sid: 1, subject: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'});
+        host.post('match17', {id: 4, sid: 1, subject: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'});
+    }
+);
+
+d.ruleset('match18', {
+        whenAll: [ m.subject.mt('%w+') ],
+        run: function(c) {
+            console.log('match 18 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match18', {id: 1, sid: 1, subject: 'aAzZ5678'});
+        host.post('match18', {id: 2, sid: 1, subject: '789Az'});
+        host.post('match18', {id: 3, sid: 1, subject: 'aA`89'});
+    }
+);
+
+d.ruleset('match19', {
+        whenAll: [ m.subject.mt('%u+') ],
+        run: function(c) {
+            console.log('match 19 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match19', {id: 1, sid: 1, subject: 'ABCDZ'});
+        host.post('match19', {id: 2, sid: 1, subject: 'W\u00D2\u00D3'});
+        host.post('match19', {id: 3, sid: 1, subject: 'abcz'});
+    }
+);
+
+d.ruleset('match20', {
+        whenAll: [ m.subject.mt('%l+') ],
+        run: function(c) {
+            console.log('match 20 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match20', {id: 1, sid: 1, subject: 'abcz'});
+        host.post('match20', {id: 2, sid: 1, subject: 'wßÿ'});
+        host.post('match20', {id: 3, sid: 1, subject: 'AbcZ'});
+    }
+);
+
+d.ruleset('match21', {
+        whenAll: [ m.subject.mt('[^ABab]+') ],
+        run: function(c) {
+            console.log('match 21 ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.post('match21', {id: 1, sid: 1, subject: 'ABCDZ'});
+        host.post('match21', {id: 2, sid: 1, subject: '.;:<>'});
+        host.post('match21', {id: 3, sid: 1, subject: '^&%()'});
+        host.post('match21', {id: 4, sid: 1, subject: 'abcz'});
     }
 );
 
