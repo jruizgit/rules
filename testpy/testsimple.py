@@ -1,3 +1,4 @@
+# coding=latin-1    
 from durable.lang import *
 import datetime
 import random
@@ -263,24 +264,24 @@ with ruleset('match3'):
 with ruleset('match4'):
     @when_all(m.subject.matches('%u+'))
     def approved(c):
-        print ('match4 ->{0}'.format(c.m.subject))
+        print ('match4 -> ' + c.m.subject)
 
     @when_start
     def start(host):
         host.post('match4', {'id': 1, 'sid': 1, 'subject': 'ABCDZ'})
-        host.post('match4', {'id': 2, 'sid': 1, 'subject': 'W\u00D2\u00D3'})
+        host.post('match4', {'id': 2, 'sid': 1, 'subject': 'WÒÓ'})
         host.post('match4', {'id': 3, 'sid': 1, 'subject': 'abcz'})
 
         
 with ruleset('match5'):
     @when_all(m.subject.matches('%l+'))
     def approved(c):
-        print ('match5 ->{0}'.format(c.m.subject))
+        print ('match5 -> ' + c.m.subject)
 
     @when_start
     def start(host):
         host.post('match5', {'id': 1, 'sid': 1, 'subject': 'abcz'})
-        host.post('match5', {'id': 2, 'sid': 1, 'subject': 'w\u00E2\u00E3'})
+        host.post('match5', {'id': 2, 'sid': 1, 'subject': 'wßÿ'})
         host.post('match5', {'id': 3, 'sid': 1, 'subject': 'AbcZ'})
 
 

@@ -179,7 +179,7 @@ static PyObject *pyAssertEvent(PyObject *self, PyObject *args) {
         PyErr_SetString(RulesError, "pyAssertEvent Invalid argument");
         return NULL;
     }
-
+    
     unsigned int result = assertEvent(handle, event);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
         return Py_BuildValue("i", result);

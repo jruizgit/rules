@@ -392,7 +392,7 @@ class Ruleset(object):
             elif (hasattr(action, '__call__')):
                 self._actions[rule_name] = Promise(action)
 
-        self._handle = rules.create_ruleset(state_cache_size, name, json.dumps(ruleset_definition))
+        self._handle = rules.create_ruleset(state_cache_size, name, json.dumps(ruleset_definition, ensure_ascii=False))
         self._definition = ruleset_definition
         
     def bind(self, databases):
@@ -403,58 +403,58 @@ class Ruleset(object):
                 rules.bind_ruleset(db['password'], db['port'], db['host'], self._handle)
 
     def assert_event(self, message):
-        return rules.assert_event(self._handle, json.dumps(message))
+        return rules.assert_event(self._handle, json.dumps(message, ensure_ascii=False))
 
     def queue_assert_event(self, sid, ruleset_name, message):
-        rules.queue_assert_event(self._handle, str(sid), ruleset_name, json.dumps(message))
+        rules.queue_assert_event(self._handle, str(sid), ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def start_assert_event(self, message):
-        return rules.start_assert_event(self._handle, json.dumps(message))
+        return rules.start_assert_event(self._handle, json.dumps(message, ensure_ascii=False))
 
     def assert_events(self, messages):
-        return rules.assert_events(self._handle, json.dumps(messages))
+        return rules.assert_events(self._handle, json.dumps(messages, ensure_ascii=False))
     
     def start_assert_events(self, messages):
-        return rules.start_assert_events(self._handle, json.dumps(messages))
+        return rules.start_assert_events(self._handle, json.dumps(messages, ensure_ascii=False))
 
     def assert_fact(self, fact):
-        return rules.assert_fact(self._handle, json.dumps(fact))
+        return rules.assert_fact(self._handle, json.dumps(fact, ensure_ascii=False))
 
     def queue_assert_fact(self, sid, ruleset_name, message):
-        rules.queue_assert_fact(self._handle, str(sid), ruleset_name, json.dumps(message))
+        rules.queue_assert_fact(self._handle, str(sid), ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def start_assert_fact(self, fact):
-        return rules.start_assert_fact(self._handle, json.dumps(fact))
+        return rules.start_assert_fact(self._handle, json.dumps(fact, ensure_ascii=False))
 
     def assert_facts(self, facts):
-        return rules.assert_facts(self._handle, json.dumps(facts))
+        return rules.assert_facts(self._handle, json.dumps(facts, ensure_ascii=False))
 
     def start_assert_facts(self, facts):
-        return rules.start_assert_facts(self._handle, json.dumps(facts))
+        return rules.start_assert_facts(self._handle, json.dumps(facts, ensure_ascii=False))
 
     def retract_fact(self, fact):
-        return rules.retract_fact(self._handle, json.dumps(fact))
+        return rules.retract_fact(self._handle, json.dumps(fact, ensure_ascii=False))
 
     def queue_retract_fact(self, sid, ruleset_name, message):
-        rules.queue_retract_fact(self._handle, str(sid), ruleset_name, json.dumps(message))
+        rules.queue_retract_fact(self._handle, str(sid), ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def start_retract_fact(self, fact):
-        return rules.start_retract_fact(self._handle, json.dumps(fact))
+        return rules.start_retract_fact(self._handle, json.dumps(fact, ensure_ascii=False))
 
     def retract_facts(self, facts):
-        return rules.retract_facts(self._handle, json.dumps(facts))
+        return rules.retract_facts(self._handle, json.dumps(facts, ensure_ascii=False))
 
     def start_retract_facts(self, facts):
-        return rules.start_retract_facts(self._handle, json.dumps(facts))
+        return rules.start_retract_facts(self._handle, json.dumps(facts, ensure_ascii=False))
 
     def start_timer(self, sid, timer, timer_duration):
-        rules.start_timer(self._handle, str(sid), timer_duration, json.dumps(timer))
+        rules.start_timer(self._handle, str(sid), timer_duration, json.dumps(timer, ensure_ascii=False))
 
     def cancel_timer(self, sid, timer):
-        rules.cancel_timer(self._handle, str(sid), json.dumps(timer))
+        rules.cancel_timer(self._handle, str(sid), json.dumps(timer, ensure_ascii=False))
 
     def assert_state(self, state):
-        return rules.assert_state(self._handle, str(state['sid']), json.dumps(state))
+        return rules.assert_state(self._handle, str(state['sid']), json.dumps(state, ensure_ascii=False))
         
     def get_state(self, sid):
         return json.loads(rules.get_state(self._handle, str(sid)))
@@ -608,7 +608,7 @@ class Ruleset(object):
                             else:
                                 pending[binding] = replies
 
-                        binding, replies = rules.start_update_state(self._handle, c._handle, json.dumps(c.s._d))
+                        binding, replies = rules.start_update_state(self._handle, c._handle, json.dumps(c.s._d, ensure_ascii=False))
                         if binding in pending:
                             pending[binding] = pending[binding] + replies
                         else:
@@ -1064,13 +1064,13 @@ class Queue(object):
         
 
     def post(self, message):
-        rules.queue_assert_event(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message))
+        rules.queue_assert_event(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def assert_fact(self, message):
-        rules.queue_assert_fact(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message))
+        rules.queue_assert_fact(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def retract_fact(self, message):
-        rules.queue_retract_fact(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message))
+        rules.queue_retract_fact(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def close(self):
         rules.delete_client(self._handle)

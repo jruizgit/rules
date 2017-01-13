@@ -1139,7 +1139,6 @@ unsigned char evaluateRegex(void *tree,
                             unsigned short vocabularyLength,
                             unsigned short statesLength,
                             unsigned int regexStateMachineOffset) {
-
     unsigned short *vocabulary = (unsigned short *)&((ruleset *)tree)->regexStateMachinePool[regexStateMachineOffset];
     unsigned short *stateTable = (unsigned short *)(vocabulary + MAX_TRANSITIONS);
     unsigned char *acceptVector = (unsigned char *)(stateTable + (vocabularyLength * statesLength));
@@ -1177,5 +1176,6 @@ unsigned char evaluateRegex(void *tree,
             }
         }
     }
+    
     return acceptVector[currentState - 1];
 }
