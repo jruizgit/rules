@@ -7,8 +7,12 @@ except ImportError:
 from codecs import open
 from os import path
 from os import environ
+from sys import platform
 
-environ['CFLAGS'] = '-std=c99 -D_GNU_SOURCE'
+if (platform == 'win32'):
+  environ['CFLAGS'] = '-std=c99 -D_GNU_SOURCE -_WIN32'
+else:
+  environ['CFLAGS'] = '-std=c99 -D_GNU_SOURCE'
 
 # Patch "install_lib" command to run build_clib before build_ext
 # to properly work with easy_install.
@@ -23,7 +27,13 @@ class install_lib(_install_lib.install_lib):
         if self.distribution.has_ext_modules():
           self.run_command('build_ext')
 
-rules_lib = ('rules_py', 
+if (platform == 'win32'):
+  rules_lib = ('rules_py', 
+             {'sources': ['deps/Win32_Interop/%s' % src for src in ('win32_error.c', 'win32_ansi.c', 'win32_fdapi.cpp', 'win32_fdapi_crt.cpp', 'win32_rfdmap.cpp', '/win32_variadic_functor.cpp', 'win32_common.cpp')] + 
+             ['deps/hiredis_win/%s.c' % src for src in ('hiredis', 'net', 'sds', 'read')] + 
+             ['src/rules/%s.c' % src for src in ('json', 'net', 'rete', 'state', 'events', 'regex')]})
+else:
+  rules_lib = ('rules_py', 
              {'sources': ['deps/hiredis/%s.c' % src for src in ('hiredis', 'net', 'sds', 'read')] + 
              ['src/rules/%s.c' % src for src in ('json', 'net', 'rete', 'state', 'events', 'regex')]})
 
@@ -37,7 +47,7 @@ with open(path.join(here, 'README.txt'), encoding='utf-8') as f:
 
 setup (
     name = 'durable_rules',
-    version = '0.33.76',
+    version = '0.33.77',
     description = 'for real time analytics (a Python Rules Engine)',
     long_description=long_description,
     url='https://github.com/jruizgit/rules',
@@ -45,8 +55,7 @@ setup (
     author_email='jr3791@live.com',
     license='MIT',
     classifiers=[
-        'Operating System :: MacOS',
-        'Operating System :: POSIX',
+        'Operating System :: OS Independent',
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Libraries',
