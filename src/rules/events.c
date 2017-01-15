@@ -7,6 +7,8 @@
 #include "json.h"
 #include "regex.h"
 
+#include <time.h> 
+
 #define MAX_EVENT_PROPERTIES 64
 #define MAX_RESULT_NODES 32
 #define MAX_NODE_RESULTS 16

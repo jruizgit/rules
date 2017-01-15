@@ -425,9 +425,9 @@ exports = module.exports = durableEngine = function () {
             for (var i = 0; i < databases.length; ++i) {
                 var db = databases[i];
                 if (typeof(db) === 'string') {
-                    r.bindRuleset(handle, db, 0, null);
+                    r.bindRuleset(handle, db, 0, null, 0);
                 } else {
-                    r.bindRuleset(handle, db.host, db.port, db.password);
+                    r.bindRuleset(handle, db.host, db.port, db.password, db.db);
                 }
             }
         };
@@ -1118,7 +1118,7 @@ exports = module.exports = durableEngine = function () {
         var rulesDirectory = {};
         var instanceDirectory = {};
         var rulesList = [];
-        databases = databases || [{host: 'localhost', port: 6379, password:null}];
+        databases = databases || [{host: 'localhost', port: 6379, password:null, db:0}];
         stateCacheSize = stateCacheSize || 1024;
         
         that.getAction = function (actionName) {
@@ -1326,7 +1326,7 @@ exports = module.exports = durableEngine = function () {
     var queue = function(rulesetName, database, stateCacheSize) {
         var that = {};
         var handle;
-        database = database || {host: 'localhost', port: 6379, password:null};
+        database = database || {host: 'localhost', port: 6379, password: null, db: 0};
         stateCacheSize = stateCacheSize || 5000;
 
         that.post = function (message) {
@@ -1347,9 +1347,9 @@ exports = module.exports = durableEngine = function () {
 
         handle = r.createClient(rulesetName, stateCacheSize)
         if (typeof(database) === 'string') {
-            r.bindRuleset(handle, database, 0, null);
+            r.bindRuleset(handle, database, 0, null, 0);
         } else {
-            r.bindRuleset(handle, database.host, database.port, database.password);
+            r.bindRuleset(handle, database.host, database.port, database.password, database.db);
         }
 
         return that;

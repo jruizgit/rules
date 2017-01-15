@@ -119,9 +119,9 @@ void jsDeleteClient(const FunctionCallbackInfo<Value>& args) {
 void jsBindRuleset(const FunctionCallbackInfo<v8::Value>& args) {
     v8::Isolate* isolate;
     isolate = args.GetIsolate();
-    if (args.Length() < 4) {
+    if (args.Length() < 5) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[1]->IsString() || !args[2]->IsNumber()) {
+    } else if (!args[0]->IsNumber() || !args[1]->IsString() || !args[2]->IsNumber() || !args[4]->IsNumber()) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int result;
@@ -129,12 +129,14 @@ void jsBindRuleset(const FunctionCallbackInfo<v8::Value>& args) {
             result = bindRuleset((void *)args[0]->IntegerValue(), 
                                  *v8::String::Utf8Value(args[1]->ToString()), 
                                  args[2]->IntegerValue(), 
-                                 *v8::String::Utf8Value(args[3]->ToString()));
+                                 *v8::String::Utf8Value(args[3]->ToString()),
+                                 args[4]->IntegerValue());
         } else {
             result = bindRuleset((void *)args[0]->IntegerValue(), 
                                  *v8::String::Utf8Value(args[1]->ToString()), 
-                                args[2]->IntegerValue(), 
-                                NULL);
+                                 args[2]->IntegerValue(), 
+                                 NULL,
+                                 args[4]->IntegerValue());
         }
 
         if (result != RULES_OK) {

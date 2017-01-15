@@ -76,7 +76,8 @@ unsigned int deleteClient(void *handle);
 unsigned int bindRuleset(void *handle, 
                          char *host, 
                          unsigned int port, 
-                         char *password);
+                         char *password,
+                         unsigned char db);
 
 unsigned int complete(void *rulesBinding, 
                       unsigned int replyCount);

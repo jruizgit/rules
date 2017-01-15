@@ -15,10 +15,11 @@
 #define REGEX_REGEX 0x06
 #define REGEX_DOT 0xFFFE
 
-#define MAX_TRANSITIONS 0xFFFF
+#define MAX_TRANSITIONS 4096
 #define MAX_QUEUE 1024
-#define MAX_STATES 512
-#define MAX_SET 1024
+#define MAX_STATES 4096
+#define MAX_HSET 1024
+#define MAX_SET 8192
 #define MAX_LIST 1024
 #define MAX_INTERVAL 100
 
@@ -64,33 +65,60 @@
 #define LIST list, top
 
 #define CREATE_HASHSET(type) \
-    type set[MAX_SET] = {NULL}; \
+    type hset[MAX_HSET] = {0}; \
 
 #define HSET(value) do { \
     unsigned int size = 0; \
-    unsigned short index = value->hash % MAX_SET; \
-    while (set[index]) { \
-        index = (index + 1) % MAX_SET; \
+    unsigned short index = value->hash % MAX_HSET; \
+    while (hset[index]) { \
+        index = (index + 1) % MAX_HSET; \
+        ++size; \
+        if (size == MAX_HSET) { \
+            return ERR_REGEX_SET_FULL; \
+        } \
+    } \
+    hset[index] = value; \
+} while(0)
+
+#define HGET(valueHash, value) do { \
+    unsigned short index = valueHash % MAX_HSET; \
+    *value = NULL; \
+    while (hset[index] && !*value) { \
+        if (hset[index]->hash == valueHash) { \
+            *value = hset[index]; \
+        } \
+        index = (index + 1) % MAX_HSET; \
+    } \
+} while(0)
+
+#define HASHSET hset
+
+#define CREATE_SET(type) \
+    type set[MAX_SET] = {0}; \
+
+#define SET(value) do { \
+    unsigned int size = 0; \
+    unsigned int i = value % MAX_SET; \
+    while (set[i]) { \
+        i = (i + 1) % MAX_SET; \
         ++size; \
         if (size == MAX_SET) { \
             return ERR_REGEX_SET_FULL; \
         } \
     } \
-    set[index] = value; \
+    set[i] = value; \
 } while(0)
 
-#define HGET(valueHash, value) do { \
-    unsigned short index = valueHash % MAX_SET; \
-    *value = NULL; \
-    while (set[index] && !*value) { \
-        if (set[index]->hash == valueHash) { \
-            *value = set[index]; \
+#define EXISTS(value, result) do { \
+    unsigned int i = value % MAX_SET; \
+    *result = 0; \
+    while (set[i] && !*result) { \
+        if (set[i] == value) { \
+            *result = 1; \
         } \
-        index = (index + 1) % MAX_SET; \
+        i = (i + 1) % MAX_HSET; \
     } \
 } while(0)
-
-#define HASHSET set
 
 #define CREATE_STATE(stateId, newState) do { \
     unsigned int result = createState(stateId, newState); \
@@ -109,7 +137,7 @@
 struct state;
 
 typedef struct transition {
-    unsigned short symbol;
+    unsigned int symbol;
     struct state *next;
 } transition;
 
@@ -128,10 +156,15 @@ typedef struct token {
     unsigned short low;
     unsigned short high;
     unsigned short symbolsLength;
-    unsigned short symbols[MAX_TRANSITIONS];
+    unsigned int symbols[MAX_TRANSITIONS];
     unsigned short inverseSymbolsLength;
-    unsigned short inverseSymbols[MAX_TRANSITIONS];
+    unsigned int inverseSymbols[MAX_TRANSITIONS];
 } token;
+
+typedef struct symbolEntry {
+    unsigned int symbol;
+    unsigned short index;
+} symbolEntry;
 
 static const unsigned int UTF8_OFFSETS[6] = {
     0x00000000UL, 0x00003080UL, 0x000E2080UL,
@@ -149,9 +182,9 @@ static const char UTF8_TRAILING[256] = {
     2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, 3,3,3,3,3,3,3,3,4,4,4,4,5,5,5,5
 };
 
-static const unsigned short EMPTY = 0;
+static const unsigned int EMPTY = 0;
 
-unsigned int utf8ToUnicode(char **first, char *last, unsigned short *result) {
+unsigned int utf8ToUnicode(char **first, char *last, unsigned int *result) {
     unsigned char byteNumber = UTF8_TRAILING[(unsigned char)*first[0]];
     if (*first + byteNumber >= last) {
         return ERR_PARSE_REGEX;
@@ -181,12 +214,12 @@ unsigned int utf8ToUnicode(char **first, char *last, unsigned short *result) {
 
 static unsigned int readInternalRange(char *first,
                                       unsigned short *rangeLength,
-                                      unsigned short *range);
+                                      unsigned int *range);
 
 static unsigned int readEscapedSymbol(char **first, 
                                       char *last,
                                       unsigned short *rangeLength, 
-                                      unsigned short *range) {
+                                      unsigned int *range) {
     ++*first;
     if (*first >= last) {
         return ERR_PARSE_REGEX;
@@ -247,12 +280,12 @@ static unsigned int readEscapedSymbol(char **first,
 static unsigned int readRange(char **first,
                               char *last, 
                               unsigned short *rangeLength,
-                              unsigned short *range,
+                              unsigned int *range,
                               unsigned short *inverseRangeLength,
-                              unsigned short *inverseRange) {
+                              unsigned int *inverseRange) {
     unsigned char parseBegin = 1;
-    unsigned short lastSymbol = 0;
-    unsigned short currentSymbol;
+    unsigned int lastSymbol = 0;
+    unsigned int currentSymbol;
     unsigned char inverse = 0;
     unsigned int result;
     *rangeLength = 0;
@@ -276,10 +309,10 @@ static unsigned int readRange(char **first,
         }
         
         if (inverse) {
-            inverseRange[*inverseRangeLength] = (unsigned short)']';
+            inverseRange[*inverseRangeLength] = (unsigned int)']';
             ++*inverseRangeLength;
         } else {
-            range[*rangeLength] = (unsigned short)']';
+            range[*rangeLength] = (unsigned int)']';
             ++*rangeLength;
         } 
     }
@@ -354,10 +387,10 @@ static unsigned int readRange(char **first,
 
     if (!parseBegin) {
         if (inverse) {
-            inverseRange[*inverseRangeLength] = (unsigned short)'-';
+            inverseRange[*inverseRangeLength] = (unsigned int)'-';
             ++*inverseRangeLength;
         } else {
-            range[*rangeLength] = (unsigned short)'-';
+            range[*rangeLength] = (unsigned int)'-';
             ++*rangeLength;
         } 
     }
@@ -368,7 +401,7 @@ static unsigned int readRange(char **first,
 
 static unsigned int readInternalRange(char *first,
                                       unsigned short *rangeLength,
-                                      unsigned short *range) {
+                                      unsigned int *range) {
     unsigned int length = strlen(first);
     return readRange(&first, first + length - 1, rangeLength, range, NULL, NULL);
 }
@@ -454,15 +487,15 @@ static unsigned int readNextToken(char **first,
         case '[':
             nextToken->type = REGEX_SYMBOL;
             return readRange(first, last, &nextToken->symbolsLength, 
-                                          (unsigned short *)&nextToken->symbols,
+                                          nextToken->symbols,
                                           &nextToken->inverseSymbolsLength, 
-                                          (unsigned short *)&nextToken->inverseSymbols);
+                                          nextToken->inverseSymbols);
         case '{':
             nextToken->type = REGEX_INTERVAL;
             return readInterval(first, last, &nextToken->low, &nextToken->high);
         case '%':
             nextToken->type = REGEX_SYMBOL;
-            return readEscapedSymbol(first, last, &nextToken->symbolsLength, (unsigned short *)&nextToken->symbols);
+            return readEscapedSymbol(first, last, &nextToken->symbolsLength, nextToken->symbols);
         case '.':
             nextToken->type = REGEX_SYMBOL;
             nextToken->symbolsLength = 1;
@@ -481,10 +514,10 @@ static unsigned int readNextToken(char **first,
 static unsigned int storeRegexStateMachine(ruleset *tree,
                                            unsigned short vocabularyLength, 
                                            unsigned short statesLength,
-                                           char **newStateMachine, 
+                                           void **newStateMachine, 
                                            unsigned int *stateMachineOffset) {
 
-    unsigned int stateMachinelength = sizeof(unsigned short) * MAX_TRANSITIONS;
+    unsigned int stateMachinelength = sizeof(symbolEntry) * vocabularyLength * 2;
     stateMachinelength = stateMachinelength + sizeof(unsigned short) * statesLength * vocabularyLength;
     stateMachinelength = stateMachinelength + sizeof(unsigned char) * statesLength;
     if (!tree->regexStateMachinePool) {
@@ -496,7 +529,7 @@ static unsigned int storeRegexStateMachine(ruleset *tree,
         memset(tree->regexStateMachinePool, 0, stateMachinelength);
         *stateMachineOffset = 0;
         *newStateMachine = &tree->regexStateMachinePool[0];
-        tree->regexStateMachineOffset = 1;
+        tree->regexStateMachineOffset = stateMachinelength;
     } else {
         tree->regexStateMachinePool = realloc(tree->regexStateMachinePool, tree->regexStateMachineOffset + stateMachinelength);
         if (!tree->regexStateMachinePool) {
@@ -534,7 +567,7 @@ static unsigned int createState(unsigned short *stateId,
 
 static unsigned int linkStates(state *previousState, 
                                state *nextState, 
-                               unsigned short tokenSymbol) {
+                               unsigned int tokenSymbol) {
     for (int i = 0; i < previousState->transitionsLength; ++i) {
         if (previousState->transitions[i].symbol == tokenSymbol && 
             previousState->transitions[i].next->id == nextState->id) {
@@ -569,7 +602,7 @@ static void deleteTransition(state *previousState, unsigned short index) {
 
 static void unlinkStates(state *previousState, 
                          state *nextState, 
-                         char tokenSymbol) {
+                         unsigned int tokenSymbol) {
     for (int i = 0; i < previousState->transitionsLength; ++i) {
         if (previousState->transitions[i].symbol == tokenSymbol && 
             previousState->transitions[i].next->id == nextState->id) {
@@ -900,19 +933,21 @@ static unsigned int consolidateStates(state *currentState,
 
 static unsigned int consolidateTransitions(state *currentState, 
                                            unsigned short *id, 
-                                           state **set) {
+                                           state **hset) {
     transition oldTransitions[MAX_TRANSITIONS];
     unsigned short oldTransitionsLength = 0;
     transition newTransitions[MAX_TRANSITIONS];
     unsigned short newTransitionsLength = 0;
-    unsigned char visited[MAX_TRANSITIONS] = {0};
+    CREATE_SET(unsigned int);
 
     for (unsigned short i = 0; i < currentState->transitionsLength; ++i) {
         transition *currentTransition = &currentState->transitions[i];
         CREATE_LIST(state*);
-        unsigned short foundSymbol = 0;
-        if (!visited[(unsigned short)currentTransition->symbol]) {
-            visited[(unsigned short)currentTransition->symbol] = 1;
+        unsigned int foundSymbol = 0;
+        unsigned char symbolExists = 0;
+        EXISTS(currentTransition->symbol, &symbolExists);
+        if (!symbolExists) {
+            SET(currentTransition->symbol);
             for (unsigned short ii = i + 1; ii < currentState->transitionsLength; ++ ii) {
                 transition *targetTransition = &currentState->transitions[ii];
                 if ((currentTransition->symbol == targetTransition->symbol) ||
@@ -1019,15 +1054,17 @@ static unsigned int calculateGraphDimensions(state *start,
     *statesLength = 0;
     CREATE_QUEUE(state*);
     unsigned char visited[MAX_STATES] = {0};
-    unsigned char vocabulary[MAX_TRANSITIONS] = {0};
+    CREATE_SET(unsigned int);
     state *currentState = start;
     visited[currentState->id] = 1;
     while (currentState) {
         ++*statesLength;
         for (int i = 0; i < currentState->transitionsLength; ++ i) {
             transition *currentTransition = &currentState->transitions[i];
-            if (!vocabulary[(unsigned short)currentTransition->symbol]) {
-                vocabulary[(unsigned short)currentTransition->symbol] = 1;
+            unsigned char symbolExists = 0;
+            EXISTS(currentTransition->symbol, &symbolExists);
+            if (!symbolExists) {
+                SET(currentTransition->symbol);
                 ++*vocabularyLength;
             }
 
@@ -1041,18 +1078,39 @@ static unsigned int calculateGraphDimensions(state *start,
     }
 
     return RULES_OK;
+}
 
+static void setIndex(symbolEntry *symbolHashSet, unsigned short vocabularyLength, unsigned int symbol, unsigned short index) {
+    unsigned int max = vocabularyLength * 2;
+    unsigned int i = symbol % max;
+    while (symbolHashSet[i].symbol) {
+        i = (i + 1) % max;
+    }
+    symbolHashSet[i].symbol = symbol;
+    symbolHashSet[i].index = index;
+}
+
+static unsigned short getIndex(symbolEntry *symbolHashSet, unsigned short vocabularyLength, unsigned int symbol) {
+    unsigned int max = vocabularyLength * 2;
+    unsigned int i = symbol % max;
+    while (symbolHashSet[i].symbol) {
+        if (symbolHashSet[i].symbol == symbol) {
+            return symbolHashSet[i].index;
+        }
+        i = (i + 1) % max;
+    }
+
+    return 0;
 }
 
 static unsigned int packGraph(state *start, 
-                              char *stateMachine,
+                              void *stateMachine,
                               unsigned short vocabularyLength,
                               unsigned short statesLength) {
-
     CREATE_QUEUE(state*);
     unsigned short visited[MAX_STATES] = {0};
-    unsigned short *vocabulary = (unsigned short *)stateMachine;
-    unsigned short *stateTable = (unsigned short *)(stateMachine + MAX_TRANSITIONS * sizeof(unsigned short));
+    symbolEntry *symbolHashSet = (symbolEntry *)stateMachine;
+    unsigned short *stateTable = (unsigned short *)(symbolHashSet + vocabularyLength * 2);
     unsigned char *acceptVector = (unsigned char *)(stateTable + (vocabularyLength * statesLength));
     unsigned short stateNumber = 1;
     unsigned short vocabularyNumber = 1;
@@ -1067,8 +1125,9 @@ static unsigned int packGraph(state *start,
 
         for (int i = 0; i < currentState->transitionsLength; ++ i) {
             transition *currentTransition = &currentState->transitions[i];
-            if (!vocabulary[currentTransition->symbol]) {
-                vocabulary[currentTransition->symbol] = vocabularyNumber;
+
+            if (!getIndex(symbolHashSet, vocabularyLength, currentTransition->symbol)) {
+                setIndex(symbolHashSet, vocabularyLength, currentTransition->symbol, vocabularyNumber);
                 ++vocabularyNumber;
             }
 
@@ -1078,7 +1137,7 @@ static unsigned int packGraph(state *start,
                 ENQUEUE(currentTransition->next);
             }
 
-            unsigned short targetSymbolNumber = vocabulary[currentTransition->symbol];
+            unsigned short targetSymbolNumber = getIndex(symbolHashSet, vocabularyLength, currentTransition->symbol);
             stateTable[statesLength * (targetSymbolNumber - 1) + (targetStateNumber - 1)] = visited[currentTransition->next->id];
         }
 
@@ -1118,7 +1177,7 @@ unsigned int compileRegex(void *tree,
     if (result != RULES_OK) {
         return result;
     }
-    char *newStateMachine;    
+    void *newStateMachine;    
     result = storeRegexStateMachine((ruleset *)tree, 
                                     *vocabularyLength, 
                                     *statesLength,
@@ -1139,19 +1198,19 @@ unsigned char evaluateRegex(void *tree,
                             unsigned short vocabularyLength,
                             unsigned short statesLength,
                             unsigned int regexStateMachineOffset) {
-    unsigned short *vocabulary = (unsigned short *)&((ruleset *)tree)->regexStateMachinePool[regexStateMachineOffset];
-    unsigned short *stateTable = (unsigned short *)(vocabulary + MAX_TRANSITIONS);
+    symbolEntry *symbolHashSet = (symbolEntry *)&((ruleset *)tree)->regexStateMachinePool[regexStateMachineOffset];
+    unsigned short *stateTable = (unsigned short *)(symbolHashSet + vocabularyLength * 2);
     unsigned char *acceptVector = (unsigned char *)(stateTable + (vocabularyLength * statesLength));
     unsigned short currentState = 1;
     char *last = first + length;
     while (first < last) {
-        unsigned short unicodeSymbol;
+        unsigned int unicodeSymbol;
         if (utf8ToUnicode(&first, last, &unicodeSymbol) != REGEX_PARSE_OK) {
             return 0;
         } else {
-            unsigned short currentSymbol = vocabulary[unicodeSymbol];
+            unsigned short currentSymbol = getIndex(symbolHashSet, vocabularyLength, unicodeSymbol);
             if (!currentSymbol) {
-                currentSymbol = vocabulary[REGEX_DOT];
+                currentSymbol = getIndex(symbolHashSet, vocabularyLength, REGEX_DOT);
                 if (!currentSymbol) {
                     return 0;
                 }
@@ -1163,7 +1222,7 @@ unsigned char evaluateRegex(void *tree,
             } else {
                 currentState = stateTable[statesLength * (currentSymbol - 1) + (currentState - 1)];
                 if (!currentState) {
-                    currentSymbol = vocabulary[REGEX_DOT];
+                    currentSymbol = getIndex(symbolHashSet, vocabularyLength, REGEX_DOT);
                     if (!currentSymbol) {
                         return 0;
                     }

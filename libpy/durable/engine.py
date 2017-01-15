@@ -398,9 +398,15 @@ class Ruleset(object):
     def bind(self, databases):
         for db in databases:
             if isinstance(db, basestring):
-                rules.bind_ruleset(None, 0, db, self._handle)
-            else: 
-                rules.bind_ruleset(db['password'], db['port'], db['host'], self._handle)
+                rules.bind_ruleset(None, 0, db, self._handle, 0)
+            else:
+                if not 'password' in db:
+                    db['password'] = None
+
+                if not 'db' in db:
+                    db['db'] = 0
+            
+                rules.bind_ruleset(db['password'], db['port'], db['host'], self._handle, db['db'])
 
     def assert_event(self, message):
         return rules.assert_event(self._handle, json.dumps(message, ensure_ascii=False))
@@ -890,7 +896,7 @@ class Flowchart(Ruleset):
 
 class Host(object):
 
-    def __init__(self, ruleset_definitions = None, databases = [{'host': 'localhost', 'port': 6379, 'password':None}], state_cache_size = 1024):
+    def __init__(self, ruleset_definitions = None, databases = [{'host': 'localhost', 'port': 6379, 'password': None, 'db': 0}], state_cache_size = 1024):
         self._ruleset_directory = {}
         self._ruleset_list = []
         self._databases = databases
@@ -1054,13 +1060,19 @@ class Host(object):
 
 class Queue(object):
 
-    def __init__(self, ruleset_name, database = {'host': 'localhost', 'port': 6379, 'password':None}, state_cache_size = 1024):
+    def __init__(self, ruleset_name, database = {'host': 'localhost', 'port': 6379, 'password':None, 'db': 0}, state_cache_size = 1024):
         self._ruleset_name = ruleset_name
         self._handle = rules.create_client(state_cache_size, ruleset_name)
         if isinstance(database, basestring):
             rules.bind_ruleset(None, 0, database, self._handle)
-        else: 
-            rules.bind_ruleset(database['password'], database['port'], database['host'], self._handle)
+        else:
+            if not 'password' in database:
+                database['password'] = None
+
+            if not 'db' in database:
+                database['db'] = 0
+
+            rules.bind_ruleset(database['password'], database['port'], database['host'], self._handle, database['db'])
         
 
     def post(self, message):

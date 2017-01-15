@@ -10,7 +10,7 @@ handle = r.createRuleset('match1',
     })
 , 4);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 console.log(r.assertEvent(handle,
     JSON.stringify({
@@ -95,7 +95,7 @@ handle = r.createRuleset('fact0',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertFact(handle, 
     JSON.stringify({
@@ -151,7 +151,7 @@ handle = r.createRuleset('fact1',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle, 
     JSON.stringify({
@@ -231,7 +231,7 @@ handle = r.createRuleset('fact2',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle, 
     JSON.stringify({
@@ -349,7 +349,7 @@ handle = r.createRuleset('fact3',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle, 
     JSON.stringify({
@@ -460,7 +460,7 @@ handle = r.createRuleset('pri0',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertFact(handle, 
     JSON.stringify({
@@ -520,7 +520,7 @@ handle = r.createRuleset('add0',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle, 
     JSON.stringify({
@@ -574,7 +574,7 @@ handle = r.createRuleset('add1',
     })
 , 10);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 console.log(r.assertState(handle,
     1,
@@ -625,7 +625,7 @@ handle = r.createRuleset('add2',
         })
 , 10);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 console.log(r.assertState(handle,
     1, 
@@ -679,7 +679,7 @@ handle = r.createRuleset('fraud0',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle, 
     JSON.stringify({
@@ -758,7 +758,7 @@ handle = r.createRuleset('fraud2',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle, 
     JSON.stringify({
@@ -812,7 +812,7 @@ handle = r.createRuleset('fraud3',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle, 
     JSON.stringify({
@@ -857,7 +857,7 @@ handle = r.createRuleset('fraud4',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle, 
     JSON.stringify({
@@ -897,7 +897,7 @@ handle = r.createRuleset('approval0',
     })
 , 4);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 console.log(r.assertEvent(handle,
     JSON.stringify({
@@ -948,7 +948,7 @@ handle = r.createRuleset('books',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle, 
     JSON.stringify({
@@ -1010,7 +1010,7 @@ handle = r.createRuleset('books2',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle, 
     JSON.stringify({
@@ -1072,7 +1072,7 @@ handle = r.createRuleset('books3',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle, 
     JSON.stringify({
@@ -1106,7 +1106,7 @@ handle = r.createRuleset('books4',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle, 
     JSON.stringify({
@@ -1148,7 +1148,7 @@ handle = r.createRuleset('approval1',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle,
     JSON.stringify({
@@ -1190,7 +1190,7 @@ handle = r.createRuleset('approval2',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle,
     JSON.stringify({
@@ -1225,7 +1225,7 @@ handle = r.createRuleset('approval3',
     })
 , 4);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 console.log(r.assertState(handle,
     1, 
@@ -1344,7 +1344,7 @@ handle = r.createRuleset('approval4',
     })
 , 4);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 console.log(r.assertState(handle,
     1,
@@ -1400,7 +1400,7 @@ handle = r.createRuleset('approval5',
     })
 , 4);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 console.log(r.assertEvent(handle,
     JSON.stringify({
@@ -1440,7 +1440,7 @@ handle = r.createRuleset('approval6',
     })
 , 4);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 console.log(r.assertEvent(handle,
     JSON.stringify({
@@ -1484,7 +1484,7 @@ handle = r.createRuleset('span0',
     })
 , 100);
 
-r.bindRuleset(handle, 'localhost', 6379, null);
+r.bindRuleset(handle, 'localhost', 6379, null, 0);
 
 r.assertEvent(handle, 
     JSON.stringify({

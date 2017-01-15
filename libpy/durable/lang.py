@@ -608,10 +608,10 @@ _ruleset_stack = []
 _rulesets = []
 _start_functions = []
 
-def create_queue(ruleset_name, database = {'host': 'localhost', 'port': 6379, 'password':None}, state_cache_size = 1024):
+def create_queue(ruleset_name, database = {'host': 'localhost', 'port': 6379, 'password':None, 'db': 0}, state_cache_size = 1024):
     return engine.Queue(ruleset_name, database, state_cache_size)
 
-def create_host(databases = [{'host': 'localhost', 'port': 6379, 'password':None}], state_cache_size = 1024):
+def create_host(databases = [{'host': 'localhost', 'port': 6379, 'password':None, 'db': 0}], state_cache_size = 1024):
     ruleset_definitions = {}
     for rset in _rulesets:
         ruleset_name, ruleset_definition = rset.define()
@@ -624,11 +624,11 @@ def create_host(databases = [{'host': 'localhost', 'port': 6379, 'password':None
     main_host.run()
     return main_host
 
-def run_all(databases = [{'host': 'localhost', 'port': 6379, 'password':None}], host_name = '127.0.0.1', port = 5000, routing_rules = [], run = None, state_cache_size = 1024):
+def run_all(databases = [{'host': 'localhost', 'port': 6379, 'password':None, 'db': 0}], host_name = '127.0.0.1', port = 5000, routing_rules = [], run = None, state_cache_size = 1024):
     main_host = create_host(databases, state_cache_size)
     main_app = interface.Application(main_host, host_name, port, routing_rules, run)
     main_app.run()
 
-def run_server(run, databases = [{'host': 'localhost', 'port': 6379, 'password':None}], routing_rules = [], state_cache_size = 1024):
+def run_server(run, databases = [{'host': 'localhost', 'port': 6379, 'password':None, 'db': 0}], routing_rules = [], state_cache_size = 1024):
     run_all(databases, None, None, routing_rules, run, state_cache_size)
 

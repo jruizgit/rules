@@ -11,6 +11,39 @@
 #include "rules.h"
 #include "json.h"
 
+#define VERIFY(result, origin) do { \
+    if (result != REDIS_OK) { \
+        return ERR_REDIS_ERROR; \
+    } \
+    redisReply *reply; \
+    result = tryGetReply(reContext, &reply); \
+    if (result != RULES_OK) { \
+        return result; \
+    } \
+    if (reply->type == REDIS_REPLY_ERROR) { \
+        printf(origin); \
+        printf(" err string %s\n", reply->str); \
+        freeReplyObject(reply); \
+        return ERR_REDIS_ERROR; \
+    } \
+    freeReplyObject(reply);\
+} while(0)
+
+#define GET_REPLY(result, origin, reply) do { \
+    if (result != REDIS_OK) { \
+        return ERR_REDIS_ERROR; \
+    } \
+    result = tryGetReply(reContext, &reply); \
+    if (result != RULES_OK) { \
+        return result; \
+    } \
+    if (reply->type == REDIS_REPLY_ERROR) { \
+        printf(origin); \
+        printf(" err string %s\n", reply->str); \
+        freeReplyObject(reply); \
+        return ERR_REDIS_ERROR; \
+    } \
+} while(0)
 
 #ifdef _WIN32
 int asprintf(char** ret, char* format, ...){
@@ -38,6 +71,25 @@ int asprintf(char** ret, char* format, ...){
     return size;
 }
 #endif
+
+static unsigned int tryGetReply(redisContext *reContext, 
+                                redisReply **reply) {
+
+    if (redisGetReply(reContext, (void**)reply) != REDIS_OK) {
+        printf("getReply err %d, %d, %s\n", reContext->err, errno, reContext->errstr);
+        #ifndef _WIN32
+        if (redisReconnect(reContext) != REDIS_OK) {
+            printf("reconnect err %d, %d, %s\n", reContext->err, errno, reContext->errstr);
+            return ERR_REDIS_ERROR;
+        }
+        return ERR_TRY_AGAIN;
+        #else
+        return ERR_REDIS_ERROR;
+        #endif
+    }
+
+    return RULES_OK;
+}
 
 static unsigned int createIdiom(ruleset *tree, jsonValue *newValue, char **idiomString) {
     char *rightProperty;
@@ -322,13 +374,8 @@ static unsigned int loadPartitionCommand(ruleset *tree, binding *rulesBinding) {
         return ERR_OUT_OF_MEMORY;
     }
 
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua); 
-    redisGetReply(reContext, (void**)&reply);
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("%s\n", reply->str);
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
+    unsigned int result = redisAppendCommand(reContext, "SCRIPT LOAD %s", lua); 
+    GET_REPLY(result, "loadPartitionCommand", reply);
 
     strncpy(rulesBinding->partitionHash, reply->str, 40);
     rulesBinding->partitionHash[40] = '\0';
@@ -373,15 +420,8 @@ static unsigned int loadRemoveActionCommand(ruleset *tree, binding *rulesBinding
         return ERR_OUT_OF_MEMORY;
     }
 
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
-    redisGetReply(reContext, (void**)&reply);
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("%s\n", reply->str);
-        freeReplyObject(reply);
-        free(lua);
-        return ERR_REDIS_ERROR;
-    }
-
+    unsigned int result = redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    GET_REPLY(result, "loadRemoveActionCommand", reply);
     strncpy(rulesBinding->removeActionHash, reply->str, 40);
     rulesBinding->removeActionHash[40] = '\0';
     freeReplyObject(reply);
@@ -410,13 +450,8 @@ static unsigned int loadTimerCommand(ruleset *tree, binding *rulesBinding) {
         return ERR_OUT_OF_MEMORY;
     }
 
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
-    redisGetReply(reContext, (void**)&reply);
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("%s\n", reply->str);
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
+    unsigned int result = redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    GET_REPLY(result, "loadTimerCommand", reply);
 
     strncpy(rulesBinding->timersHash, reply->str, 40);
     rulesBinding->timersHash[40] = '\0';
@@ -440,13 +475,8 @@ static unsigned int loadUpdateActionCommand(ruleset *tree, binding *rulesBinding
         return ERR_OUT_OF_MEMORY;
     }
 
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
-    redisGetReply(reContext, (void**)&reply);
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("%s\n", reply->str);
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
+    unsigned int result = redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    GET_REPLY(result, "loadUpdateActionCommand", reply);
 
     strncpy(rulesBinding->updateActionHash, reply->str, 40);
     rulesBinding->updateActionHash[40] = '\0';
@@ -548,14 +578,8 @@ static unsigned int loadDeleteSessionCommand(ruleset *tree, binding *rulesBindin
     }
 
     free(deleteSessionLua);
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
-    redisGetReply(reContext, (void**)&reply);
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("%s\n", reply->str);
-        freeReplyObject(reply);
-        free(lua);
-        return ERR_REDIS_ERROR;
-    }
+    unsigned int result = redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    GET_REPLY(result, "loadDeleteSessionCommand", reply);
 
     strncpy(rulesBinding->deleteSessionHash, reply->str, 40);
     rulesBinding->deleteSessionHash[40] = '\0';
@@ -708,14 +732,8 @@ static unsigned int loadAddMessageCommand(ruleset *tree, binding *rulesBinding) 
     }
 
     free(addMessageLua);
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
-    redisGetReply(reContext, (void**)&reply);
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("%s\n", reply->str);
-        freeReplyObject(reply);
-        free(lua);
-        return ERR_REDIS_ERROR;
-    }
+    unsigned int result = redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    GET_REPLY(result, "loadAddMessageCommand", reply);
 
     strncpy(rulesBinding->addMessageHash, reply->str, 40);
     rulesBinding->addMessageHash[40] = '\0';
@@ -1188,14 +1206,8 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
         return ERR_OUT_OF_MEMORY;
     }
     free(peekActionLua);
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
-    redisGetReply(reContext, (void**)&reply);
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("%s\n", reply->str);
-        freeReplyObject(reply);
-        free(lua);
-        return ERR_REDIS_ERROR;
-    }
+    unsigned int result = redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    GET_REPLY(result, "loadPeekActionCommand", reply);
 
     strncpy(rulesBinding->peekActionHash, reply->str, 40);
     rulesBinding->peekActionHash[40] = '\0';
@@ -2140,14 +2152,8 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
     }
 
     free(oldLua);
-    redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
-    redisGetReply(reContext, (void**)&reply);
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("%s\n", reply->str);
-        freeReplyObject(reply);
-        free(lua);
-        return ERR_REDIS_ERROR;
-    }
+    unsigned int result = redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    GET_REPLY(result, "loadEvalMessageCommand", reply);
 
     strncpy(rulesBinding->evalMessageHash, reply->str, 40);
     rulesBinding->evalMessageHash[40] = '\0';
@@ -2262,7 +2268,8 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
 unsigned int bindRuleset(void *handle, 
                          char *host, 
                          unsigned int port, 
-                         char *password) {
+                         char *password,
+                         unsigned char db) {
     ruleset *tree = (ruleset*)handle;
     bindingsList *list;
     if (tree->bindingsList) {
@@ -2294,7 +2301,8 @@ unsigned int bindRuleset(void *handle,
     }
 
     int result = REDIS_OK;
-    #ifndef _WIN32
+
+#ifndef _WIN32
     struct timeval tv;
     tv.tv_sec = 10;
     tv.tv_usec = 0;
@@ -2302,26 +2310,16 @@ unsigned int bindRuleset(void *handle,
     if (result != REDIS_OK) {
         return ERR_REDIS_ERROR;
     }
-    #endif
+#endif
 
     if (password != NULL) {
         result = redisAppendCommand(reContext, "auth %s", password);
-        if (result != REDIS_OK) {
-            return ERR_REDIS_ERROR;
-        }
+        VERIFY(result, "bindRuleset");
+    }
 
-        redisReply *reply;
-        result = redisGetReply(reContext, (void**)&reply);
-        if (result != REDIS_OK) {
-            return ERR_REDIS_ERROR;
-        }
-        
-        if (reply->type == REDIS_REPLY_ERROR) {
-            freeReplyObject(reply);   
-            return ERR_REDIS_ERROR;
-        }
-
-        freeReplyObject(reply);
+    if (db) {
+        result = redisAppendCommand(reContext, "select %d", db);
+        VERIFY(result, "bindRuleset");
     }
 
     if (!list->bindings) {
@@ -2368,20 +2366,8 @@ unsigned int getBindingIndex(ruleset *tree, unsigned int sidHash, unsigned int *
                                     firstBinding->partitionHash, 
                                     sidHash, 
                                     list->bindingsLength);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
     redisReply *reply;
-    result = redisGetReply(reContext, (void**)&reply);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-    
-    if (reply->type == REDIS_REPLY_ERROR) {
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    } 
+    GET_REPLY(result, "loadEvalMessageCommand", reply);
 
     *bindingIndex = reply->integer;
     freeReplyObject(reply);
@@ -2749,25 +2735,6 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
     return result;
 }
 
-static unsigned int tryGetReply(redisContext *reContext, 
-                                redisReply **reply) {
-
-    if (redisGetReply(reContext, (void**)reply) != REDIS_OK) {
-        printf("getReply err %d, %d, %s\n", reContext->err, errno, reContext->errstr);
-        #ifndef _WIN32
-        if (redisReconnect(reContext) != REDIS_OK) {
-            printf("reconnect err %d, %d, %s\n", reContext->err, errno, reContext->errstr);
-            return ERR_REDIS_ERROR;
-        }
-        return ERR_TRY_AGAIN;
-        #else
-        return ERR_REDIS_ERROR;
-        #endif
-    }
-
-    return RULES_OK;
-}
-
 unsigned int completeNonBlockingBatch(void *rulesBinding,
                                       unsigned int replyCount) {
     if (replyCount == 0) {
@@ -2876,23 +2843,7 @@ unsigned int removeMessage(void *rulesBinding, char *sid, char *mid) {
                                     currentBinding->factsHashset, 
                                     sid, 
                                     mid);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
-    redisReply *reply;
-    result = tryGetReply(reContext, &reply);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("removeMessage err string %s\n", reply->str);
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-    
-    freeReplyObject(reply);    
+    VERIFY(result, "removeMessage");   
     return RULES_OK;
 }
 
@@ -2983,23 +2934,7 @@ unsigned int registerTimer(void *rulesBinding, unsigned int duration, char *time
                                     currentBinding->timersSortedset, 
                                     currentTime + duration, 
                                     timer);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-    
-    redisReply *reply;
-    result = tryGetReply(reContext, &reply);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("registerTimer err string %s\n", reply->str);
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-
-    freeReplyObject(reply);    
+    VERIFY(result, "registerTimer");   
     return RULES_OK;
 }
 
@@ -3011,23 +2946,7 @@ unsigned int removeTimer(void *rulesBinding, char *timer) {
                                     "zrem %s p:%s", 
                                     currentBinding->timersSortedset,
                                     timer);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-    
-    redisReply *reply;
-    result = tryGetReply(reContext, &reply);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("deleteTimer err string %s\n", reply->str);
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-
-    freeReplyObject(reply);    
+    VERIFY(result, "removeTimer");  
     return RULES_OK;
 }
 
@@ -3062,23 +2981,7 @@ unsigned int registerMessage(void *rulesBinding, unsigned int queueAction, char 
             break;
     }
     
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-    
-    redisReply *reply;
-    result = tryGetReply(reContext, &reply);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("registerMessage err string %s\n", reply->str);
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-
-    freeReplyObject(reply);    
+    VERIFY(result, "registerMessage");  
     return RULES_OK;
 }
 
@@ -3089,21 +2992,8 @@ unsigned int getSession(void *rulesBinding, char *sid, char **state) {
                                 "hget %s %s", 
                                 currentBinding->sessionHashset, 
                                 sid);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
     redisReply *reply;
-    result = tryGetReply(reContext, &reply);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    if (reply->type == REDIS_REPLY_ERROR) {
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-
+    GET_REPLY(result, "getSession", reply);
     if (reply->type != REDIS_REPLY_STRING) {
         freeReplyObject(reply);
         return ERR_NEW_SESSION;
@@ -3125,21 +3015,9 @@ unsigned int getSessionVersion(void *rulesBinding, char *sid, unsigned long *sta
                                              "hget %s!v %s", 
                                              currentBinding->sessionHashset, 
                                              sid);
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-
+    
     redisReply *reply;
-    result = tryGetReply(reContext, &reply);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    if (reply->type == REDIS_REPLY_ERROR) {
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-
+    GET_REPLY(result, "getSessionVersion", reply);
     if (reply->type != REDIS_REPLY_INTEGER) {
         *stateVersion = 0;
     } else {
@@ -3158,23 +3036,7 @@ unsigned int deleteSession(void *rulesBinding, char *sid) {
                                     "evalsha %s 0 %s", 
                                     currentBinding->deleteSessionHash,
                                     sid); 
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-    
-    redisReply *reply;
-    result = tryGetReply(reContext, &reply);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("deleteSession err string %s\n", reply->str);
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-
-    freeReplyObject(reply);  
+    VERIFY(result, "deleteSession");  
     return REDIS_OK;
 }
 
@@ -3188,22 +3050,6 @@ unsigned int updateAction(void *rulesBinding, char *sid) {
                                     currentBinding->updateActionHash,
                                     sid,
                                     currentTime + 15); 
-    if (result != REDIS_OK) {
-        return ERR_REDIS_ERROR;
-    }
-    
-    redisReply *reply;
-    result = tryGetReply(reContext, &reply);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    if (reply->type == REDIS_REPLY_ERROR) {
-        printf("updateAction err string %s\n", reply->str);
-        freeReplyObject(reply);
-        return ERR_REDIS_ERROR;
-    }
-
-    freeReplyObject(reply);    
+    VERIFY(result, "updateAction");  
     return RULES_OK;
 }

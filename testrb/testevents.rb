@@ -1,5 +1,5 @@
 require 'json'
-require_relative '../src/rulesrb/rules'
+require 'durable'
 
 puts('books1 *****')
 handle = Rules.create_ruleset 'books1', JSON.generate({
@@ -25,7 +25,7 @@ handle = Rules.create_ruleset 'books1', JSON.generate({
   }
 }), 100
 
-Rules.bind_ruleset handle, '/tmp/redis.sock', 0 , nil
+Rules.bind_ruleset handle, 'localhost', 6379, nil, 0
 
 Rules.assert_event handle, JSON.generate({
   :id => 1,
@@ -83,7 +83,7 @@ handle = Rules.create_ruleset 'books2',  JSON.generate({
   }
 }), 100
 
-Rules.bind_ruleset handle, '/tmp/redis.sock', 0, nil
+Rules.bind_ruleset handle, 'localhost', 6379, nil, 0
 
 Rules.assert_event handle, JSON.generate({
   :id => 1,
@@ -115,7 +115,7 @@ handle = Rules.create_ruleset 'books3', JSON.generate({
  }
 }), 100
 
-Rules.bind_ruleset handle, '/tmp/redis.sock', 0 , nil
+Rules.bind_ruleset handle, 'localhost', 6379, nil, 0
 
 Rules.assert_event handle, JSON.generate({
   :id => 1,
@@ -146,7 +146,7 @@ handle = Rules.create_ruleset 'books4', JSON.generate({
   }
 }), 100
 
-Rules.bind_ruleset handle, '/tmp/redis.sock', 0, nil
+Rules.bind_ruleset handle, 'localhost', 6379, nil, 0
 
 Rules.assert_events handle, JSON.generate([
   {:id => '0', :sid => 1, :subject => 'approve', :amount => 100}, 
@@ -181,7 +181,7 @@ handle = Rules.create_ruleset 'approval1', JSON.generate({
   }
 }), 100
 
-Rules.bind_ruleset handle, '/tmp/redis.sock', 0, nil
+Rules.bind_ruleset handle, 'localhost', 6379, nil, 0
 
 Rules.assert_event handle, JSON.generate({
   :id => 3,
@@ -220,7 +220,7 @@ handle = Rules.create_ruleset 'approval2', JSON.generate({
   }
 }), 100
 
-Rules.bind_ruleset handle, '/tmp/redis.sock', 0, nil
+Rules.bind_ruleset handle, 'localhost', 6379, nil, 0
 
 Rules.assert_event handle, JSON.generate({
   :id => 5,

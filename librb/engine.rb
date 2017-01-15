@@ -419,9 +419,9 @@ module Engine
     def bind(databases)
       for db in databases do
         if db.kind_of? String
-          Rules.bind_ruleset @handle, db, 0, nil
+          Rules.bind_ruleset @handle, db, 0, nil, 0
         else
-          Rules.bind_ruleset @handle, db[:host], db[:port], db[:password]
+          Rules.bind_ruleset @handle, db[:host], db[:port], db[:password], db[:db]
         end
       end
     end
@@ -1086,7 +1086,7 @@ module Engine
 
   class Host
 
-    def initialize(ruleset_definitions = nil, databases = [{:host => 'localhost', :port => 6379, :password => nil}], state_cache_size = 1024)
+    def initialize(ruleset_definitions = nil, databases = [{:host => 'localhost', :port => 6379, :password => nil, :db => 0}], state_cache_size = 1024)
       @ruleset_directory = {}
       @ruleset_list = []
       @databases = databases
@@ -1303,13 +1303,13 @@ module Engine
 
   class Queue
 
-    def initialize(ruleset_name, database = {:host => 'localhost', :port => 6379, :password => nil}, state_cache_size = 1024)
+    def initialize(ruleset_name, database = {:host => 'localhost', :port => 6379, :password => nil, :db => 0}, state_cache_size = 1024)
       @_ruleset_name = ruleset_name.to_s
       @handle = Rules.create_client @_ruleset_name, state_cache_size
       if database.kind_of? String
-        Rules.bind_ruleset @handle, database, 0, nil
+        Rules.bind_ruleset @handle, database, 0, nil, 0
       else
-        Rules.bind_ruleset @handle, database[:host], database[:port], database[:password]
+        Rules.bind_ruleset @handle, database[:host], database[:port], database[:password], database[:db]
       end
     end
 

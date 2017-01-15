@@ -67,16 +67,17 @@ static VALUE rbDeleteClient(VALUE self, VALUE handle) {
     return Qnil;
 }
 
-static VALUE rbBindRuleset(VALUE self, VALUE handle, VALUE host, VALUE port, VALUE password) {
+static VALUE rbBindRuleset(VALUE self, VALUE handle, VALUE host, VALUE port, VALUE password, VALUE db) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(host, T_STRING);
     Check_Type(port, T_FIXNUM);
-    
+    Check_Type(db, T_FIXNUM);
+
     unsigned int result;
     if (TYPE(password) == T_STRING) {
-        result = bindRuleset((void *)FIX2LONG(handle), RSTRING_PTR(host), FIX2INT(port), RSTRING_PTR(password));
+        result = bindRuleset((void *)FIX2LONG(handle), RSTRING_PTR(host), FIX2INT(port), RSTRING_PTR(password), FIX2INT(db));
     } else if (TYPE(password) == T_NIL) {
-        result = bindRuleset((void *)FIX2LONG(handle), RSTRING_PTR(host), FIX2INT(port), NULL);
+        result = bindRuleset((void *)FIX2LONG(handle), RSTRING_PTR(host), FIX2INT(port), NULL, FIX2INT(db));
     } else {
         rb_raise(rb_eTypeError, "Wrong argument type for password");   
     }
@@ -654,7 +655,7 @@ void Init_rules() {
     rb_define_singleton_method(rulesModule, "delete_ruleset", rbDeleteRuleset, 1);
     rb_define_singleton_method(rulesModule, "create_client", rbCreateClient, 2);
     rb_define_singleton_method(rulesModule, "delete_client", rbDeleteClient, 1);
-    rb_define_singleton_method(rulesModule, "bind_ruleset", rbBindRuleset, 4);
+    rb_define_singleton_method(rulesModule, "bind_ruleset", rbBindRuleset, 5);
     rb_define_singleton_method(rulesModule, "complete", rbComplete, 2);
     rb_define_singleton_method(rulesModule, "assert_event", rbAssertEvent, 2);
     rb_define_singleton_method(rulesModule, "queue_assert_event", rbQueueAssertEvent, 4);
