@@ -1,30 +1,21 @@
 from durable.lang import *
 
-with statechart('a6'):
-    with state('work'):
-        with state('enter'):
-            @to('process')
-            @when_all(m.subject == 'enter')
-            def continue_process(c):
-                print('a6 continue_process')
-    
-        with state('process'):
-            @to('process')
-            @when_all(m.subject == 'continue')
-            def continue_process(c):
-                print('a6 processing')
+with ruleset('coach'):
+    @when_all(m.completed != True)
+    def trigger_reminders(c):
+        print('An error message should follow this line')
+        # this function is not defined and should crash
+        errorOutHere()
+        # this line is never reached
+        print('This part is never reached and no error is thrown')
 
-        @to('canceled')
-        @when_all(pri(1), m.subject == 'cancel')
-        def cancel(c):
-            print('a6 canceling')
+    @when_all(+s.exception)
+    def exception_handler(c):
+        print('Error message: {0}'.format(c.s.exception))
+        c.s.exception = None
 
-    state('canceled')
     @when_start
     def start(host):
-        host.post('a6', {'id': 1, 'sid': 1, 'subject': 'enter'})
-        host.post('a6', {'id': 2, 'sid': 1, 'subject': 'continue'})
-        host.post('a6', {'id': 3, 'sid': 1, 'subject': 'continue'})
-        host.post('a6', {'id': 4, 'sid': 1, 'subject': 'cancel'})
+        host.assert_fact('coach', {'id': 1, 'sid': 1, 'completed': False})
 
 run_all()

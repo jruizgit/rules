@@ -421,6 +421,14 @@ module Engine
         if db.kind_of? String
           Rules.bind_ruleset @handle, db, 0, nil, 0
         else
+          if !db.key? :password
+            db[:password] = nil
+          end
+
+          if !db.key? :db
+            db[:db] = 0
+          end
+          
           Rules.bind_ruleset @handle, db[:host], db[:port], db[:password], db[:db]
         end
       end

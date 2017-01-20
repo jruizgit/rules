@@ -427,6 +427,8 @@ exports = module.exports = durableEngine = function () {
                 if (typeof(db) === 'string') {
                     r.bindRuleset(handle, db, 0, null, 0);
                 } else {
+                    db.db = db.db || 0;
+                    db.password = db.password || null;
                     r.bindRuleset(handle, db.host, db.port, db.password, db.db);
                 }
             }
