@@ -46,7 +46,7 @@ with ruleset('test'):
 run_all()
 ```  
 #### Node.js
-**JavaScript**
+JavaScript
 ```javascript
 var d = require('durable');
 var m = d.m, s = d.s, c = d.c;
@@ -60,7 +60,7 @@ d.ruleset('test', {
 
 d.runAll();
 ```
-**TypeScript**
+TypeScript
 ```typescript
 import * as d from 'durable';
 let m = d.m, s = d.s, c = d.c;
