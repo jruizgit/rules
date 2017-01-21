@@ -46,6 +46,7 @@ with ruleset('test'):
 run_all()
 ```  
 #### Node.js
+**JavaScript**
 ```javascript
 var d = require('durable');
 var m = d.m, s = d.s, c = d.c;
@@ -54,13 +55,26 @@ d.ruleset('test', {
     // antecedent
     whenAll: m.subject.eq('World'),
     // consequent
-    run: function(c) {
-        console.log('Hello ' + c.m.subject);
-    }
-);
+    run: function(c) { console.log('Hello ' + c.m.subject); }
+});
 
 d.runAll();
 ```
+**TypeScript**
+```typescript
+import * as d from 'durable';
+let m = d.m, s = d.s, c = d.c;
+
+d.ruleset('test', {
+    // antecedent
+    whenAll: m['subject'].eq('World'),
+    // consequent
+    run: (c) => { console.log('Hello ' + c.m['subject']); }
+});
+
+d.runAll();
+```
+
 
 ## Event Processing and Fraud Detection  
 
