@@ -48,14 +48,17 @@ run_all()
 #### Node.js
 ```javascript
 var d = require('durable');
+var m = d.m, s = d.s, c = d.c;
 
-with (d.ruleset('test')) {
+d.ruleset('test', {
     // antecedent
-    whenAll(m.subject.eq('World'), function (c) {
-        // consequent
+    whenAll: m.subject.eq('World'),
+    // consequent
+    run: function(c) {
         console.log('Hello ' + c.m.subject);
-    });
-} 
+    }
+);
+
 d.runAll();
 ```
 
