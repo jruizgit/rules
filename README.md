@@ -18,7 +18,8 @@ durable_rules is cloud ready. It can easily be hosted and scaled in environments
 
 Using your scripting language of choice, you simply need to describe the event to match (antecedent) and the action to take (consequent). In this example the rule can be triggered by posting `{"id": 1, "subject": "World"}` to url `http://localhost:5000/test/1`. 
 
-<sub>Tip: once the test is running, from a terminal type: `curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "World"}' http://localhost:5000/test/1`</sub>
+<sub>Tip: once the test is running, from a terminal type:   
+`curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "World"}' http://localhost:5000/test/1`</sub>
 
 #### Ruby
 ```ruby
