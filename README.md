@@ -184,7 +184,7 @@ end
 Durable.run_all
 ```
 ### Python
-```ptyhon
+```python
 from durable.lang import *
 
 with ruleset('fibonacci'):
