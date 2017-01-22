@@ -42,7 +42,7 @@ class avalue(object):
         self._right = other
         return self
 
-    def id(self, id):
+    def ref_id(self, id):
         self._sid = id 
         return self
 

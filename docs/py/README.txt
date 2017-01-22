@@ -28,57 +28,54 @@ In this example the rule can be triggered by posting `{"id": 1, "subject": "Worl
 
 **Example 2**
 
-Let’s consider a couple of fictitious fraud rules used in bank account management.
-Note: I'm paraphrasing the example presented in this article(https://www.packtpub.com/books/content/drools-jboss-rules-50complex-event-processing).  
-
-1. If there are two debit requests greater than 200% the average monthly withdrawal amount in a span of 2 minutes, flag the account as medium risk.
-2. If there are three consecutive increasing debit requests, withdrawing more than 70% the average monthly balance in a span of three minutes, flag the account as high risk.
+durable_rules provides string pattern matching. Expressions are compiled down to a DFA, guaranteeing linear execution time in the order of single digit nano seconds per character (note: backtracking expressions are not supported).
 
 ::
 
     from durable.lang import *
-    
-    with ruleset('fraud_detection'):
-        # compute monthly averages
-        @when_all(span(86400), (m.t == 'debit_cleared') | (m.t == 'credit_cleared'))
-        def handle_balance(c):
-            debit_total = 0
-            credit_total = 0
-            for tx in c.m:
-                if tx.t == 'debit_cleared':
-                    debit_total += tx.amount
-                else:
-                    credit_total += tx.amount
 
-            c.s.balance = c.s.balance - debit_total + credit_total
-            c.s.avg_balance = (c.s.avg_balance * 29 + c.s.balance) / 30
-            c.s.avg_withdraw = (c.s.avg_withdraw * 29 + debit_total) / 30
-        
-        # medium risk rule
-        @when_all(c.first << (m.t == 'debit_request') & 
-                             (m.amount > c.s.avg_withdraw * 2),
-                  c.second << (m.t == 'debit_request') & 
-                              (m.amount > c.s.avg_withdraw * 2) & 
-                              (m.stamp > c.first.stamp) &
-                              (m.stamp < c.first.stamp + 120))
-        def first_rule(c):
-            print('Medium Risk')
+    with ruleset('test'):
+        @when_all(m.subject.matches('3[47][0-9]{13}'))
+        def amex(c):
+            print ('Amex detected {0}'.format(c.m.subject))
 
-        # high risk rule
-        @when_all(c.first << m.t == 'debit_request',
-                  c.second << (m.t == 'debit_request') &
-                              (m.amount > c.first.amount) & 
-                              (m.stamp < c.first.stamp + 180),
-                  c.third << (m.t == 'debit_request') & 
-                             (m.amount > c.second.amount) & 
-                             (m.stamp < c.first.stamp + 180),
-                  s.avg_balance < (c.first.amount + c.second.amount + c.third.amount) / 0.7)
-        def second_rule(c):
-            print('High Risk')
+        @when_all(m.subject.matches('4[0-9]{12}([0-9]{3})?'))
+        def visa(c):
+            print ('Visa detected {0}'.format(c.m.subject))
+
+        @when_all(m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}'))
+        def mastercard(c):
+            print ('Mastercard detected {0}'.format(c.m.subject))
 
     run_all()
 
 **Example 3**
+
+durable_rules super-power is the ability to define forward reasoning rules. In other words, rules to derive an action based on a set of correlated facts or observed events. The example below illustrates this basic building block by calculating the first 100 numbers of the Fibonacci series.
+
+::
+
+    from durable.lang import *
+
+    with ruleset('fibonacci'):
+        @when_all(c.first << (m.value != 0),
+                  c.second << (m.id == c.first.id + 1))
+        def calculate(c):
+            print('Value: {0}'.format(c.first.value))
+            if c.second.id > 100:
+                print('Value: {0}'.format(c.second.value))
+            else:
+                c.assert_fact({'id': c.second.id + 1, 'value': c.first.value + c.second.value})
+                c.retract_fact(c.first)
+    
+        @when_start
+        def start(host):
+            host.assert_fact('fibonacci', {'id': 1, 'sid': 1, 'value': 1})
+            host.assert_fact('fibonacci', {'id': 2, 'sid': 1, 'value': 1})
+        
+    run_all()
+
+**Example 4**
 
 durable_rules can also be used to solve traditional Production Bussiness Rules problems. The example below is the 'Miss Manners' benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent guests are of opposite sex and share at least one hobby. 
 
