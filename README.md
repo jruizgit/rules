@@ -21,7 +21,7 @@ Using your scripting language of choice, you simply need to describe the event t
 <sub>Tip: once the test is running, from a terminal type:   
 `curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "World"}' http://localhost:5000/test/1`</sub>
 
-#### Ruby
+### Ruby
 ```ruby
 require "durable"
 Durable.ruleset :test do
@@ -33,7 +33,7 @@ Durable.ruleset :test do
 end
 Durable.run_all
 ```  
-#### Python
+### Python
 ```python
 from durable.lang import *
 
@@ -46,7 +46,7 @@ with ruleset('test'):
 
 run_all()
 ```  
-#### Node.js
+### Node.js
 JavaScript
 ```javascript
 var d = require('durable');
@@ -85,7 +85,7 @@ durable_rules provides string pattern matching. Expressions are compiled down to
 `curl -H "Content-type: application/json" -X POST -d '{"id": 3, "subject": "2228345634567898"}' http://localhost:5000/test/1`  
 </sub>
 
-#### Ruby
+### Ruby
 ```ruby
 require "durable"
 Durable.ruleset :test do
@@ -101,7 +101,7 @@ Durable.ruleset :test do
 end
 Durable.run_all
 ```
-#### Python
+### Python
 ```python
 from durable.lang import *
 
@@ -120,7 +120,7 @@ with ruleset('test'):
 
 run_all()
 ```
-#### Node.js
+### Node.js
 JavaScript
 ```javascript
 var d = require('durable');
@@ -157,153 +157,108 @@ d.ruleset('test', {
 
 d.runAll();
 ```
-## Event Processing and Fraud Detection  
+## Forward Inference  
 
-Let’s consider a couple of fictitious fraud rules used in bank account management.  
-Note: I'm paraphrasing the example presented in this [article](https://www.packtpub.com/books/content/drools-jboss-rules-50complex-event-processing).  
+durable_rules super-power is the ability to define forward reasoning rules. In other words, rules to derive an action based on a set of correlated facts or observed events. The example below illustrates this basic building block by calculating the first 100 numbers of the Fibonacci series.
 
-1. If there are two debit requests greater than 200% the average monthly withdrawal amount in a span of 2 minutes, flag the account as medium risk.
-2. If there are three consecutive increasing debit requests, withdrawing more than 70% the average monthly balance in a span of three minutes, flag the account as high risk.
-
-
-#### Ruby
+### Ruby
 ```ruby
 require "durable"
 
-Durable.ruleset :fraud_detection do
-  # compute monthly averages
-  when_all span(86400), (m.t == "debit_cleared") | (m.t == "credit_cleared") do
-    debit_total = 0
-    credit_total = 0
-    for tx in m do
-      if tx.t == "debit_cleared"
-        debit_total += tx.amount
-      else
-        credit_total += tx.amount
-      end
+Durable.ruleset :fibonacci do
+  when_all(c.first = (m.value != 0),
+           c.second = (m.id == first.id + 1)) do
+    puts "Value: #{first.value}"
+    if second.id > 100
+        puts "Value: #{second.value}"
+    else
+        assert(:id => second.id + 1, :value => first.value + second.value)
+        retract first
     end
-
-    s.balance = s.balance - debit_total + credit_total
-    s.avg_balance = (s.avg_balance * 29 + s.balance) / 30
-    s.avg_withdraw = (s.avg_withdraw * 29 + debit_total) / 30
   end
-
-  # medium risk rule
-  when_all c.first = (m.t == "debit_request") & 
-                     (m.amount > s.avg_withdraw * 2),
-           c.second = (m.t == "debit_request") & 
-                      (m.amount > s.avg_withdraw * 2) & 
-                      (m.stamp > first.stamp) &
-                      (m.stamp < first.stamp + 120) do
-    puts "Medium risk"
-  end
-
-  # high risk rule
-  when_all c.first = m.t == "debit_request",
-           c.second = (m.t == "debit_request") &
-                      (m.amount > first.amount) & 
-                      (m.stamp < first.stamp + 180),
-           c.third = (m.t == "debit_request") & 
-                     (m.amount > second.amount) & 
-                     (m.stamp < first.stamp + 180),
-           s.avg_balance < (first.amount + second.amount + third.amount) / 0.7 do
-    puts "High risk"
+  when_start do
+    assert :fibonacci, {:id => 1, :sid => 1, :value => 1}
+    assert :fibonacci, {:id => 2, :sid => 1, :value => 1}
   end
 end
-
 Durable.run_all
 ```
-#### Python
-```python
+### Python
+```ptyhon
 from durable.lang import *
 
-with ruleset('fraud_detection'):
-    # compute monthly averages
-    @when_all(span(86400), (m.t == 'debit_cleared') | (m.t == 'credit_cleared'))
-    def handle_balance(c):
-        debit_total = 0
-        credit_total = 0
-        for tx in c.m:
-            if tx.t == 'debit_cleared':
-                debit_total += tx.amount
-            else:
-                credit_total += tx.amount
-
-        c.s.balance = c.s.balance - debit_total + credit_total
-        c.s.avg_balance = (c.s.avg_balance * 29 + c.s.balance) / 30
-        c.s.avg_withdraw = (c.s.avg_withdraw * 29 + debit_total) / 30
+with ruleset('fibonacci'):
+    @when_all(c.first << (m.value != 0),
+              c.second << (m.id == c.first.id + 1))
+    def calculate(c):
+        print('Value: {0}'.format(c.first.value))
+        if c.second.id > 100:
+            print('Value: {0}'.format(c.second.value))
+        else:
+            c.assert_fact({'id': c.second.id + 1, 'value': c.first.value + c.second.value})
+            c.retract_fact(c.first)
     
-    # medium risk rule
-    @when_all(c.first << (m.t == 'debit_request') & 
-                         (m.amount > c.s.avg_withdraw * 2),
-              c.second << (m.t == 'debit_request') & 
-                          (m.amount > c.s.avg_withdraw * 2) & 
-                          (m.stamp > c.first.stamp) &
-                          (m.stamp < c.first.stamp + 120))
-    def first_rule(c):
-        print('Medium Risk')
-
-    # high risk rule
-    @when_all(c.first << m.t == 'debit_request',
-              c.second << (m.t == 'debit_request') &
-                          (m.amount > c.first.amount) & 
-                          (m.stamp < c.first.stamp + 180),
-              c.third << (m.t == 'debit_request') & 
-                         (m.amount > c.second.amount) & 
-                         (m.stamp < c.first.stamp + 180),
-              s.avg_balance < (c.first.amount + c.second.amount + c.third.amount) / 0.7)
-    def second_rule(c):
-        print('High Risk')
-
+    @when_start
+    def start(host):
+        host.assert_fact('fibonacci', {'id': 1, 'sid': 1, 'value': 1})
+        host.assert_fact('fibonacci', {'id': 2, 'sid': 1, 'value': 1})
+        
 run_all()
 ```
-#### Node.js
+### Node.js
+JavaScript  
 ```javascript
 var d = require('durable');
+var m = d.m, s = d.s, c = d.c;
 
-with (d.ruleset('fraudDetection')) {
-    // compute monthly averages
-    whenAll(span(86400), or(m.t.eq('debitCleared'), m.t.eq('creditCleared')), 
-    function(c) {
-        var debitTotal = 0;
-        var creditTotal = 0;
-        for (var i = 0; i < c.m.length; ++i) {
-            if (c.m[i].t === 'debitCleared') {
-                debitTotal += c.m[i].amount;
+d.ruleset('fibonacci', {
+        whenAll: [
+            c.first = m.value.neq(0),
+            c.second = m.id.eq(c.first.id.add(1))
+        ],
+        run: function(c) { 
+            console.log('Value: ' + c.first.value);
+            if (c.second.id > 100) {
+                console.log('Value: ' + c.second.value);
             } else {
-                creditTotal += c.m[i].amount;
+                c.assert({id: c.second.id + 1, value: c.first.value + c.second.value});
+                c.retract(c.first);
             }
         }
+    }, 
+    function(host) {
+        host.assert('fibonacci', { id: 1, sid: 1, value: 1 });
+        host.assert('fibonacci', { id: 2, sid: 1, value: 1 });
+    }
+);
 
-        c.s.balance = c.s.balance - debitTotal + creditTotal;
-        c.s.avgBalance = (c.s.avgBalance * 29 + c.s.balance) / 30;
-        c.s.avgWithdraw = (c.s.avgWithdraw * 29 + debitTotal) / 30;
-    });
+d.runAll();
+```
+TypeScript  
+```typescript
+import * as d from 'durable';
+let m = d.m, s = d.s, c = d.c;
 
-    // medium risk rule
-    whenAll(c.first = and(m.t.eq('debitRequest'), 
-                          m.amount.gt(c.s.avgWithdraw.mul(2))),
-            c.second = and(m.t.eq('debitRequest'),
-                           m.amount.gt(c.s.avgWithdraw.mul(2)),
-                           m.stamp.gt(c.first.stamp),
-                           m.stamp.lt(c.first.stamp.add(120))),
-    function(c) {
-        console.log('Medium risk');
-    });
-
-    // high risk rule 
-    whenAll(c.first = m.t.eq('debitRequest'),
-            c.second = and(m.t.eq('debitRequest'),
-                           m.amount.gt(c.first.amount),
-                           m.stamp.lt(c.first.stamp.add(180))),
-            c.third = and(m.t.eq('debitRequest'),
-                          m.amount.gt(c.second.amount),
-                          m.stamp.lt(c.first.stamp.add(180))),
-            s.avgBalance.lt(add(c.first.amount, c.second.amount, c.third.amount).div(0.7)),
-    function(c) {
-        console.log('High risk');
-    });
-}
+d.ruleset('fibonacci', {
+        whenAll: [
+            c['first'] = m['value'].neq(0),
+            c['second'] = m['id'].eq(c['first']['id'].add(1))
+        ],
+        run: (c) => { 
+            console.log('Value: ' + c['first']['value']);
+            if (c['second']['id'] > 100) {
+                console.log('Value: ' + c['second']['value']);
+            } else {
+                c.assert({id: c['second']['id']+1, value: c['first']['value'] + c['second']['value']});
+                c.retract(c['first']);
+            }
+        }
+    }, 
+    function(host) {
+        host.assert('fibonacci', { id: 1, sid: 1, value: 1 });
+        host.assert('fibonacci', { id: 2, sid: 1, value: 1 });
+    }
+);
 
 d.runAll();
 ```
@@ -318,11 +273,11 @@ Note how the benchmark flow structure is defined using a statechart to improve c
 
 _IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive_    
 
-#### [Ruby](https://github.com/jruizgit/rules/blob/master/testrb/manners.rb)
+### [Ruby](https://github.com/jruizgit/rules/blob/master/testrb/manners.rb)
 
-#### [Python](https://github.com/jruizgit/rules/blob/master/testpy/manners.py)
+### [Python](https://github.com/jruizgit/rules/blob/master/testpy/manners.py)
 
-#### [Node.js](https://github.com/jruizgit/rules/blob/master/testjs/manners.js)
+### [Node.js](https://github.com/jruizgit/rules/blob/master/testjs/manners.js)
 
 ## Image recognition and Waltzdb
 
@@ -334,11 +289,11 @@ In this case too, the benchmark flow structure is defined using a statechart to 
 
 _IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive_    
 
-#### [Ruby](https://github.com/jruizgit/rules/blob/master/testrb/waltzdb.rb)
+### [Ruby](https://github.com/jruizgit/rules/blob/master/testrb/waltzdb.rb)
 
-#### [Python](https://github.com/jruizgit/rules/blob/master/testpy/waltzdb.py)
+### [Python](https://github.com/jruizgit/rules/blob/master/testpy/waltzdb.py)
 
-#### [Node.js](https://github.com/jruizgit/rules/blob/master/testjs/waltzdb.js)
+### [Node.js](https://github.com/jruizgit/rules/blob/master/testjs/waltzdb.js)
 
 ## To Learn More  
 Reference Manual:  
