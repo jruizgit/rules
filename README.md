@@ -16,9 +16,7 @@ durable_rules is cloud ready. It can easily be hosted and scaled in environments
 
 ## Getting Started  
 
-durable_rules is simple. Using your scripting language of choice, you only need to describe the event or fact pattern to match (antecedent) and the action to take (consequent).  
-
-In this example the rule can be triggered by posting `{"id": 1, "subject": "World"}` to url `http://localhost:5000/test/1`. 
+Using your scripting language of choice, you simply need to describe the event to match (antecedent) and the action to take (consequent). In this example the rule can be triggered by posting `{"id": 1, "subject": "World"}` to url `http://localhost:5000/test/1`. 
 
 <sub>Tip: once the test is running, from a terminal type: `curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "World"}' http://localhost:5000/test/1`</sub>
 
@@ -76,7 +74,88 @@ d.ruleset('test', {
 
 d.runAll();
 ```
+## Pattern Matching
 
+durable_rules provides string pattern matching. Expressions are compiled down to a DFA, guaranteeing linear execution time in the order of single digit nano seconds per character (note: backtracking expressions are not supported).
+
+<sub>Tip: once the test is running, from a terminal type:  
+`curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "375678956789765"}' http://localhost:5000/test/1`  
+`curl -H "Content-type: application/json" -X POST -d '{"id": 2, "subject": "4345634566789888"}' http://localhost:5000/test/1`  
+`curl -H "Content-type: application/json" -X POST -d '{"id": 3, "subject": "2228345634567898"}' http://localhost:5000/test/1`  
+</sub>
+
+#### Ruby
+```ruby
+require "durable"
+Durable.ruleset :test do
+  when_all m.subject.matches('3[47][0-9]{13}') do
+    puts "Amex detected in #{m.subject}"
+  end
+  when_all m.subject.matches('4[0-9]{12}([0-9]{3})?') do
+    puts "Visa detected in #{m.subject}"
+  end
+  when_all m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}') do
+    puts "Mastercard detected in #{m.subject}"
+  end
+end
+Durable.run_all
+```
+#### Python
+```python
+from durable.lang import *
+
+with ruleset('test'):
+    @when_all(m.subject.matches('3[47][0-9]{13}'))
+    def amex(c):
+        print ('Amex detected {0}'.format(c.m.subject))
+
+    @when_all(m.subject.matches('4[0-9]{12}([0-9]{3})?'))
+    def visa(c):
+        print ('Visa detected {0}'.format(c.m.subject))
+
+    @when_all(m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}'))
+    def mastercard(c):
+        print ('Mastercard detected {0}'.format(c.m.subject))
+
+run_all()
+```
+#### Node.js
+JavaScript
+```javascript
+var d = require('durable');
+var m = d.m, s = d.s, c = d.c;
+
+d.ruleset('test', {
+    whenAll: m.subject.mt('3[47][0-9]{13}'),
+    run: function(c) { console.log('Amex detected in ' + c.m.subject); }
+}, {
+    whenAll: m.subject.mt('4[0-9]{12}([0-9]{3})?'),
+    run: function(c) { console.log('Visa detected in ' + c.m.subject); }
+}, {
+    whenAll: m.subject.mt('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}'),
+    run: function(c) { console.log('Mastercard detected in ' + c.m.subject); }
+});
+
+d.runAll();
+```
+TypeScript
+```typescript
+import * as d from 'durable';
+let m = d.m, s = d.s, c = d.c;
+
+d.ruleset('test', {
+    whenAll: m['subject'].mt('3[47][0-9]{13}'),
+    run: (c) => { console.log('Amex detected in ' + c.m['subject']); }
+},{
+    whenAll: m['subject'].mt('4[0-9]{12}([0-9]{3})?'),
+    run: (c) => { console.log('Visa detected in ' + c.m['subject']); }
+},{
+    whenAll: m['subject'].mt('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}'),
+    run: (c) => { console.log('Mastercard detected in ' + c.m['subject']); }
+});
+
+d.runAll();
+```
 ## Event Processing and Fraud Detection  
 
 Let’s consider a couple of fictitious fraud rules used in bank account management.  
