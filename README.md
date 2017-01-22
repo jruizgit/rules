@@ -94,7 +94,7 @@ Durable.ruleset :test do
   when_all m.subject.matches('4[0-9]{12}([0-9]{3})?') do
     puts "Visa detected in #{m.subject}"
   end
-  when_all m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}') do
+  when_all m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}') do
     puts "Mastercard detected in #{m.subject}"
   end
 end
@@ -113,7 +113,7 @@ with ruleset('test'):
     def visa(c):
         print ('Visa detected {0}'.format(c.m.subject))
 
-    @when_all(m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}'))
+    @when_all(m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}'))
     def mastercard(c):
         print ('Mastercard detected {0}'.format(c.m.subject))
 
@@ -132,7 +132,7 @@ d.ruleset('test', {
     whenAll: m.subject.mt('4[0-9]{12}([0-9]{3})?'),
     run: function(c) { console.log('Visa detected in ' + c.m.subject); }
 }, {
-    whenAll: m.subject.mt('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}'),
+    whenAll: m.subject.mt('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}'),
     run: function(c) { console.log('Mastercard detected in ' + c.m.subject); }
 });
 
