@@ -137,7 +137,7 @@ module Durable
       return Expression.new(@name, @left) & other
     end
 
-    def refId(sid)
+    def ref_id(sid)
       Arithmetic.new @name, @left, sid
     end
 

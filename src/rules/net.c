@@ -2876,6 +2876,11 @@ unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply
         }
         
         if ((*reply)->type == REDIS_REPLY_ARRAY) {
+            if ((*reply)->elements < 4) {
+                freeReplyObject(*reply);
+                return ERR_REDIS_ERROR;       
+            }
+            
             *bindingContext = currentBinding;
             return RULES_OK;
         } else {

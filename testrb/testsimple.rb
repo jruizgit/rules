@@ -289,7 +289,7 @@ Durable.ruleset :a7 do
 end
 
 Durable.ruleset :a8 do
-  when_all (m.amount < s.max_amount) & (m.amount > s.id(:global).min_amount) do
+  when_all (m.amount < s.max_amount) & (m.amount > s.ref_id(:global).min_amount) do
     puts "a8 approved " + m.amount.to_s
   end
   when_start do

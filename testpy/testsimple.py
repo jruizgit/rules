@@ -602,7 +602,7 @@ with ruleset('a7'):
 
 
 with ruleset('a8'):
-    @when_all((m.amount < c.s.max_amount) & (m.amount > c.s.id('global').min_amount))
+    @when_all((m.amount < c.s.max_amount) & (m.amount > c.s.ref_id('global').min_amount))
     def approved(c):
         print ('a8 approved {0}'.format(c.m.amount))
 
@@ -627,7 +627,7 @@ with ruleset('a9'):
 
 
 with ruleset('a10'):
-    @when_all(m.amount < c.s.max_amount + c.s.id('global').max_amount)
+    @when_all(m.amount < c.s.max_amount + c.s.ref_id('global').max_amount)
     def approved(c):
         print ('a10 approved {0}'.format(c.m.amount))
 
