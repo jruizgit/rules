@@ -459,6 +459,10 @@ static unsigned int readNextToken(char **first,
                                   char *last, 
                                   token *nextToken) {
     unsigned int result = REGEX_PARSE_OK;
+    nextToken->low = 0;
+    nextToken->high = 0;
+    nextToken->symbolsLength = 0;
+    nextToken->inverseSymbolsLength = 0;
     if (*first >= last) {
         return REGEX_PARSE_END;
     }
