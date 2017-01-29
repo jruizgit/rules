@@ -189,7 +189,6 @@ unsigned int utf8ToUnicode(char **first, char *last, unsigned int *result) {
     if (*first + byteNumber >= last) {
         return ERR_PARSE_REGEX;
     }
-    
     *result = 0;
     switch (byteNumber) {
         case 3: 

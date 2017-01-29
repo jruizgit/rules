@@ -1,4 +1,4 @@
-# coding=latin-1    
+# coding=utf-8   
 from durable.lang import *
 import datetime
 import random

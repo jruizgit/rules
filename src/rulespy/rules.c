@@ -1006,6 +1006,34 @@ static PyMethodDef myModule_methods[] = {
     {NULL, NULL}
 };
 
+#if PY_MAJOR_VERSION >= 3
+
+static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        "rules",
+        NULL,
+        -1,
+        myModule_methods,
+        NULL,
+        NULL,
+        NULL,
+        NULL
+};
+
+PyMODINIT_FUNC PyInit_rules(void)
+{
+    PyObject *m = PyModule_Create(&moduledef);
+    if (m != NULL) {
+        RulesError = PyErr_NewException("rules.error", NULL, NULL);
+        Py_INCREF(RulesError);
+        PyModule_AddObject(m, "error", RulesError);
+    }
+
+    return m;
+}
+
+#else
+
 PyMODINIT_FUNC initrules(void)
 {
     PyObject *m = Py_InitModule("rules", myModule_methods);
@@ -1015,3 +1043,5 @@ PyMODINIT_FUNC initrules(void)
         PyModule_AddObject(m, "error", RulesError);
     }
 }
+
+#endif

@@ -382,10 +382,10 @@ class Ruleset(object):
         self._actions = {}
         self._name = name
         self._host = host
-        for rule_name, rule in ruleset_definition.iteritems():
+        for rule_name, rule in ruleset_definition.items():
             action = rule['run']
             del rule['run']
-            if isinstance(action, basestring):
+            if isinstance(action, str):
                 self._actions[rule_name] = Promise(host.get_action(action))
             elif isinstance(action, Promise):
                 self._actions[rule_name] = action.root
@@ -397,7 +397,7 @@ class Ruleset(object):
         
     def bind(self, databases):
         for db in databases:
-            if isinstance(db, basestring):
+            if isinstance(db, str):
                 rules.bind_ruleset(None, 0, db, self._handle, 0)
             else:
                 if not 'password' in db:
@@ -477,7 +477,7 @@ class Ruleset(object):
     @staticmethod
     def create_rulesets(parent_name, host, ruleset_definitions, state_cache_size):
         branches = {}
-        for name, definition in ruleset_definitions.iteritems():  
+        for name, definition in ruleset_definitions.items():  
             if name.rfind('$state') != -1:
                 name = name[:name.rfind('$state')]
                 if parent_name:
@@ -542,7 +542,7 @@ class Ruleset(object):
         
         while 'message' in result_container:
             action_name = None
-            for action_name, message in result_container['message'].iteritems():
+            for action_name, message in result_container['message'].items():
                 break
 
             del(result_container['message'])
@@ -557,13 +557,13 @@ class Ruleset(object):
                     complete(e, True)
                 else:
                     try:
-                        for timer_id, timer in c.get_cancelled_timers().iteritems():
+                        for timer_id, timer in c.get_cancelled_timers().items():
                             self.cancel_timer(c.s['sid'], timer)
 
-                        for timer_id, timer_duration in c.get_timers().iteritems():
+                        for timer_id, timer_duration in c.get_timers().items():
                             self.start_timer(c.s['sid'], timer_duration[0], timer_duration[1])
 
-                        for ruleset_name, q in c.get_queues().iteritems():
+                        for ruleset_name, q in c.get_queues().items():
                             for message in q.get_queued_posts():
                                 self.queue_assert_event(message['sid'], ruleset_name, message)
 
@@ -574,14 +574,14 @@ class Ruleset(object):
                                 self.queue_retract_fact(message['sid'], ruleset_name, message)
 
   
-                        for ruleset_name, sid in c.get_deletes().iteritems():
+                        for ruleset_name, sid in c.get_deletes().items():
                             self._host.delete_state(ruleset_name, sid)
 
                         binding  = 0
                         replies = 0
                         pending = {action_binding: 0}
         
-                        for ruleset_name, facts in c.get_retract_facts().iteritems():
+                        for ruleset_name, facts in c.get_retract_facts().items():
                             if len(facts) == 1:
                                 binding, replies = self._host.start_retract_fact(ruleset_name, facts[0])
                             else:
@@ -592,7 +592,7 @@ class Ruleset(object):
                             else:
                                 pending[binding] = replies
                         
-                        for ruleset_name, facts in c.get_facts().iteritems():
+                        for ruleset_name, facts in c.get_facts().items():
                             if len(facts) == 1:
                                 binding, replies = self._host.start_assert_fact(ruleset_name, facts[0])
                             else:
@@ -603,7 +603,7 @@ class Ruleset(object):
                             else:
                                 pending[binding] = replies
 
-                        for ruleset_name, messages in c.get_messages().iteritems():
+                        for ruleset_name, messages in c.get_messages().items():
                             if len(messages) == 1:
                                 binding, replies = self._host.start_post(ruleset_name, messages[0])
                             else:
@@ -620,7 +620,7 @@ class Ruleset(object):
                         else:
                             pending[binding] = replies
                         
-                        for binding, replies in pending.iteritems():
+                        for binding, replies in pending.items():
                             if binding != 0:
                                 if binding != action_binding:
                                     rules.complete(binding, replies)
@@ -674,28 +674,28 @@ class Statechart(Ruleset):
         start_state = {}
         reflexive_states = {}
 
-        for state_name, state in chart_definition.iteritems():
+        for state_name, state in chart_definition.items():
             qualified_name = state_name
             if parent_name:
                 qualified_name = '{0}.{1}'.format(parent_name, state_name)
 
             start_state[qualified_name] = True
 
-            for trigger_name, trigger in state.iteritems():
+            for trigger_name, trigger in state.items():
                 if ('to' in trigger and trigger['to'] == state_name) or 'count' in trigger or 'cap' in trigger or 'span' in trigger:
                     reflexive_states[qualified_name] = True
 
-        for state_name, state in chart_definition.iteritems():
+        for state_name, state in chart_definition.items():
             qualified_name = state_name
             if parent_name:
                 qualified_name = '{0}.{1}'.format(parent_name, state_name)
 
             triggers = {}
             if parent_triggers:
-                for parent_trigger_name, trigger in parent_triggers.iteritems():
+                for parent_trigger_name, trigger in parent_triggers.items():
                     triggers['{0}.{1}'.format(qualified_name, parent_trigger_name)] = trigger 
 
-            for trigger_name, trigger in state.iteritems():
+            for trigger_name, trigger in state.items():
                 if trigger_name != '$chart':
                     if ('to' in trigger) and parent_name:
                         trigger['to'] = '{0}.{1}'.format(parent_name, trigger['to'])
@@ -705,7 +705,7 @@ class Statechart(Ruleset):
             if '$chart' in state:
                 self._transform(qualified_name, triggers, start_state, state['$chart'], rules)
             else:
-                for trigger_name, trigger in triggers.iteritems():
+                for trigger_name, trigger in triggers.items():
                     rule = {}
                     state_test = {'chart_context': {'$and':[{'label': qualified_name}, {'chart': 1}]}}
                     if 'pri' in trigger:
@@ -729,7 +729,7 @@ class Statechart(Ruleset):
                         rule['all'] = [state_test]
 
                     if 'run' in trigger:
-                        if isinstance(trigger['run'], basestring):
+                        if isinstance(trigger['run'], str):
                             rule['run'] = Promise(self._host.get_action(trigger['run']))
                         elif isinstance(trigger['run'], Promise):
                             rule['run'] = trigger['run']
@@ -791,24 +791,24 @@ class Flowchart(Ruleset):
         visited = {}
         reflexive_stages = {}
 
-        for stage_name, stage in chart_definition.iteritems():
+        for stage_name, stage in chart_definition.items():
             if 'to' in stage:
-                if isinstance(stage['to'], basestring):
+                if isinstance(stage['to'], str):
                     if stage['to'] == stage_name:
                         reflexive_stages[stage_name] = True
                 else:
-                    for transition_name, transition in stage['to'].iteritems():
+                    for transition_name, transition in stage['to'].items():
                         if transition_name == stage_name or 'count' in transition or 'span' in transition or 'cap' in transition:
                             reflexive_stages[stage_name] = True
 
-        for stage_name, stage in chart_definition.iteritems():
+        for stage_name, stage in chart_definition.items():
             stage_test = {'chart_context': {'$and':[{'label': stage_name}, {'chart':1}]}}
             from_stage = None
             if stage_name in reflexive_stages:
                 from_stage = stage_name
 
             if 'to' in stage:
-                if isinstance(stage['to'], basestring):
+                if isinstance(stage['to'], str):
                     next_stage = None
                     rule = {'all': [stage_test]}
                     if stage['to'] in chart_definition:
@@ -823,7 +823,7 @@ class Flowchart(Ruleset):
                     if not 'run' in next_stage:
                         rule['run'] = To(from_stage, stage['to'], assert_stage)
                     else:
-                        if isinstance(next_stage['run'], basestring):
+                        if isinstance(next_stage['run'], str):
                             rule['run'] = To(from_stage, stage['to'], assert_stage).continue_with(Promise(self._host.get_action(next_stage['run'])))
                         elif isinstance(next_stage['run'], Promise) or hasattr(next_stage['run'], '__call__'):
                             rule['run'] = To(from_stage, stage['to'], assert_stage).continue_with(next_stage['run'])
@@ -831,7 +831,7 @@ class Flowchart(Ruleset):
                     rules['{0}.{1}'.format(stage_name, stage['to'])] = rule
                     visited[stage['to']] = True
                 else:
-                    for transition_name, transition in stage['to'].iteritems():
+                    for transition_name, transition in stage['to'].items():
                         rule = {}
                         next_stage = None
 
@@ -867,7 +867,7 @@ class Flowchart(Ruleset):
                         if not 'run' in next_stage:
                             rule['run'] = To(from_stage, transition_name, assert_stage)
                         else:
-                            if isinstance(next_stage['run'], basestring):
+                            if isinstance(next_stage['run'], str):
                                 rule['run'] = To(from_stage, transition_name, assert_stage).continue_with(Promise(self._host.get_action(next_stage['run'])))
                             elif isinstance(next_stage['run'], Promise) or hasattr(next_stage['run'], '__call__'):
                                 rule['run'] = To(from_stage, transition_name, assert_stage).continue_with(next_stage['run'])
@@ -876,7 +876,7 @@ class Flowchart(Ruleset):
                         visited[transition_name] = True
 
         started = False
-        for stage_name, stage in chart_definition.iteritems():
+        for stage_name, stage in chart_definition.items():
             if not stage_name in visited:
                 if started:
                     raise Exception('Chart {0} has more than one start state'.format(self._name))
@@ -885,7 +885,7 @@ class Flowchart(Ruleset):
                 if not 'run' in stage:
                     rule['run'] = To(None, stage_name, False)
                 else:
-                    if isinstance(stage['run'], basestring):
+                    if isinstance(stage['run'], str):
                         rule['run'] = To(None, stage_name, False).continue_with(Promise(self._host.get_action(stage['run'])))
                     elif isinstance(stage['run'], Promise) or hasattr(stage['run'], '__call__'):
                         rule['run'] = To(None, stage_name, False).continue_with(stage['run'])
@@ -978,7 +978,7 @@ class Host(object):
 
     def register_rulesets(self, parent_name, ruleset_definitions):
         rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions, self._state_cache_size)
-        for ruleset_name, ruleset in rulesets.iteritems():
+        for ruleset_name, ruleset in rulesets.items():
             if ruleset_name in self._ruleset_directory:
                 raise Exception('Ruleset with name {0} already registered'.format(ruleset_name))
             else:    
@@ -1063,7 +1063,7 @@ class Queue(object):
     def __init__(self, ruleset_name, database = {'host': 'localhost', 'port': 6379, 'password':None, 'db': 0}, state_cache_size = 1024):
         self._ruleset_name = ruleset_name
         self._handle = rules.create_client(state_cache_size, ruleset_name)
-        if isinstance(database, basestring):
+        if isinstance(database, str):
             rules.bind_ruleset(None, 0, database, self._handle)
         else:
             if not 'password' in database:

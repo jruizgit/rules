@@ -117,7 +117,7 @@ with statechart('miss_manners'):
 
     @when_start
     def start(host):
-      	host.assert_fact('miss_manners', {'id': 1, 'sid': 1, 't': 'guest', 'name': '1', 'sex': 'm', 'hobby': 'h2'})
+        host.assert_fact('miss_manners', {'id': 1, 'sid': 1, 't': 'guest', 'name': '1', 'sex': 'm', 'hobby': 'h2'})
         host.assert_fact('miss_manners', {'id': 2, 'sid': 1, 't': 'guest', 'name': '1', 'sex': 'm', 'hobby': 'h3'})
         host.assert_fact('miss_manners', {'id': 3, 'sid': 1, 't': 'guest', 'name': '1', 'sex': 'm', 'hobby': 'h1'})
         host.assert_fact('miss_manners', {'id': 4, 'sid': 1, 't': 'guest', 'name': '1', 'sex': 'm', 'hobby': 'h4'})

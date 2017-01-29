@@ -47,7 +47,7 @@ with open(path.join(here, 'README.txt'), encoding='utf-8') as f:
 
 setup (
     name = 'durable_rules',
-    version = '0.33.80',
+    version = '0.33.81',
     description = 'for real time analytics (a Python Rules Engine)',
     long_description=long_description,
     url='https://github.com/jruizgit/rules',
@@ -63,6 +63,8 @@ setup (
         'Programming Language :: C',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
     ],
     keywords='rules engine rete forward chaining event stream state machine workflow streaming analytics',
     install_requires=['werkzeug'],

@@ -1,6 +1,6 @@
 import os
 import json
-import engine
+from . import engine
 from werkzeug.wrappers import Request, Response
 from werkzeug.routing import Map, Rule
 from werkzeug.exceptions import HTTPException, NotFound

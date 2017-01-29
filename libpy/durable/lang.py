@@ -1,5 +1,5 @@
-import engine
-import interface
+from . import engine
+from . import interface
 
 class avalue(object):
 
@@ -20,6 +20,9 @@ class avalue(object):
         return self._set_right('$mul', other)
 
     def __div__(self, other):
+        return self._set_right('$div', other)
+
+    def __truediv__(self, other):
         return self._set_right('$div', other)
 
     def __lshift__(self, other):
