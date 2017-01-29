@@ -95,7 +95,6 @@ typedef struct action {
     unsigned short span;
     unsigned short count;
     unsigned short cap;
-    unsigned int partitionBy;
     unsigned short priority;
     unsigned int joinsOffset;
     unsigned short joinsLength;

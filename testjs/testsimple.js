@@ -524,19 +524,19 @@ with (d.ruleset('fraud5')) {
     whenAll(m.amount.gt(100),
             pri(3),
         function(c) {
-            console.log('fraud5 first ' + c.m.amount + ' from ' + c.s.sid);
+            console.log('fraud5 first ' + c.m.amount + ', ' + c.m.id + ' from ' + c.s.sid);
         }
     );
     whenAll(m.amount.gt(200),
             pri(2),
         function(c) {
-            console.log('fraud5 second ' + c.m.amount + ' from ' + c.s.sid);
+            console.log('fraud5 second ' + c.m.amount + ', ' + c.m.id  + ' from ' + c.s.sid);
         }
     );
     whenAll(m.amount.gt(300),
             pri(1),
         function(c) {
-            console.log('fraud5 third ' + c.m.amount + ' from ' + c.s.sid);
+            console.log('fraud5 third ' + c.m.amount + ', ' + c.m.id  + ' from ' + c.s.sid);
         }
     );
     whenStart(function (host) {

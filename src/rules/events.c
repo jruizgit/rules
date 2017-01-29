@@ -272,7 +272,6 @@ static unsigned int handleAction(ruleset *tree,
                                  node *node, 
                                  unsigned char actionType, 
                                  char **evalKeys,
-                                 unsigned short *evalPriorities,
                                  unsigned int *evalCount,
                                  char **addKeys,
                                  unsigned int *addCount,
@@ -303,15 +302,7 @@ static unsigned int handleAction(ruleset *tree,
             }
 
             strcpy(evalKey, prefix);
-            unsigned int index = *evalCount;
-            while (index > 0 && node->value.c.priority < evalPriorities[index - 1]) {
-                evalKeys[index] = evalKeys[index - 1];
-                evalPriorities[index] = evalPriorities[index - 1];
-                --index;
-            }
-
-            evalKeys[index] = evalKey;
-            evalPriorities[index] = node->value.c.priority;
+            evalKeys[*evalCount] = evalKey;
             ++*evalCount;
             break;
 
@@ -354,7 +345,6 @@ static unsigned int handleBeta(ruleset *tree,
                                node *betaNode,
                                unsigned short actionType, 
                                char **evalKeys,
-                               unsigned short *evalPriorities,
                                unsigned int *evalCount,
                                char **addKeys,
                                unsigned int *addCount,
@@ -420,7 +410,6 @@ static unsigned int handleBeta(ruleset *tree,
                         actionNode, 
                         actionType,
                         evalKeys,
-                        evalPriorities,
                         evalCount,
                         addKeys,
                         addCount,
@@ -923,7 +912,6 @@ static unsigned int handleAlpha(ruleset *tree,
                                 alpha *alphaNode, 
                                 unsigned char actionType,
                                 char **evalKeys,
-                                unsigned short *evalPriorities,
                                 unsigned int *evalCount,
                                 char **addKeys,
                                 unsigned int *addCount,
@@ -1010,7 +998,6 @@ static unsigned int handleAlpha(ruleset *tree,
                                     &tree->nodePool[betaList[entry]],  
                                     actionType, 
                                     evalKeys,
-                                    evalPriorities,
                                     evalCount,
                                     addKeys,
                                     addCount,
@@ -1126,7 +1113,6 @@ static unsigned int handleMessageCore(ruleset *tree,
     char *addKeys[MAX_ADD_COUNT];
     unsigned int addCount = 0;
     char *evalKeys[MAX_EVAL_COUNT];
-    unsigned short evalPriorities[MAX_EVAL_COUNT];
     unsigned int evalCount = 0;
     result = handleAlpha(tree, 
                          sid, 
@@ -1137,7 +1123,6 @@ static unsigned int handleMessageCore(ruleset *tree,
                          &tree->nodePool[NODE_M_OFFSET].value.a, 
                          actionType, 
                          evalKeys,
-                         evalPriorities,
                          &evalCount,
                          addKeys,
                          &addCount,
@@ -1201,7 +1186,6 @@ static unsigned int handleMessageCore(ruleset *tree,
                                         evalKeys,
                                         evalCount,
                                         &evalCommand);
-
             for (unsigned int i = 0; i < evalCount; ++i) {
                 free(evalKeys[i]);
             }

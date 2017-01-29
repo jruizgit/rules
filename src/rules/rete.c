@@ -1084,23 +1084,6 @@ static unsigned int findAlpha(ruleset *tree,
     return linkAlpha(tree, parentOffset, *resultOffset);
 }
 
-static void getSymbolSetting(unsigned int settingHash, char *rule, unsigned int *symbolHash) {
-    char *first;
-    char *last;
-    unsigned int hash;
-    unsigned char type;
-    unsigned int result = readNextName(rule, &first, &last, &hash);
-    while (result == PARSE_OK) {
-        if (hash == settingHash) {
-            readNextString(last, &first, &last, symbolHash);
-            break;
-        } else {
-            readNextValue(last, &first, &last, &type);
-            result = readNextName(last, &first, &last, &hash);
-        }
-    }
-}
-
 static void getSetting(unsigned int settingHash, char *rule, unsigned short *value) {
     char *first;
     char *last;
@@ -1696,12 +1679,10 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         ruleAction->value.c.count = 0;
         ruleAction->value.c.span = 0;
         ruleAction->value.c.cap = 0;
-        ruleAction->value.c.partitionBy = 0;
         getSetting(HASH_PRI, first, &ruleAction->value.c.priority);
         getSetting(HASH_COUNT, first, &ruleAction->value.c.count);
         getSetting(HASH_SPAN, first, &ruleAction->value.c.span);
         getSetting(HASH_CAP, first, &ruleAction->value.c.cap);
-        getSymbolSetting(HASH_BY, first, &ruleAction->value.c.partitionBy);
         if (!ruleAction->value.c.count && !ruleAction->value.c.span && !ruleAction->value.c.cap) {
             ruleAction->value.c.count = 1;
         }
