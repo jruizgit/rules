@@ -1244,11 +1244,11 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 
 #ifdef _WIN32
     char *actionKey = (char *)_alloca(sizeof(char) * (nameLength + 3));
-    sprintf_s(actionKey, nameLength + 3, "%s!a", name);
+    sprintf_s(actionKey, sizeof(char) * (nameLength + 3), "%s!a", name);
     node **sortedActions = (node **)_alloca(sizeof(node *) * tree->nodeOffset);
 #else
     char actionKey[nameLength + 3];
-    snprintf(actionKey, nameLength + 3, "%s!a", name);
+    snprintf(actionKey, sizeof(char) * (nameLength + 3), "%s!a", name);
     node *sortedActions[tree->nodeOffset];
 #endif
     
@@ -2411,13 +2411,13 @@ unsigned int formatEvalMessage(void *rulesBinding,
     char score[11];
     char keysLengthString[5];
 #ifdef _WIN32
-    sprintf_s(keysLengthString, 5, "%d", keysLength);
-    sprintf_s(score, 11, "%ld", currentTime);
+    sprintf_s(keysLengthString, sizeof(char) * 5, "%d", keysLength);
+    sprintf_s(score, sizeof(char) * 11, "%ld", currentTime);
     char **argv = (char **)_alloca(sizeof(char*)*(8 + keysLength + propertiesLength * 3));
     size_t *argvl = (size_t *)_alloca(sizeof(size_t)*(8 + keysLength +  propertiesLength * 3));
 #else
-    snprintf(keysLengthString, 5, "%d", keysLength);
-    snprintf(score, 11, "%ld", currentTime);
+    snprintf(keysLengthString, sizeof(char) * 5, "%d", keysLength);
+    snprintf(score, sizeof(char) * 11, "%ld", currentTime);
     char *argv[8 + keysLength + propertiesLength * 3];
     size_t argvl[8 + keysLength + propertiesLength * 3];
 #endif
@@ -2497,11 +2497,11 @@ unsigned int formatStoreMessage(void *rulesBinding,
     binding *bindingContext = (binding*)rulesBinding;
     char keysLengthString[5];
 #ifdef _WIN32
-    sprintf_s(keysLengthString, 5, "%d", keysLength);
+    sprintf_s(keysLengthString, sizeof(char) * 5, "%d", keysLength);
     char **argv = (char **)_alloca(sizeof(char*)*(6 + keysLength + propertiesLength * 3));
     size_t *argvl = (size_t *)_alloca(sizeof(size_t)*(6 + keysLength + propertiesLength * 3));
 #else
-    snprintf(keysLengthString, 5, "%d", keysLength);
+    snprintf(keysLengthString, sizeof(char) * 5, "%d", keysLength);
     char *argv[6 + keysLength + propertiesLength * 3];
     size_t argvl[6 + keysLength + propertiesLength * 3];
 #endif
