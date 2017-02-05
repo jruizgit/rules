@@ -37,8 +37,6 @@ else:
              {'sources': ['deps/hiredis/%s.c' % src for src in ('hiredis', 'net', 'sds', 'read')] + 
              ['src/rules/%s.c' % src for src in ('json', 'net', 'rete', 'state', 'events', 'regex')]})
 
-win32_files = ['src/deps/Win32_Interop/*.c', 'src/deps/Win32_Interop/*.h', 'src/deps/hiredis_win/*.c', 'src/deps/hiredis_win/*.h']
-
 rules = Extension('rules',
                   sources = ['src/rulespy/rules.c'],
                   include_dirs=['src/rules'])
@@ -49,7 +47,7 @@ with open(path.join(here, 'README.txt'), encoding='utf-8') as f:
 
 setup (
     name = 'durable_rules',
-    version = '0.33.83',
+    version = '0.33.87',
     description = 'for real time analytics (a Python Rules Engine)',
     long_description=long_description,
     url='https://github.com/jruizgit/rules',
@@ -74,8 +72,6 @@ setup (
     package_dir = {'': 'libpy'},
     libraries = [rules_lib],
     ext_modules = [rules],
-    package_data={'': win32_files},
-    include_package_data=True,
     # Override 'install_lib' command
     cmdclass={'install_lib': install_lib},
 )
