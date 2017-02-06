@@ -606,9 +606,10 @@ static void deleteTransition(state *previousState, unsigned short index) {
 static void unlinkStates(state *previousState, 
                          state *nextState, 
                          unsigned int tokenSymbol) {
+    unsigned short nextId = nextState->id;
     for (int i = 0; i < previousState->transitionsLength; ++i) {
         if (previousState->transitions[i].symbol == tokenSymbol && 
-            previousState->transitions[i].next->id == nextState->id) {
+            previousState->transitions[i].next->id == nextId) {
             deleteTransition(previousState, i);
         }
     }
