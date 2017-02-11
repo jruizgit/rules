@@ -204,7 +204,6 @@ static unsigned char compareStringAndStringProperty(char *leftFirst,
     int result = strcmp(leftFirst, rightFirst);
     rightFirst[rightLength] = rightTemp;
     leftFirst[leftLength] = leftTemp;
-
     switch(op) {
         case OP_LT:
             return (result < 0);

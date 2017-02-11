@@ -68,7 +68,7 @@
     type hset[MAX_HSET] = {0}; \
 
 #define HSET(value) do { \
-    unsigned int size = 0; \
+    unsigned short size = 0; \
     unsigned short index = value->hash % MAX_HSET; \
     while (hset[index]) { \
         index = (index + 1) % MAX_HSET; \
@@ -81,12 +81,14 @@
 } while(0)
 
 #define HGET(valueHash, value) do { \
+    unsigned short size = 0; \
     unsigned short index = valueHash % MAX_HSET; \
     *value = NULL; \
-    while (hset[index] && !*value) { \
+    while (hset[index] && !*value && size < MAX_HSET) { \
         if (hset[index]->hash == valueHash) { \
             *value = hset[index]; \
         } \
+        ++size; \
         index = (index + 1) % MAX_HSET; \
     } \
 } while(0)
@@ -97,8 +99,8 @@
     type set[MAX_SET] = {0}; \
 
 #define SET(value) do { \
-    unsigned int size = 0; \
-    unsigned int i = value % MAX_SET; \
+    unsigned short size = 0; \
+    unsigned short i = value % MAX_SET; \
     while (set[i]) { \
         i = (i + 1) % MAX_SET; \
         ++size; \
@@ -110,13 +112,15 @@
 } while(0)
 
 #define EXISTS(value, result) do { \
-    unsigned int i = value % MAX_SET; \
+    unsigned short size = 0; \
+    unsigned short i = value % MAX_SET; \
     *result = 0; \
-    while (set[i] && !*result) { \
+    while (set[i] && !*result && size < MAX_SET) { \
         if (set[i] == value) { \
             *result = 1; \
         } \
-        i = (i + 1) % MAX_HSET; \
+        ++size; \
+        i = (i + 1) % MAX_SET; \
     } \
 } while(0)
 
@@ -128,7 +132,14 @@
 } while (0)
 
 #define LINK_STATES(previousState, nextState, tokenSymbol) do { \
-    unsigned int result = linkStates(previousState, nextState, tokenSymbol); \
+    unsigned int result = linkStates(previousState, nextState, tokenSymbol, 0); \
+    if (result != RULES_OK) { \
+        return result; \
+    } \
+} while (0)
+
+#define LINK_STATES_D(previousState, nextState, tokenSymbol) do { \
+    unsigned int result = linkStates(previousState, nextState, tokenSymbol, 1); \
     if (result != RULES_OK) { \
         return result; \
     } \
@@ -137,6 +148,7 @@
 struct state;
 
 typedef struct transition {
+    unsigned short deterministic;
     unsigned int symbol;
     struct state *next;
 } transition;
@@ -570,7 +582,8 @@ static unsigned int createState(unsigned short *stateId,
 
 static unsigned int linkStates(state *previousState, 
                                state *nextState, 
-                               unsigned int tokenSymbol) {
+                               unsigned int tokenSymbol,
+                               unsigned short deterministic) {
     for (int i = 0; i < previousState->transitionsLength; ++i) {
         if (previousState->transitions[i].symbol == tokenSymbol && 
             previousState->transitions[i].next->id == nextState->id) {
@@ -578,6 +591,7 @@ static unsigned int linkStates(state *previousState,
         }
     }
 
+    previousState->transitions[previousState->transitionsLength].deterministic = deterministic;
     previousState->transitions[previousState->transitionsLength].symbol = tokenSymbol;
     previousState->transitions[previousState->transitionsLength].next = nextState;
     ++previousState->transitionsLength;
@@ -597,6 +611,7 @@ static void deleteTransition(state *previousState, unsigned short index) {
     }
 
     for (unsigned short i = index + 1; i < previousState->transitionsLength; ++i) {
+        previousState->transitions[i - 1].deterministic = previousState->transitions[i].deterministic;
         previousState->transitions[i - 1].symbol = previousState->transitions[i].symbol;
         previousState->transitions[i - 1].next = previousState->transitions[i].next;
     }
@@ -631,7 +646,7 @@ static unsigned int printGraph(state *start) {
         }
         for (int i = 0; i < currentState->transitionsLength; ++ i) {
             transition *currentTransition = &currentState->transitions[i];
-            printf("    transition %x to state %d\n", currentTransition->symbol, currentTransition->next->id);
+            printf("    transition %x to state %d deterministic %d\n", currentTransition->symbol, currentTransition->next->id, currentTransition->deterministic);
             if (!visited[currentTransition->next->id]) {
                 visited[currentTransition->next->id] = 1;
                 ENQUEUE(currentTransition->next);
@@ -709,7 +724,7 @@ static unsigned int createGraph(char **first,
                     CREATE_STATE(id, &currentState);
                     currentState->isReject = 1;
                     for (unsigned short i = 0; i < currentToken.inverseSymbolsLength; ++i) {
-                        LINK_STATES(previousState, currentState, currentToken.inverseSymbols[i]);
+                        LINK_STATES_D(previousState, currentState, currentToken.inverseSymbols[i]);
                     }
 
                     CREATE_STATE(id, &currentState);
@@ -871,6 +886,14 @@ static unsigned short calculateHash(state **list,
     return hash;
 }
 
+static unsigned int calculateHashFromTwo(state *first,
+                                         state *second) {
+    CREATE_LIST(state*);
+    ADD(first);
+    ADD(second);
+    return calculateHash(LIST);
+}
+
 static unsigned int ensureState(unsigned short *id, 
                                 state **list, 
                                 unsigned short stateListLength, 
@@ -880,7 +903,10 @@ static unsigned int ensureState(unsigned short *id,
         state *targetState = list[i];
         for (unsigned short ii = 0; ii < targetState->transitionsLength; ++ii) {
             transition *targetTransition = &targetState->transitions[ii];
-            LINK_STATES(*newState, targetTransition->next, targetTransition->symbol);
+            unsigned int result = linkStates(*newState, targetTransition->next, targetTransition->symbol, targetTransition->deterministic);
+            if (result != RULES_OK) {
+                return result;
+            }
         }
 
         if (targetState->isAccept) {
@@ -895,8 +921,17 @@ static unsigned int ensureState(unsigned short *id,
             return ERR_REGEX_CONFLICT;
         }        
     }
-
     return RULES_OK;
+}
+
+static unsigned int ensureStateFromTwo(unsigned short *id, 
+                                       state *first,
+                                       state *second, 
+                                       state **newState) {
+    CREATE_LIST(state*);
+    ADD(first);
+    ADD(second);
+    return ensureState(id, LIST, newState);
 }
 
 static unsigned int consolidateStates(state *currentState, 
@@ -908,7 +943,10 @@ static unsigned int consolidateStates(state *currentState,
             if (nextState != currentState) {
                 for (unsigned short ii = 0; ii < nextState->transitionsLength; ++ii) {
                     transition *nextTransition = &nextState->transitions[ii];
-                    LINK_STATES(currentState, nextTransition->next, nextTransition->symbol);
+                    unsigned int result = linkStates(currentState, nextTransition->next, nextTransition->symbol, nextTransition->deterministic);
+                    if (result != RULES_OK) {
+                        return result;
+                    }
                     if (nextState->refCount == 1) {
                         --nextTransition->next->refCount;
                     }
@@ -954,14 +992,8 @@ static unsigned int consolidateTransitions(state *currentState,
             SET(currentTransition->symbol);
             for (unsigned short ii = i + 1; ii < currentState->transitionsLength; ++ ii) {
                 transition *targetTransition = &currentState->transitions[ii];
-                if ((currentTransition->symbol == targetTransition->symbol) ||
-                    (currentTransition->symbol == REGEX_DOT && !targetTransition->next->isReject) ||
-                    (targetTransition->symbol == REGEX_DOT && !currentTransition->next->isReject)) {
+                if (currentTransition->symbol == targetTransition->symbol) {
                     foundSymbol = currentTransition->symbol;
-                    if (foundSymbol == REGEX_DOT) {
-                        foundSymbol = targetTransition->symbol;
-                    }
-                    
                     if (LIST_EMPTY()) {
                         ADD(currentTransition->next);
                         oldTransitions[oldTransitionsLength].symbol = currentTransition->symbol;
@@ -1008,13 +1040,63 @@ static unsigned int consolidateTransitions(state *currentState,
     return RULES_OK;
 }
 
+static unsigned int consolidateDot(state *currentState, 
+                                   unsigned short *id, 
+                                   state **hset) {
+    transition oldTransitions[MAX_TRANSITIONS];
+    unsigned short oldTransitionsLength = 0;
+    transition newTransitions[MAX_TRANSITIONS];
+    unsigned short newTransitionsLength = 0;
+    
+    for (unsigned short i = 0; i < currentState->transitionsLength; ++i) {
+        transition *currentTransition = &currentState->transitions[i];
+        for (unsigned short ii = i + 1; ii < currentState->transitionsLength; ++ ii) {
+            transition *targetTransition = &currentState->transitions[ii];
+            if ((currentTransition->symbol == REGEX_DOT && targetTransition->symbol != REGEX_DOT && !targetTransition->deterministic) ||
+                (currentTransition->symbol != REGEX_DOT && !currentTransition->deterministic && targetTransition->symbol == REGEX_DOT)){
+                state *newState;
+                unsigned int newStateHash = calculateHashFromTwo(currentTransition->next, targetTransition->next);
+                HGET(newStateHash, &newState);
+                if (!newState) {
+                    unsigned int result = ensureStateFromTwo(id, currentTransition->next, targetTransition->next, &newState);
+                    if (result != REGEX_PARSE_OK) {
+                        return result;
+                    }
+
+                    newState->hash = newStateHash;
+                    HSET(newState);
+                } 
+
+                if (currentTransition->symbol == REGEX_DOT) {
+                    oldTransitions[oldTransitionsLength].symbol = targetTransition->symbol;
+                    oldTransitions[oldTransitionsLength].next = targetTransition->next;
+                } else {
+                    oldTransitions[oldTransitionsLength].symbol = currentTransition->symbol;
+                    oldTransitions[oldTransitionsLength].next = currentTransition->next;
+                }
+                
+                newTransitions[newTransitionsLength].symbol = oldTransitions[oldTransitionsLength].symbol;
+                newTransitions[newTransitionsLength].next = newState;
+                ++oldTransitionsLength;
+                ++newTransitionsLength;
+
+            } 
+        }   
+    }
+    
+    for (unsigned short i = 0; i < oldTransitionsLength; ++i) {
+        unlinkStates(currentState, oldTransitions[i].next, oldTransitions[i].symbol);
+    }
+    
+    for (unsigned short i = 0; i < newTransitionsLength; ++i) {
+        LINK_STATES_D(currentState, newTransitions[i].next, newTransitions[i].symbol);
+    }
+    
+    return RULES_OK;
+}
+
 static unsigned int transformToDFA(state *nfa, 
                                    unsigned short *id) {
-
-#ifdef _PRINT
-    printf("*** NFA ***\n");
-    printGraph(nfa);
-#endif
 
     CREATE_HASHSET(state*);
     CREATE_QUEUE(state*);
@@ -1032,6 +1114,7 @@ static unsigned int transformToDFA(state *nfa,
             return result;
         }
         
+
         for (int i = 0; i < currentState->transitionsLength; ++ i) {
             transition *currentTransition = &currentState->transitions[i];
             if (!visited[currentTransition->next->id]) {
@@ -1043,10 +1126,33 @@ static unsigned int transformToDFA(state *nfa,
         DEQUEUE(&currentState);    
     }
 
-#ifdef _PRINT
-    printf("*** DFA ***\n");
-    printGraph(nfa);
-#endif
+    return RULES_OK;
+}
+
+static unsigned int expandDot(state *nfa, 
+                                   unsigned short *id) {
+
+    CREATE_HASHSET(state*);
+    CREATE_QUEUE(state*);
+    unsigned char visited[MAX_STATES] = {0};
+    state *currentState = nfa;
+    visited[currentState->id] = 1;
+    while (currentState) {
+        unsigned int result = consolidateDot(currentState, id, HASHSET);
+        if (result != REGEX_PARSE_OK) {
+           return result;
+        }
+
+        for (int i = 0; i < currentState->transitionsLength; ++ i) {
+            transition *currentTransition = &currentState->transitions[i];
+            if (!visited[currentTransition->next->id]) {
+                visited[currentTransition->next->id] = 1;
+                ENQUEUE(currentTransition->next);
+            }
+        }
+
+        DEQUEUE(&currentState);    
+    }
 
     return RULES_OK;
 }
@@ -1171,10 +1277,32 @@ unsigned int compileRegex(void *tree,
     }
     end->isAccept = 1;
     ++start->refCount;
+
+#ifdef _PRINT
+    printf("*** NFA ***\n");
+    printGraph(start);
+#endif
+
     result = transformToDFA(start, &id);
     if (result != RULES_OK) {
         return result;
     }
+
+    result = expandDot(start, &id);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    result = transformToDFA(start, &id);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+#ifdef _PRINT
+    printf("*** DFA ***\n");
+    printGraph(start);
+#endif
+
     result = calculateGraphDimensions(start, 
                                  vocabularyLength, 
                                  statesLength);
@@ -1224,8 +1352,10 @@ unsigned char evaluateRegex(void *tree,
                     return 0;
                 }
             } else {
-                currentState = stateTable[statesLength * (currentSymbol - 1) + (currentState - 1)];
-                if (!currentState) {
+                unsigned short futureState = stateTable[statesLength * (currentSymbol - 1) + (currentState - 1)];
+                if (futureState) {
+                    currentState = futureState;
+                } else {
                     currentSymbol = getIndex(symbolHashSet, vocabularyLength, REGEX_DOT);
                     if (!currentSymbol) {
                         return 0;
@@ -1239,6 +1369,5 @@ unsigned char evaluateRegex(void *tree,
             }
         }
     }
-    
     return acceptVector[currentState - 1];
 }

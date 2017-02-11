@@ -292,6 +292,31 @@ d.ruleset('match20', {
     }
 );
 
+d.ruleset('match21', {
+        whenAll: m.subject.mt('hello.*'),
+        run: function(c) {
+            console.log('match 21 starts with hello: ' + c.m.subject);
+        }
+    }, {
+        whenAll: m.subject.mt('.*hello'),
+        run: function(c) {
+            console.log('match 21 ends with hello: ' + c.m.subject);
+        }
+    }, {
+        whenAll: m.subject.mt('.*hello.*'),
+        run: function(c) {
+            console.log('match 21 contains hello: ' + c.m.subject);
+        }
+    },
+    function (host) {
+        host.assert('match21', {id: 1, sid: 1, subject: 'hello world'});
+        host.assert('match21', {id: 2, sid: 1, subject: 'world hello'});
+        host.assert('match21', {id: 3, sid: 1, subject: 'world hello hello'});
+        host.assert('match21', {id: 4, sid: 1, subject: 'has hello string'});
+        host.assert('match21', {id: 5, sid: 1, subject: 'does not match'});
+    }
+);
+
 d.ruleset('fraud1_0', {
         whenAll: [ m.amount.eq(null) ],
         run: function(c) {
