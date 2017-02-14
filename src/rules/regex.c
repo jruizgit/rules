@@ -18,7 +18,7 @@
 #define MAX_TRANSITIONS 4096
 #define MAX_QUEUE 1024
 #define MAX_STATES 4096
-#define MAX_HSET 1024
+#define MAX_HSET 8192
 #define MAX_SET 8192
 #define MAX_LIST 1024
 #define MAX_INTERVAL 100

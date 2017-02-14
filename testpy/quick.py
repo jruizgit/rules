@@ -18,4 +18,14 @@ with ruleset('coach'):
     def start(host):
         host.assert_fact('coach', {'id': 1, 'sid': 1, 'completed': False})
 
+
+with ruleset('test'):
+    @when_all(m.subject == 'World')
+    def say_hello(c):
+        print ('Hello {0}'.format(len(c.m.mydata)))
+
+    @when_start
+    def start(host):
+        host.post('test', {'id': 1, 'sid': 11221, 'subject': 'World', 'mydata': ['World','games']})
+
 run_all()

@@ -406,7 +406,7 @@ class Ruleset(object):
                 if not 'db' in db:
                     db['db'] = 0
             
-                rules.bind_ruleset(db['password'], db['port'], db['host'], self._handle, db['db'])
+                rules.bind_ruleset(db['password'], db['port'], db['host'], db['db'], self._handle)
 
     def assert_event(self, message):
         return rules.assert_event(self._handle, json.dumps(message, ensure_ascii=False))
@@ -1072,7 +1072,7 @@ class Queue(object):
             if not 'db' in database:
                 database['db'] = 0
 
-            rules.bind_ruleset(database['password'], database['port'], database['host'], self._handle, database['db'])
+            rules.bind_ruleset(database['password'], database['port'], database['host'], database['db'], self._handle)
         
 
     def post(self, message):
