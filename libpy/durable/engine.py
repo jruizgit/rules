@@ -398,7 +398,7 @@ class Ruleset(object):
     def bind(self, databases):
         for db in databases:
             if isinstance(db, str):
-                rules.bind_ruleset(None, 0, db, self._handle, 0)
+                rules.bind_ruleset(None, 0, db, 0, self._handle)
             else:
                 if not 'password' in db:
                     db['password'] = None
@@ -1064,7 +1064,7 @@ class Queue(object):
         self._ruleset_name = ruleset_name
         self._handle = rules.create_client(state_cache_size, ruleset_name)
         if isinstance(database, str):
-            rules.bind_ruleset(None, 0, database, self._handle)
+            rules.bind_ruleset(None, 0, database, 0, self._handle)
         else:
             if not 'password' in database:
                 database['password'] = None
