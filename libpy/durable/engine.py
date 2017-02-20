@@ -316,10 +316,8 @@ class Promise(object):
                 self._func(c) 
             except BaseException as error:
                 c.s.exception = 'exception caught {0}'.format(str(error))
-                complete(None)
             except:
                 c.s.exception = 'unknown exception'
-                complete(None)
                
             if self._next:
                 self._next.run(c, complete)

@@ -1,31 +1,40 @@
 from durable.lang import *
 
-with ruleset('coach'):
-    @when_all(m.completed != True)
-    def trigger_reminders(c):
-        print('An error message should follow this line')
-        # this function is not defined and should crash
-        errorOutHere()
-        # this line is never reached
-        print('This part is never reached and no error is thrown')
+with statechart('coach'):
+    with state('work'):
+        with state('s1'):
+            @to('s2')
+            def startup(c):
+                print('s1')
+                #errorHere()
+                print('s1 after')
 
-    @when_all(+s.exception)
-    def exception_handler(c):
-        print('Error message: {0}'.format(c.s.exception))
-        c.s.exception = None
+        with state('s2'):
+            @to('s3')
+            def s2(c):
+                print('s2 before')
+                #errorHere()
+                print('s2 after')
+
+        with state('s3'):
+            @to('s3')
+            @when_all(m.completed != True)
+            def s2(c):
+                print('s3 before')
+                errorHere()
+                print('s3 after')
+
+
+        @to('canceled')
+        @when_all(+s.exception)
+        def exception_handler(c):
+            print('Error message: {0}'.format(c.s.exception))
+            c.s.exception = None
+
+    state('canceled')
 
     @when_start
     def start(host):
-        host.assert_fact('coach', {'id': 1, 'sid': 1, 'completed': False})
-
-
-with ruleset('test'):
-    @when_all(m.subject == 'World')
-    def say_hello(c):
-        print ('Hello {0}'.format(len(c.m.mydata)))
-
-    @when_start
-    def start(host):
-        host.post('test', {'id': 1, 'sid': 11221, 'subject': 'World', 'mydata': ['World','games']})
+        host.post('coach', {'id': 1, 'sid': 1, 'completed': False})
 
 run_all()

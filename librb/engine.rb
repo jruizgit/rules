@@ -306,8 +306,6 @@ module Engine
         begin
           @func.call c
         rescue Exception => e
-          puts "unexpected error #{e}"
-          puts e.backtrace
           c.s.exception = e.to_s
         end
 
@@ -321,8 +319,9 @@ module Engine
           time_left = @func.call c, -> e {
             if e
               c.s.exception = e.to_s
-              complete.call nil
-            elsif @next
+            end
+
+            if @next
               @next.run c, complete
             else
               complete.call nil

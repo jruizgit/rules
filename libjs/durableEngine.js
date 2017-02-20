@@ -337,7 +337,6 @@ exports = module.exports = durableEngine = function () {
                 try {
                     func(c);
                 } catch (reason) {
-                    console.log(reason.stack);
                     c.s.exception = String(reason);
                 }
 
@@ -351,8 +350,9 @@ exports = module.exports = durableEngine = function () {
                     var timeLeft = func(c, function (err) {
                         if (err) {
                             c.s.exception = err;
-                            complete(null, c);
-                        } else if (next) {
+                        } 
+
+                        if (next) {
                             next.run(c, complete);
                         } else {
                             complete(null, c);
