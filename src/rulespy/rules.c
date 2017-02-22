@@ -119,7 +119,7 @@ static PyObject *pyBindRuleset(PyObject *self, PyObject *args) {
     char *password = NULL;
     unsigned int db;
     unsigned int result;
-    if (PyArg_ParseTuple(args, "zlslK", &password, &port, &host, &db, &handle)) {
+    if (PyArg_ParseTuple(args, "llszK", &port, &db, &host, &password, &handle)) {
         result = bindRuleset(handle, host, port, password, db);
     } else {
         PyErr_SetString(RulesError, "pyBindRuleset Invalid argument");

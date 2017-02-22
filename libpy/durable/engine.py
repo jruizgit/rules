@@ -396,15 +396,15 @@ class Ruleset(object):
     def bind(self, databases):
         for db in databases:
             if isinstance(db, str):
-                rules.bind_ruleset(None, 0, db, 0, self._handle)
+                rules.bind_ruleset(0, 0, db, None, self._handle)
             else:
                 if not 'password' in db:
                     db['password'] = None
 
                 if not 'db' in db:
                     db['db'] = 0
-            
-                rules.bind_ruleset(db['password'], db['port'], db['host'], db['db'], self._handle)
+
+                rules.bind_ruleset(db['port'], db['db'], db['host'], db['password'], self._handle)
 
     def assert_event(self, message):
         return rules.assert_event(self._handle, json.dumps(message, ensure_ascii=False))
@@ -1062,7 +1062,7 @@ class Queue(object):
         self._ruleset_name = ruleset_name
         self._handle = rules.create_client(state_cache_size, ruleset_name)
         if isinstance(database, str):
-            rules.bind_ruleset(None, 0, database, 0, self._handle)
+            rules.bind_ruleset(0, 0, database, None, self._handle)
         else:
             if not 'password' in database:
                 database['password'] = None
@@ -1070,7 +1070,7 @@ class Queue(object):
             if not 'db' in database:
                 database['db'] = 0
 
-            rules.bind_ruleset(database['password'], database['port'], database['host'], database['db'], self._handle)
+            rules.bind_ruleset(database['port'], database['db'], database['host'], database['password'], self._handle)
         
 
     def post(self, message):
