@@ -137,6 +137,10 @@ module Durable
       return Expression.new(@name, @left) & other
     end
 
+    def matches(other)
+      return Expression.new(@name, @left).matches(other)
+    end
+
     def ref_id(sid)
       Arithmetic.new @name, @left, sid
     end
