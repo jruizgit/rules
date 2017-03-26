@@ -150,7 +150,7 @@ Logical operators:
 * Pattern matching: `lt`, `gt`, `lte`, `gte`, `eq`, `neq`  
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c; or = d.or;
+var m = d.m, s = d.s, c = d.c, or = d.or;
 
 d.ruleset('a0', {
         whenAll: [ or(m.subject.lt(100), m.subject.eq('approve'), m.subject.eq('ok')) ],
@@ -194,7 +194,7 @@ durable_rules implements a simple pattern matching dialect. Similar to lua, it u
 
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c; timeout = d.timeout;
+var m = d.m, s = d.s, c = d.c;
 
 d.ruleset('match', {
         whenAll: [ m.url.mt('(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*') ],
@@ -220,22 +220,27 @@ The `whenAll` function expresses a sequence of events or facts separated by `,`.
 Arithmetic operators: `add`, `sub`, `mul`, `div`
 ```javascript
 var d = require('durable');
-with (d.ruleset('fraudDetection')) {
-    whenAll(c.first = m.amount.gt(100),
+var m = d.m, s = d.s, c = d.c, add = d.add;
+
+d.ruleset('fraudDetection', {
+        whenAll: [
+            c.first = m.amount.gt(100),
             c.second = m.amount.gt(c.first.amount.mul(2)), 
             c.third = m.amount.gt(add(c.first.amount, c.second.amount).div(2)),
-        function(c) {
+        ],
+        run: function(c) {
             console.log('fraud detected -> ' + c.first.amount);
             console.log('               -> ' + c.second.amount);
             console.log('               -> ' + c.third.amount);
         }
-    );
-    whenStart(function (host) {
+    },
+    function (host) {
         host.post('fraudDetection', {id: 1, sid: 1, amount: 200});
         host.post('fraudDetection', {id: 2, sid: 1, amount: 500});
         host.post('fraudDetection', {id: 3, sid: 1, amount: 1000});
-    });
-}
+    }
+);
+
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
