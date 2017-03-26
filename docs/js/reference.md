@@ -327,19 +327,26 @@ Summary of rule attributes:
 
 ```javascript
 var d = require('durable');
-with (d.ruleset('t0')) {
-    whenAll(or(m.count.eq(0), timeout('myTimer')), function (c) {
-        c.s.count += 1;
-        c.post('t0', {id: c.s.count, sid: 1, t: 'purchase'});
-        c.startTimer('myTimer', Math.random() * 3 + 1);
-    });
-    whenAll(span(5), m.t.eq('purchase'), function (c) {
-        console.log('t0 pulse ->' + c.m.length);
-    });
-    whenStart(function (host) {
+var m = d.m, s = d.s, c = d.c, or = d.or, timeout = d.timeout;
+
+d.ruleset('t0', {
+        whenAll: or(m.count.eq(0), timeout('myTimer')),
+        run: function(c) {
+            c.s.count += 1;
+            c.post('t0', {id: c.s.count, sid: 1, t: 'purchase'});
+            c.startTimer('myTimer', Math.random() * 3 + 1, 't0_' + c.s.count);
+        }
+    }, {
+        whenAll: m.t.eq('purchase'),
+        span: 5,
+        run: function(c) {
+            console.log('t0 pulse ->' + c.m.length);
+        }
+    },
+    function (host) {
         host.patchState('t0', {sid: 1, count: 0});
-    });
-}
+    }
+);
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
