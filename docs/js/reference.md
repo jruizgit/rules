@@ -621,34 +621,39 @@ API:
 Note: conditions have to be defined immediately after the stage definition  
 ```javascript
 var d = require('durable');
-with (d.flowchart('a3')) {
-    with (stage('input')) {
-        to('request').whenAll(m.subject.eq('approve').and(m.amount.lte(1000)));
-        to('deny').whenAll(m.subject.eq('approve').and(m.amount.gt(1000)));
-    }
-    with (stage('request')) {
-        run(function (c) {
-            console.log('a3 request approval from: ' + c.s.sid);
+var m = d.m, s = d.s, c = d.c;
+
+d.flowchart('a3', {
+    input: {
+        request: { whenAll: m.subject.eq('approve').and(m.amount.lte(1000)) }, 
+        deny: { whenAll: m.subject.eq('approve').and(m.amount.gt(1000)) }, 
+    },
+    request: {
+        run: function (c) {
+            console.log('a3_0 request approval from: ' + c.s.sid);
             if (c.s.status) 
                 c.s.status = 'approved';
             else
                 c.s.status = 'pending';
-        });
-        to('approve').whenAll(s.status.eq('approved'));
-        to('deny').whenAll(m.subject.eq('denied'));
-        to('request').whenAny(m.subject.eq('approved'), m.subject.eq('ok'));
+        },
+        approve: { whenAll: s.status.eq('approved') },
+        deny: { whenAll: m.subject.eq('denied') },
+        request: { whenAll: m.subject.eq('approved') }
+    },
+    approve: {
+        run: function (c) { console.log('a3 approved from: ' + c.s.sid); }
+    },
+    deny: {
+        run: function (c) { console.log('a3 denied from: ' + c.s.sid); }
+    },
+    whenStart: function (host) {
+        host.post('a3', {id: 1, sid: 1, subject: 'approve', amount: 100});
+        host.post('a3', {id: 2, sid: 1, subject: 'approved'});
+        host.post('a3', {id: 3, sid: 2, subject: 'approve', amount: 100});
+        host.post('a3', {id: 4, sid: 2, subject: 'denied'});
+        host.post('a3', {id: 5, sid: 3, subject: 'approve', amount: 10000});
     }
-    with (stage('approve')) {
-        run(function (c) {
-            console.log('a3 approved from: ' + c.s.sid);
-        });
-    }
-    with (stage('deny')) {
-        run(function (c) {
-            console.log('a3 denied from: ' + c.s.sid);
-        });
-    }
-}
+});
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
