@@ -283,31 +283,37 @@ Events or facts can produce multiple results in a single fact, in which case dur
 In this example, notice how the last rule is triggered first, as it has the highest priority. In the last rule result facts are ordered starting with the most recent.
 ```javascript
 var d = require('durable');
-with (d.ruleset('attributes')) {
-    whenAll(pri(3), count(3), m.amount.lt(300),
-        function(c) {
+var m = d.m, s = d.s, c = d.c;
+
+d.ruleset('attributes', {
+        whenAll: m.amount.lt(300),
+        pri: 3, count: 3,
+        run: function(c) {
             console.log('attributes ->' + c.m[0].amount);
             console.log('           ->' + c.m[1].amount);
             console.log('           ->' + c.m[2].amount);
         }
-    );
-    whenAll(pri(2), count(2), m.amount.lt(200),
-        function(c) {
+    }, {
+        whenAll: m.amount.lt(200),
+        pri: 2, count: 2,
+        run: function(c) {
             console.log('attributes ->' + c.m[0].amount);
             console.log('           ->' + c.m[1].amount);
         }
-    );
-    whenAll(pri(1), m.amount.lt(100),
-        function(c) {
+    }, {
+        whenAll: m.amount.lt(100),
+        pri: 1,
+        run: function(c) {
             console.log('attributes ->' + c.m.amount);
         }
-    );
-    whenStart(function (host) {
+    },
+    function (host) {
         host.assert('attributes', {id: 1, sid: 1, amount: 50});
         host.assert('attributes', {id: 2, sid: 1, amount: 150});
         host.assert('attributes', {id: 3, sid: 1, amount: 250});
-    });
-}
+    }
+);
+
 d.runAll();
 ```
 [top](reference.md#table-of-contents) 
