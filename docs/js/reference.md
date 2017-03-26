@@ -525,7 +525,7 @@ Statechart rules:
 * A trigger can have a rule (absence means state enter).  
 * A trigger can have an action.  
 
-The example shows an approval state machine, which waits for two consecutive events (`subject = "approve"` and `subject = "approved"`) to reach the `approved` state.  
+The example shows an approval state machine, which detects an anomaly if three consecutive events happen in less than 30 seconds.
 
 API:  
 * `with (statechart(rulesetName)) statesBlock`  
@@ -533,30 +533,34 @@ API:
 * `to(stateName, [actionBlock]).[ruleAntecedent, actionBlock]`   
 ```javascript
 var d = require('durable');
-with (d.statechart('a2')) {
-    with (state('input')) {
-        to('denied').whenAll(m.subject.eq('approve').and(m.amount.gt(1000)), function (c) {
-            console.log('a2 denied from: ' + c.s.sid);
-        });
-        to('pending').whenAll(m.subject.eq('approve').and(m.amount.lte(1000)), function (c) {
-            console.log('a2 request approval from: ' + c.s.sid);
-        });
+var m = d.m, s = d.s, c = d.c, timeout = d.timeout;
+
+d.statechart('fraud', {
+    start: {
+        to: 'metering',
+        whenAll: m.amount.gt(100),
+        run: function (c) { c.startTimer('velocity', 30); }
+    },
+    metering: [{
+        to: 'fraud',
+        count: 3,
+        whenAll: m.amount.gt(100),
+        run: function (c) { console.log('fraud detected'); }
+    }, {
+        to: 'cleared',
+        whenAll: timeout('velocity'),
+        run: function (c) { console.log('fraud cleared'); }
+    }],
+    cleared: {},
+    fraud: {},
+    whenStart: function (host) {
+        host.post('fraud', {id: 1, sid: 1, amount: 200});
+        host.post('fraud', {id: 2, sid: 1, amount: 200});
+        host.post('fraud', {id: 3, sid: 1, amount: 200});
+        host.post('fraud', {id: 4, sid: 1, amount: 200});
     }
-    with (state('pending')) {
-        to('pending').whenAll(m.subject.eq('approved'), function (c) {
-            console.log('a2 second request approval from: ' + c.s.sid);
-            c.s.status = 'approved';
-        });
-        to('approved').whenAll(s.status.eq('approved'), function (c) {
-            console.log('a2 approved from: ' + c.s.sid);
-        });
-        to('denied').whenAll(m.subject.eq('denied'), function (c) {
-            console.log('a2 denied from: ' + c.s.sid);
-        });
-    }
-    state('denied');
-    state('approved');
-}
+});
+
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
