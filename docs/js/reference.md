@@ -1,7 +1,6 @@
 Reference Manual
 =====
 ## Table of contents
-------
 * [Local Setup](reference.md#setup)
 * [Cloud Setup](reference.md#setup)
 * [Rules](reference.md#rules)
@@ -22,7 +21,6 @@ Reference Manual
   * [Flowchart](reference.md#flowchart) 
 
 ## Local Setup
-------
 durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
 ### Redis install
 durable.js relies on Redis version 2.8  
@@ -84,7 +82,6 @@ Note 2: If you are running in Windows, you will need VS2013 express edition and 
 
 [top](reference.md#table-of-contents) 
 ## Cloud Setup
---------
 ### Redis install
 Redis To Go has worked well for me and is very fast if you are deploying an app using Heroku or AWS.   
 1. Go to: [Redis To Go](https://redistogo.com)  
@@ -135,7 +132,6 @@ Heroku is a good platform to create a cloud application in just a few minutes.
 [top](reference.md#table-of-contents)  
 
 ## Rules
-------
 ### Simple Filter
 Rules are the basic building blocks. All rules have a condition, which defines the events and facts that trigger an action.  
 * The rule condition is an expression. Its left side represents an event or fact property, followed by a logical operator and its right side defines a pattern to be matched. By convention events or facts originated by calling post or assert are represented with the `m` name; events or facts originated by changing the context state are represented with the `s` name.  
@@ -350,7 +346,6 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 ## Data Model
-------
 ### Events
 Inference based on events is the main purpose of `durable_rules`. What makes events unique is they can only be consumed once by an action. Events are removed from inference sets as soon as they are scheduled for dispatch. The join combinatorics are significantly reduced, thus improving the rule evaluation performance, in some cases, by orders of magnitude.  
 
@@ -511,7 +506,6 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 ## Flow Structures
--------
 ### Statechart
 `durable_rules` lets you organize the ruleset flow such that its context is always in exactly one of a number of possible states with well-defined conditional transitions between these states. Actions depend on the state of the context and a triggering event.  
 
