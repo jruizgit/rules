@@ -422,6 +422,13 @@ with statechart('a2'):
         
     state('denied')
     state('approved')
+    @when_start
+    def start(host):
+        host.post('a2', {'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100})
+        host.post('a2', {'id': 2, 'sid': 1, 'subject': 'approved'})
+        host.post('a2', {'id': 3, 'sid': 2, 'subject': 'approve', 'amount': 100})
+        host.post('a2', {'id': 4, 'sid': 2, 'subject': 'denied'})
+        host.post('a2', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000})
 
 run_all()
 ```
