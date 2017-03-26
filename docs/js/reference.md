@@ -152,6 +152,52 @@ with (d.ruleset('a0')) {
 }
 d.runAll();
 ```  
+[top](reference.md#table-of-contents)
+#### Pattern Matching
+durable_rules implements a simple pattern matching dialect. Similar to lua, it uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. The expressiveness of the dialect is not as rich as that of ruby, python or jscript. Event processing is O(n) guaranteed (n being the size of the event).  
+
+**Repetition**  
+\+ 1 or more repetitions  
+\* 0 or more repetitions  
+? optional (0 or 1 occurrence)  
+
+**Special**  
+() group  
+| disjunct  
+[] range  
+{} repeat  
+
+**Character classes**  
+.	all characters  
+%a	letters  
+%c	control characters  
+%d	digits  
+%l	lower case letters  
+%p	punctuation characters  
+%s	space characters  
+%u	upper case letters  
+%w	alphanumeric characters  
+%x	hexadecimal digits  
+
+```javascript
+var d = require('durable');
+var m = d.m, s = d.s, c = d.c; timeout = d.timeout;
+
+d.ruleset('match', {
+        whenAll: [ m.url.mt('(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*') ],
+        run: function(c) {
+            console.log('match 15 url ' + c.m.url);
+        }
+    },
+    function (host) {
+        host.post('match', {id: 1, sid: 1, url: 'https://github.com'});
+        host.post('match', {id: 2, sid: 1, url: 'http://github.com/jruizgit/rul!es'});
+        host.post('match', {id: 3, sid: 1, url: 'https://github.com/jruizgit/rules/reference.md'});
+        host.post('match', {id: 4, sid: 1, url: '//rules'});
+        host.post('match', {id: 5, sid: 1, url: 'https://github.c/jruizgit/rules'});
+    }
+);
+```  
 [top](reference.md#table-of-contents) 
 #### Correlated Sequence
 The ability to express and efficiently evaluate sequences of correlated events or facts represents the forward inference hallmark. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
