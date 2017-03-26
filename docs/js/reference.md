@@ -567,39 +567,38 @@ d.runAll();
 #### Nested States
 `durable_rules` supports nested states. Which implies that, along with the [statechart](reference.md#statechart) description from the previous section, most of the [UML statechart](http://en.wikipedia.org/wiki/UML_state_machine) semantics is supported. If a context is in the nested state, it also (implicitly) is in the surrounding state. The state machine will attempt to handle any event in the context of the substate, which conceptually is at the lower level of the hierarchy. However, if the substate does not prescribe how to handle the event, the event is not discarded, but it is automatically handled at the higher level context of the superstate.
 
-The example below shows a statechart, where the `canceled` and reflective `work` transitions are reused for both the `enter` and the `process` states. 
+The example below shows a statechart, where the `canceled` transition is reused for both the `enter` and the `process` states. 
 
 ```javascript
 var d = require('durable');
-with (d.statechart('a6')) {
-    with (state('start')) {
-        to('work');
-    }
-    with (state('work')) {
-        with (state('enter')) {
-            to('process').whenAll(m.subject.eq('enter'), function (c) {
-                console.log('a6 continue process');
-            });
+var m = d.m, s = d.s, c = d.c;
+
+d.statechart('a6', {
+    work: [{
+        enter: {
+            to: 'process',
+            whenAll: m.subject.eq('enter'),
+            run: function (c) { console.log('a6 continue process'); }
+        },
+        process: {
+            to: 'process',
+            whenAll: m.subject.eq('continue'),
+            run: function (c) { console.log('a6 processing'); }
         }
-        with (state('process')) {
-            to('process').whenAll(m.subject.eq('continue'), function (c) {
-                console.log('a6 processing');
-            });
-        }
-        to('work').whenAll(m.subject.eq('reset'), function (c) {
-            console.log('a6 resetting');
-        });
-        to('canceled').whenAll(m.subject.eq('cancel'), function (c) {
-            console.log('a6 canceling');
-        });
-    }
-    state('canceled');
-    whenStart(function (host) {
+    }, {
+        to: 'canceled',
+        pri: 1,
+        whenAll: m.subject.eq('cancel'),
+        run: function (c) { console.log('a6 canceling');}
+    }],
+    canceled: {},
+    whenStart: function (host) {
         host.post('a6', {id: 1, sid: 1, subject: 'enter'});
         host.post('a6', {id: 2, sid: 1, subject: 'continue'});
         host.post('a6', {id: 3, sid: 1, subject: 'continue'});
-    });
-}
+        host.post('a6', {id: 4, sid: 1, subject: 'cancel'});
+    }
+});
 d.runAll();
 ```
 [top](reference.md#table-of-contents)
