@@ -116,7 +116,7 @@ Arithmetic operator precedence:
 ```python
 from durable.lang import *
 with ruleset('fraud_detection'):
-    @when_all(c.first << m.amount > 100,
+    @when_all(c.first << m.amount > 10,
               c.second << m.amount > c.first.amount * 2,
               c.third << m.amount > (c.first.amount + c.second.amount) / 2)
     def detected(c):
@@ -201,12 +201,14 @@ Summary of rule attributes:
 
 ```python
 from durable.lang import *
+import random
+
 with ruleset('t0'):
     @when_all(timeout('my_timer') | (s.count == 0))
     def start_timer(c):
         c.s.count += 1
         c.post('t0', {'id': c.s.count, 'sid': 1, 't': 'purchase'})
-        c.start_timer('my_timer', random.randint(1, 3))
+        c.start_timer('my_timer', random.randint(1, 3), 't_{0}'.format(c.s.count))
 
     @when_all(span(5), m.t == 'purchase')
     def pulse(c):
