@@ -247,7 +247,7 @@ with ruleset('fraud_detection'):
     @when_all(c.first << m.t == 'purchase',
               c.second << m.location != c.first.location)
     def detected(c):
-        print ('fraud detected ->{0}, {1}'.format(c.m.first.location, c.m.second.location))
+        print ('fraud detected ->{0}, {1}'.format(c.first.location, c.second.location))
 
     @when_start
     def start(host):
