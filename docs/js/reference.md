@@ -372,18 +372,22 @@ API:
 * `host.postBatch(rulesetName, {event}, {event}...)`  
 ```javascript
 var d = require('durable');
-with (d.ruleset('fraudDetection')) {
-    whenAll(c.first = m.t.eq('purchase'),
-            c.second = m.location.neq(c.first.location), 
-        function(c) {
-            console.log('fraud detected ->' + c.m.first.location + ', ' + c.m.second.location);
+var m = d.m, s = d.s, c = d.c;
+
+d.ruleset('fraudDetection', {
+        whenAll: [
+            c.first = m.t.eq('purchase'),
+            c.second = m.location.neq(c.first.location)
+        ],
+        run: function(c) {
+            console.log('fraud detected ->' + c.first.location + ', ' + c.second.location);
         }
-    );
-    whenStart(function (host) {
+    },
+    function (host) {
         host.post('fraudDetection', {id: 1, sid: 1, t: 'purchase', location: 'US'});
         host.post('fraudDetection', {id: 2, sid: 1, t: 'purchase', location: 'CA'});
-    });
-}
+    }
+);
 d.runAll();
 ```
 
