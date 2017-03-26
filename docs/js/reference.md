@@ -6,6 +6,7 @@ Reference Manual
 * [Cloud Setup](reference.md#setup)
 * [Rules](reference.md#rules)
   * [Simple Filter](reference.md#simple-filter)
+  * [Pattern Matching](reference.md#pattern-matching)
   * [Correlated Sequence](reference.md#correlated-sequence)
   * [Choice of Sequences](reference.md#choice-of-sequences)
   * [Conflict Resolution](reference.md#conflict-resolution)
