@@ -1,6 +1,6 @@
 Reference Manual
 =====
-### Table of contents
+## Table of contents
 ------
 * [Local Setup](reference.md#setup)
 * [Cloud Setup](reference.md#setup)
@@ -21,10 +21,10 @@ Reference Manual
   * [Nested States](reference.md#nested-states)
   * [Flowchart](reference.md#flowchart) 
 
-### Local Setup
+## Local Setup
 ------
 durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
-#### Redis install
+### Redis install
 durable.js relies on Redis version 2.8  
  
 _Mac_  
@@ -40,7 +40,7 @@ _Windows_
 For more information go to: https://github.com/MSOpenTech/redis  
 
 Note: To test applications locally you can also use a Redis [cloud service](reference.md#cloud-setup) 
-#### Node.js install
+### Node.js install
 durable.js uses Node.js version  0.10.15.    
 
 1. Download [Node.js](http://nodejs.org/dist/v0.10.15)  
@@ -49,7 +49,7 @@ durable.js uses Node.js version  0.10.15.
 
 For more information go to: http://nodejs.org/download  
 
-#### First App
+### First App
 Now that your cache and web server are ready, let's write a simple rule:  
 
 1. Start a terminal  
@@ -83,18 +83,18 @@ Note 1: If you are using [Redis To Go](https://redistogo.com), replace the last 
 Note 2: If you are running in Windows, you will need VS2013 express edition and Python 2.7, make sure both the VS build tools and the python directory are in your path.  
 
 [top](reference.md#table-of-contents) 
-### Cloud Setup
+## Cloud Setup
 --------
-#### Redis install
+### Redis install
 Redis To Go has worked well for me and is very fast if you are deploying an app using Heroku or AWS.   
 1. Go to: [Redis To Go](https://redistogo.com)  
 2. Create an account (the free instance with 5MB has enough space for you to evaluate durable_rules)  
 3. Make sure you write down the host, port and password, which represents your new account  
-#### Heroku install
+### Heroku install
 Heroku is a good platform to create a cloud application in just a few minutes.  
 1. Go to: [Heroku](https://www.heroku.com)  
 2. Create an account (the free instance with 1 dyno works well for evaluating durable_rules)  
-#### First app
+### First app
 1. Follow the instructions in the [tutorial](https://devcenter.heroku.com/articles/getting-started-with-nodejs#introduction), with the following changes:
   * procfile  
   `web: node test.js`
@@ -134,9 +134,9 @@ Heroku is a good platform to create a cloud application in just a few minutes.
 3. Run `heroku logs`, you should see the message: `a0 approved from 1`  
 [top](reference.md#table-of-contents)  
 
-### Rules
+## Rules
 ------
-#### Simple Filter
+### Simple Filter
 Rules are the basic building blocks. All rules have a condition, which defines the events and facts that trigger an action.  
 * The rule condition is an expression. Its left side represents an event or fact property, followed by a logical operator and its right side defines a pattern to be matched. By convention events or facts originated by calling post or assert are represented with the `m` name; events or facts originated by changing the context state are represented with the `s` name.  
 * The rule action is a function to which the context is passed as a parameter. Actions can be synchronous and asynchronous. Asynchronous actions take a completion function as a parameter.  
@@ -165,7 +165,7 @@ d.ruleset('a0', {
 d.runAll();
 ```  
 [top](reference.md#table-of-contents)
-#### Pattern Matching
+### Pattern Matching
 durable_rules implements a simple pattern matching dialect. Similar to lua, it uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. The expressiveness of the dialect is not as rich as that of ruby, python or jscript. Event processing is O(n) guaranteed (n being the size of the event).  
 
 **Repetition**  
@@ -211,7 +211,7 @@ d.ruleset('match', {
 );
 ```  
 [top](reference.md#table-of-contents) 
-#### Correlated Sequence
+### Correlated Sequence
 The ability to express and efficiently evaluate sequences of correlated events or facts represents the forward inference hallmark. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
 The `whenAll` function expresses a sequence of events or facts separated by `,`. The assignment operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
@@ -243,7 +243,7 @@ d.ruleset('fraudDetection', {
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
-#### Choice of Sequences
+### Choice of Sequences
 durable_rules allows expressing and efficiently evaluating richer events sequences leveraging forward inference. In the example below any of the two event\fact sequences will trigger the `a4` action. 
 
 The following two functions can be used to define a rule:  
@@ -276,7 +276,7 @@ d.ruleset('a4', {
 d.runAll();
 ```
 [top](reference.md#table-of-contents) 
-#### Conflict Resolution
+### Conflict Resolution
 Events or facts can produce multiple results in a single fact, in which case durable_rules will choose the result with the most recent events or facts. In addition events or facts can trigger more than one action simultaneously, the triggering order can be defined by setting the priority (salience) attribute on the rule.
 
 In this example, notice how the last rule is triggered first, as it has the highest priority. In the last rule result facts are ordered starting with the most recent.
@@ -316,7 +316,7 @@ d.ruleset('attributes', {
 d.runAll();
 ```
 [top](reference.md#table-of-contents) 
-#### Tumbling Window
+### Tumbling Window
 durable_rules enables aggregating events or observed facts over time with tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
 
 Summary of rule attributes:  
@@ -349,9 +349,9 @@ d.ruleset('t0', {
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
-### Data Model
+## Data Model
 ------
-#### Events
+### Events
 Inference based on events is the main purpose of `durable_rules`. What makes events unique is they can only be consumed once by an action. Events are removed from inference sets as soon as they are scheduled for dispatch. The join combinatorics are significantly reduced, thus improving the rule evaluation performance, in some cases, by orders of magnitude.  
 
 Event rules:  
@@ -392,7 +392,7 @@ d.runAll();
 
 [top](reference.md#table-of-contents)  
 
-#### Facts
+### Facts
 Facts are used for defining more permanent state, which lifetime spans at least more than one action execution.
 
 Fact rules:  
@@ -436,7 +436,7 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 
-#### Context
+### Context
 Context state is permanent. It is used for controlling the ruleset flow or for storing configuration information. `durable_rules` implements a client cache with LRU eviction policy to reference contexts by id, this helps reducing the combinatorics in joins which otherwise would be used for configuration facts.  
 
 Context rules:
@@ -468,7 +468,7 @@ d.ruleset('a8', {
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
-#### Timers
+### Timers
 `durable_rules` supports scheduling timeout events and writing rules, which observe such events.  
 
 Timer rules:  
@@ -510,9 +510,9 @@ d.ruleset('t1', {
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
-### Flow Structures
+## Flow Structures
 -------
-#### Statechart
+### Statechart
 `durable_rules` lets you organize the ruleset flow such that its context is always in exactly one of a number of possible states with well-defined conditional transitions between these states. Actions depend on the state of the context and a triggering event.  
 
 Statechart rules:  
@@ -564,7 +564,7 @@ d.statechart('fraud', {
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
-#### Nested States
+### Nested States
 `durable_rules` supports nested states. Which implies that, along with the [statechart](reference.md#statechart) description from the previous section, most of the [UML statechart](http://en.wikipedia.org/wiki/UML_state_machine) semantics is supported. If a context is in the nested state, it also (implicitly) is in the surrounding state. The state machine will attempt to handle any event in the context of the substate, which conceptually is at the lower level of the hierarchy. However, if the substate does not prescribe how to handle the event, the event is not discarded, but it is automatically handled at the higher level context of the superstate.
 
 The example below shows a statechart, where the `canceled` transition is reused for both the `enter` and the `process` states. 
@@ -602,7 +602,7 @@ d.statechart('a6', {
 d.runAll();
 ```
 [top](reference.md#table-of-contents)
-#### Flowchart
+### Flowchart
 In addition to [statechart](reference.md#statechart), flowchart is another way for organizing a ruleset flow. In a flowchart each stage represents an action to be executed. So (unlike the statechart state), when applied to the context state, it results in a transition to another stage.  
 
 Flowchart rules:  
