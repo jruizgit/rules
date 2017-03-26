@@ -453,11 +453,6 @@ with statechart('a6'):
             def continue_process(c):
                 print('a6 processing')
 
-        @to('work')
-        @when_all(m.subject == 'reset')
-        def reset(c):
-            print('a6 resetting')
-
         @to('canceled')
         @when_all(m.subject == 'cancel')
         def cancel(c):
@@ -469,7 +464,8 @@ with statechart('a6'):
         host.post('a6', {'id': 1, 'sid': 1, 'subject': 'enter'})
         host.post('a6', {'id': 2, 'sid': 1, 'subject': 'continue'})
         host.post('a6', {'id': 3, 'sid': 1, 'subject': 'continue'})
-
+        host.post('a6', {'id': 4, 'sid': 1, 'subject': 'cancel'})
+        
 run_all()
 ```
 [top](reference.md#table-of-contents)
