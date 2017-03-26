@@ -332,13 +332,14 @@ API:
 ```ruby
 require "durable"
 Durable.ruleset :a8 do
-  when_all m.amount < s.max_amount + s.id(:global).min_amount do
+  when_all (m.amount < s.max_amount) & (m.amount > s.ref_id(:global).min_amount) do
     puts "a8 approved " + m.amount.to_s
   end
   when_start do
     patch_state :a8, {:sid => 1, :max_amount => 500}
     patch_state :a8, {:sid => :global, :min_amount => 100}
     post :a8, {:id => 1, :sid => 1, :amount => 10}
+    post :a8, {:id => 2, :sid => 1, :amount => 200}
   end
 end
 Durable.run_all
