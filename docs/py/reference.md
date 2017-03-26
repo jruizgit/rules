@@ -1,7 +1,6 @@
 Reference Manual
 =====
 ## Table of contents
-------
 * [Setup](reference.md#local-setup)
 * [Rules](reference.md#rules)
   * [Simple Filter](reference.md#simple-filter)
@@ -21,7 +20,6 @@ Reference Manual
   * [Flowchart](reference.md#flowchart)
 
 ## Setup
-------
 durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
 ### Redis install
 durable_rules relies on Redis version 2.8  
@@ -72,7 +70,6 @@ Note: If you are using [Redis To Go](https://redistogo.com), replace the last li
 [top](reference.md#table-of-contents) 
 
 ## Rules
-------
 ### Simple Filter
 Rules are the basic building blocks. All rules have a condition, which defines the events and facts that trigger an action.  
 * The rule condition is an expression. Its left side represents an event or fact property, followed by a logical operator and its right side defines a pattern to be matched. By convention events or facts originated by calling post or assert are represented with the `m` name; events or facts originated by changing the context state are represented with the `s` name.  
@@ -259,7 +256,6 @@ run_all()
 ```
 [top](reference.md#table-of-contents)  
 ## Data Model
-------
 ### Events
 Inference based on events is the main purpose of `durable_rules`. What makes events unique is they can only be consumed once by an action. Events are removed from inference sets as soon as they are scheduled for dispatch. The join combinatorics are significantly reduced, thus improving the rule evaluation performance, in some cases, by orders of magnitude.  
 
@@ -403,7 +399,6 @@ run_all()
 ```
 [top](reference.md#table-of-contents)  
 ## Flow Structures
--------
 ### Statechart
 `durable_rules` lets you organize the ruleset flow such that its context is always in exactly one of a number of possible states with well-defined conditional transitions between these states. Actions depend on the state of the context and a triggering event.  
 
