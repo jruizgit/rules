@@ -2,8 +2,7 @@ Reference Manual
 =====
 ## Table of contents
 ------
-* [Local Setup](reference.md#local-setup)
-* [Cloud Setup](reference.md#cloud-setup)
+* [Setup](reference.md#local-setup)
 * [Rules](reference.md#rules)
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
@@ -21,7 +20,7 @@ Reference Manual
   * [Nested States](reference.md#nested-states)
   * [Flowchart](reference.md#flowchart)
 
-## Local Setup
+## Setup
 ------
 durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
 ### Redis install
@@ -71,13 +70,6 @@ Note: If you are using [Redis To Go](https://redistogo.com), replace the last li
   ```
 
 [top](reference.md#table-of-contents) 
-## Cloud Setup
---------
-### Redis install
-Redis To Go has worked well for me and is very fast if you are deploying an app using Heroku or AWS.   
-1. Go to: [Redis To Go](https://redistogo.com)  
-2. Create an account (the free instance with 5MB has enough space for you to evaluate durable_rules)  
-3. Make sure you write down the host, port and password, which represents your new account  
 
 ## Rules
 ------
