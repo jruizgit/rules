@@ -60,7 +60,7 @@ Now that your cache and web server are ready, let's write a simple rule:
 5. Copy/Paste and save the following code:
   ```javascript
   var d = require('durable');
-  var m = d.m, s = d.s, c = d.c; timeout = d.timeout;
+  var m = d.m, s = d.s, c = d.c;
   
   d.ruleset('a0', {
           whenAll: [ m.amount.lt(100) ],
@@ -116,7 +116,7 @@ Heroku is a good platform to create a cloud application in just a few minutes.
   * test.js
   ```javascript
   var d = require('durable');
-  var m = d.m, s = d.s, c = d.c; timeout = d.timeout;
+  var m = d.m, s = d.s, c = d.c;
 
   d.ruleset('a0', {
           whenAll: [ m.amount.lt(100) ],
@@ -150,14 +150,19 @@ Logical operators:
 * Pattern matching: `lt`, `gt`, `lte`, `gte`, `eq`, `neq`  
 ```javascript
 var d = require('durable');
-with (d.ruleset('a0')) {
-    whenAll(or(m.subject.lt(100), m.subject.eq('approve'), m.subject.eq('ok')), function (c) {
-        console.log('a0 approved ->' + c.m.subject);
-    });
-    whenStart(function (host) {
+var m = d.m, s = d.s, c = d.c; or = d.or;
+
+d.ruleset('a0', {
+        whenAll: [ or(m.subject.lt(100), m.subject.eq('approve'), m.subject.eq('ok')) ],
+        run: function(c) {
+            console.log('a0 approved from ' + c.s.sid);
+        }
+    },
+    function (host) {
         host.post('a0', {id: 1, sid: 1, subject: 10});
-    });
-}
+    }
+);
+
 d.runAll();
 ```  
 [top](reference.md#table-of-contents)
