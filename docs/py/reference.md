@@ -313,7 +313,7 @@ API:
 ```python
 from durable.lang import *
 with ruleset('a8'):
-    @when_all(m.amount < c.s.max_amount + c.s.id('global').min_amount)
+    @when_all(m.amount < c.s.max_amount + c.s.ref_id('global').min_amount)
     def approved(c):
         print ('a8 approved {0}'.format(c.m.amount))
 
