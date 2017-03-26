@@ -1,9 +1,8 @@
 Reference Manual
 =====
-### Table of contents
+## Table of contents
 ------
-* [Local Setup](reference.md#local-setup)
-* [Cloud Setup](reference.md#cloud-setup)
+* [Setup](reference.md#local-setup)
 * [Rules](reference.md#rules)
   * [Simple Filter](reference.md#simple-filter)
   * [Correlated Sequence](reference.md#correlated-sequence)
@@ -20,10 +19,10 @@ Reference Manual
   * [Nested States](reference.md#nested-states)
   * [Flowchart](reference.md#flowchart)
 
-### Local Setup
+## Setup
 ------
 durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
-#### Redis install
+### Redis install
 durable_rules relies on Redis version 2.8 or higher 
  
 _Mac_  
@@ -40,7 +39,7 @@ For more information go to: https://github.com/MSOpenTech/redis
 
 Note: To test applications locally you can also use a Redis [cloud service](reference.md#cloud-setup) 
 
-#### First App
+### First App
 Now that your cache ready, let's write a simple rule:  
 
 1. Start a terminal  
@@ -70,17 +69,10 @@ Note: If you are using [Redis To Go](https://redistogo.com), replace the last li
   Durable.run_all([{:host => "host_name", :port => "port", :password => "password"}])
   ```
 [top](reference.md#table-of-contents) 
-### Cloud Setup
---------
-#### Redis install
-Redis To Go has worked well for me and is very fast if you are deploying an app using Heroku or AWS.   
-1. Go to: [Redis To Go](https://redistogo.com)  
-2. Create an account (the free instance with 5MB has enough space for you to evaluate durable_rules)  
-3. Make sure you write down the host, port and password, which represents your new account  
 
-### Rules
+## Rules
 ------
-#### Simple Filter
+### Simple Filter
 Rules are the basic building blocks. All rules have a condition, which defines the events and facts that trigger an action.  
 * The rule condition is an expression. Its left side represents an event or fact property, followed by a logical operator and its right side defines a pattern to be matched. By convention events or facts originated by calling post or assert are represented with the `m` name; events or facts originated by changing the context state are represented with the `s` name.  
 * The rule action is a function to which the context is passed as a parameter. Actions can be synchronous and asynchronous. Asynchronous actions take a completion function as a parameter.  
@@ -104,7 +96,7 @@ end
 Durable.run_all
 ```
 [top](reference.md#table-of-contents) 
-#### Correlated Sequence
+### Correlated Sequence
 The ability to express and efficiently evaluate sequences of correlated events or facts represents the forward inference hallmark. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
 The `when_all` function expresses a sequence of events or facts separated by `,`. The assignment operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
@@ -131,7 +123,7 @@ end
 Durable.run_all
 ```
 [top](reference.md#table-of-contents)  
-#### Choice of Sequences
+### Choice of Sequences
 durable_rules allows expressing and efficiently evaluating richer events sequences leveraging forward inference. In the example below any of the two event\fact sequences will trigger the `a4` action. 
 
 The following two functions can be used to define a rule:  
@@ -157,7 +149,7 @@ end
 Durable.run_all
 ```
 [top](reference.md#table-of-contents) 
-#### Conflict Resolution
+### Conflict Resolution
 Events or facts can produce multiple results in a single fact, in which case durable_rules will choose the result with the most recent events or facts. In addition events or facts can trigger more than one action simultaneously, the triggering order can be defined by setting the priority (salience) attribute on the rule.
 
 In this example, notice how the last rule is triggered first, as it has the highest priority. In the last rule result facts are ordered starting with the most recent.
@@ -185,7 +177,7 @@ end
 Durable.run_all
 ```
 [top](reference.md#table-of-contents) 
-#### Tumbling Window
+### Tumbling Window
 durable_rules enables aggregating events or observed facts over time with tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
 
 Summary of rule attributes:  
@@ -199,7 +191,7 @@ Durable.ruleset :t0 do
   when_all (timeout :my_timer) | (m.count == 0) do
     s.count += 1
     post :t0, {:id => s.count, :sid => 1, :t => "purchase"}
-    start_timer(:my_timer, rand(3))
+    start_timer(:my_timer, rand(3), "t_#{s.count}")
   end
   when_all span(5), m.t == "purchase" do 
     puts("t0 pulse -> #{m.count}")
@@ -211,9 +203,9 @@ end
 Durable.run_all
 ```
 [top](reference.md#table-of-contents)  
-### Data Model
+## Data Model
 ------
-#### Events
+### Events
 Inference based on events is the main purpose of `durable_rules`. What makes events unique is they can only be consumed once by an action. Events are removed from inference sets as soon as they are scheduled for dispatch. The join combinatorics are significantly reduced, thus improving the rule evaluation performance, in some cases, by orders of magnitude.  
 
 Event rules:  
@@ -234,7 +226,7 @@ require "durable"
 Durable.ruleset :fraud_detection do
   when_all c.first = m.t == "purchase",
            c.second = m.location != first.location do
-    puts "fraud detected ->" + m.first.location + ", " + m.second.location
+    puts "fraud detected ->" + first.location + ", " + second.location
   end
   when_start do
     post :fraud_detection, {:id => 1, :sid => 1, :t => "purchase", :location => "US"}
@@ -245,7 +237,7 @@ Durable.run_all
 ```
 [top](reference.md#table-of-contents)  
 
-#### Facts
+### Facts
 Facts are used for defining more permanent state, which lifetime spans at least more than one action execution.
 
 Fact rules:  
@@ -280,7 +272,7 @@ Durable.run_all
 ```
 [top](reference.md#table-of-contents)  
 
-#### Context
+### Context
 Context state is permanent. It is used for controlling the ruleset flow or for storing configuration information. `durable_rules` implements a client cache with LRU eviction policy to reference contexts by id, this helps reducing the combinatorics in joins which otherwise would be used for configuration facts.  
 
 Context rules:
@@ -308,7 +300,7 @@ end
 Durable.run_all
 ```
 [top](reference.md#table-of-contents)  
-#### Timers
+### Timers
 `durable_rules` supports scheduling timeout events and writing rules, which observe such events.  
 
 Timer rules:  
@@ -343,9 +335,9 @@ end
 Durable.run_all
 ```
 [top](reference.md#table-of-contents)  
-### Flow Structures
+## Flow Structures
 -------
-#### Statechart
+### Statechart
 `durable_rules` lets you organize the ruleset flow such that its context is always in exactly one of a number of possible states with well-defined conditional transitions between these states. Actions depend on the state of the context and a triggering event.  
 
 Statechart rules:  
@@ -369,39 +361,44 @@ API:
 require "durable"
 Durable.statechart :a2 do
   state :input do
-    to :denied, when_all((m.subject == 'approve') & (m.amount > 1000)) do
+    to :denied, when_all((m.subject == "approve") & (m.amount > 1000)) do
       puts "a2 state denied: #{s.sid}"
     end
-    to :pending, when_all((m.subject == 'approve') & (m.amount <= 1000)) do
+    to :pending, when_all((m.subject == "approve") & (m.amount <= 1000)) do
       puts "a2 state request approval from: #{s.sid}"
+      s.status? ? s.status = "approved": s.status = "pending"
     end
   end  
   state :pending do
-    to :pending, when_any(m.subject == 'approved', m.subject == 'ok') do
+    to :pending, when_any(m.subject == "approved", m.subject == "ok") do
       puts "a2 state received approval for: #{s.sid}"
       s.status = "approved"
     end
-    to :approved, when_all(s.status == 'approved')
-    to :denied, when_all(m.subject == 'denied') do
+    to :approved, when_all(s.status == "approved")
+    to :denied, when_all(m.subject == "denied") do
       puts "a2 state denied: #{s.sid}"
     end
   end
   state :approved
   state :denied
+  when_start do
+    post :a2, {:id => 1, :sid => 1, :subject => "approve", :amount => 100}
+    post :a2, {:id => 2, :sid => 1, :subject => "approved"}
+    post :a2, {:id => 3, :sid => 2, :subject => "approve", :amount => 100}
+    post :a2, {:id => 4, :sid => 2, :subject => "denied"}
+    post :a2, {:id => 5, :sid => 3, :subject => "approve", :amount => 10000}
+  end
 end
 Durable.run_all
 ```
 [top](reference.md#table-of-contents)  
-#### Nested States
+### Nested States
 `durable_rules` supports nested states. Which implies that, along with the [statechart](reference.md#statechart) description from the previous section, most of the [UML statechart](http://en.wikipedia.org/wiki/UML_state_machine) semantics is supported. If a context is in the nested state, it also (implicitly) is in the surrounding state. The state machine will attempt to handle any event in the context of the substate, which conceptually is at the lower level of the hierarchy. However, if the substate does not prescribe how to handle the event, the event is not discarded, but it is automatically handled at the higher level context of the superstate.
 
-The example below shows a statechart, where the `canceled` and reflective `work` transitions are reused for both the `enter` and the `process` states. 
+The example below shows a statechart, where the `canceled` transition is reused for both the `enter` and the `process` states. 
 ```ruby
 require "durable"
 Durable.statechart :a6 do
-  state :start do
-    to :work
-  end
   state :work do   
     state :enter do
       to :process, when_all(m.subject == "enter") do
@@ -413,10 +410,7 @@ Durable.statechart :a6 do
         puts "a6 processing"
       end
     end
-    to :work, when_all(m.subject == "reset") do
-      puts "a6 resetting"
-    end
-    to :canceled, when_all(m.subject == "cancel") do
+    to :canceled, when_all(pri(1), m.subject == "cancel") do
       puts "a6 canceling"
     end
   end
@@ -425,12 +419,13 @@ Durable.statechart :a6 do
     post :a6, {:id => 1, :sid => 1, :subject => "enter"}
     post :a6, {:id => 2, :sid => 1, :subject => "continue"}
     post :a6, {:id => 3, :sid => 1, :subject => "continue"}
+    post :a6, {:id => 4, :sid => 1, :subject => "cancel"}
   end
 end
 Durable.run_all
 ```
 [top](reference.md#table-of-contents)
-#### Flowchart
+### Flowchart
 In addition to [statechart](reference.md#statechart), flowchart is another way for organizing a ruleset flow. In a flowchart each stage represents an action to be executed. So (unlike the statechart state), when applied to the context state, it results in a transition to another stage.  
 
 Flowchart rules:  
@@ -450,23 +445,31 @@ Note: conditions have to be defined immediately after the stage definition
 require "durable"
 Durable.flowchart :a3 do
   stage :input
-  to :request, when_all((m.subject == 'approve') & (m.amount <= 1000))
-  to :deny, when_all((m.subject == 'approve') & (m.amount > 1000))
+  to :request, when_all((m.subject == "approve") & (m.amount <= 1000))
+  to :deny, when_all((m.subject == "approve") & (m.amount > 1000))
   
   stage :request do
     puts "a3 flow requesting approval for: #{s.sid}"
     s.status? ? s.status = "approved": s.status = "pending"
   end
-  to :approve, when_all(s.status == 'approved')
-  to :deny, when_all(m.subject == 'denied')
-  to :request, when_any(m.subject == 'approved', m.subject == 'ok')
+  to :approve, when_all(s.status == "approved")
+  to :deny, when_all(m.subject == "denied")
+  to :request, when_any(m.subject == "approved", m.subject == "ok")
   
   stage :approve do
-    puts "a3 flow approved: #{s.sid}"
+    puts "a3 flow aprroved: #{s.sid}"
   end
 
   stage :deny do
     puts "a3 flow denied: #{s.sid}"
+  end
+
+  when_start do
+    post :a3, {:id => 1, :sid => 1, :subject => "approve", :amount => 100}
+    post :a3, {:id => 2, :sid => 1, :subject => "approved"}
+    post :a3, {:id => 3, :sid => 2, :subject => "approve", :amount => 100}
+    post :a3, {:id => 4, :sid => 2, :subject => "denied"}
+    post :a3, {:id => 5, :sid => 3, :subject => "approve", :amount => 10000}
   end
 end
 Durable.run_all
