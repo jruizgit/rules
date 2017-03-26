@@ -60,15 +60,18 @@ Now that your cache and web server are ready, let's write a simple rule:
 5. Copy/Paste and save the following code:
   ```javascript
   var d = require('durable');
-
-  with (d.ruleset('a0')) {
-      whenAll(m.amount.lt(100), function (c) {
-          console.log('a0 approved from ' + c.s.sid);
-      });
-      whenStart(function (host) {
+  var m = d.m, s = d.s, c = d.c; timeout = d.timeout;
+  
+  d.ruleset('a0', {
+          whenAll: [ m.amount.lt(100) ],
+          run: function(c) {
+              console.log('a0 approved from ' + c.s.sid);
+          }
+      },
+      function (host) {
           host.post('a0', {id: 1, sid: 1, amount: 10});
-      });
-  } 
+      }
+  );
   d.runAll();
   ```
 7. In the terminal type `node test.js`  
@@ -113,15 +116,19 @@ Heroku is a good platform to create a cloud application in just a few minutes.
   * test.js
   ```javascript
   var d = require('durable');
+  var m = d.m, s = d.s, c = d.c; timeout = d.timeout;
 
-  with (d.ruleset('a0')) {
-      whenAll(m.amount.lt(100), function (c) {
-          console.log('a0 approved from ' + c.s.sid);
-      });
-      whenStart(function (host) {
+  d.ruleset('a0', {
+          whenAll: [ m.amount.lt(100) ],
+          run: function(c) {
+              console.log('a0 approved from ' + c.s.sid);
+          }
+      },
+      function (host) {
           host.post('a0', {id: 1, sid: 1, amount: 10});
-      });
-  } 
+      }
+  );
+
   d.runAll([{host: 'hostName', port: port, password: 'password'}]);
   ```  
 2. Deploy and scale the App
