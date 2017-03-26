@@ -487,20 +487,26 @@ API:
 * `when... timeout(timerName)`  
 ```javascript
 var d = require('durable');
-with (d.ruleset('t1')) {
-    whenAll(m.start.eq('yes'), function (c) {
-        c.s.start = new Date();
-        c.startTimer('myTimer', 5);
-    });
-    whenAll(timeout('myTimer'), function (c) {
-        console.log('t1 end');
-        console.log('t1 started ' + c.s.start);
-        console.log('t1 ended ' + new Date());
-    });
-    whenStart(function (host) {
+var m = d.m, s = d.s, c = d.c, timeout = d.timeout;
+
+d.ruleset('t1', {
+        whenAll: m.start.eq('yes'),
+        run: function(c) {
+            c.s.start = new Date();
+            c.startTimer('myTimer', 5);
+        }
+    }, {
+        whenAll: timeout('myTimer'),
+        run: function(c) {
+            console.log('t1 end');
+            console.log('t1 started ' + c.s.start);
+            console.log('t1 ended ' + new Date());
+        }
+    },
+    function (host) {
         host.post('t1', {id: 1, sid: 1, start: 'yes'});
-    });
-}
+    }
+);
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
