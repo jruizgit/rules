@@ -19,8 +19,7 @@ Reference Manual
 * [Flow Structures](reference.md#flow-structures)
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
-  * [Flowchart](reference.md#flowchart)
-  * [Parallel](reference.md#parallel)  
+  * [Flowchart](reference.md#flowchart) 
 
 ### Local Setup
 ------
@@ -452,16 +451,20 @@ API:
 * `c.state.property = ...`  
 ```javascript
 var d = require('durable');
-with (d.ruleset('a8')) {
-    whenAll(m.amount.lt(add(c.s.maxAmount, c.s.id('global').minAmount)), function (c) {
-        console.log('a8 approved ' +  c.m.amount);
-    });
-    whenStart(function (host) {
+var m = d.m, s = d.s, c = d.c, add = d.add;
+
+d.ruleset('a8', {
+        whenAll: [ m.amount.lt(add(c.s.maxAmount, c.s.refId('global').minAmount)) ],
+        run: function(c) {
+            console.log('a8 approved ' +  c.m.amount);
+        }
+    },
+    function (host) {
         host.patchState('a8', {sid: 1, maxAmount: 500});
         host.patchState('a8', {sid: 'global', minAmount: 100});
         host.post('a8', {id: 1, sid: 1, amount: 10});
-    });
-}
+    }
+);
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
@@ -641,53 +644,5 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 
-#### Parallel
-Rulesets can be structured for concurrent execution by defining hierarchical rulesets.   
-
-Parallel rules:
-* Actions can be defined by using `ruleset`, `statechart` and `flowchart` constructs.   
-* The context used for child rulesets is a deep copy of the parent context at the time of the action execution.  
-* The child context id is qualified with that if its parent ruleset.  
-* Child rulesets can signal events to parent rulesets.  
-
-In this example two child rulesets are created when observing the `start = "yes"` event. When both child rulesets complete, the parent resumes.  
-
-API:  
-* `signal(parentContextId, {event})`  
-```javascript
-var d = require('durable');
-with (d.ruleset('p1')) {
-    with (whenAll(m.start.eq('yes'))) {
-        with (ruleset('one')) {
-            whenAll(s.start.nex(), function (c) {
-                c.s.start = 1;
-            });
-            whenAll(s.start.eq(1), function (c) {
-                console.log('p1 finish one');
-                c.signal({id: 1, end: 'one'});
-                c.s.start  = 2;
-            });
-        }
-        with (ruleset('two')) {
-            whenAll(s.start.nex(), function (c) {
-                c.s.start = 1;
-            });
-            whenAll(s.start.eq(1), function (c) {
-                console.log('p1 finish two');
-                c.signal({id: 1, end: 'two'});
-                c.s.start  = 2;
-            });
-        }
-    }
-    whenAll(m.end.eq('one'), m.end.eq('two'), function (c) {
-        console.log('p1 approved');
-    });
-    whenStart(function (host) {
-        host.post('p1', {id: 1, sid: 1, start: 'yes'});
-    });
-}
-d.runAll();
-```
-[top](reference.md#table-of-contents)  
  
 
