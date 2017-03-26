@@ -6,6 +6,7 @@ Reference Manual
 * [Cloud Setup](reference.md#cloud-setup)
 * [Rules](reference.md#rules)
   * [Simple Filter](reference.md#simple-filter)
+  * [Pattern Matching](reference.md#pattern-matching)
   * [Correlated Sequence](reference.md#correlated-sequence)
   * [Choice of Sequences](reference.md#choice-of-sequences)
   * [Conflict Resolution](reference.md#conflict-resolution)
@@ -104,6 +105,50 @@ with ruleset('a0'):
         
 run_all()
 ```
+[top](reference.md#table-of-contents) 
+#### Pattern Matching
+durable_rules implements a simple pattern matching dialect. Similar to lua, it uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. The expressiveness of the dialect is not as rich as that of ruby, python or jscript. Event processing is O(n) guaranteed (n being the size of the event).  
+
+**Repetition**  
+\+ 1 or more repetitions  
+\* 0 or more repetitions  
+? optional (0 or 1 occurrence)  
+
+**Special**  
+() group  
+| disjunct  
+[] range  
+{} repeat  
+
+**Character classes**  
+.	all characters  
+%a	letters  
+%c	control characters  
+%d	digits  
+%l	lower case letters  
+%p	punctuation characters  
+%s	space characters  
+%u	upper case letters  
+%w	alphanumeric characters  
+%x	hexadecimal digits  
+
+```python
+from durable.lang import *
+with ruleset('match3'):
+    @when_all(m.url.matches('(https?://)?([0-9a-z.-]+)%.[a-z]{2,6}(/[A-z0-9_.-]+/?)*'))
+    def approved(c):
+        print ('match3 url ->{0}'.format(c.m.url))
+
+    @when_start
+    def start(host):
+        host.post('match3', {'id': 1, 'sid': 1, 'url': 'https://github.com'})
+        host.post('match3', {'id': 2, 'sid': 1, 'url': 'http://github.com/jruizgit/rul!es'})
+        host.post('match3', {'id': 3, 'sid': 1, 'url': 'https://github.com/jruizgit/rules/reference.md'})
+        host.post('match3', {'id': 4, 'sid': 1, 'url': '//rules'})
+        host.post('match3', {'id': 5, 'sid': 1, 'url': 'https://github.c/jruizgit/rules'})
+
+run_all()
+```  
 [top](reference.md#table-of-contents) 
 #### Correlated Sequence
 The ability to express and efficiently evaluate sequences of correlated events or facts represents the forward inference hallmark. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
