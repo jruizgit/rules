@@ -345,6 +345,8 @@ API:
 * `when... timeout(timer_name)`  
 ```python
 from durable.lang import *
+import datetime
+
 with ruleset('t1'): 
     @when_all(m.start == 'yes')
     def start_timer(c):
