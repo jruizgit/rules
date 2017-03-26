@@ -257,16 +257,23 @@ The following functions can be combined to form richer sequences:
 * none: no event or fact matching the pattern. 
 ```javascript
 var d = require('durable');
-with (d.ruleset('a4')) {
-    whenAny(all(m.subject.eq('approve'), m.amount.eq(1000)), 
-            all(m.subject.eq('jumbo'), m.amount.eq(10000)), function (c) {
-        console.log('a4 action from: ' + c.s.sid);
-    });
-    whenStart(function (host) {
+var m = d.m, s = d.s, c = d.c, all = d.all;
+
+d.ruleset('a4', {
+        whenAll: [
+            all(m.subject.eq('approve'), m.amount.eq(1000)), 
+            all(m.subject.eq('jumbo'), m.amount.eq(10000))
+        ],
+        run: function(c) {
+            console.log('a4 action from: ' + c.s.sid);
+        }
+    },
+    function (host) {
         host.post('a4', {id: 1, sid: 2, subject: 'jumbo'});
         host.post('a4', {id: 2, sid: 2, amount: 10000});
-    });
-}
+    }
+);
+
 d.runAll();
 ```
 [top](reference.md#table-of-contents) 
