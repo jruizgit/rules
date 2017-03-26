@@ -506,7 +506,7 @@ with flowchart('a3'):
 
         to('approve').when_all(s.status == 'approved')
         to('deny').when_all(m.subject == 'denied')
-        to('request').when_any(m.subject == 'approved', m.subject == 'ok')
+        to('request').when_all(m.subject == 'approved')
     
     with stage('approve'):
         @run 
@@ -517,6 +517,14 @@ with flowchart('a3'):
         @run
         def denied(c):
             print ('a3 denied from: {0}'.format(c.s.sid))
+
+    @when_start
+    def start(host):
+        host.post('a3', {'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100})
+        host.post('a3', {'id': 2, 'sid': 1, 'subject': 'approved'})
+        host.post('a3', {'id': 3, 'sid': 2, 'subject': 'approve', 'amount': 100})
+        host.post('a3', {'id': 4, 'sid': 2, 'subject': 'denied'})
+        host.post('a3', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000})
 
 run_all()
 ```
