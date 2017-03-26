@@ -415,20 +415,24 @@ API:
 * `c.retract(rulesetName, {fact})`  
 ```javascript
 var d = require('durable');
-with (d.ruleset('fraudDetection')) {
-    whenAll(c.first = m.t.eq('purchase'),
-            c.second = m.location.neq(c.first.location), 
-            count(2), 
-        function(c) {
+var m = d.m, s = d.s, c = d.c;
+
+d.ruleset('fraudDetection', {
+        whenAll: [
+            c.first = m.t.eq('purchase'),
+            c.second = m.location.neq(c.first.location)
+        ],
+        count: 2,
+        run: function(c) {
             console.log('fraud detected ->' + c.m[0].first.location + ', ' + c.m[0].second.location);
             console.log('               ->' + c.m[1].first.location + ', ' + c.m[1].second.location);
         }
-    );
-    whenStart(function (host) {
+    },
+    function (host) {
         host.assert('fraudDetection', {id: 1, sid: 1, t: 'purchase', location: 'US'});
         host.assert('fraudDetection', {id: 2, sid: 1, t: 'purchase', location: 'CA'});
-    });
-}
+    }
+);
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
