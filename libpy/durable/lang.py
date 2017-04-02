@@ -358,6 +358,7 @@ class ruleset(object):
         if not len(_ruleset_stack):
             _rulesets.append(self)
         elif len(_rule_stack) > 0:
+
             _rule_stack[-1].func.append(self)
         else:
             raise Exception('Invalid rule context')
@@ -601,6 +602,13 @@ def span(value):
 
 def cap(value):
     return {'cap': value}
+
+def select(name):
+    for rset in _rulesets:
+        if rset.name == name:
+            return rset
+
+    raise Exception('Ruleset {0} not found'.format(name))
 
 m = value('m')
 s = value('$s')

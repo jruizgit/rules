@@ -7,7 +7,7 @@ static PyObject *pyCreateRuleset(PyObject *self, PyObject *args) {
     char *name;
     char *rules;
     unsigned int stateCacheSize;
-    if (!PyArg_ParseTuple(args, "lss", &stateCacheSize, &name, &rules)) {
+    if (!PyArg_ParseTuple(args, "iss", &stateCacheSize, &name, &rules)) {
         PyErr_SetString(RulesError, "pyCreateRuleset Invalid argument");
         return NULL;
     }
@@ -61,7 +61,7 @@ static PyObject *pyDeleteRuleset(PyObject *self, PyObject *args) {
 static PyObject *pyCreateClient(PyObject *self, PyObject *args) {
     char *name;
     unsigned int stateCacheSize;
-    if (!PyArg_ParseTuple(args, "ls", &stateCacheSize, &name)) {
+    if (!PyArg_ParseTuple(args, "is", &stateCacheSize, &name)) {
         PyErr_SetString(RulesError, "pyCreateRuleset Invalid argument");
         return NULL;
     }
@@ -119,7 +119,7 @@ static PyObject *pyBindRuleset(PyObject *self, PyObject *args) {
     char *password = NULL;
     unsigned int db;
     unsigned int result;
-    if (PyArg_ParseTuple(args, "llszK", &port, &db, &host, &password, &handle)) {
+    if (PyArg_ParseTuple(args, "iiszK", &port, &db, &host, &password, &handle)) {
         result = bindRuleset(handle, host, port, password, db);
     } else {
         PyErr_SetString(RulesError, "pyBindRuleset Invalid argument");
@@ -140,7 +140,6 @@ static PyObject *pyBindRuleset(PyObject *self, PyObject *args) {
         }
         return NULL;
     }
-
     Py_RETURN_NONE;
 }
 
@@ -746,7 +745,7 @@ static PyObject *pyCompleteAndStartAction(PyObject *self, PyObject *args) {
     void *handle;
     void *actionHandle;
     unsigned int expectedReplies;
-    if (!PyArg_ParseTuple(args, "KlK", &handle, &expectedReplies, &actionHandle)) {
+    if (!PyArg_ParseTuple(args, "KiK", &handle, &expectedReplies, &actionHandle)) {
         PyErr_SetString(RulesError, "pyCompleteAndStartAction Invalid argument");
         return NULL;
     }
