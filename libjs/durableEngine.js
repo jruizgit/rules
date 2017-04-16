@@ -57,11 +57,11 @@ exports = module.exports = durableEngine = function () {
 
         that.s = document;
         
-        if (output.constructor !== Array) {
+        if (output && output.constructor !== Array) {
             for (var name in output) {
                 that[name] = output[name];
             }
-        } else {
+        } else if (output) {
             that.m = [];
             for (var i = 0; i < output.length; ++i) {
                 if (!output[i].m) {
@@ -1459,6 +1459,7 @@ exports = module.exports = durableEngine = function () {
     };
 
     return {
+        closure: closure,
         promise: promise,
         host: host,
         queue: queue,

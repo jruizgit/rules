@@ -4,6 +4,7 @@ exports = module.exports = durableEngine = function () {
     var ep = require('esprima');
     var ec = require('escodegen');
     var dh = d.host();
+    var dc = d.closure();
 
     var omap = {
         '+': 'add',
@@ -97,7 +98,6 @@ exports = module.exports = durableEngine = function () {
     }
 
     var transformStartStatements = function (block, cmap) {
-        //console.log(JSON.stringify(block, null, 2));
         var statements;
         if (block.type !== 'BlockStatement') {
             statements = [ block ];
@@ -110,16 +110,9 @@ exports = module.exports = durableEngine = function () {
         });
 
         return {
-            type: 'ObjectExpression',
-            properties: [{
-                type: 'Property',
-                key: { type: 'Identifier', name: 'whenStart' },
-                value: {
-                    type: 'FunctionExpression',
-                    params: [{type:'Identifier', name:'host'}],
-                    body: { type: 'BlockStatement', body: statements }
-                }
-            }]
+            type: 'FunctionExpression',
+            params: [{type:'Identifier', name:'host'}],
+            body: { type: 'BlockStatement', body: statements }
         };
     }
 
@@ -142,7 +135,22 @@ exports = module.exports = durableEngine = function () {
                 statement['arguments'].forEach(function (argument, idx) {
                     transformRunStatement(argument, cmap);
                 });
-                transformRunStatement(statement.callee, cmap);
+
+                if (statement.callee.type === 'Identifier' && 
+                    dc[statement.callee.name]) {
+                    statement.callee = {
+                        type: 'MemberExpression',
+                        object: {
+                            type: 'Identifier',
+                            name: 'c'
+                        },
+                        property: {
+                            type: 'Identifier',
+                            name: statement.callee.name
+                        }  
+                    }; 
+                }
+                
                 break;
             case 'AssignmentExpression':
                 transformRunStatement(statement.right, cmap);
@@ -199,7 +207,6 @@ exports = module.exports = durableEngine = function () {
     }
 
     var transformRunStatements = function (block, cmap) {
-        //console.log(JSON.stringify(block, null, 2));
         var statements;
         if (block.type !== 'BlockStatement') {
             statements = [ block ];
@@ -212,13 +219,9 @@ exports = module.exports = durableEngine = function () {
         });
 
         return {
-            type: 'Property',
-            key: { type: 'Identifier', name: 'run' },
-            value: {
-                type: 'FunctionExpression',
-                params: [{type:'Identifier', name:'c'}],
-                body: { type: 'BlockStatement', body: [block] }
-            }
+            type: 'FunctionExpression',
+            params: [{type:'Identifier', name:'c'}],
+            body: { type: 'BlockStatement', body: [block] }
         };
     }
 
@@ -306,7 +309,6 @@ exports = module.exports = durableEngine = function () {
     }
 
     var transformExpressions = function (block, cmap) {
-        //console.log(JSON.stringify(block, null, 2));
         var statements;
         if (block.type === 'ExpressionStatement') {
             statements = [ block.expression ];
@@ -335,16 +337,9 @@ exports = module.exports = durableEngine = function () {
             }
         });
 
-        return currentRule = {
-            type: 'ObjectExpression',
-            properties: [{
-                type: 'Property',
-                key: { type: 'Identifier', name: 'whenAll' },
-                value: {
-                    'type': 'ArrayExpression',
-                    'elements': statements
-                }
-            }]
+        return {
+            'type': 'ArrayExpression',
+            'elements': statements
         };
     }
 
@@ -359,12 +354,30 @@ exports = module.exports = durableEngine = function () {
 
             if (statement.label.name === 'whenAll') {
                 cmap = {};
-                currentRule = transformExpressions(statement.body, cmap);
+                currentRule = {
+                    type: 'ObjectExpression',
+                    properties: [{
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'whenAll' },
+                        value: transformExpressions(statement.body, cmap)
+                    }]
+                };
                 rules.push(currentRule);
             } else if (statement.label.name === 'whenStart') {
-                rules.push(transformStartStatements(statement.body));
+                rules.push({
+                    type: 'ObjectExpression',
+                    properties: [{
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'whenStart' },
+                        value: transformStartStatements(statement.body)
+                    }]
+                });
             } else if (statement.label.name === 'run') {
-                currentRule.properties.push(transformRunStatements(statement.body, cmap));
+                currentRule.properties.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: 'run' },
+                    value: transformRunStatements(statement.body, cmap)
+                });
             } else if ((statement.label.name === 'pri') ||
                       (statement.label.name === 'count')||
                       (statement.label.name === 'span')||
@@ -405,11 +418,264 @@ exports = module.exports = durableEngine = function () {
                 }
             }
         });
-        console.log(func);
         return func;
     }
 
+    var transformState = function(block) {
+        var triggers = [];
+        var states = null;
+        var currentTrigger = null;
+        var cmap;
+        block.body.forEach(function (statement, index) {
+            if (statement.type !== 'LabeledStatement') {
+                throw 'syntax error: statement type ' + statement.type + ' unexpected';
+            }
 
+            if (statement.label.name === 'to') {
+                cmap = {};
+                currentTrigger = {
+                    type: 'ObjectExpression',
+                    properties: [{
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'to' },
+                        value: statement.body.expression
+                    }]
+                };
+
+                triggers.push(currentTrigger);
+            } else if (statement.label.name === 'whenAll') {
+                currentTrigger.properties.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: 'whenAll' },
+                    value: transformExpressions(statement.body, cmap)
+                });
+            } else if (statement.label.name === 'run') {
+                currentTrigger.properties.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: 'run' },
+                    value: transformRunStatements(statement.body, cmap)
+                });
+            } else if ((statement.label.name === 'pri') ||
+                      (statement.label.name === 'count')||
+                      (statement.label.name === 'span')||
+                      (statement.label.name === 'cap')) {
+                currentTrigger.properties.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: statement.label.name },
+                    value: statement.body.expression
+                })
+            } else {
+                if (!states) {
+                    states = [];
+                    triggers.push({
+                        type: 'ObjectExpression',
+                        properties: states
+                    });
+                }
+
+                states.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: statement.label.name },
+                    value: transformState(statement.body)
+                });
+            }
+        });
+
+        return {
+            'type': 'ArrayExpression',
+            'elements': triggers
+        };
+    }
+
+    var transformStates = function (block) {
+        var states = [];
+        block.body.forEach(function (statement, index) {
+            if (statement.type !== 'LabeledStatement') {
+                throw 'syntax error: statement type ' + statement.type + ' unexpected';
+            }
+            
+            if (statement.label.name === 'whenStart') {
+                states.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: 'whenStart' },
+                    value: transformStartStatements(statement.body)
+                });
+            } else {
+                states.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: statement.label.name },
+                    value: transformState(statement.body)
+                });
+            }
+        });
+
+        return states;
+    }
+
+    var transformStatechart = function (block) {
+        var program = {
+            type: 'Program',
+            body: [{
+                type: 'FunctionExpression',
+                id: null,
+                params: [],
+                body: {
+                    type: 'BlockStatement',
+                    body: [{
+                        type: 'ReturnStatement',
+                        argument: {
+                            type: 'ObjectExpression',
+                            properties: transformStates(block)
+                        }
+                    }]
+                }
+            }]
+        }
+        
+        var func = ec.generate(program, {
+            format: {
+                indent: {
+                    style: '  '
+                }
+            }
+        });
+        return func;
+    }
+
+    var transformCondition = function(block) {
+        var cmap = {};
+        var currentCondition = {
+            type: 'ObjectExpression',
+            properties: []
+        };
+
+        if (block.type === 'ExpressionStatement') {
+            currentCondition.properties.push({
+                type: 'Property',
+                key: { type: 'Identifier', name: 'whenAll' },
+                value: transformExpressions(block, cmap)
+            });
+        } else {
+            block.body.forEach(function (statement, index) {
+                if (statement.type !== 'LabeledStatement') {
+                    throw 'syntax error: statement type ' + statement.type + ' unexpected';
+                }
+
+                if (statement.label.name === 'whenAll') {
+                    currentCondition.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'whenAll' },
+                        value: transformExpressions(statement.body, cmap)
+                    });
+                } else if ((statement.label.name === 'pri') ||
+                          (statement.label.name === 'count')||
+                          (statement.label.name === 'span')||
+                          (statement.label.name === 'cap')) {
+                    currentCondition.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: statement.label.name },
+                        value: statement.body.expression
+                    });
+                } else {
+                    throw 'syntax error: whenAll, pri, count, span or cap labels expected';   
+                }
+            });
+        }
+
+        return currentCondition;
+    }
+
+    var transformStage = function(block, name) {
+        var triggers = [];
+        var currentStage = {
+            type: 'ObjectExpression',
+            properties: []
+        };
+
+        block.body.forEach(function (statement, index) {
+            if (statement.type !== 'LabeledStatement') {
+                throw 'syntax error: statement type ' + statement.type + ' unexpected';
+            }
+
+            if (statement.label.name === 'run') {
+                currentStage.properties.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: 'run' },
+                    value: transformRunStatements(statement.body, {})
+                });
+
+            } else if (statement.label.name === 'self') {
+                currentStage.properties.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: name },
+                    value: transformCondition(statement.body) 
+                });
+            } else {
+                currentStage.properties.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: statement.label.name },
+                    value: transformCondition(statement.body) 
+                });
+            }
+        });
+
+        return currentStage;
+    }
+
+    var transformStages = function (block) {
+        var stages = [];
+        block.body.forEach(function (statement, index) {
+            if (statement.type !== 'LabeledStatement') {
+                throw 'syntax error: statement type ' + statement.type + ' unexpected';
+            }
+            
+            if (statement.label.name === 'whenStart') {
+                stages.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: 'whenStart' },
+                    value: transformStartStatements(statement.body)
+                });
+            } else {
+                stages.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: statement.label.name },
+                    value: transformStage(statement.body, statement.label.name)
+                });
+            }
+        });
+
+        return stages;
+    }
+
+    var transformFlowchart = function (block) {
+        var program = {
+            type: 'Program',
+            body: [{
+                type: 'FunctionExpression',
+                id: null,
+                params: [],
+                body: {
+                    type: 'BlockStatement',
+                    body: [{
+                        type: 'ReturnStatement',
+                        argument: {
+                            type: 'ObjectExpression',
+                            properties: transformStages(block)
+                        }
+                    }]
+                }
+            }]
+        }
+        
+        var func = ec.generate(program, {
+            format: {
+                indent: {
+                    style: '  '
+                }
+            }
+        });
+        return func;
+    }
 
     var argsToArray = function(args, array) {
         array = array || [];
@@ -992,6 +1258,25 @@ exports = module.exports = durableEngine = function () {
         }
     );
 
+    var all = function() {
+        var that = rule('$all', argsToArray(arguments));
+        return that;
+    };
+
+    var any = function() {
+        var that = rule('$any', argsToArray(arguments));
+        return that;
+    };
+        
+    var none = function(exp) {
+        var that = rule('$not', [exp]);
+        return that;
+    };
+
+    var timeout = function(name) {
+        return m.$t.eq(name);
+    };
+
     var extend = function (obj) {        
         obj.add = add;
         obj.sub = sub;
@@ -1002,21 +1287,10 @@ exports = module.exports = durableEngine = function () {
         obj.c = c;
         obj.m = m;
         obj.s = s;
-
-        obj.all = function() {
-            var that = rule('$all', argsToArray(arguments));
-            return that;
-        };
-
-        obj.any = function() {
-            var that = rule('$any', argsToArray(arguments));
-            return that;
-        };
-        
-        obj.none = function(exp) {
-            var that = rule('$not', [exp]);
-            return that;
-        }
+        obj.all = all;
+        obj.any = any;
+        obj.none = none;
+        obj.timeout = timeout;
 
         obj.pri = function(pri) {
             var that = {};
@@ -1049,10 +1323,6 @@ exports = module.exports = durableEngine = function () {
             }
             return that;
         };
-
-        obj.timeout = function(name) {
-            return m.$t.eq(name);
-        }
     };
 
     var ruleset = function () {
@@ -1080,10 +1350,6 @@ exports = module.exports = durableEngine = function () {
             rules.push(newRule);
             return newRule;
         };
-
-        that.timeout = function(name) {
-            return m.$t.eq(name);
-        }
 
         that.whenStart = function (func) {
             startFunc = func;
@@ -1276,6 +1542,16 @@ exports = module.exports = durableEngine = function () {
         extend(that);
         rulesets.push(that);
         if (stateObjects) {
+            if (typeof(stateObjects) === 'function') {
+                var ast = ep.parse('var fn = ' + stateObjects);
+                if (!ast) {
+                    throw 'invalid code block. AST generation error';
+                }
+                
+                func = transformStatechart(ast.body[0].declarations[0].init.body);
+                eval('var fn = ' + func + '; stateObjects = fn();');
+            } 
+
             for (var stateName in stateObjects) {
                 if (stateName === 'whenStart') {
                     startFunc = stateObjects[stateName];
@@ -1286,7 +1562,8 @@ exports = module.exports = durableEngine = function () {
                         states.push(state(stateName, that, [stateObjects[stateName]]));
                     }
                 }
-            }    
+            }  
+              
         }
         
         return that;
@@ -1420,14 +1697,25 @@ exports = module.exports = durableEngine = function () {
         extend(that);
         rulesets.push(that);
         if (stageObjects) {
+            if (typeof(stageObjects) === 'function') {
+                var ast = ep.parse('var fn = ' + stageObjects);
+                if (!ast) {
+                    throw 'invalid code block. AST generation error';
+                }
+                
+                func = transformFlowchart(ast.body[0].declarations[0].init.body);
+                eval('var fn = ' + func + '; stageObjects = fn();');
+            } 
+
             for (var stageName in stageObjects) {
                 if (stageName === 'whenStart') {
                     startFunc = stageObjects[stageName];
                 } else {
                     stages.push(stage(stageName, that, stageObjects[stageName]));
                 }
-            }    
+            } 
         }
+
         return that;
     };
 
