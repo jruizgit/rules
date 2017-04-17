@@ -52,7 +52,7 @@ exports = module.exports = durableEngine = function () {
         var branchDirectory = {};
         var deleteDirectory = {};
         var startTime = new Date().getTime();
-        var completed = false;
+        var ended = false;
         var deleted = false;
 
         that.s = document;
@@ -266,19 +266,19 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
-        that.hasCompleted = function () {
+        that._hasEnded = function () {
             if ((new Date().getTime() - startTime) > 10000) {
-                completed = true;
+                ended = true;
             }
 
-            return completed;
+            return ended;
         };
 
-        that.complete = function () {
-            completed = true;
+        that._end = function () {
+            ended = true;
         }
 
-        that.isDeleted = function () {
+        that._isDeleted = function () {
             return deleted;
         };
 
@@ -326,7 +326,7 @@ exports = module.exports = durableEngine = function () {
                 if (new Date().getTime() > maxTime) {
                     c.s.exception = 'timeout expired';
                     complete(null, c)
-                } else if (!c.hasCompleted()) {
+                } else if (!c._hasEnded()) {
                     c.renewActionLease();
                     setTimeout(timeoutCallback, 5000, maxTime);
                 }
@@ -598,10 +598,10 @@ exports = module.exports = durableEngine = function () {
                     } else {
                         var rulesetNames = c.getTargetRulesets();
                         ensureRulesets(rulesetNames, 0, c, function(err, c) {
-                            if (c.hasCompleted()) {
+                            if (c._hasEnded()) {
                                 return;
                             } else {
-                                c.complete();
+                                c._end();
                             }
 
                             if (err) {
@@ -736,7 +736,7 @@ exports = module.exports = durableEngine = function () {
                                 complete(reason);
                             }
 
-                            if (c.isDeleted()) {
+                            if (c._isDeleted()) {
                                 try {
                                     host.deleteState(rulesetName, c.s.sid);
                                 } catch (reason) {

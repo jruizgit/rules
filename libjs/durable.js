@@ -62,6 +62,7 @@ exports = module.exports = durableEngine = function () {
                 
                 break;
             case 'AssignmentExpression':
+                transformStartStatement(statement.left);
                 transformStartStatement(statement.right);
                 break;
             case 'UnaryExpression':
@@ -80,15 +81,27 @@ exports = module.exports = durableEngine = function () {
                 transformStartStatement(statement.argument);
                 break;
             case 'SwitchStatement':
-               statement.cases.forEach(function(_case, idx){
-                  transformStartStatement(_case);
+               statement.cases.forEach(function(c, i){
+                  transformStartStatement(c);
                });
-            break;
+                break;
             case 'SwitchCase':
-               statement.consequent.forEach(function(con, idx){
-                   transformStartStatement(con);
+               statement.consequent.forEach(function(c, i){
+                   transformStartStatement(c);
                });
-            break;
+                break;
+            case 'IfStatement':
+                transformStartStatement(statement.test);
+                transformStartStatement(statement.consequent);
+                if (statement.alternate) {
+                    transformStartStatement(statement.alternate);   
+                }
+                break;
+            case 'ObjectExpression':
+                statement.properties.forEach(function(prop, i) {
+                    transformStartStatement(prop.key);
+                    transformStartStatement(prop.value);
+                });
             case 'MemberExpression':
             case 'UpdateExpression':
             case 'Literal':
@@ -136,8 +149,10 @@ exports = module.exports = durableEngine = function () {
                     transformRunStatement(argument, cmap);
                 });
 
-                if (statement.callee.type === 'Identifier' && 
-                    dc[statement.callee.name]) {
+                if (statement.callee.type !== 'Identifier' ||
+                    !dc[statement.callee.name]) {
+                    transformRunStatement(statement.callee, cmap);
+                } else {
                     statement.callee = {
                         type: 'MemberExpression',
                         object: {
@@ -153,6 +168,7 @@ exports = module.exports = durableEngine = function () {
                 
                 break;
             case 'AssignmentExpression':
+                transformRunStatement(statement.left, cmap);
                 transformRunStatement(statement.right, cmap);
                 break;
             case 'UnaryExpression':
@@ -171,7 +187,8 @@ exports = module.exports = durableEngine = function () {
                 transformRunStatement(statement.argument, cmap);
                 break;
             case 'MemberExpression':
-                if (statement.object.type === 'MemberExpression') {
+                if (statement.object.type === 'MemberExpression' || 
+                    statement.object.type === 'CallExpression') {
                     transformRunStatement(statement.object, cmap);
                 } else if (cmap[statement.object.name] || 
                            statement.object.name === 's' ||
@@ -190,24 +207,55 @@ exports = module.exports = durableEngine = function () {
                 };
                break;
             case 'SwitchStatement':
-               statement.cases.forEach(function(_case, idx){
-                  transformRunStatement(_case, cmap);
+               statement.cases.forEach(function(c, i){
+                  transformRunStatement(c, cmap);
                });
-            break;
+                break;
             case 'SwitchCase':
-               statement.consequent.forEach(function(con, idx){
-                   transformRunStatement(con, cmap);
+               statement.consequent.forEach(function(c, i){
+                   transformRunStatement(c, cmap);
                });
-            break;
+                break;
+            case 'IfStatement':
+                transformRunStatement(statement.test, cmap);
+                transformRunStatement(statement.consequent, cmap);
+                if (statement.alternate) {
+                    transformRunStatement(statement.alternate, cmap);   
+                }
+                break;
+            case 'Identifier':
+                if (cmap[statement.name] || 
+                    statement.name === 's' ||
+                    statement.name === 'm') {
+                    statement.type = 'MemberExpression';
+                    statement.object = {
+                        type: 'Identifier',
+                        name: 'c'
+                    };
+                    statement.property = {
+                        type: 'Identifier',
+                        name: statement.name
+                    };
+                }
+                break;
+            case 'ObjectExpression':
+                statement.properties.forEach(function(prop, i) {
+                    transformRunStatement(prop.key, cmap);
+                    transformRunStatement(prop.value, cmap);
+                });
             case 'UpdateExpression':
             case 'Literal':
-            case 'Identifier':
                 break;
         }
     }
 
-    var transformRunStatements = function (block, cmap) {
+    var transformRunStatements = function (block, cmap, async) {
         var statements;
+        var params = [{type:'Identifier', name:'c'}];
+        if (async) {
+            params.push({type:'Identifier', name:'complete'})
+        }
+
         if (block.type !== 'BlockStatement') {
             statements = [ block ];
         } else {
@@ -220,12 +268,12 @@ exports = module.exports = durableEngine = function () {
 
         return {
             type: 'FunctionExpression',
-            params: [{type:'Identifier', name:'c'}],
+            params: params,
             body: { type: 'BlockStatement', body: [block] }
         };
     }
 
-    var transformExpression = function (expression, cmap) {
+    var transformExpression = function (expression, cmap, right) {
         if (expression.type === 'BinaryExpression' || 
             expression.type === 'LogicalExpression') {
             if (!expression.operator || !omap[expression.operator]) {
@@ -284,8 +332,9 @@ exports = module.exports = durableEngine = function () {
                 delete(expression['operator']);
             }
         } else if (expression.type === 'MemberExpression') {
-            if (expression.object.type === 'MemberExpression') {
-                transformExpression(expression.object);
+            if (expression.object.type === 'MemberExpression' || 
+                expression.object.type === 'CallExpression') {
+                transformExpression(expression.object, cmap);
             } else if (cmap[expression.object.name]) {
                 expression.object = {
                     type: 'MemberExpression',
@@ -299,9 +348,42 @@ exports = module.exports = durableEngine = function () {
                     }  
                 };
             }
-        } else if (expression.type !== 'Literal' && 
-                   expression.type !== 'Identifier' &&
-                   expression.type !== 'CallExpression') {
+        } else if (expression.type === 'CallExpression') {
+            expression['arguments'].forEach(function (argument, idx) {
+                transformExpression(argument, cmap);
+            });
+                    
+            if (expression.callee.type === 'MemberExpression' && expression.callee.object.name === 's') {
+                expression.callee.object = {
+                    type: 'MemberExpression',
+                    property: expression.callee.object,
+                    object: {
+                        type: 'Identifier',
+                        name: 'c'
+                    }
+                }; 
+            }
+        } else if (expression.type === 'LabeledStatement') {
+            expression.type = 'CallExpression';
+            var functionName;
+            if (expression.label.name === 'whenAll') {
+                functionName = 'all';
+            } else if (expression.label.name === 'whenAny') {
+                functionName = 'any';
+            } else {
+                throw 'syntax error: label ' + expression.label.name + ' unexpected';   
+            }
+
+            expression.callee = {
+                type: 'Identifier',
+                name: functionName
+            };
+
+            expression['arguments'] = transformExpressions(expression.body, cmap).elements;
+            delete(expression['label']);
+            delete(expression['body']);
+
+        } else if (expression.type !== 'Literal' && expression.type !== 'Identifier') {
             throw 'syntax error: expression type ' + expression.type + ' unexpected';
         }
 
@@ -311,11 +393,23 @@ exports = module.exports = durableEngine = function () {
     var transformExpressions = function (block, cmap) {
         var statements;
         if (block.type === 'ExpressionStatement') {
-            statements = [ block.expression ];
+            if (block.expression.type === 'SequenceExpression') {
+                statements = block.expression.expressions;             
+            } else {
+                statements = [ block.expression ]; 
+            }
         } else if (block.type === 'BlockStatement') {
-            statements = block.body.map(function (s, v) { return s.expression; }, []);
+            statements = block.body.map(function (s, v) { 
+                if (s.type === 'ExpressionStatement') {
+                    return s.expression; 
+                } else if (s.type === 'LabeledStatement') {
+                    return s; 
+                } else {
+                    throw 'syntax error: statment type ' + s.type + ' unexpected';
+                }
+            }, []);
         } else {
-            throw 'syntax error: statement type ' + statement.type + ' unexpected';
+            throw 'syntax error: statement type ' + block.type + ' unexpected';
         }
 
         statements.forEach(function (expression, index) {
@@ -363,6 +457,17 @@ exports = module.exports = durableEngine = function () {
                     }]
                 };
                 rules.push(currentRule);
+            } else if (statement.label.name === 'whenAny') {
+                cmap = {};
+                currentRule = {
+                    type: 'ObjectExpression',
+                    properties: [{
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'whenAny' },
+                        value: transformExpressions(statement.body, cmap)
+                    }]
+                };
+                rules.push(currentRule);
             } else if (statement.label.name === 'whenStart') {
                 rules.push({
                     type: 'ObjectExpression',
@@ -377,6 +482,12 @@ exports = module.exports = durableEngine = function () {
                     type: 'Property',
                     key: { type: 'Identifier', name: 'run' },
                     value: transformRunStatements(statement.body, cmap)
+                });
+            } else if (statement.label.name === 'runAsync') {
+                currentRule.properties.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: 'run' },
+                    value: transformRunStatements(statement.body, cmap, true)
                 });
             } else if ((statement.label.name === 'pri') ||
                       (statement.label.name === 'count')||
@@ -449,11 +560,23 @@ exports = module.exports = durableEngine = function () {
                     key: { type: 'Identifier', name: 'whenAll' },
                     value: transformExpressions(statement.body, cmap)
                 });
+            } else if (statement.label.name === 'whenAny') {
+                currentTrigger.properties.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: 'whenAny' },
+                    value: transformExpressions(statement.body, cmap)
+                });
             } else if (statement.label.name === 'run') {
                 currentTrigger.properties.push({
                     type: 'Property',
                     key: { type: 'Identifier', name: 'run' },
                     value: transformRunStatements(statement.body, cmap)
+                });
+            } else if (statement.label.name === 'runAsync') {
+                currentTrigger.properties.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: 'run' },
+                    value: transformRunStatements(statement.body, cmap, true)
                 });
             } else if ((statement.label.name === 'pri') ||
                       (statement.label.name === 'count')||
@@ -567,6 +690,12 @@ exports = module.exports = durableEngine = function () {
                         key: { type: 'Identifier', name: 'whenAll' },
                         value: transformExpressions(statement.body, cmap)
                     });
+                } else if (statement.label.name === 'whenAny') {
+                    currentCondition.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'whenAny' },
+                        value: transformExpressions(statement.body, cmap)
+                    });
                 } else if ((statement.label.name === 'pri') ||
                           (statement.label.name === 'count')||
                           (statement.label.name === 'span')||
@@ -603,7 +732,12 @@ exports = module.exports = durableEngine = function () {
                     key: { type: 'Identifier', name: 'run' },
                     value: transformRunStatements(statement.body, {})
                 });
-
+            } else if (statement.label.name === 'runAsync') {
+                currentStage.properties.push({
+                    type: 'Property',
+                    key: { type: 'Identifier', name: 'run' },
+                    value: transformRunStatements(statement.body, {}, true)
+                });
             } else if (statement.label.name === 'self') {
                 currentStage.properties.push({
                     type: 'Property',
