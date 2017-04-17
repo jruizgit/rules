@@ -50,109 +50,12 @@ run_all()
 JavaScript
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
 
-d.ruleset('test', {
+d.ruleset('test', function() {
     // antecedent
-    whenAll: m.subject.eq('World'),
+    whenAll: m.subject == 'World'
     // consequent
-    run: function(c) { console.log('Hello ' + c.m.subject); }
-});
-
-d.runAll();
-```
-TypeScript
-```typescript
-import * as d from 'durable';
-let m = d.m, s = d.s, c = d.c;
-
-d.ruleset('test', {
-    // antecedent
-    whenAll: m['subject'].eq('World'),
-    // consequent
-    run: (c) => { console.log('Hello ' + c.m['subject']); }
-});
-
-d.runAll();
-```
-## Pattern Matching
-
-durable_rules provides string pattern matching. Expressions are compiled down to a DFA, guaranteeing linear execution time in the order of single digit nano seconds per character (note: backtracking expressions are not supported).
-
-<sub>Tip: once the test is running, from a terminal type:  
-`curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "375678956789765"}' http://localhost:5000/test/1`  
-`curl -H "Content-type: application/json" -X POST -d '{"id": 2, "subject": "4345634566789888"}' http://localhost:5000/test/1`  
-`curl -H "Content-type: application/json" -X POST -d '{"id": 3, "subject": "2228345634567898"}' http://localhost:5000/test/1`  
-</sub>
-
-### Ruby
-```ruby
-require "durable"
-Durable.ruleset :test do
-  when_all m.subject.matches('3[47][0-9]{13}') do
-    puts "Amex detected in #{m.subject}"
-  end
-  when_all m.subject.matches('4[0-9]{12}([0-9]{3})?') do
-    puts "Visa detected in #{m.subject}"
-  end
-  when_all m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}') do
-    puts "Mastercard detected in #{m.subject}"
-  end
-end
-Durable.run_all
-```
-### Python
-```python
-from durable.lang import *
-
-with ruleset('test'):
-    @when_all(m.subject.matches('3[47][0-9]{13}'))
-    def amex(c):
-        print ('Amex detected {0}'.format(c.m.subject))
-
-    @when_all(m.subject.matches('4[0-9]{12}([0-9]{3})?'))
-    def visa(c):
-        print ('Visa detected {0}'.format(c.m.subject))
-
-    @when_all(m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}'))
-    def mastercard(c):
-        print ('Mastercard detected {0}'.format(c.m.subject))
-
-run_all()
-```
-### Node.js
-JavaScript
-```javascript
-var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
-
-d.ruleset('test', {
-    whenAll: m.subject.mt('3[47][0-9]{13}'),
-    run: function(c) { console.log('Amex detected in ' + c.m.subject); }
-}, {
-    whenAll: m.subject.mt('4[0-9]{12}([0-9]{3})?'),
-    run: function(c) { console.log('Visa detected in ' + c.m.subject); }
-}, {
-    whenAll: m.subject.mt('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}'),
-    run: function(c) { console.log('Mastercard detected in ' + c.m.subject); }
-});
-
-d.runAll();
-```
-TypeScript
-```typescript
-import * as d from 'durable';
-let m = d.m, s = d.s, c = d.c;
-
-d.ruleset('test', {
-    whenAll: m['subject'].mt('3[47][0-9]{13}'),
-    run: (c) => { console.log('Amex detected in ' + c.m['subject']); }
-},{
-    whenAll: m['subject'].mt('4[0-9]{12}([0-9]{3})?'),
-    run: (c) => { console.log('Visa detected in ' + c.m['subject']); }
-},{
-    whenAll: m['subject'].mt('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}'),
-    run: (c) => { console.log('Mastercard detected in ' + c.m['subject']); }
+    run: console.log('Hello ' + m.subject)
 });
 
 d.runAll();
@@ -209,56 +112,90 @@ run_all()
 JavaScript  
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
 
-d.ruleset('fibonacci', {
-        whenAll: [
-            c.first = m.value.neq(0),
-            c.second = m.id.eq(c.first.id.add(1))
-        ],
-        run: function(c) { 
-            console.log('Value: ' + c.first.value);
-            if (c.second.id > 100) {
-                console.log('Value: ' + c.second.value);
-            } else {
-                c.assert({id: c.second.id + 1, value: c.first.value + c.second.value});
-                c.retract(c.first);
-            }
+d.ruleset('fibonacci', function() {
+    whenAll: {
+        first = m.value != 0
+        second = m.id == first.id + 1
+    }
+    run: { 
+        console.log('Value: ' + first.value);
+        if (second.id > 100) {
+            console.log('Value: ' + second.value);
+        } else {
+            c.assert({id: second.id + 1, value: first.value + second.value});
+            c.retract(first);
         }
-    }, 
-    function(host) {
+    }
+    
+    whenStart: {
         host.assert('fibonacci', { id: 1, sid: 1, value: 1 });
         host.assert('fibonacci', { id: 2, sid: 1, value: 1 });
     }
-);
+});
 
 d.runAll();
 ```
-TypeScript  
-```typescript
-import * as d from 'durable';
-let m = d.m, s = d.s, c = d.c;
+## Pattern Matching
 
-d.ruleset('fibonacci', {
-        whenAll: [
-            c['first'] = m['value'].neq(0),
-            c['second'] = m['id'].eq(c['first']['id'].add(1))
-        ],
-        run: (c) => { 
-            console.log('Value: ' + c['first']['value']);
-            if (c['second']['id'] > 100) {
-                console.log('Value: ' + c['second']['value']);
-            } else {
-                c.assert({id: c['second']['id']+1, value: c['first']['value'] + c['second']['value']});
-                c.retract(c['first']);
-            }
-        }
-    }, 
-    function(host) {
-        host.assert('fibonacci', { id: 1, sid: 1, value: 1 });
-        host.assert('fibonacci', { id: 2, sid: 1, value: 1 });
-    }
-);
+durable_rules provides string pattern matching. Expressions are compiled down to a DFA, guaranteeing linear execution time in the order of single digit nano seconds per character (note: backtracking expressions are not supported).
+
+<sub>Tip: once the test is running, from a terminal type:  
+`curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "375678956789765"}' http://localhost:5000/test/1`  
+`curl -H "Content-type: application/json" -X POST -d '{"id": 2, "subject": "4345634566789888"}' http://localhost:5000/test/1`  
+`curl -H "Content-type: application/json" -X POST -d '{"id": 3, "subject": "2228345634567898"}' http://localhost:5000/test/1`  
+</sub>
+
+### Ruby
+```ruby
+require "durable"
+Durable.ruleset :test do
+  when_all m.subject.matches('3[47][0-9]{13}') do
+    puts "Amex detected in #{m.subject}"
+  end
+  when_all m.subject.matches('4[0-9]{12}([0-9]{3})?') do
+    puts "Visa detected in #{m.subject}"
+  end
+  when_all m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}') do
+    puts "Mastercard detected in #{m.subject}"
+  end
+end
+Durable.run_all
+```
+### Python
+```python
+from durable.lang import *
+
+with ruleset('test'):
+    @when_all(m.subject.matches('3[47][0-9]{13}'))
+    def amex(c):
+        print ('Amex detected {0}'.format(c.m.subject))
+
+    @when_all(m.subject.matches('4[0-9]{12}([0-9]{3})?'))
+    def visa(c):
+        print ('Visa detected {0}'.format(c.m.subject))
+
+    @when_all(m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}'))
+    def mastercard(c):
+        print ('Mastercard detected {0}'.format(c.m.subject))
+
+run_all()
+```
+### Node.js
+JavaScript
+```javascript
+var d = require('durable');
+
+d.ruleset('test', function() {
+    whenAll: m.subject.matches('3[47][0-9]{13}')
+    run: console.log('Amex detected in ' + m.subject)
+    
+    whenAll: m.subject.matches('4[0-9]{12}([0-9]{3})?')
+    run: console.log('Visa detected in ' + m.subject)
+    
+    whenAll: m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}')
+    run: console.log('Mastercard detected in ' + c.m.subject)
+});
 
 d.runAll();
 ```
