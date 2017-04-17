@@ -47,7 +47,6 @@ with ruleset('test'):
 run_all()
 ```  
 ### Node.js
-JavaScript
 ```javascript
 var d = require('durable');
 
@@ -109,7 +108,6 @@ with ruleset('fibonacci'):
 run_all()
 ```
 ### Node.js
-JavaScript  
 ```javascript
 var d = require('durable');
 
@@ -182,7 +180,6 @@ with ruleset('test'):
 run_all()
 ```
 ### Node.js
-JavaScript
 ```javascript
 var d = require('durable');
 
