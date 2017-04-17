@@ -144,7 +144,39 @@ The combination of forward inference and durable_rules tolerance to failures on 
 `curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "approve", "amount": 100}' http://localhost:5000/expense/2`  
 `curl -H "Content-type: application/json" -X POST -d '{"id": 2, "subject": "denied"}' http://localhost:5000/expense/2`  
 </sub>
+### Python
+```python
+from durable.lang import *
 
+with statechart('expense'):
+    with state('input'):
+        @to('denied')
+        @when_all((m.subject == 'approve') & (m.amount > 1000))
+        def denied(c):
+            print ('expense denied: {0}'.format(c.s.sid))
+        
+        @to('pending')    
+        @when_all((m.subject == 'approve') & (m.amount <= 1000))
+        def request(c):
+            print ('requesting expense approval: {0}'.format(c.s.sid))
+        
+    with state('pending'):
+        @to('approved')
+        @when_all(m.subject == 'approved')
+        def approved(c):
+            print ('expense approved by: {0}'.format(c.s.sid))
+            
+        @to('denied')
+        @when_all(m.subject == 'denied')
+        def denied(c):
+            print ('expense denied by: {0}'.format(c.s.sid))
+        
+    state('denied')
+    state('approved')
+    
+run_all()
+```
+### Node.js
 ```javascript
 d.statechart('expense', function() {
     input: {
