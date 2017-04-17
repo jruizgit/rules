@@ -139,10 +139,10 @@ d.runAll();
 The combination of forward inference and durable_rules tolerance to failures on rule action dispatch, enables work coordination with data flow structures such as statecharts, nested states and flowcharts. 
 
 <sub>Tip: once the test is running, from a terminal type:   
-`curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "approve", "amount": 100}' http://localhost:5000/expense/1`
-`curl -H "Content-type: application/json" -X POST -d '{"id": 2, "subject": "approved"}' http://localhost:5000/expense/1`
-`curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "approve", "amount": 100}' http://localhost:5000/expense/2`
-`curl -H "Content-type: application/json" -X POST -d '{"id": 2, "subject": "denied"}' http://localhost:5000/expense/2`
+`curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "approve", "amount": 100}' http://localhost:5000/expense/1`  
+`curl -H "Content-type: application/json" -X POST -d '{"id": 2, "subject": "approved"}' http://localhost:5000/expense/1`  
+`curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "approve", "amount": 100}' http://localhost:5000/expense/2`  
+`curl -H "Content-type: application/json" -X POST -d '{"id": 2, "subject": "denied"}' http://localhost:5000/expense/2`  
 </sub>
 
 ```javascript
@@ -154,17 +154,17 @@ d.statechart('expense', function() {
 
         to: 'pending'
         whenAll: m.subject == 'approve' && m.amount <= 1000
-        run: console.log('expense request approval from: ' + c.s.sid);
+        run: console.log('expense request approval from: ' + s.sid);
     }
 
     pending: {
         to: 'approved'
         whenAll: m.subject == 'approved'
-        run: console.log('expense second request approval from: ' + s.sid);
+        run: console.log('expense approved by: ' + s.sid);
             
         to: 'denied'
         whenAll: m.subject == 'denied'
-        run: console.log('expense denied from: ' + s.sid)
+        run: console.log('expense denied by: ' + s.sid)
     }
     
     denied: {}
