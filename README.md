@@ -19,19 +19,20 @@ durable_rules is cloud ready. It can easily be hosted and scaled in environments
 Using your scripting language of choice, simply describe the event to match (antecedent) and the action to take (consequent). In this example the rule can be triggered by posting `{"id": 1, "subject": "World"}` to url `http://localhost:5000/test/1`. 
 
 <sub>Tip: once the test is running, from a terminal type:   
-`curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "World"}' http://localhost:5000/test/1`</sub>
+`curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "World"}' http://localhost:5000/test/1`</sub>  
 
-### Ruby
-```ruby
-require "durable"
-Durable.ruleset :test do
-  # antecedent
-  when_all (m.subject == "World") do
-    # consequent
-    puts "Hello #{m.subject}"
-  end
-end
-Durable.run_all
+### Node.js
+```javascript
+var d = require('durable');
+
+d.ruleset('test', function() {
+    // antecedent
+    whenAll: m.subject == 'World'
+    // consequent
+    run: console.log('Hello ' + m.subject)
+});
+
+d.runAll();
 ```  
 ### Python
 ```python
@@ -46,67 +47,22 @@ with ruleset('test'):
 
 run_all()
 ```  
-### Node.js
-```javascript
-var d = require('durable');
-
-d.ruleset('test', function() {
-    // antecedent
-    whenAll: m.subject == 'World'
-    // consequent
-    run: console.log('Hello ' + m.subject)
-});
-
-d.runAll();
-```
+### Ruby
+```ruby
+require "durable"
+Durable.ruleset :test do
+  # antecedent
+  when_all (m.subject == "World") do
+    # consequent
+    puts "Hello #{m.subject}"
+  end
+end
+Durable.run_all
+```  
 ## Forward Inference  
 
 durable_rules super-power is the ability to define forward reasoning rules. In other words, rules to derive an action based on a set of correlated facts or observed events. The example below illustrates this basic building block by calculating the first 100 numbers of the Fibonacci series.
 
-### Ruby
-```ruby
-require "durable"
-
-Durable.ruleset :fibonacci do
-  when_all(c.first = (m.value != 0),
-           c.second = (m.id == first.id + 1)) do
-    puts "Value: #{first.value}"
-    if second.id > 100
-        puts "Value: #{second.value}"
-    else
-        assert(:id => second.id + 1, :value => first.value + second.value)
-        retract first
-    end
-  end
-  when_start do
-    assert :fibonacci, {:id => 1, :sid => 1, :value => 1}
-    assert :fibonacci, {:id => 2, :sid => 1, :value => 1}
-  end
-end
-Durable.run_all
-```
-### Python
-```python
-from durable.lang import *
-
-with ruleset('fibonacci'):
-    @when_all(c.first << (m.value != 0),
-              c.second << (m.id == c.first.id + 1))
-    def calculate(c):
-        print('Value: {0}'.format(c.first.value))
-        if c.second.id > 100:
-            print('Value: {0}'.format(c.second.value))
-        else:
-            c.assert_fact({'id': c.second.id + 1, 'value': c.first.value + c.second.value})
-            c.retract_fact(c.first)
-    
-    @when_start
-    def start(host):
-        host.assert_fact('fibonacci', {'id': 1, 'sid': 1, 'value': 1})
-        host.assert_fact('fibonacci', {'id': 2, 'sid': 1, 'value': 1})
-        
-run_all()
-```
 ### Node.js
 ```javascript
 var d = require('durable');
@@ -134,6 +90,50 @@ d.ruleset('fibonacci', function() {
 
 d.runAll();
 ```
+### Python
+```python
+from durable.lang import *
+
+with ruleset('fibonacci'):
+    @when_all(c.first << (m.value != 0),
+              c.second << (m.id == c.first.id + 1))
+    def calculate(c):
+        print('Value: {0}'.format(c.first.value))
+        if c.second.id > 100:
+            print('Value: {0}'.format(c.second.value))
+        else:
+            c.assert_fact({'id': c.second.id + 1, 'value': c.first.value + c.second.value})
+            c.retract_fact(c.first)
+    
+    @when_start
+    def start(host):
+        host.assert_fact('fibonacci', {'id': 1, 'sid': 1, 'value': 1})
+        host.assert_fact('fibonacci', {'id': 2, 'sid': 1, 'value': 1})
+        
+run_all()
+```
+### Ruby
+```ruby
+require "durable"
+
+Durable.ruleset :fibonacci do
+  when_all(c.first = (m.value != 0),
+           c.second = (m.id == first.id + 1)) do
+    puts "Value: #{first.value}"
+    if second.id > 100
+        puts "Value: #{second.value}"
+    else
+        assert(:id => second.id + 1, :value => first.value + second.value)
+        retract first
+    end
+  end
+  when_start do
+    assert :fibonacci, {:id => 1, :sid => 1, :value => 1}
+    assert :fibonacci, {:id => 2, :sid => 1, :value => 1}
+  end
+end
+Durable.run_all
+```
 ## Flow Structures
 
 The combination of forward inference and durable_rules tolerance to failures on rule action dispatch, enables work coordination with data flow structures such as statecharts, nested states and flowcharts. 
@@ -144,6 +144,35 @@ The combination of forward inference and durable_rules tolerance to failures on 
 `curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "approve", "amount": 100}' http://localhost:5000/expense/2`  
 `curl -H "Content-type: application/json" -X POST -d '{"id": 2, "subject": "denied"}' http://localhost:5000/expense/2`  
 </sub>
+### Node.js
+```javascript
+d.statechart('expense', function() {
+    input: {
+        to: 'denied'
+        whenAll: m.subject == 'approve' && m.amount > 1000
+        run: console.log('expense denied: ' + s.sid)
+
+        to: 'pending'
+        whenAll: m.subject == 'approve' && m.amount <= 1000
+        run: console.log('requesting expense approval: ' + s.sid);
+    }
+
+    pending: {
+        to: 'approved'
+        whenAll: m.subject == 'approved'
+        run: console.log('expense approved by: ' + s.sid);
+            
+        to: 'denied'
+        whenAll: m.subject == 'denied'
+        run: console.log('expense denied by: ' + s.sid)
+    }
+    
+    denied: {}
+    approved: {}
+});
+
+d.runAll();
+```
 ### Python
 ```python
 from durable.lang import *
@@ -176,36 +205,33 @@ with statechart('expense'):
     
 run_all()
 ```
-### Node.js
-```javascript
-d.statechart('expense', function() {
-    input: {
-        to: 'denied'
-        whenAll: m.subject == 'approve' && m.amount > 1000
-        run: console.log('expense denied: ' + s.sid)
+### Ruby
+```ruby
+require "durable"
 
-        to: 'pending'
-        whenAll: m.subject == 'approve' && m.amount <= 1000
-        run: console.log('requesting expense approval: ' + s.sid);
-    }
+Durable.statechart :expense do
+  state :input do
+    to :denied, when_all((m.subject == "approve") & (m.amount > 1000)) do
+      puts "expense denied: #{s.sid}"
+    end
+    to :pending, when_all((m.subject == "approve") & (m.amount <= 1000)) do
+      puts "requesting expense approval: #{s.sid}"
+    end
+  end  
+  state :pending do
+    to :approved, when_all(m.subject == "approved") do
+      puts "expense approved by: #{s.sid}"
+    end
+    to :denied, when_all(m.subject == "denied") do
+      puts "expense denied by: #{s.sid}"
+    end
+  end
+  state :approved
+  state :denied
+end
 
-    pending: {
-        to: 'approved'
-        whenAll: m.subject == 'approved'
-        run: console.log('expense approved by: ' + s.sid);
-            
-        to: 'denied'
-        whenAll: m.subject == 'denied'
-        run: console.log('expense denied by: ' + s.sid)
-    }
-    
-    denied: {}
-    approved: {}
-});
-
-d.runAll();
+Durable.run_all
 ```
-
 ## Pattern Matching
 
 durable_rules provides string pattern matching. Expressions are compiled down to a DFA, guaranteeing linear execution time in the order of single digit nano seconds per character (note: backtracking expressions are not supported).
@@ -216,21 +242,22 @@ durable_rules provides string pattern matching. Expressions are compiled down to
 `curl -H "Content-type: application/json" -X POST -d '{"id": 3, "subject": "2228345634567898"}' http://localhost:5000/test/1`  
 </sub>
 
-### Ruby
-```ruby
-require "durable"
-Durable.ruleset :test do
-  when_all m.subject.matches('3[47][0-9]{13}') do
-    puts "Amex detected in #{m.subject}"
-  end
-  when_all m.subject.matches('4[0-9]{12}([0-9]{3})?') do
-    puts "Visa detected in #{m.subject}"
-  end
-  when_all m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}') do
-    puts "Mastercard detected in #{m.subject}"
-  end
-end
-Durable.run_all
+### Node.js
+```javascript
+var d = require('durable');
+
+d.ruleset('test', function() {
+    whenAll: m.subject.matches('3[47][0-9]{13}')
+    run: console.log('Amex detected in ' + m.subject)
+    
+    whenAll: m.subject.matches('4[0-9]{12}([0-9]{3})?')
+    run: console.log('Visa detected in ' + m.subject)
+    
+    whenAll: m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}')
+    run: console.log('Mastercard detected in ' + c.m.subject)
+});
+
+d.runAll();
 ```
 ### Python
 ```python
@@ -251,24 +278,22 @@ with ruleset('test'):
 
 run_all()
 ```
-### Node.js
-```javascript
-var d = require('durable');
-
-d.ruleset('test', function() {
-    whenAll: m.subject.matches('3[47][0-9]{13}')
-    run: console.log('Amex detected in ' + m.subject)
-    
-    whenAll: m.subject.matches('4[0-9]{12}([0-9]{3})?')
-    run: console.log('Visa detected in ' + m.subject)
-    
-    whenAll: m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}')
-    run: console.log('Mastercard detected in ' + c.m.subject)
-});
-
-d.runAll();
+### Ruby
+```ruby
+require "durable"
+Durable.ruleset :test do
+  when_all m.subject.matches('3[47][0-9]{13}') do
+    puts "Amex detected in #{m.subject}"
+  end
+  when_all m.subject.matches('4[0-9]{12}([0-9]{3})?') do
+    puts "Visa detected in #{m.subject}"
+  end
+  when_all m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}') do
+    puts "Mastercard detected in #{m.subject}"
+  end
+end
+Durable.run_all
 ```
-
 ## Business Rules and Miss Manners 
 
 durable_rules can also be used to solve traditional Production Bussiness Rules problems. This example is an industry benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent people are of opposite sex and share at least one hobby. 
