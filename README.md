@@ -121,14 +121,14 @@ d.ruleset('fibonacci', function() {
         if (second.id > 100) {
             console.log('Value: ' + second.value);
         } else {
-            c.assert({id: second.id + 1, value: first.value + second.value});
-            c.retract(first);
+            assert({id: second.id + 1, value: first.value + second.value});
+            retract(first);
         }
     }
     
     whenStart: {
-        host.assert('fibonacci', { id: 1, sid: 1, value: 1 });
-        host.assert('fibonacci', { id: 2, sid: 1, value: 1 });
+        assert('fibonacci', { id: 1, sid: 1, value: 1 });
+        assert('fibonacci', { id: 2, sid: 1, value: 1 });
     }
 });
 
