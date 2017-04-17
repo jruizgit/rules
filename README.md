@@ -150,11 +150,11 @@ d.statechart('expense', function() {
     input: {
         to: 'denied'
         whenAll: m.subject == 'approve' && m.amount > 1000
-        run: console.log('expense denied from: ' + s.sid)
+        run: console.log('expense denied: ' + s.sid)
 
         to: 'pending'
         whenAll: m.subject == 'approve' && m.amount <= 1000
-        run: console.log('expense request approval from: ' + s.sid);
+        run: console.log('requesting expense approval: ' + s.sid);
     }
 
     pending: {
