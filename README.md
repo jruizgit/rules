@@ -1,4 +1,5 @@
-  
+<sub>*note: The new node.js syntax was just pushed as of npm 0.36.57. It is a level up from the previous iteration. Your feedback is welcomed. The old syntax is still supported.*</sub>  
+
 # durable_rules    
 #### for real time analytics (a Ruby, Python and Node.js Rules Engine)
 [![Build Status](https://travis-ci.org/jruizgit/rules.svg?branch=master)](https://travis-ci.org/jruizgit/rules)
