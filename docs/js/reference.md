@@ -97,7 +97,7 @@ Heroku is a good platform to create a cloud application in just a few minutes.
     "name": "test",
     "version": "0.0.6",
     "dependencies": {
-      "durable": "0.30.x"
+      "durable": "0.36.x"
     },
     "engines": {
       "node": "0.10.x",
@@ -132,23 +132,18 @@ Rules are the basic building blocks. All rules have a condition, which defines t
 Below is an example of the typical rule structure. 
 
 Logical operators:  
-* Unary: `nex` (not exists), `ex` (exists)  
-* Boolean operators: `and`, `or`  
-* Pattern matching: `lt`, `gt`, `lte`, `gte`, `eq`, `neq`  
+* Unary: ~ (does not exist), + (exists)  
+* Logical operators: &&, ||  
+* Relational operators: < , >, <=, >=, ==, !=  
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c, or = d.or;
 
-d.ruleset('a0', {
-        whenAll: [ or(m.subject.lt(100), m.subject.eq('approve'), m.subject.eq('ok')) ],
-        run: function(c) {
-            console.log('a0 approved from ' + c.s.sid);
-        }
-    },
-    function (host) {
-        host.post('a0', {id: 1, sid: 1, subject: 10});
-    }
-);
+d.ruleset('a0', function() {
+    whenAll: m.subject < 100 || m.subject == 'approve' || m.subject == 'ok'
+    run: console.log('a0 approved from ' + s.sid)
+    
+    whenStart: post('a0', {id: 1, sid: 1, subject: 10})
+});
 
 d.runAll();
 ```  
