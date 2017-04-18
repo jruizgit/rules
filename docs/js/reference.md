@@ -108,18 +108,14 @@ Heroku is a good platform to create a cloud application in just a few minutes.
   * test.js
   ```javascript
   var d = require('durable');
-  var m = d.m, s = d.s, c = d.c;
-
-  d.ruleset('a0', {
-          whenAll: [ m.amount.lt(100) ],
-          run: function(c) {
-              console.log('a0 approved from ' + c.s.sid);
-          }
-      },
-      function (host) {
-          host.post('a0', {id: 1, sid: 1, amount: 10});
+  d.ruleset('a0', function() {
+      whenAll: m.amount < 100
+      run: console.log('a0 approved from ' + s.sid)
+    
+      whenStart: {
+          post('a0', {id: 1, sid: 1, amount: 10});
       }
-  );
+  });
 
   d.runAll([{host: 'hostName', port: port, password: 'password'}]);
   ```  
