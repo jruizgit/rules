@@ -78,9 +78,9 @@ Rules are the basic building blocks. All rules have a condition, which defines t
 Below is an example of the typical rule structure. 
 
 Logical operator precedence:  
-1. Unary: `-` (not exists), `+` (exists)  
-2. Boolean operators: `|` (or) , `&` (and)  
-3. Pattern matching: >, <, >=, <=, ==, !=  
+1. Unary: `-` (does not exist), `+` (exists)  
+2. Logical operators: `|` (or) , `&` (and)  
+3. Relational operators: >, <, >=, <=, ==, !=  
 ```python
 from durable.lang import *
 with ruleset('a0'):
