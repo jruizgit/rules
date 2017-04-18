@@ -57,18 +57,14 @@ Now that your cache and web server are ready, let's write a simple rule:
 5. Copy/Paste and save the following code:
   ```javascript
   var d = require('durable');
-  var m = d.m, s = d.s, c = d.c;
-  
-  d.ruleset('a0', {
-          whenAll: [ m.amount.lt(100) ],
-          run: function(c) {
-              console.log('a0 approved from ' + c.s.sid);
-          }
-      },
-      function (host) {
-          host.post('a0', {id: 1, sid: 1, amount: 10});
+  d.ruleset('a0', function() {
+      whenAll: m.amount < 100
+      run: console.log('a0 approved from ' + s.sid)
+    
+      whenStart: {
+          post('a0', {id: 1, sid: 1, amount: 10});
       }
-  );
+  });
   d.runAll();
   ```
 7. In the terminal type `node test.js`  
