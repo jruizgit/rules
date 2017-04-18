@@ -437,6 +437,17 @@ exports = module.exports = durableEngine = function () {
         };
     }
 
+    var filterContext = function (block) {
+        var statements = [];
+        block.body.forEach(function (statement, index) {
+            if (statement.type !== 'LabeledStatement') {
+                statements.push(statement);
+            }
+        });
+
+        return statements;
+    }
+
     var transformRuleset = function (block) {
         var rules = [];
         var currentRule = null;
@@ -503,6 +514,15 @@ exports = module.exports = durableEngine = function () {
             }
         });
 
+        var body = filterContext(block);
+        body.push({
+            type: 'ReturnStatement',
+            argument: {
+                type: 'ArrayExpression',
+                elements: rules,
+            }
+        });
+
         var program = {
             type: 'Program',
             body: [{
@@ -511,13 +531,7 @@ exports = module.exports = durableEngine = function () {
                 params: [],
                 body: {
                     type: 'BlockStatement',
-                    body: [{
-                        type: 'ReturnStatement',
-                        argument: {
-                            type: 'ArrayExpression',
-                            elements: rules,
-                        }
-                    }]
+                    body: body
                 }
             }]
         }
@@ -613,22 +627,20 @@ exports = module.exports = durableEngine = function () {
     var transformStates = function (block) {
         var states = [];
         block.body.forEach(function (statement, index) {
-            if (statement.type !== 'LabeledStatement') {
-                throw 'syntax error: statement type ' + statement.type + ' unexpected';
-            }
-            
-            if (statement.label.name === 'whenStart') {
-                states.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: 'whenStart' },
-                    value: transformStartStatements(statement.body)
-                });
-            } else {
-                states.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: statement.label.name },
-                    value: transformState(statement.body)
-                });
+            if (statement.type === 'LabeledStatement') {
+                if (statement.label.name === 'whenStart') {
+                    states.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'whenStart' },
+                        value: transformStartStatements(statement.body)
+                    });
+                } else {
+                    states.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: statement.label.name },
+                        value: transformState(statement.body)
+                    });
+                } 
             }
         });
 
@@ -636,6 +648,15 @@ exports = module.exports = durableEngine = function () {
     }
 
     var transformStatechart = function (block) {
+        var body = filterContext(block);
+        body.push({
+            type: 'ReturnStatement',
+            argument: {
+                type: 'ObjectExpression',
+                properties: transformStates(block)
+            }
+        });
+
         var program = {
             type: 'Program',
             body: [{
@@ -644,13 +665,7 @@ exports = module.exports = durableEngine = function () {
                 params: [],
                 body: {
                     type: 'BlockStatement',
-                    body: [{
-                        type: 'ReturnStatement',
-                        argument: {
-                            type: 'ObjectExpression',
-                            properties: transformStates(block)
-                        }
-                    }]
+                    body: body
                 }
             }]
         }
@@ -782,6 +797,15 @@ exports = module.exports = durableEngine = function () {
     }
 
     var transformFlowchart = function (block) {
+        var body = filterContext(block);
+        body.push({
+            type: 'ReturnStatement',
+            argument: {
+                type: 'ObjectExpression',
+                properties: transformStages(block)
+            }
+        });
+
         var program = {
             type: 'Program',
             body: [{
@@ -790,13 +814,7 @@ exports = module.exports = durableEngine = function () {
                 params: [],
                 body: {
                     type: 'BlockStatement',
-                    body: [{
-                        type: 'ReturnStatement',
-                        argument: {
-                            type: 'ObjectExpression',
-                            properties: transformStages(block)
-                        }
-                    }]
+                    body: body
                 }
             }]
         }
