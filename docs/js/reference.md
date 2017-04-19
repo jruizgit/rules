@@ -196,7 +196,7 @@ d.runAll();
 ### Correlated Sequence
 The ability to express and efficiently evaluate sequences of correlated events or facts represents the forward inference hallmark. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
-The `whenAll` function expresses a sequence of events or facts. The assignment operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
+The `whenAll` label expresses a sequence of events or facts. The assignment operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
 
 Arithmetic operators: +, -, *, /
 ```javascript
@@ -223,36 +223,46 @@ d.ruleset('fraudDetection', function() {
 
 d.runAll();
 ```
+
+Note: 
+
 [top](reference.md#table-of-contents)  
 ### Choice of Sequences
 durable_rules allows expressing and efficiently evaluating richer events sequences leveraging forward inference. In the example below any of the two event\fact sequences will trigger the `a4` action. 
 
-The following two functions can be used to define a rule:  
-* whenAll: a set of event or fact patterns separated by `,`. All of them are required to match to trigger an action.  
-* whenAny: a set of event or fact patterns separated by `,`. Any one match will trigger an action.  
+The following two labels can be used and combined to define richer event sequences:  
+* whenAll: a set of event or fact patterns. All of them are required to match to trigger an action.  
+* whenAny: a set of event or fact patterns. Any one match will trigger an action.  
 
-The following functions can be combined to form richer sequences:
-* all: patterns separated by `,`, all of them are required to match.
-* any: patterns separated by `,`, any of the patterns can match.    
-* none: no event or fact matching the pattern. 
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c, all = d.all;
 
-d.ruleset('a4', {
-        whenAll: [
-            all(m.subject.eq('approve'), m.amount.eq(1000)), 
-            all(m.subject.eq('jumbo'), m.amount.eq(10000))
-        ],
-        run: function(c) {
-            console.log('a4 action from: ' + c.s.sid);
+d.ruleset('a8', function() {
+    whenAny: {
+        whenAll: {
+            first = m.subject == 'approve'
+            second = m.amount == 1000
         }
-    },
-    function (host) {
-        host.post('a4', {id: 1, sid: 2, subject: 'jumbo'});
-        host.post('a4', {id: 2, sid: 2, amount: 10000});
+        whenAll: { 
+            third = m.subject == 'jumbo'
+            fourth = m.amount == 10000
+        }
     }
-);
+    run: {
+        if (first) {
+            console.log('a8 action from: ' + s.sid + ' ' + first.subject + ' ' + second.amount);     
+        } else {
+            console.log('a8 action from: ' + s.sid + ' ' + third.subject + ' ' + fourth.amount);        
+        }
+    }
+
+    whenStart: {
+        post('a8', {id: 1, sid: 1, subject: 'approve'});
+        post('a8', {id: 2, sid: 1, amount: 1000});
+        post('a8', {id: 3, sid: 2, subject: 'jumbo'});
+        post('a8', {id: 4, sid: 2, amount: 10000});
+    }
+});
 
 d.runAll();
 ```
