@@ -7,6 +7,7 @@ Reference Manual
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
   * [Correlated Sequence](reference.md#correlated-sequence)
+  * [Absence](reference.md#absence)
   * [Choice of Sequences](reference.md#choice-of-sequences)
   * [Conflict Resolution](reference.md#conflict-resolution)
   * [Tumbling Window](reference.md#tumbling-window)
@@ -223,12 +224,34 @@ d.ruleset('fraudDetection', function() {
 
 d.runAll();
 ```
+[top](reference.md#table-of-contents) 
+### Absence
+In some cases lack of information is meaninful. The `none` function enables such tests. 
+```javascript
+var d = require('durable');
 
-Note: 
+d.ruleset('fraud6', function() {
+    whenAll: {
+        first = m.t == 'deposit'
+        none(m.t == 'balance')
+        third = m.t == 'withrawal'
+        fourth = m.t == 'chargeback'
+    }
+    run: console.log('fraud6 detected ' + first.t + ' ' + third.t + ' ' + fourth.t + ' from ' + s.sid);
+
+    whenStart: {
+        post('fraud6', {id: 1, sid: 1, t: 'deposit'});
+        post('fraud6', {id: 2, sid: 1, t: 'withrawal'});
+        post('fraud6', {id: 3, sid: 1, t: 'chargeback'});
+    }
+});
+
+d.runAll();
+```
 
 [top](reference.md#table-of-contents)  
 ### Choice of Sequences
-durable_rules allows expressing and efficiently evaluating richer events sequences leveraging forward inference. In the example below any of the two event\fact sequences will trigger the `a4` action. 
+durable_rules allows expressing and efficiently evaluating richer events sequences leveraging forward inference. In the example below any of the two event\fact sequences will trigger an action. 
 
 The following two labels can be used and combined to define richer event sequences:  
 * whenAll: a set of event or fact patterns. All of them are required to match to trigger an action.  
