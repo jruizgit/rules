@@ -176,22 +176,21 @@ durable_rules implements a simple pattern matching dialect. Similar to lua, it u
 
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
 
-d.ruleset('match', {
-        whenAll: [ m.url.mt('(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*') ],
-        run: function(c) {
-            console.log('match 15 url ' + c.m.url);
-        }
-    },
-    function (host) {
-        host.post('match', {id: 1, sid: 1, url: 'https://github.com'});
-        host.post('match', {id: 2, sid: 1, url: 'http://github.com/jruizgit/rul!es'});
-        host.post('match', {id: 3, sid: 1, url: 'https://github.com/jruizgit/rules/reference.md'});
-        host.post('match', {id: 4, sid: 1, url: '//rules'});
-        host.post('match', {id: 5, sid: 1, url: 'https://github.c/jruizgit/rules'});
+d.ruleset('match', function() {
+    whenAll: m.url.matches('(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*') 
+    run: console.log('match url ' + m.url)
+        
+    whenStart: {
+        post('match', {id: 1, sid: 1, url: 'https://github.com'});
+        post('match', {id: 2, sid: 1, url: 'http://github.com/jruizgit/rul!es'});
+        post('match', {id: 3, sid: 1, url: 'https://github.com/jruizgit/rules/reference.md'});
+        post('match', {id: 4, sid: 1, url: '//rules'});
+        post('match', {id: 5, sid: 1, url: 'https://github.c/jruizgit/rules'});
     }
-);
+});
+
+d.runAll();
 ```  
 [top](reference.md#table-of-contents) 
 ### Correlated Sequence
