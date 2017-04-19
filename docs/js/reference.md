@@ -196,31 +196,30 @@ d.runAll();
 ### Correlated Sequence
 The ability to express and efficiently evaluate sequences of correlated events or facts represents the forward inference hallmark. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
-The `whenAll` function expresses a sequence of events or facts separated by `,`. The assignment operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
+The `whenAll` function expresses a sequence of events or facts. The assignment operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
 
-Arithmetic operators: `add`, `sub`, `mul`, `div`
+Arithmetic operators: +, -, *, /
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c, add = d.add;
 
-d.ruleset('fraudDetection', {
-        whenAll: [
-            c.first = m.amount.gt(100),
-            c.second = m.amount.gt(c.first.amount.mul(2)), 
-            c.third = m.amount.gt(add(c.first.amount, c.second.amount).div(2)),
-        ],
-        run: function(c) {
-            console.log('fraud detected -> ' + c.first.amount);
-            console.log('               -> ' + c.second.amount);
-            console.log('               -> ' + c.third.amount);
-        }
-    },
-    function (host) {
+d.ruleset('fraudDetection', function() {
+    whenAll: {
+        first = m.amount > 100
+        second = m.amount > first.amount * 2
+        third = m.amount > (first.amount + second.amount) / 2
+    }
+    run: {
+       	console.log('fraud detected -> ' + first.amount);
+        console.log('               -> ' + second.amount);
+        console.log('               -> ' + third.amount);
+    }
+
+    whenStart: {
         host.post('fraudDetection', {id: 1, sid: 1, amount: 200});
         host.post('fraudDetection', {id: 2, sid: 1, amount: 500});
         host.post('fraudDetection', {id: 3, sid: 1, amount: 1000});
     }
-);
+});
 
 d.runAll();
 ```
