@@ -7,7 +7,7 @@ Reference Manual
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
   * [Correlated Sequence](reference.md#correlated-sequence)
-  * [Absence](reference.md#absence)
+  * [Lack of Information](reference.md#lack-of-information)
   * [Choice of Sequences](reference.md#choice-of-sequences)
   * [Conflict Resolution](reference.md#conflict-resolution)
   * [Tumbling Window](reference.md#tumbling-window)
@@ -225,7 +225,7 @@ d.ruleset('fraudDetection', function() {
 d.runAll();
 ```
 [top](reference.md#table-of-contents) 
-### Absence
+### Lack of Information
 In some cases lack of information is meaninful. The `none` function enables such tests. 
 ```javascript
 var d = require('durable');
@@ -296,36 +296,35 @@ Events or facts can produce multiple results in a single fact, in which case dur
 In this example, notice how the last rule is triggered first, as it has the highest priority. In the last rule result facts are ordered starting with the most recent.
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
 
-d.ruleset('attributes', {
-        whenAll: m.amount.lt(300),
-        pri: 3, count: 3,
-        run: function(c) {
-            console.log('attributes ->' + c.m[0].amount);
-            console.log('           ->' + c.m[1].amount);
-            console.log('           ->' + c.m[2].amount);
-        }
-    }, {
-        whenAll: m.amount.lt(200),
-        pri: 2, count: 2,
-        run: function(c) {
-            console.log('attributes ->' + c.m[0].amount);
-            console.log('           ->' + c.m[1].amount);
-        }
-    }, {
-        whenAll: m.amount.lt(100),
-        pri: 1,
-        run: function(c) {
-            console.log('attributes ->' + c.m.amount);
-        }
-    },
-    function (host) {
-        host.assert('attributes', {id: 1, sid: 1, amount: 50});
-        host.assert('attributes', {id: 2, sid: 1, amount: 150});
-        host.assert('attributes', {id: 3, sid: 1, amount: 250});
+d.ruleset('attributes', function() {
+    whenAll: m.amount < 300
+    pri: 3 
+    count: 3
+    run: {
+        console.log('attributes P3 ->' + m[0].amount);
+        console.log('           P3 ->' + m[1].amount);
+        console.log('           P3 ->' + m[2].amount);
     }
-);
+    
+    whenAll: m.amount < 200
+    pri: 2
+    count: 2
+    run: {
+        console.log('attributes P2 ->' + m[0].amount);
+        console.log('           P2 ->' + m[1].amount);
+    }
+            
+    whenAll: m.amount < 100
+    pri: 1
+    run: console.log('attributes P1 ->' + m.amount);
+       
+    whenStart: {
+        assert('attributes', {id: 1, sid: 1, amount: 50});
+        assert('attributes', {id: 2, sid: 1, amount: 150});
+        assert('attributes', {id: 3, sid: 1, amount: 250});
+    }
+});
 
 d.runAll();
 ```
