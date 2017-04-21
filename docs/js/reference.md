@@ -350,6 +350,29 @@ d.ruleset('t0', function() {
 
 d.runAll();
 ```
+
+In this example, when the rule is satisfied three times, the action is scheduled.
+```javascript
+d.ruleset('a15', function() {
+    whenAll: {
+        first = m.amount < 100
+        second = m.subject == 'approve'
+    }
+    count: 3
+    run: console.log('a15 approved ->' + JSON.stringify(m));
+
+    whenStart: {
+        postBatch('a15', {id: 1, sid: 1, amount: 10},
+                         {id: 2, sid: 1, amount: 10},
+                         {id: 3, sid: 1, amount: 10},
+                         {id: 4, sid: 1, subject: 'approve'});
+        postBatch('a15', {id: 5, sid: 1, subject: 'approve'},
+                         {id: 6, sid: 1, subject: 'approve'});
+    }
+});
+
+d.runAll();
+```
 [top](reference.md#table-of-contents)  
 ## Data Model
 ### Events
@@ -480,7 +503,7 @@ Timer rules:
 * Timeouts can be observed in rules given the timer name.  
 * The start timer operation is idempotent.  
 
-The example shows an event scheduled to be raised after 5 seconds and a rule which reacts to such an event.  
+This example shows an event scheduled to be raised after 5 seconds and a rule which reacts to such an event.  
 
 API:  
 * `host.startTimer(timerName, seconds)`
