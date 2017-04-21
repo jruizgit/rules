@@ -291,29 +291,20 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents) 
 ### Conflict Resolution
-Events or facts can produce multiple results in a single fact, in which case durable_rules will choose the result with the most recent events or facts. In addition events or facts can trigger more than one action simultaneously, the triggering order can be defined by setting the priority (salience) attribute on the rule.
+Event and fact evaluation can lead to multiple actions.The triggering order can be defined by setting the priority (salience) attribute on the rule.
 
-In this example, notice how the last rule is triggered first, as it has the highest priority. In the last rule result facts are ordered starting with the most recent.
+In this example, notice how the last rule is triggered first, as it has the highest priority.
 ```javascript
 var d = require('durable');
 
 d.ruleset('attributes', function() {
     whenAll: m.amount < 300
     pri: 3 
-    count: 3
-    run: {
-        console.log('attributes P3 ->' + m[0].amount);
-        console.log('           P3 ->' + m[1].amount);
-        console.log('           P3 ->' + m[2].amount);
-    }
-    
+    run: console.log('attributes P3 ->' + m.amount);
+        
     whenAll: m.amount < 200
     pri: 2
-    count: 2
-    run: {
-        console.log('attributes P2 ->' + m[0].amount);
-        console.log('           P2 ->' + m[1].amount);
-    }
+    run: console.log('attributes P2 ->' + m.amount);     
             
     whenAll: m.amount < 100
     pri: 1
@@ -329,36 +320,34 @@ d.ruleset('attributes', function() {
 d.runAll();
 ```
 [top](reference.md#table-of-contents) 
-### Tumbling Window
-durable_rules enables aggregating events or observed facts over time with tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
+### Windows
+durable_rules enables aggregating actions using count windows or time tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
 
 Summary of rule attributes:  
-* count: defines the number of events or facts, which need to be matched when scheduling an action.   
+* count: defines the number of times the rule needs to be satisfied befure scheduling the action.   
 * span: defines the tumbling time in seconds between scheduled actions.  
-* pri: defines the scheduled action order in case of conflict.  
 
+This example generates events at random times and schedules an action every 5 seconds (tumbling window).
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c, or = d.or, timeout = d.timeout;
 
-d.ruleset('t0', {
-        whenAll: or(m.count.eq(0), timeout('myTimer')),
-        run: function(c) {
-            c.s.count += 1;
-            c.post('t0', {id: c.s.count, sid: 1, t: 'purchase'});
-            c.startTimer('myTimer', Math.random() * 3 + 1, 't0_' + c.s.count);
-        }
-    }, {
-        whenAll: m.t.eq('purchase'),
-        span: 5,
-        run: function(c) {
-            console.log('t0 pulse ->' + c.m.length);
-        }
-    },
-    function (host) {
-        host.patchState('t0', {sid: 1, count: 0});
+d.ruleset('t0', function() {
+    whenAll: m.count == 0 || timeout('myTimer')
+    run: {
+        s.count += 1;
+        post('t0', {id: s.count, sid: 1, t: 'purchase'});
+        startTimer('myTimer', Math.random() * 2 + 1, 't0_' + s.count);
     }
-);
+
+    whenAll: m.t == 'purchase'
+    span: 5
+    run: console.log('t0 pulse ->' + s.count);
+
+    whenStart: {
+        patchState('t0', {sid: 1, count: 0}); 
+    }
+});
+
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
