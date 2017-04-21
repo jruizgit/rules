@@ -10,7 +10,7 @@ Reference Manual
   * [Lack of Information](reference.md#lack-of-information)
   * [Choice of Sequences](reference.md#choice-of-sequences)
   * [Conflict Resolution](reference.md#conflict-resolution)
-  * [Tumbling Window](reference.md#tumbling-window)
+  * [Action Windows](reference.md#action-windows)
 * [Data Model](reference.md#data-model)
   * [Events](reference.md#events)
   * [Facts](reference.md#facts)
@@ -320,7 +320,7 @@ d.ruleset('attributes', function() {
 d.runAll();
 ```
 [top](reference.md#table-of-contents) 
-### Windows
+### Action Windows
 durable_rules enables aggregating actions using count windows or time tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
 
 Summary of rule attributes:  
