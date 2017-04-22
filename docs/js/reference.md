@@ -226,7 +226,7 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents) 
 ### Lack of Information
-In some cases lack of information is meaninful. The `none` function enables such tests. 
+In some cases lack of information is meaningful. The `none` function enables such tests. 
 ```javascript
 var d = require('durable');
 
