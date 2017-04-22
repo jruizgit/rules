@@ -4,8 +4,8 @@ Reference Manual
 * [Setup](reference.md#setup)
 * [Basics](reference.md#basics)
   * [Rules](reference.md#rules)
-  * [Events](reference.md#events)
   * [Facts](reference.md#facts)
+  * [Events](reference.md#events)
   * [State](reference.md#state)
 * [Antecedents](reference.md#antecedents)
   * [Simple Filter](reference.md#simple-filter)
@@ -73,11 +73,11 @@ Now that your cache and web server are ready, let's write a simple rule:
 7. In the terminal type `node test.js`  
 8. You should see the message: `a0 approved from 1`  
 
-<sub>Note 1: If you are using a redis service outside your local host, replace the last line with:</sub>
+Note 1: If you are using a redis service outside your local host, replace the last line with:
   ```javascript
   d.runAll([{host: 'hostName', port: port, password: 'password'}]);
   ```
-<sub>Note 2: If you are running in Windows, you will need VS2013 express edition and Python 2.7 for the package to build during npm install. Make sure both the VS build tools and the python directory are in your path.</sub>  
+Note 2: If you are running in Windows, you will need VS2013 express edition and Python 2.7 for the package to build during npm install. Make sure both the VS build tools and the python directory are in your path. 
 
 [top](reference.md#table-of-contents) 
 
@@ -103,6 +103,73 @@ d.ruleset('test', function() {
 
 d.runAll();
 ```
+### Facts
+Facts are used to define the knowledge base. Facts are the data stored by the rules engine. Facts can be asserted and retracted.
+
+```javascript
+var d = require('durable');
+var m = d.m, s = d.s, c = d.c;
+
+d.ruleset('fraudDetection', {
+        whenAll: [
+            c.first = m.t.eq('purchase'),
+            c.second = m.location.neq(c.first.location)
+        ],
+        count: 2,
+        run: function(c) {
+            console.log('fraud detected ->' + c.m[0].first.location + ', ' + c.m[0].second.location);
+            console.log('               ->' + c.m[1].first.location + ', ' + c.m[1].second.location);
+        }
+    },
+    function (host) {
+        host.assert('fraudDetection', {id: 1, sid: 1, t: 'purchase', location: 'US'});
+        host.assert('fraudDetection', {id: 2, sid: 1, t: 'purchase', location: 'CA'});
+    }
+);
+d.runAll();
+```
+[top](reference.md#table-of-contents)  
+
+### Events
+Inference based on events is the main purpose of `durable_rules`. What makes events unique is they can only be consumed once by an action. Events are removed from inference sets as soon as they are scheduled for dispatch. The join combinatorics are significantly reduced, thus improving the rule evaluation performance, in some cases, by orders of magnitude.  
+
+Event rules:  
+* Events can be posted in the `start` handler via the host parameter.   
+* Events be posted in an `action` handler using the context parameter.   
+* Events can be posted one at a time or in batches.  
+* Events don't need to be retracted.  
+* Events can co-exist with facts.  
+* The post event operation is idempotent.    
+
+The example below shows how two events will cause only one action to be scheduled, as a given event can only be observed once. You can contrast this with the example in the facts section, which will schedule two actions.
+
+API:  
+* `c.post(rulesetName, {event})`  
+* `c.postBatch(rulesetName, {event}, {event}...)`  
+* `host.post(rulesetName, {event})`  
+* `host.postBatch(rulesetName, {event}, {event}...)`  
+```javascript
+var d = require('durable');
+var m = d.m, s = d.s, c = d.c;
+
+d.ruleset('fraudDetection', {
+        whenAll: [
+            c.first = m.t.eq('purchase'),
+            c.second = m.location.neq(c.first.location)
+        ],
+        run: function(c) {
+            console.log('fraud detected ->' + c.first.location + ', ' + c.second.location);
+        }
+    },
+    function (host) {
+        host.post('fraudDetection', {id: 1, sid: 1, t: 'purchase', location: 'US'});
+        host.post('fraudDetection', {id: 2, sid: 1, t: 'purchase', location: 'CA'});
+    }
+);
+d.runAll();
+```
+
+[top](reference.md#table-of-contents)  
 
 ## Antecendents
 ### Simple Filter
@@ -351,91 +418,6 @@ d.ruleset('a15', function() {
     }
 });
 
-d.runAll();
-```
-[top](reference.md#table-of-contents)  
-## Data Model
-### Events
-Inference based on events is the main purpose of `durable_rules`. What makes events unique is they can only be consumed once by an action. Events are removed from inference sets as soon as they are scheduled for dispatch. The join combinatorics are significantly reduced, thus improving the rule evaluation performance, in some cases, by orders of magnitude.  
-
-Event rules:  
-* Events can be posted in the `start` handler via the host parameter.   
-* Events be posted in an `action` handler using the context parameter.   
-* Events can be posted one at a time or in batches.  
-* Events don't need to be retracted.  
-* Events can co-exist with facts.  
-* The post event operation is idempotent.    
-
-The example below shows how two events will cause only one action to be scheduled, as a given event can only be observed once. You can contrast this with the example in the facts section, which will schedule two actions.
-
-API:  
-* `c.post(rulesetName, {event})`  
-* `c.postBatch(rulesetName, {event}, {event}...)`  
-* `host.post(rulesetName, {event})`  
-* `host.postBatch(rulesetName, {event}, {event}...)`  
-```javascript
-var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
-
-d.ruleset('fraudDetection', {
-        whenAll: [
-            c.first = m.t.eq('purchase'),
-            c.second = m.location.neq(c.first.location)
-        ],
-        run: function(c) {
-            console.log('fraud detected ->' + c.first.location + ', ' + c.second.location);
-        }
-    },
-    function (host) {
-        host.post('fraudDetection', {id: 1, sid: 1, t: 'purchase', location: 'US'});
-        host.post('fraudDetection', {id: 2, sid: 1, t: 'purchase', location: 'CA'});
-    }
-);
-d.runAll();
-```
-
-[top](reference.md#table-of-contents)  
-
-### Facts
-Facts are used for defining more permanent state, which lifetime spans at least more than one action execution.
-
-Fact rules:  
-* Facts can be asserted in the `start` handler via the host parameter.   
-* Facts can asserted in an `action` handler using the context parameter.   
-* Facts have to be explicitly retracted.  
-* Once retracted all related scheduled actions are cancelled.  
-* Facts can co-exist with events.  
-* The assert and retract fact operations are idempotent.  
-
-This example shows how asserting two facts lead to scheduling two actions: one for each combination.  
-
-API:  
-* `host.assert(rulesetName, {fact})`
-* `host.assertFacts(rulesetName, {fact}, {fact}...)`  
-* `host.retract(rulesetName, {fact})`  
-* `c.assert(rulesetName, {fact})`  
-* `c.assertFacts(rulesetName, {fact}, {fact}...)`  
-* `c.retract(rulesetName, {fact})`  
-```javascript
-var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
-
-d.ruleset('fraudDetection', {
-        whenAll: [
-            c.first = m.t.eq('purchase'),
-            c.second = m.location.neq(c.first.location)
-        ],
-        count: 2,
-        run: function(c) {
-            console.log('fraud detected ->' + c.m[0].first.location + ', ' + c.m[0].second.location);
-            console.log('               ->' + c.m[1].first.location + ', ' + c.m[1].second.location);
-        }
-    },
-    function (host) {
-        host.assert('fraudDetection', {id: 1, sid: 1, t: 'purchase', location: 'US'});
-        host.assert('fraudDetection', {id: 2, sid: 1, t: 'purchase', location: 'CA'});
-    }
-);
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
