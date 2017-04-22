@@ -1,27 +1,29 @@
 Reference Manual
 =====
 ## Table of contents
-* [Local Setup](reference.md#setup)
-* [Cloud Setup](reference.md#setup)
-* [Rules](reference.md#rules)
+* [Setup](reference.md#setup)
+* [Basics](reference.md#basics)
+  * [Rules](reference.md#rules)
+  * [Events](reference.md#events)
+  * [Facts](reference.md#facts)
+  * [State](reference.md#state)
+* [Antecedents](reference.md#antecedents)
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
   * [Correlated Sequence](reference.md#correlated-sequence)
   * [Lack of Information](reference.md#lack-of-information)
   * [Choice of Sequences](reference.md#choice-of-sequences)
+* [Consequents](reference.md#consequents)  
   * [Conflict Resolution](reference.md#conflict-resolution)
   * [Action Windows](reference.md#action-windows)
-* [Data Model](reference.md#data-model)
-  * [Events](reference.md#events)
-  * [Facts](reference.md#facts)
-  * [Context](reference.md#context)
-  * [Timers](reference.md#timers) 
+  * [Async Actions](reference.md#async-actions)
 * [Flow Structures](reference.md#flow-structures)
+  * [Timers](reference.md#timers) 
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
   * [Flowchart](reference.md#flowchart) 
 
-## Local Setup
+## Setup
 durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
 ### Redis install
 durable.js relies on Redis version 2.8  
@@ -71,60 +73,38 @@ Now that your cache and web server are ready, let's write a simple rule:
 7. In the terminal type `node test.js`  
 8. You should see the message: `a0 approved from 1`  
 
-Note 1: If you are using [Redis To Go](https://redistogo.com), replace the last line.
+<sub>Note 1: If you are using a redis service outside your local host, replace the last line with:</sub>
   ```javascript
   d.runAll([{host: 'hostName', port: port, password: 'password'}]);
   ```
-Note 2: If you are running in Windows, you will need VS2013 express edition and Python 2.7, make sure both the VS build tools and the python directory are in your path.  
+<sub>Note 2: If you are running in Windows, you will need VS2013 express edition and Python 2.7 for the package to build during npm install. Make sure both the VS build tools and the python directory are in your path.</sub>  
 
 [top](reference.md#table-of-contents) 
-## Cloud Setup
-### Redis install
-Redis To Go has worked well for me and is very fast if you are deploying an app using Heroku or AWS.   
-1. Go to: [Redis To Go](https://redistogo.com)  
-2. Create an account (the free instance with 5MB has enough space for you to evaluate durable_rules)  
-3. Make sure you write down the host, port and password, which represents your new account  
-### Heroku install
-Heroku is a good platform to create a cloud application in just a few minutes.  
-1. Go to: [Heroku](https://www.heroku.com)  
-2. Create an account (the free instance with 1 dyno works well for evaluating durable_rules)  
-### First app
-1. Follow the instructions in the [tutorial](https://devcenter.heroku.com/articles/getting-started-with-nodejs#introduction), with the following changes:
-  * procfile  
-  `web: node test.js`
-  * package.json  
-  ```javascript
-  {
-    "name": "test",
-    "version": "0.0.6",
-    "dependencies": {
-      "durable": "0.36.x"
-    },
-    "engines": {
-      "node": "0.10.x",
-      "npm": "1.3.x"
-    }
-  }
-  ```
-  * test.js
-  ```javascript
-  var d = require('durable');
-  d.ruleset('a0', function() {
-      whenAll: m.amount < 100
-      run: console.log('a0 approved from ' + s.sid)
-    
-      whenStart: {
-          post('a0', {id: 1, sid: 1, amount: 10});
-      }
-  });
 
-  d.runAll([{host: 'hostName', port: port, password: 'password'}]);
-  ```  
-2. Deploy and scale the App
-3. Run `heroku logs`, you should see the message: `a0 approved from 1`  
-[top](reference.md#table-of-contents)  
+## Basics
+### Rules
+A rule is the basic building block of the framework. The rule antecendent defines the conditions that need to be satisfied to execute the rule consequent (action). The 'test' rule in this example illustrates this simple concept.
 
-## Rules
+* `whenAll` and `whenAny` label the antecendent definition of a rule
+* `run` and `runAsync` label the consequent definition of a rule 
+* `whenStart` labels the action to be taken when starting the ruleset  
+  
+```javascript
+var d = require('durable');
+
+d.ruleset('test', function() {
+    // antecedent
+    whenAll: m.subject == 'World'
+    // consequent
+    run: console.log('Hello ' + m.subject)
+    // on ruleset start
+    whenStart: post('test', {id: 1, sid: 1, subject: 'World'})
+});
+
+d.runAll();
+```
+
+## Antecendents
 ### Simple Filter
 Rules are the basic building blocks. All rules have a condition, which defines the events and facts that trigger an action.  
 * The rule condition is an expression. Its left side represents an event or fact property, followed by a logical operator and its right side defines a pattern to be matched. By convention events or facts originated by calling post or assert are represented with the `m` name; events or facts originated by changing the context state are represented with the `s` name.  
