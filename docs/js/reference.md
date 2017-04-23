@@ -526,44 +526,32 @@ d.runAll();
 
 ## Flow Structures
 ### Timers
-`durable_rules` supports scheduling timeout events and writing rules, which observe such events.  
+Events can be scheduled with timers. A timeout condition can be included in the rule antecedent.   
 
-Timer rules:  
-* Timers can be started in the `start` handler via the host parameter.   
-* Timers can started in an `action` handler using the context parameter.   
-* A timeout is an event. 
-* A timeout is raised only once.  
-* Timeouts can be observed in rules given the timer name.  
-* The start timer operation is idempotent.  
-
-This example shows an event scheduled to be raised after 5 seconds and a rule which reacts to such an event.  
-
-API:  
-* `host.startTimer(timerName, seconds)`
-* `c.startTimer(timerName, seconds)`  
-* `when... timeout(timerName)`  
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c, timeout = d.timeout;
 
-d.ruleset('t1', {
-        whenAll: m.start.eq('yes'),
-        run: function(c) {
-            c.s.start = new Date();
-            c.startTimer('myTimer', 5);
+d.ruleset('timer', function() {
+    whenAny: {
+        whenAll: s.count == 0
+        whenAll: {
+            s.count < 5 
+            // when a timeout for 'Timer' occurs
+            timeout('Timer')
         }
-    }, {
-        whenAll: timeout('myTimer'),
-        run: function(c) {
-            console.log('t1 end');
-            console.log('t1 started ' + c.s.start);
-            console.log('t1 ended ' + new Date());
-        }
-    },
-    function (host) {
-        host.post('t1', {id: 1, sid: 1, start: 'yes'});
     }
-);
+    run: {
+        s.count += 1;
+        // start the 'Timer', wait 3 seconds for timeout
+        startTimer('Timer', 3);
+        console.log('Pusle ->' + new Date());
+    }
+
+    whenStart: {
+        patchState('timer', { count: 0 }); 
+    }
+});
+
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
