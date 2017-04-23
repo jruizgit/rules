@@ -133,9 +133,9 @@ d.ruleset('animal', function() {
 d.runAll();
 ```
 
-Facts can also be asserted using the http API:  
+Facts can also be asserted using the http API. For the example above, run the following command:  
 
-<sub>`curl -H "Content-type: application/json" -X POST -d '{"subject": "Tweety", "verb": "eats", "predicate": "worms"}' http://localhost:5000/animal/facts`</sub>
+<sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "verb": "eats", "predicate": "worms"}' http://localhost:5000/animal/facts`</sub>
 
 [top](reference.md#table-of-contents)  
 
