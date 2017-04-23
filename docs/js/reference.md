@@ -146,7 +146,6 @@ d.ruleset('risk', function() {
         first = m.t == 'purchase'
         second = m.location != first.location
     }
-
     run: console.log('fraud detected ->' + first.location + ', ' + second.location)
    
     whenStart: {
@@ -172,8 +171,8 @@ d.ruleset('flow', function() {
 
     whenAll: s.state == 'last'
     run: {
-        s.state = null;
         console.log('done');
+        deleteState();
     }
 
     whenStart: patchState('flow', {state: 'start'})
