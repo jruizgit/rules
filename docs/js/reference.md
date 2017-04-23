@@ -477,7 +477,7 @@ d.ruleset('flow', function() {
             s.state = 'second';
             console.log('first completed');
             
-            // completes the async action
+            // completes the async action after 3 seconds
             complete();
         }, 3000);
     }
@@ -486,6 +486,8 @@ d.ruleset('flow', function() {
     runAsync: {
         setTimeout(function() {
             console.log('second completed');
+            
+            // completes the async action after 6 seconds
             complete();
         }, 6000);
         
@@ -510,6 +512,7 @@ d.ruleset('flow', function() {
     whenAll: m.action == 'start'
     run: throw 'Unhandled Exception!'
 
+    // when the exception property exists
     whenAll: +s.exception
     run: {
         console.log(s.exception);
@@ -528,10 +531,15 @@ d.runAll();
 ### Timers
 Events can be scheduled with timers. A timeout condition can be included in the rule antecedent.   
 
+* startTimer: starts a timer with the name and duration specified. id is optional if planning to cancel the timer.
+* cancelTimer: cancels ongoing timer, name and id are required.
+* timeout: used as an antecedent condition.
+
 ```javascript
 var d = require('durable');
 
 d.ruleset('timer', function() {
+    // when first timer or less than 5 timeouts
     whenAny: {
         whenAll: s.count == 0
         whenAll: {
