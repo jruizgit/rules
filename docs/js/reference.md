@@ -48,7 +48,7 @@ durable.js uses Node.js version  0.10.15.
 2. Run the installer and follow the instructions  
 3. The installer will set all the necessary environment variables, so you are ready to go  
 
-For more information go to: http://nodejs.org/download  
+For more information go to: http://nodejs.org/download   
 
 ### First App
 Now that your cache and web server are ready, let's write a simple rule:  
@@ -195,8 +195,8 @@ d.runAll();
 ```
 State can also be retrieved and modified using the http API. When the example above is running, try the following commands: 
 <sub>
-curl GET http://localhost:5000/flow/state  
-curl -H "content-type: application/json" -X POST -d '{"state": "next"}' http://localhost:5000/flow/state  
+curl GET http://localhost:5000/flow/state   
+curl -H "content-type: application/json" -X POST -d '{"state": "next"}' http://localhost:5000/flow/state   
 </sub>
 
 [top](reference.md#table-of-contents)  
