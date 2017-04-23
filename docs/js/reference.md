@@ -160,6 +160,14 @@ d.ruleset('risk', function() {
 
 d.runAll();
 ```
+
+Events can be posted using the http API. When the example above is listening, run the following commands:  
+
+<sub>
+curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:5000/risk/events
+curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:5000/risk/events
+</sub>
+
 ### State
 Context state is available when a consequent is executed. The same context state is passed across rule execution. Context state is stored until it is deleted. Context state changes can be evaluated by rules. By convention `s` represents the state to be evaluated by a rule.
 
