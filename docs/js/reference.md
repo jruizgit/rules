@@ -65,7 +65,7 @@ Now that your cache and web server are ready, let's write a simple rule:
       run: console.log('a0 approved')
     
       whenStart: {
-          post('a0', { amount: 10});
+          post('a0', { amount: 10 });
       }
   });
   d.runAll();
@@ -98,7 +98,7 @@ d.ruleset('test', function() {
     // consequent
     run: console.log('Hello ' + m.subject)
     // on ruleset start
-    whenStart: post('test', { subject: 'World'})
+    whenStart: post('test', { subject: 'World' })
 });
 
 d.runAll();
@@ -126,7 +126,7 @@ d.ruleset('animal', function() {
     run: console.log('fact: ' + m.subject + ' ' + m.verb + ' ' + m.predicate)
 
     whenStart: {
-        assert('animal', { subject: 'Kermit', verb: 'eats', predicate: 'flies'});
+        assert('animal', { subject: 'Kermit', verb: 'eats', predicate: 'flies' });
     }
 });
 
@@ -153,8 +153,8 @@ d.ruleset('risk', function() {
     run: console.log('fraud detected ->' + first.location + ', ' + second.location)
    
     whenStart: {
-        post('risk', {t: 'purchase', location: 'US'});
-        post('risk', {t: 'purchase', location: 'CA'});
+        post('risk', { t: 'purchase', location: 'US' });
+        post('risk', { t: 'purchase', location: 'CA' });
     }
 });
 
@@ -193,7 +193,7 @@ d.ruleset('flow', function() {
         deleteState();
     }
 
-    whenStart: patchState('flow', {state: 'start'})
+    whenStart: patchState('flow', { state: 'start' })
 });
 
 d.runAll();
@@ -292,9 +292,9 @@ d.ruleset('risk', function() {
     }
 
     whenStart: {
-        host.post('risk', {amount: 200});
-        host.post('risk', {amount: 500});
-        host.post('risk', {amount: 1000});
+        host.post('risk', { amount: 200 });
+        host.post('risk', { amount: 500 });
+        host.post('risk', { amount: 1000 });
     }
 });
 
@@ -316,9 +316,9 @@ d.ruleset('risk', function() {
     run: console.log('fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
 
     whenStart: {
-        post('risk', {t: 'deposit'});
-        post('risk', {t: 'withrawal'});
-        post('risk', {t: 'chargeback'});
+        post('risk', { t: 'deposit' });
+        post('risk', { t: 'withrawal' });
+        post('risk', { t: 'chargeback' });
     }
 });
 
@@ -356,10 +356,10 @@ d.ruleset('expense', function() {
     }
 
     whenStart: {
-        post('expense', {subject: 'approve'});
-        post('expense', {amount: 1000});
-        post('expense', {subject: 'jumbo'});
-        post('expense', {amount: 10000});
+        post('expense', { subject: 'approve' });
+        post('expense', { amount: 1000 });
+        post('expense', { subject: 'jumbo' });
+        post('expense', { amount: 10000 });
     }
 });
 
@@ -389,16 +389,45 @@ d.ruleset('attributes', function() {
     run: console.log('attributes P1 ->' + m.amount);
        
     whenStart: {
-        assert('attributes', {amount: 50});
-        assert('attributes', {amount: 150});
-        assert('attributes', {amount: 250});
+        assert('attributes', { amount: 50 });
+        assert('attributes', { amount: 150 });
+        assert('attributes', { amount: 250 });
     }
 });
 
 d.runAll();
 ```
 [top](reference.md#table-of-contents) 
-### Action Windows
+### Batch Window
+When a high number of events or facts satisfy a consequent, the consequent results can be delivered in batches.
+
+* count: defines the exact number of times the rule needs to be satisfied before scheduling the action.   
+* cap: defines the maximum number of times the rule needs to be satisfied before scheduling the action.  
+
+```javascript
+d.ruleset('expense', function() {
+    whenAll: m.amount < 100
+    count: 3
+    run: console.log('approved ' + JSON.stringify(m));
+
+    whenAll: m.amount >= 100
+    cap: 2
+    run: console.log('rejected ' + JSON.stringify(m));
+
+    whenStart: {
+        postBatch('expense', { amount: 10 },
+                             { amount: 20 },
+                             { amount: 100 },
+                             { amount: 30 });
+        postBatch('expense', { amount: 200 },
+                             { amount: 400 });
+    }
+});
+
+d.runAll();
+```
+
+### Tumbling Window
 durable_rules enables aggregating actions using count windows or time tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
 
 Summary of rule attributes:  
