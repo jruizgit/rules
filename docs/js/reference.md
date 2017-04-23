@@ -15,7 +15,8 @@ Reference Manual
   * [Choice of Sequences](reference.md#choice-of-sequences)
 * [Consequents](reference.md#consequents)  
   * [Conflict Resolution](reference.md#conflict-resolution)
-  * [Action Windows](reference.md#action-windows)
+  * [Action Batches](reference.md#action-batches)
+  * [Tumbling Window](reference.md#tumbling-windows)
   * [Async Actions](reference.md#async-actions)
 * [Flow Structures](reference.md#flow-structures)
   * [Timers](reference.md#timers) 
@@ -398,19 +399,25 @@ d.ruleset('attributes', function() {
 d.runAll();
 ```
 [top](reference.md#table-of-contents) 
-### Batch Window
+### Action Batches
 When a high number of events or facts satisfy a consequent, the consequent results can be delivered in batches.
 
 * count: defines the exact number of times the rule needs to be satisfied before scheduling the action.   
 * cap: defines the maximum number of times the rule needs to be satisfied before scheduling the action.  
 
+This example batches exaclty three approvals and caps the number of rejects to two:  
 ```javascript
+var d = require('durable');
+
 d.ruleset('expense', function() {
     whenAll: m.amount < 100
     count: 3
     run: console.log('approved ' + JSON.stringify(m));
 
-    whenAll: m.amount >= 100
+    whenAll: {
+        expense = m.amount >= 100
+        approval = m.review == true
+    }
     cap: 2
     run: console.log('rejected ' + JSON.stringify(m));
 
@@ -418,9 +425,10 @@ d.ruleset('expense', function() {
         postBatch('expense', { amount: 10 },
                              { amount: 20 },
                              { amount: 100 },
-                             { amount: 30 });
-        postBatch('expense', { amount: 200 },
+                             { amount: 30 },
+                             { amount: 200 },
                              { amount: 400 });
+        assert('expense', { review: true })
     }
 });
 
@@ -428,53 +436,25 @@ d.runAll();
 ```
 
 ### Tumbling Window
-durable_rules enables aggregating actions using count windows or time tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
+Actions can also be batched using time tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
 
-Summary of rule attributes:  
-* count: defines the number of times the rule needs to be satisfied befure scheduling the action.   
 * span: defines the tumbling time in seconds between scheduled actions.  
 
-This example generates events at random times and schedules an action every 5 seconds (tumbling window).
+This example generates events with random amounts. An action is scheduled every 5 seconds (tumbling window).
 ```javascript
 var d = require('durable');
 
-d.ruleset('t0', function() {
-    whenAll: m.count == 0 || timeout('myTimer')
-    run: {
-        s.count += 1;
-        post('t0', {id: s.count, sid: 1, t: 'purchase'});
-        startTimer('myTimer', Math.random() * 2 + 1, 't0_' + s.count);
-    }
-
-    whenAll: m.t == 'purchase'
+d.ruleset('risk', function() {
+    whenAll: m.amount > 100
     span: 5
-    run: console.log('t0 pulse ->' + s.count);
+    run: console.log('high value purchases ->' + JSON.stringify(m));
 
     whenStart: {
-        patchState('t0', {sid: 1, count: 0}); 
-    }
-});
-
-d.runAll();
-```
-
-In this example, when the rule is satisfied three times, the action is scheduled.
-```javascript
-d.ruleset('a15', function() {
-    whenAll: {
-        first = m.amount < 100
-        second = m.subject == 'approve'
-    }
-    count: 3
-    run: console.log('a15 approved ->' + JSON.stringify(m));
-
-    whenStart: {
-        postBatch('a15', {id: 1, sid: 1, amount: 10},
-                         {id: 2, sid: 1, amount: 10},
-                         {id: 3, sid: 1, amount: 10},
-                         {id: 4, sid: 1, subject: 'approve'});
-        postBatch('a15', {id: 5, sid: 1, subject: 'approve'},
-                         {id: 6, sid: 1, subject: 'approve'});
+        var callback = function() {
+            post('risk', { amount: Math.random() * 200 });
+            setTimeout(callback, 1000); 
+        }
+        callback();
     }
 });
 
@@ -482,6 +462,7 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 
+## Flow Structures
 ### Timers
 `durable_rules` supports scheduling timeout events and writing rules, which observe such events.  
 
@@ -524,7 +505,7 @@ d.ruleset('t1', {
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
-## Flow Structures
+
 ### Statechart
 `durable_rules` lets you organize the ruleset flow such that its context is always in exactly one of a number of possible states with well-defined conditional transitions between these states. Actions depend on the state of the context and a triggering event.  
 
