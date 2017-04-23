@@ -463,6 +463,44 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 
+### Async Actions  
+The consequent action can be asynchronous. When the action is finished, the `complete` function has to be called. By default an action is considered abandoned after 5 seconds. This value can be changed by returning a different number in the action function or extended by calling `renewActionLease`.
+
+```javascript
+var d = require('durable');
+
+d.ruleset('flow', function() {
+    whenAll: s.state == 'first'
+    // runAsync labels an async action
+    runAsync: {
+        setTimeout(function() {
+            s.state = 'second';
+            console.log('first completed');
+            
+            // completes the async action
+            complete();
+        }, 3000);
+    }
+
+    whenAll: s.state == 'second'
+    runAsync: {
+        setTimeout(function() {
+            console.log('second completed');
+            complete();
+        }, 6000);
+        
+        // overrides the 5 second default abandon timeout
+        return 10;
+    }
+
+    whenStart: {
+        patchState('flow', { state: 'first' });
+    }
+});
+
+d.runAll();
+```
+
 ## Flow Structures
 ### Timers
 `durable_rules` supports scheduling timeout events and writing rules, which observe such events.  
