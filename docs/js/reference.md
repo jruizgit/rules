@@ -135,7 +135,7 @@ d.runAll();
 
 Facts can also be asserted using the http API. For the example above, run the following command:  
 
-<sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "verb": "eats", "predicate": "worms"}' http://localhost:5000/animal/facts`</sub>
+<sub>curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "verb": "eats", "predicate": "worms"}' http://localhost:5000/animal/facts</sub>
 
 [top](reference.md#table-of-contents)  
 
@@ -164,10 +164,11 @@ d.runAll();
 Events can be posted using the http API. When the example above is listening, run the following commands:  
 
 <sub>
-curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:5000/risk/events
-curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:5000/risk/events
+curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:5000/risk/events  
+curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:5000/risk/events  
 </sub>
 
+[top](reference.md#table-of-contents)  
 ### State
 Context state is available when a consequent is executed. The same context state is passed across rule execution. Context state is stored until it is deleted. Context state changes can be evaluated by rules. By convention `s` represents the state to be evaluated by a rule.
 
@@ -192,6 +193,12 @@ d.ruleset('flow', function() {
 
 d.runAll();
 ```
+State can also be retrieved and modified using the http API. When the example above is running, try the following commands: 
+<sub>
+curl GET http://localhost:5000/flow/state  
+curl -H "content-type: application/json" -X POST -d '{"state": "next"}' http://localhost:5000/flow/state  
+</sub>
+
 [top](reference.md#table-of-contents)  
 
 ## Antecendents
