@@ -62,10 +62,10 @@ Now that your cache and web server are ready, let's write a simple rule:
   var d = require('durable');
   d.ruleset('a0', function() {
       whenAll: m.amount < 100
-      run: console.log('a0 approved from ' + s.sid)
+      run: console.log('a0 approved')
     
       whenStart: {
-          post('a0', {id: 1, sid: 1, amount: 10});
+          post('a0', { amount: 10});
       }
   });
   d.runAll();
@@ -98,74 +98,63 @@ d.ruleset('test', function() {
     // consequent
     run: console.log('Hello ' + m.subject)
     // on ruleset start
-    whenStart: post('test', {id: 1, sid: 1, subject: 'World'})
+    whenStart: post('test', { subject: 'World'})
 });
 
 d.runAll();
 ```
 ### Facts
-Facts are used to define the knowledge base. Facts are the data stored by the rules engine. Facts can be asserted and retracted.
+Facts represent the data that defines a knowledge base. After facts are asserted, they are stored until they are retracted. when a fact satisfies a rule antecedent, the rule consequent is executed.
 
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
 
-d.ruleset('fraudDetection', {
-        whenAll: [
-            c.first = m.t.eq('purchase'),
-            c.second = m.location.neq(c.first.location)
-        ],
-        count: 2,
-        run: function(c) {
-            console.log('fraud detected ->' + c.m[0].first.location + ', ' + c.m[0].second.location);
-            console.log('               ->' + c.m[1].first.location + ', ' + c.m[1].second.location);
-        }
-    },
-    function (host) {
-        host.assert('fraudDetection', {id: 1, sid: 1, t: 'purchase', location: 'US'});
-        host.assert('fraudDetection', {id: 2, sid: 1, t: 'purchase', location: 'CA'});
+d.ruleset('animal', function() {
+    whenAll: m.verb == 'eats' && m.predicate == 'flies' 
+    run: assert({ subject: m.subject, verb: 'is', predicate: 'frog' })
+
+    whenAll: m.verb == 'eats' && m.predicate == 'worms' 
+    run: assert({ subject: m.subject, verb: 'is', predicate: 'bird' })
+
+    whenAll: m.verb == 'is' && m.predicate == 'frog' 
+    run: assert({ subject: m.subject, verb: 'is', predicate: 'green'})
+
+    whenAll: m.verb == 'is' && m.predicate == 'bird' 
+    run: assert({ subject: m.subject, verb: 'is', predicate: 'black'})
+
+    whenAll: +m.subject
+    run: console.log('fact: ' + m.subject + ' ' + m.verb + ' ' + m.predicate)
+
+    whenStart: {
+        assert('animal', { subject: 'Kermit', verb: 'eats', predicate: 'flies'});
+        assert('animal', { subject: 'Tweety', verb: 'eats', predicate: 'worms'});
     }
-);
+});
+
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 
 ### Events
-Inference based on events is the main purpose of `durable_rules`. What makes events unique is they can only be consumed once by an action. Events are removed from inference sets as soon as they are scheduled for dispatch. The join combinatorics are significantly reduced, thus improving the rule evaluation performance, in some cases, by orders of magnitude.  
+A rule can be applied to events. An event is an ephemeral fact, that is, a fact retracted right before executing a consequent. Thus, events can only be observed once. Events can only be posted.
 
-Event rules:  
-* Events can be posted in the `start` handler via the host parameter.   
-* Events be posted in an `action` handler using the context parameter.   
-* Events can be posted one at a time or in batches.  
-* Events don't need to be retracted.  
-* Events can co-exist with facts.  
-* The post event operation is idempotent.    
-
-The example below shows how two events will cause only one action to be scheduled, as a given event can only be observed once. You can contrast this with the example in the facts section, which will schedule two actions.
-
-API:  
-* `c.post(rulesetName, {event})`  
-* `c.postBatch(rulesetName, {event}, {event}...)`  
-* `host.post(rulesetName, {event})`  
-* `host.postBatch(rulesetName, {event}, {event}...)`  
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
 
-d.ruleset('fraudDetection', {
-        whenAll: [
-            c.first = m.t.eq('purchase'),
-            c.second = m.location.neq(c.first.location)
-        ],
-        run: function(c) {
-            console.log('fraud detected ->' + c.first.location + ', ' + c.second.location);
-        }
-    },
-    function (host) {
-        host.post('fraudDetection', {id: 1, sid: 1, t: 'purchase', location: 'US'});
-        host.post('fraudDetection', {id: 2, sid: 1, t: 'purchase', location: 'CA'});
+d.ruleset('risk', function() {
+    whenAll: {
+        first = m.t == 'purchase'
+        second = m.location != first.location
     }
-);
+
+    run: console.log('fraud detected ->' + first.location + ', ' + second.location)
+   
+    whenStart: {
+        post('risk', {t: 'purchase', location: 'US'});
+        post('risk', {t: 'purchase', location: 'CA'});
+    }
+});
+
 d.runAll();
 ```
 
