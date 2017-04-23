@@ -261,11 +261,11 @@ d.ruleset('match', function() {
     run: console.log('match url ' + m.url)
         
     whenStart: {
-        post('match', {url: 'https://github.com'});
-        post('match', {url: 'http://github.com/jruizgit/rul!es'});
-        post('match', {url: 'https://github.com/jruizgit/rules/reference.md'});
-        post('match', {url: '//rules'});
-        post('match', {url: 'https://github.c/jruizgit/rules'});
+        post('match', { url: 'https://github.com' });
+        post('match', { url: 'http://github.com/jruizgit/rul!es' });
+        post('match', { url: 'https://github.com/jruizgit/rules/reference.md' });
+        post('match', { url: '//rules'});
+        post('match', { url: 'https://github.c/jruizgit/rules' });
     }
 });
 
@@ -495,6 +495,29 @@ d.ruleset('flow', function() {
 
     whenStart: {
         patchState('flow', { state: 'first' });
+    }
+});
+
+d.runAll();
+```
+### Unhandled Exceptions  
+When exceptions are not handled by actions, they are stored in the context state. This enables writing exception handling rules.
+
+```javascript
+var d = require('durable');
+
+d.ruleset('flow', function() {
+    whenAll: m.action == 'start'
+    run: throw 'Unhandled Exception!'
+
+    whenAll: +s.exception
+    run: {
+        console.log(s.exception);
+        delete(s.exception); 
+    }
+
+    whenStart: {
+        post('flow', { action: 'start' });
     }
 });
 
