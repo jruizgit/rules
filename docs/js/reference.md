@@ -185,31 +185,28 @@ d.runAll();
 
 ## Antecendents
 ### Simple Filter
-Rules are the basic building blocks. All rules have a condition, which defines the events and facts that trigger an action.  
-* The rule condition is an expression. Its left side represents an event or fact property, followed by a logical operator and its right side defines a pattern to be matched. By convention events or facts originated by calling post or assert are represented with the `m` name; events or facts originated by changing the context state are represented with the `s` name.  
-* The rule action is a function to which the context is passed as a parameter. Actions can be synchronous and asynchronous. Asynchronous actions take a completion function as a parameter.  
-
-Below is an example of the typical rule structure. 
+A rule antecedent is an expression. The left side of the expression represents an event or fact property. The right side defines a pattern to be matched. By convention events or facts are represented with the `m` name. Context state are represented with the `s` name.  
 
 Logical operators:  
 * Unary: ~ (does not exist), + (exists)  
 * Logical operators: &&, ||  
 * Relational operators: < , >, <=, >=, ==, !=  
+
 ```javascript
 var d = require('durable');
 
-d.ruleset('a0', function() {
-    whenAll: m.subject < 100 || m.subject == 'approve' || m.subject == 'ok'
-    run: console.log('a0 approved from ' + s.sid)
+d.ruleset('expense', function() {
+    whenAll: m.subject == 'approve' || m.subject == 'ok'
+    run: console.log('Approved')
     
-    whenStart: post('a0', {id: 1, sid: 1, subject: 10})
+    whenStart: post('expense', { subject: 'approve' })
 });
 
 d.runAll();
 ```  
 [top](reference.md#table-of-contents)
 ### Pattern Matching
-durable_rules implements a simple pattern matching dialect. Similar to lua, it uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. The expressiveness of the dialect is not as rich as that of ruby, python or jscript. Event processing is O(n) guaranteed (n being the size of the event).  
+durable_rules implements a simple pattern matching dialect. Similar to lua, it uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. Event processing is O(n) guaranteed (n being the size of the event).  
 
 **Repetition**  
 \+ 1 or more repetitions  
@@ -242,11 +239,11 @@ d.ruleset('match', function() {
     run: console.log('match url ' + m.url)
         
     whenStart: {
-        post('match', {id: 1, sid: 1, url: 'https://github.com'});
-        post('match', {id: 2, sid: 1, url: 'http://github.com/jruizgit/rul!es'});
-        post('match', {id: 3, sid: 1, url: 'https://github.com/jruizgit/rules/reference.md'});
-        post('match', {id: 4, sid: 1, url: '//rules'});
-        post('match', {id: 5, sid: 1, url: 'https://github.c/jruizgit/rules'});
+        post('match', {url: 'https://github.com'});
+        post('match', {url: 'http://github.com/jruizgit/rul!es'});
+        post('match', {url: 'https://github.com/jruizgit/rules/reference.md'});
+        post('match', {url: '//rules'});
+        post('match', {url: 'https://github.c/jruizgit/rules'});
     }
 });
 
