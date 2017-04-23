@@ -565,7 +565,7 @@ d.runAll();
 [top](reference.md#table-of-contents)  
 
 ### Statechart
-`durable_rules` lets you organize the ruleset flow such that its context is always in exactly one of a number of possible states with well-defined conditional transitions between these states. Actions depend on the state of the context and a triggering event.  
+Rules can be organized using statecharts. A statechart is a deterministic finite automaton (DFA). The state context is in one of a number of possible states with conditional transitions between these states. 
 
 Statechart rules:  
 * A statechart can have one or more states.  
@@ -577,39 +577,49 @@ Statechart rules:
 * A trigger can have a rule (absence means state enter).  
 * A trigger can have an action.  
 
-The example shows an approval state machine, which detects an anomaly if three consecutive events happen in less than 30 seconds.
-
-API:  
-* `with (statechart(rulesetName)) statesBlock`  
-* `with (state(stateName)) triggersAndStatesBlock`  
-* `to(stateName, [actionBlock]).[ruleAntecedent, actionBlock]`   
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c, timeout = d.timeout;
 
-d.statechart('fraud', {
-    start: {
-        to: 'metering',
-        whenAll: m.amount.gt(100),
-        run: function (c) { c.startTimer('velocity', 30); }
-    },
-    metering: [{
-        to: 'fraud',
-        count: 3,
-        whenAll: m.amount.gt(100),
-        run: function (c) { console.log('fraud detected'); }
-    }, {
-        to: 'cleared',
-        whenAll: timeout('velocity'),
-        run: function (c) { console.log('fraud cleared'); }
-    }],
-    cleared: {},
-    fraud: {},
-    whenStart: function (host) {
-        host.post('fraud', {id: 1, sid: 1, amount: 200});
-        host.post('fraud', {id: 2, sid: 1, amount: 200});
-        host.post('fraud', {id: 3, sid: 1, amount: 200});
-        host.post('fraud', {id: 4, sid: 1, amount: 200});
+d.statechart('expense', function() {
+    // initial state 'input' with two triggers
+    input: {
+        // trigger to move to 'denied' given a condition
+        to: 'denied'
+        whenAll: m.subject == 'approve' && m.amount > 1000
+        // action executed before state change
+        run: console.log('Denied amount: ' + m.amount)
+
+        to: 'pending'
+        whenAll: m.subject == 'approve' && m.amount <= 1000
+        run: console.log('Requesting approve amount: ' + m.amount);
+    }
+
+    // intermediate state 'pending' with two triggers
+    pending: {
+        to: 'approved'
+        whenAll: m.subject == 'approved'
+        run: console.log('Expense approved')
+
+        to: 'denied'
+        whenAll: m.subject == 'denied'
+        run: console.log('Expense denied')
+    }
+    
+    // 'denied' and 'approved' are final states
+    denied: {}
+    approved: {}
+    
+    whenStart: {
+        // events directed to default statechart instance
+        post('expense', { subject: 'approve', amount: 100 });
+        post('expense', { subject: 'approved' });
+        
+        // events directed to statechart instance with id '1'
+        post('expense', { sid: 1, subject: 'approve', amount: 100 });
+        post('expense', { sid: 1, subject: 'denied' });
+        
+        // events directed to statechart instance with id '2'
+        post('expense', { sid: 2, subject: 'approve', amount: 10000 });
     }
 });
 
