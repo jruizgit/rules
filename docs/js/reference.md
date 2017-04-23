@@ -135,7 +135,7 @@ d.runAll();
 
 Facts can also be asserted using the http API. For the example above, run the following command:  
 
-<sub>curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "verb": "eats", "predicate": "worms"}' http://localhost:5000/animal/facts</sub>
+<sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "verb": "eats", "predicate": "worms"}' http://localhost:5000/animal/facts`</sub>
 
 [top](reference.md#table-of-contents)  
 
@@ -164,8 +164,9 @@ d.runAll();
 Events can be posted using the http API. When the example above is listening, run the following commands:  
 
 <sub>
-curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:5000/risk/events  
-curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:5000/risk/events  
+`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:5000/risk/events`  
+
+`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:5000/risk/events`  
 </sub>
 
 [top](reference.md#table-of-contents)  
@@ -177,14 +178,21 @@ var d = require('durable');
 
 d.ruleset('flow', function() {
     whenAll: s.state == 'start'
-    run: s.state = 'next'
+    run: {
+        s.state = 'next';
+        console.log('start');
+    }
 
     whenAll: s.state == 'next'
-    run: s.state = 'last'
+    run: {
+        s.state = 'last';
+        console.log('next');
+    }
 
     whenAll: s.state == 'last'
     run: {
-        console.log('done');
+        s.state = 'end';
+        console.log('last');
         deleteState();
     }
 
@@ -195,8 +203,7 @@ d.runAll();
 ```
 State can also be retrieved and modified using the http API. When the example above is running, try the following commands: 
 <sub>
-curl GET http://localhost:5000/flow/state   
-curl -H "content-type: application/json" -X POST -d '{"state": "next"}' http://localhost:5000/flow/state   
+`curl -H "content-type: application/json" -X POST -d '{"state": "next"}' http://localhost:5000/flow/state`   
 </sub>
 
 [top](reference.md#table-of-contents)  
