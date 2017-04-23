@@ -127,12 +127,16 @@ d.ruleset('animal', function() {
 
     whenStart: {
         assert('animal', { subject: 'Kermit', verb: 'eats', predicate: 'flies'});
-        assert('animal', { subject: 'Tweety', verb: 'eats', predicate: 'worms'});
     }
 });
 
 d.runAll();
 ```
+
+Facts can also be asserted using the http API:  
+
+<sub>`curl -H "Content-type: application/json" -X POST -d '{"subject": "Tweety", "verb": "eats", "predicate": "worms"}' http://localhost:5000/animal/facts`</sub>
+
 [top](reference.md#table-of-contents)  
 
 ### Events
