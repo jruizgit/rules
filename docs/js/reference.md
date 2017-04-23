@@ -83,7 +83,7 @@ Note 2: If you are running in Windows, you will need VS2013 express edition and 
 
 ## Basics
 ### Rules
-A rule is the basic building block of the framework. The rule antecendent defines the conditions that need to be satisfied to execute the rule consequent (action). The 'test' rule in this example illustrates this simple concept.
+A rule is the basic building block of the framework. The rule antecendent defines the conditions that need to be satisfied to execute the rule consequent (action). By convention `m` represents the data to be evaluated by a given rule.
 
 * `whenAll` and `whenAny` label the antecendent definition of a rule
 * `run` and `runAsync` label the consequent definition of a rule 
@@ -104,7 +104,7 @@ d.ruleset('test', function() {
 d.runAll();
 ```
 ### Facts
-Facts represent the data that defines a knowledge base. After facts are asserted, they are stored until they are retracted. when a fact satisfies a rule antecedent, the rule consequent is executed.
+Facts represent the data that defines a knowledge base. After facts are asserted as JSON objects. Facts are stored until they are retracted. When a fact satisfies a rule antecedent, the rule consequent is executed.
 
 ```javascript
 var d = require('durable');
@@ -136,7 +136,7 @@ d.runAll();
 [top](reference.md#table-of-contents)  
 
 ### Events
-A rule can be applied to events. An event is an ephemeral fact, that is, a fact retracted right before executing a consequent. Thus, events can only be observed once. Events can only be posted.
+Events can be posted to and evaluated by rules. An event is an ephemeral fact, that is, a fact retracted right before executing a consequent. Thus, events can only be observed once. Events are stored until they are observed. 
 
 ```javascript
 var d = require('durable');
@@ -157,7 +157,30 @@ d.ruleset('risk', function() {
 
 d.runAll();
 ```
+### State
+Context state is available when a consequent is executed. The same context state is passed across rule execution. Context state is stored until it is deleted. Context state changes can be evaluated by rules. By convention `s` represents the state to be evaluated by a rule.
 
+```javascript
+var d = require('durable');
+
+d.ruleset('flow', function() {
+    whenAll: s.state == 'start'
+    run: s.state = 'next'
+
+    whenAll: s.state == 'next'
+    run: s.state = 'last'
+
+    whenAll: s.state == 'last'
+    run: {
+        s.state = null;
+        console.log('done');
+    }
+
+    whenStart: patchState('flow', {state: 'start'})
+});
+
+d.runAll();
+```
 [top](reference.md#table-of-contents)  
 
 ## Antecendents
@@ -411,38 +434,6 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 
-### Context
-Context state is permanent. It is used for controlling the ruleset flow or for storing configuration information. `durable_rules` implements a client cache with LRU eviction policy to reference contexts by id, this helps reducing the combinatorics in joins which otherwise would be used for configuration facts.  
-
-Context rules:
-* Context state can be modified in the `start` handler via the host parameter.   
-* Context state can modified in an `action` handler simply by modifying the context state object.  
-* All events and facts are addressed to a context id.  
-* Rules can be written for context changes. By convention the `s` name is used for naming the context state.  
-* The right side of a rule can reference a context, the references will be resolved in the Rete tree alpha nodes.  
-
-API:  
-* `host.patchState(rulesetName, {state})`  
-* `c.state.property = ...`  
-```javascript
-var d = require('durable');
-var m = d.m, s = d.s, c = d.c, add = d.add;
-
-d.ruleset('a8', {
-        whenAll: [ m.amount.lt(add(c.s.maxAmount, c.s.refId('global').minAmount)) ],
-        run: function(c) {
-            console.log('a8 approved ' +  c.m.amount);
-        }
-    },
-    function (host) {
-        host.patchState('a8', {sid: 1, maxAmount: 500});
-        host.patchState('a8', {sid: 'global', minAmount: 100});
-        host.post('a8', {id: 1, sid: 1, amount: 10});
-    }
-);
-d.runAll();
-```
-[top](reference.md#table-of-contents)  
 ### Timers
 `durable_rules` supports scheduling timeout events and writing rules, which observe such events.  
 
