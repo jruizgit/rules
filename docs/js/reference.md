@@ -163,11 +163,8 @@ d.runAll();
 
 Events can be posted using the http API. When the example above is listening, run the following commands:  
 
-<sub>
-`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:5000/risk/events`  
-
-`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:5000/risk/events`  
-</sub>
+<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:5000/risk/events`</sub>  
+<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:5000/risk/events`</sub>  
 
 [top](reference.md#table-of-contents)  
 ### State
@@ -201,10 +198,8 @@ d.ruleset('flow', function() {
 
 d.runAll();
 ```
-State can also be retrieved and modified using the http API. When the example above is running, try the following commands: 
-<sub>
-`curl -H "content-type: application/json" -X POST -d '{"state": "next"}' http://localhost:5000/flow/state`   
-</sub>
+State can also be retrieved and modified using the http API. When the example above is running, try the following commands:  
+<sub>`curl -H "content-type: application/json" -X POST -d '{"state": "next"}' http://localhost:5000/flow/state`</sub>  
 
 [top](reference.md#table-of-contents)  
 
