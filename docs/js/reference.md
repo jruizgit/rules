@@ -251,7 +251,7 @@ d.runAll();
 ```  
 [top](reference.md#table-of-contents) 
 ### Correlated Sequence
-The ability to express and efficiently evaluate sequences of correlated events or facts represents the forward inference hallmark. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
+Rules can be used to efficiently evaluate sequences of correlated events or facts. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
 The `whenAll` label expresses a sequence of events or facts. The assignment operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
 
@@ -259,7 +259,7 @@ Arithmetic operators: +, -, *, /
 ```javascript
 var d = require('durable');
 
-d.ruleset('fraudDetection', function() {
+d.ruleset('risk', function() {
     whenAll: {
         first = m.amount > 100
         second = m.amount > first.amount * 2
@@ -272,9 +272,9 @@ d.ruleset('fraudDetection', function() {
     }
 
     whenStart: {
-        host.post('fraudDetection', {id: 1, sid: 1, amount: 200});
-        host.post('fraudDetection', {id: 2, sid: 1, amount: 500});
-        host.post('fraudDetection', {id: 3, sid: 1, amount: 1000});
+        host.post('risk', {amount: 200});
+        host.post('risk', {amount: 500});
+        host.post('risk', {amount: 1000});
     }
 });
 
@@ -282,23 +282,23 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents) 
 ### Lack of Information
-In some cases lack of information is meaningful. The `none` function enables such tests. 
+In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.
 ```javascript
 var d = require('durable');
 
-d.ruleset('fraud6', function() {
+d.ruleset('risk', function() {
     whenAll: {
         first = m.t == 'deposit'
         none(m.t == 'balance')
         third = m.t == 'withrawal'
         fourth = m.t == 'chargeback'
     }
-    run: console.log('fraud6 detected ' + first.t + ' ' + third.t + ' ' + fourth.t + ' from ' + s.sid);
+    run: console.log('fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
 
     whenStart: {
-        post('fraud6', {id: 1, sid: 1, t: 'deposit'});
-        post('fraud6', {id: 2, sid: 1, t: 'withrawal'});
-        post('fraud6', {id: 3, sid: 1, t: 'chargeback'});
+        post('risk', {t: 'deposit'});
+        post('risk', {t: 'withrawal'});
+        post('risk', {t: 'chargeback'});
     }
 });
 
@@ -307,7 +307,7 @@ d.runAll();
 
 [top](reference.md#table-of-contents)  
 ### Choice of Sequences
-durable_rules allows expressing and efficiently evaluating richer events sequences leveraging forward inference. In the example below any of the two event\fact sequences will trigger an action. 
+durable_rules allows expressing and efficiently evaluating richer events sequences In the example below any of the two event\fact sequences will trigger an action. 
 
 The following two labels can be used and combined to define richer event sequences:  
 * whenAll: a set of event or fact patterns. All of them are required to match to trigger an action.  
@@ -316,7 +316,7 @@ The following two labels can be used and combined to define richer event sequenc
 ```javascript
 var d = require('durable');
 
-d.ruleset('a8', function() {
+d.ruleset('expense', function() {
     whenAny: {
         whenAll: {
             first = m.subject == 'approve'
@@ -329,25 +329,27 @@ d.ruleset('a8', function() {
     }
     run: {
         if (first) {
-            console.log('a8 action from: ' + s.sid + ' ' + first.subject + ' ' + second.amount);     
+            console.log('Approved ' + first.subject + ' ' + second.amount);     
         } else {
-            console.log('a8 action from: ' + s.sid + ' ' + third.subject + ' ' + fourth.amount);        
+            console.log('Approved ' + third.subject + ' ' + fourth.amount);        
         }
     }
 
     whenStart: {
-        post('a8', {id: 1, sid: 1, subject: 'approve'});
-        post('a8', {id: 2, sid: 1, amount: 1000});
-        post('a8', {id: 3, sid: 2, subject: 'jumbo'});
-        post('a8', {id: 4, sid: 2, amount: 10000});
+        post('expense', {subject: 'approve'});
+        post('expense', {amount: 1000});
+        post('expense', {subject: 'jumbo'});
+        post('expense', {amount: 10000});
     }
 });
 
 d.runAll();
 ```
 [top](reference.md#table-of-contents) 
+
+## Consequents
 ### Conflict Resolution
-Event and fact evaluation can lead to multiple actions.The triggering order can be defined by setting the priority (salience) attribute on the rule.
+Event and fact evaluation can lead to multiple consequents. The triggering order can be controlled by using the priority (salience) attribute.
 
 In this example, notice how the last rule is triggered first, as it has the highest priority.
 ```javascript
@@ -367,9 +369,9 @@ d.ruleset('attributes', function() {
     run: console.log('attributes P1 ->' + m.amount);
        
     whenStart: {
-        assert('attributes', {id: 1, sid: 1, amount: 50});
-        assert('attributes', {id: 2, sid: 1, amount: 150});
-        assert('attributes', {id: 3, sid: 1, amount: 250});
+        assert('attributes', {amount: 50});
+        assert('attributes', {amount: 150});
+        assert('attributes', {amount: 250});
     }
 });
 
