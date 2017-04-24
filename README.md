@@ -112,21 +112,45 @@ d.runAll();
 ```python
 from durable.lang import *
 
-with ruleset('fibonacci'):
-    @when_all(c.first << (m.value != 0),
-              c.second << (m.id == c.first.id + 1))
-    def calculate(c):
-        print('Value: {0}'.format(c.first.value))
-        if c.second.id > 100:
-            print('Value: {0}'.format(c.second.value))
-        else:
-            c.assert_fact({'id': c.second.id + 1, 'value': c.first.value + c.second.value})
-            c.retract_fact(c.first)
-    
+with ruleset('animal'):
+    @when_all(c.first << (m.verb == 'eats') & (m.predicate == 'flies'),
+              (m.verb == 'lives') & (m.predicate == 'water') & (m.subject == c.first.subject))
+    def frog(c):
+        c.assert_fact({ 'subject': c.first.subject, 'verb': 'is', 'predicate': 'frog' })
+
+    @when_all(c.first << (m.verb == 'eats') & (m.predicate == 'flies'),
+              (m.verb == 'lives') & (m.predicate == 'land') & (m.subject == c.first.subject))
+    def chameleon(c):
+        c.assert_fact({ 'subject': c.first.subject, 'verb': 'is', 'predicate': 'chameleon' })
+
+    @when_all((m.verb == 'eats') & (m.predicate == 'worms'))
+    def bird(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'bird' })
+
+    @when_all((m.verb == 'is') & (m.predicate == 'frog'))
+    def green(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'green' })
+
+    @when_all((m.verb == 'is') & (m.predicate == 'chameleon'))
+    def grey(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'grey' })
+
+    @when_all((m.verb == 'is') & (m.predicate == 'bird'))
+    def black(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'black' })
+
+    @when_all(count(11), +m.subject)
+    def output(c):
+        for f in c.m:
+            print ('Fact: {0} {1} {2}'.format(f.subject, f.verb, f.predicate))
+
     @when_start
     def start(host):
-        host.assert_fact('fibonacci', {'id': 1, 'sid': 1, 'value': 1})
-        host.assert_fact('fibonacci', {'id': 2, 'sid': 1, 'value': 1})
+        host.assert_fact('animal', { 'subject': 'Kermit', 'verb': 'eats', 'predicate': 'flies' })
+        host.assert_fact('animal', { 'subject': 'Kermit', 'verb': 'lives', 'predicate': 'water' })
+        host.assert_fact('animal', { 'subject': 'Greedy', 'verb': 'eats', 'predicate': 'flies' })
+        host.assert_fact('animal', { 'subject': 'Greedy', 'verb': 'lives', 'predicate': 'land' })
+        host.assert_fact('animal', { 'subject': 'Tweety', 'verb': 'eats', 'predicate': 'worms' })
         
 run_all()
 ```
