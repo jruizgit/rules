@@ -16,8 +16,13 @@ class Application(object):
         self._host_name = host_name
         self._port = port
         self._run = run
-        routing_rules.append(Rule('/<ruleset_name>', endpoint=self._ruleset_definition_request))
-        routing_rules.append(Rule('/<ruleset_name>/<sid>', endpoint=self._state_request))
+        routing_rules.append(Rule('/<ruleset_name>/definition', endpoint=self._ruleset_definition_request))
+        routing_rules.append(Rule('/<ruleset_name>/state', endpoint=self._default_state_request))
+        routing_rules.append(Rule('/<ruleset_name>/state/<sid>', endpoint=self._state_request))
+        routing_rules.append(Rule('/<ruleset_name>/events', endpoint=self._default_events_request))
+        routing_rules.append(Rule('/<ruleset_name>/events/<sid>', endpoint=self._events_request))
+        routing_rules.append(Rule('/<ruleset_name>/facts', endpoint=self._default_facts_request))
+        routing_rules.append(Rule('/<ruleset_name>/facts/<sid>', endpoint=self._facts_request))
         self._url_map = Map(routing_rules)
 
     def _ruleset_definition_request(self, environ, start_response, ruleset_name):
@@ -45,14 +50,54 @@ class Application(object):
         elif request.method == 'POST':
             message = json.loads(request.stream.read())
             message['sid'] = sid
-            result = self._host.post(ruleset_name, message)
+            result = self._host.patch_state(ruleset_name, message)
             return Response(json.dumps({'outcome': result}))(environ, start_response)
-        elif request.method == 'PATCH':
-            document = json.loads(request.stream.read())
-            document['id'] = sid
-            result = self._host.patch_state(ruleset_name, document)
+
+    def _default_state_request(self, environ, start_response, ruleset_name):
+        request = Request(environ)
+        result = None
+        if request.method == 'GET':
+            result = self._host.get_state(ruleset_name, '0')
+            return Response(json.dumps(result))(environ, start_response)
+        elif request.method == 'POST':
+            message = json.loads(request.stream.read())
+            result = self._host.patch_state(ruleset_name, message)
             return Response(json.dumps({'outcome': result}))(environ, start_response)
         
+    def _events_request(self, environ, start_response, ruleset_name, sid):
+        request = Request(environ)
+        result = None
+        if request.method == 'POST':
+            message = json.loads(request.stream.read())
+            message['sid'] = sid
+            result = self._host.post(ruleset_name, message)
+            return Response(json.dumps({'outcome': result}))(environ, start_response)
+
+    def _default_events_request(self, environ, start_response, ruleset_name):
+        request = Request(environ)
+        result = None
+        if request.method == 'POST':
+            message = json.loads(request.stream.read())
+            result = self._host.post(ruleset_name, message)
+            return Response(json.dumps({'outcome': result}))(environ, start_response)
+
+    def _facts_request(self, environ, start_response, ruleset_name, sid):
+        request = Request(environ)
+        result = None
+        if request.method == 'POST':
+            message = json.loads(request.stream.read())
+            message['sid'] = sid
+            result = self._host.assert_fact(ruleset_name, message)
+            return Response(json.dumps({'outcome': result}))(environ, start_response)
+
+    def _default_facts_request(self, environ, start_response, ruleset_name):
+        request = Request(environ)
+        result = None
+        if request.method == 'POST':
+            message = json.loads(request.stream.read())
+            result = self._host.assert_fact(ruleset_name, message)
+            return Response(json.dumps({'outcome': result}))(environ, start_response)
+
     def _not_found(self, environ, start_response):
         return Exception('File not found')
 

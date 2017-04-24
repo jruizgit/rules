@@ -9,9 +9,10 @@ The durable_rules core engine is implemented in C, which enables ultra fast rule
 
 **Example 1**
 
-durable_rules is simple: to define a rule, all you need to do is describe the event or fact pattern to match (antecedent) and the action to take (consequent).
+durable_rules is simple: to define a rule, all you need to do is describe the event or fact pattern to match (antecedent) and the action to take (consequent). In this example the rule can be triggered by posting `{"subject": "World"}` to url `http://localhost:5000/test/events`
 
-In this example the rule can be triggered by posting `{"id": 1, "subject": "World"}` to url `http://localhost:5000/test/1`
+Once the test is running, from a terminal type:   
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "World"}' http://localhost:5000/test/events`
 
 ::
 
@@ -28,7 +29,103 @@ In this example the rule can be triggered by posting `{"id": 1, "subject": "Worl
 
 **Example 2**
 
+durable_rules super-power is the foward-chaining evaluation of rules. In other words, the repeated application of logical modus ponens(https://en.wikipedia.org/wiki/Modus_ponens) to a set of facts or observed events to derive a conclusion. The example below shows a set of rules applied to a small knowledge base (set of facts).
+
+::
+
+    from durable.lang import *
+
+    with ruleset('animal'):
+        @when_all(c.first << (m.verb == 'eats') & (m.predicate == 'flies'),
+                  (m.verb == 'lives') & (m.predicate == 'water') & (m.subject == c.first.subject))
+        def frog(c):
+            c.assert_fact({ 'subject': c.first.subject, 'verb': 'is', 'predicate': 'frog' })
+
+        @when_all(c.first << (m.verb == 'eats') & (m.predicate == 'flies'),
+                  (m.verb == 'lives') & (m.predicate == 'land') & (m.subject == c.first.subject))
+        def chameleon(c):
+            c.assert_fact({ 'subject': c.first.subject, 'verb': 'is', 'predicate': 'chameleon' })
+
+        @when_all((m.verb == 'eats') & (m.predicate == 'worms'))
+        def bird(c):
+            c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'bird' })
+
+        @when_all((m.verb == 'is') & (m.predicate == 'frog'))
+        def green(c):
+            c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'green' })
+
+        @when_all((m.verb == 'is') & (m.predicate == 'chameleon'))
+        def grey(c):
+            c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'grey' })
+
+        @when_all((m.verb == 'is') & (m.predicate == 'bird'))
+        def black(c):
+            c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'black' })
+
+        @when_all(count(11), +m.subject)
+        def output(c):
+            for f in c.m:
+                print ('Fact: {0} {1} {2}'.format(f.subject, f.verb, f.predicate))
+
+        @when_start
+        def start(host):
+            host.assert_fact('animal', { 'subject': 'Kermit', 'verb': 'eats', 'predicate': 'flies' })
+            host.assert_fact('animal', { 'subject': 'Kermit', 'verb': 'lives', 'predicate': 'water' })
+            host.assert_fact('animal', { 'subject': 'Greedy', 'verb': 'eats', 'predicate': 'flies' })
+            host.assert_fact('animal', { 'subject': 'Greedy', 'verb': 'lives', 'predicate': 'land' })
+            host.assert_fact('animal', { 'subject': 'Tweety', 'verb': 'eats', 'predicate': 'worms' })
+            
+    run_all()
+
+**Example 3**
+
+The combination of forward inference and durable_rules tolerance to failures on rule action dispatch, enables work coordination with data flow structures such as statecharts, nested states and flowcharts. 
+
+Once the test is running, from a terminal type:   
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "approve", "amount": 100}' http://localhost:5000/expense/events`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "approved"}' http://localhost:5000/expense/events`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "approve", "amount": 100}' http://localhost:5000/expense/events/2`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "denied"}' http://localhost:5000/expense/events/2`  
+::
+
+    from durable.lang import *
+
+    with statechart('expense'):
+        with state('input'):
+            @to('denied')
+            @when_all((m.subject == 'approve') & (m.amount > 1000))
+            def denied(c):
+                print ('expense denied')
+            
+            @to('pending')    
+            @when_all((m.subject == 'approve') & (m.amount <= 1000))
+            def request(c):
+                print ('requesting expense approval')
+            
+        with state('pending'):
+            @to('approved')
+            @when_all(m.subject == 'approved')
+            def approved(c):
+                print ('expense approved')
+                
+            @to('denied')
+            @when_all(m.subject == 'denied')
+            def denied(c):
+                print ('expense denied')
+            
+        state('denied')
+        state('approved')
+        
+    run_all()
+
+**Example 4**
+
 durable_rules provides string pattern matching. Expressions are compiled down to a DFA, guaranteeing linear execution time in the order of single digit nano seconds per character (note: backtracking expressions are not supported).
+
+Once the test is running, from a terminal type:  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "375678956789765"}' http://localhost:5000/test/events`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "4345634566789888"}' http://localhost:5000/test/events`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "2228345634567898"}' http://localhost:5000/test/events` 
 
 ::
 
@@ -49,33 +146,7 @@ durable_rules provides string pattern matching. Expressions are compiled down to
 
     run_all()
 
-**Example 3**
-
-durable_rules super-power is the ability to define forward reasoning rules. In other words, rules to derive an action based on a set of correlated facts or observed events. The example below illustrates this basic building block by calculating the first 100 numbers of the Fibonacci series.
-
-::
-
-    from durable.lang import *
-
-    with ruleset('fibonacci'):
-        @when_all(c.first << (m.value != 0),
-                  c.second << (m.id == c.first.id + 1))
-        def calculate(c):
-            print('Value: {0}'.format(c.first.value))
-            if c.second.id > 100:
-                print('Value: {0}'.format(c.second.value))
-            else:
-                c.assert_fact({'id': c.second.id + 1, 'value': c.first.value + c.second.value})
-                c.retract_fact(c.first)
-    
-        @when_start
-        def start(host):
-            host.assert_fact('fibonacci', {'id': 1, 'sid': 1, 'value': 1})
-            host.assert_fact('fibonacci', {'id': 2, 'sid': 1, 'value': 1})
-        
-    run_all()
-
-**Example 4**
+**Example 5**
 
 durable_rules can also be used to solve traditional Production Bussiness Rules problems. The example below is the 'Miss Manners' benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent guests are of opposite sex and share at least one hobby. 
 
