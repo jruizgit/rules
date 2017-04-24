@@ -627,40 +627,48 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 ### Nested States
-`durable_rules` supports nested states. Which implies that, along with the [statechart](reference.md#statechart) description from the previous section, most of the [UML statechart](http://en.wikipedia.org/wiki/UML_state_machine) semantics is supported. If a context is in the nested state, it also (implicitly) is in the surrounding state. The state machine will attempt to handle any event in the context of the substate, which conceptually is at the lower level of the hierarchy. However, if the substate does not prescribe how to handle the event, the event is not discarded, but it is automatically handled at the higher level context of the superstate.
-
-The example below shows a statechart, where the `canceled` transition is reused for both the `enter` and the `process` states. 
+Nested states allow for writing compact statecharts. If a context is in the nested state, it also (implicitly) is in the surrounding state. The statechart will attempt to handle any event in the context of the sub-state. If the sub-state does not  handle an event, the event is automatically handled at the context of the super-state.
 
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
 
-d.statechart('a6', {
-    work: [{
+d.statechart('worker', function() {
+    // super-state 'work' has two states and one trigger
+    work: {
+        // sub-sate 'enter' has only one trigger
         enter: {
-            to: 'process',
-            whenAll: m.subject.eq('enter'),
-            run: function (c) { console.log('a6 continue process'); }
-        },
-        process: {
-            to: 'process',
-            whenAll: m.subject.eq('continue'),
-            run: function (c) { console.log('a6 processing'); }
+            to: 'process'
+            whenAll: m.subject == 'enter'
+            run: console.log('start process')
         }
-    }, {
-        to: 'canceled',
-        pri: 1,
-        whenAll: m.subject.eq('cancel'),
-        run: function (c) { console.log('a6 canceling');}
-    }],
-    canceled: {},
-    whenStart: function (host) {
-        host.post('a6', {id: 1, sid: 1, subject: 'enter'});
-        host.post('a6', {id: 2, sid: 1, subject: 'continue'});
-        host.post('a6', {id: 3, sid: 1, subject: 'continue'});
-        host.post('a6', {id: 4, sid: 1, subject: 'cancel'});
+
+        process: {
+            to: 'process'
+            whenAll: m.subject == 'continue'
+            run: console.log('continue processing')
+        }
+    
+        // the super-state trigger will be evaluated for all sub-state triggers
+        to: 'canceled'
+        pri: 1
+        whenAll: m.subject == 'cancel'
+        run: console.log('cancel process')
+    }
+
+    canceled: {}
+    whenStart: {
+        // will move the statechart to the 'work.process' sub-state
+        post('worker', { subject: 'enter' });
+        
+        // will keep the statechart to the 'work.process' sub-state
+        post('worker', { subject: 'continue' });
+        post('worker', { subject: 'continue' });
+        
+        // will move the statechart out of the work state
+        post('worker', { subject: 'cancel' });
     }
 });
+
 d.runAll();
 ```
 [top](reference.md#table-of-contents)
