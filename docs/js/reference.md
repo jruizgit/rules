@@ -673,7 +673,7 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)
 ### Flowchart
-In addition to [statechart](reference.md#statechart), flowchart is another way for organizing a ruleset flow. In a flowchart each stage represents an action to be executed. So (unlike the statechart state), when applied to the context state, it results in a transition to another stage.  
+A flowchart is another way of organizing a ruleset flow. In a flowchart each stage represents an action to be executed. So (unlike the statechart state), when applied to the context state, it results in a transition to another stage.  
 
 Flowchart rules:  
 * A flowchart can have one or more stages.  
@@ -683,47 +683,49 @@ Flowchart rules:
 * A stage can have zero or more conditions.  
 * A condition has a rule and a destination stage.  
 
-API:  
-* `flowchart(rulesetName) stageConditionBlock`  
-* `with (stage(stageName)) [actionConditionbBlock]` 
-* `run(actionFunction)`  
-* `to(stageName).[rule]`  
-Note: conditions have to be defined immediately after the stage definition  
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
 
-d.flowchart('a3', {
+d.flowchart('expense', function() {
+    // initial stage 'input' has two conditions
     input: {
-        request: { whenAll: m.subject.eq('approve').and(m.amount.lte(1000)) }, 
-        deny: { whenAll: m.subject.eq('approve').and(m.amount.gt(1000)) }, 
-    },
+        request: m.subject == 'approve' && m.amount <= 1000 
+        deny:  m.subject == 'approve' && m.amount > 1000
+    }
+
+    // intermediate stage 'request' has an action and three conditions
     request: {
-        run: function (c) {
-            console.log('a3_0 request approval from: ' + c.s.sid);
-            if (c.s.status) 
-                c.s.status = 'approved';
-            else
-                c.s.status = 'pending';
-        },
-        approve: { whenAll: s.status.eq('approved') },
-        deny: { whenAll: m.subject.eq('denied') },
-        request: { whenAll: m.subject.eq('approved') }
-    },
+        run: console.log('Requesting approve')
+        approve: m.subject == 'approved'
+        deny: m.subject == 'denied'
+        // self is a reflexive condition: if met, returns to the same stage
+        self: m.subject == 'retry'
+    }
+
+    // two final stages 'approve' and 'deny' with no conditions
     approve: {
-        run: function (c) { console.log('a3 approved from: ' + c.s.sid); }
-    },
+        run: console.log('Expense approved')
+    }
+
     deny: {
-        run: function (c) { console.log('a3 denied from: ' + c.s.sid); }
-    },
-    whenStart: function (host) {
-        host.post('a3', {id: 1, sid: 1, subject: 'approve', amount: 100});
-        host.post('a3', {id: 2, sid: 1, subject: 'approved'});
-        host.post('a3', {id: 3, sid: 2, subject: 'approve', amount: 100});
-        host.post('a3', {id: 4, sid: 2, subject: 'denied'});
-        host.post('a3', {id: 5, sid: 3, subject: 'approve', amount: 10000});
+        run: console.log('Expense denied')
+    }
+
+    whenStart: {
+        // events for the default flowchart instance, approved after retry
+        post('expense', { subject: 'approve', amount: 100 });
+        post('expense', { subject: 'retry' });
+        post('expense', { subject: 'approved' });
+        
+        // events for the flowchart instance '1', denied after first try
+        post('expense', {sid: 1, subject: 'approve', amount: 100});
+        post('expense', {sid: 1, subject: 'denied'});
+        
+        // event for the flowchart instance '2' immediately denied
+        post('expense', {sid: 2, subject: 'approve', amount: 10000});
     }
 });
+
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
