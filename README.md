@@ -85,24 +85,24 @@ d.ruleset('animal', function() {
     run: assert({ subject: m.subject, verb: 'is', predicate: 'bird' })
 
     whenAll: m.verb == 'is' && m.predicate == 'frog'
-    run: assert({ subject: m.subject, verb: 'is', predicate: 'green'})
+    run: assert({ subject: m.subject, verb: 'is', predicate: 'green' })
 
     whenAll: m.verb == 'is' && m.predicate == 'chameleon'
-    run: assert({ subject: m.subject, verb: 'is', predicate: 'green'})
+    run: assert({ subject: m.subject, verb: 'is', predicate: 'green' })
 
     whenAll: m.verb == 'is' && m.predicate == 'bird' 
-    run: assert({ subject: m.subject, verb: 'is', predicate: 'black'})
+    run: assert({ subject: m.subject, verb: 'is', predicate: 'black' })
 
     whenAll: +m.subject
     count: 11
-    run: m.forEach(function(f, i) { console.log('fact: ' + f.subject + ' ' + f.verb + ' ' + f.predicate) })
+    run: m.forEach(function(f, i) {console.log('fact: ' + f.subject + ' ' + f.verb + ' ' + f.predicate)})
 
     whenStart: {
-        assert('animal', { subject: 'Kermit', verb: 'eats', predicate: 'flies'});
-        assert('animal', { subject: 'Kermit', verb: 'lives', predicate: 'water'});
-        assert('animal', { subject: 'Greedy', verb: 'eats', predicate: 'flies'});
-        assert('animal', { subject: 'Greedy', verb: 'lives', predicate: 'land'});
-        assert('animal', { subject: 'Tweety', verb: 'eats', predicate: 'worms'});
+        assert('animal', { subject: 'Kermit', verb: 'eats', predicate: 'flies' });
+        assert('animal', { subject: 'Kermit', verb: 'lives', predicate: 'water' });
+        assert('animal', { subject: 'Greedy', verb: 'eats', predicate: 'flies' });
+        assert('animal', { subject: 'Greedy', verb: 'lives', predicate: 'land' });
+        assert('animal', { subject: 'Tweety', verb: 'eats', predicate: 'worms' });
     }
 });
 
@@ -157,10 +157,10 @@ Durable.run_all
 The combination of forward inference and durable_rules tolerance to failures on rule action dispatch, enables work coordination with data flow structures such as statecharts, nested states and flowcharts. 
 
 <sub>Tip: once the test is running, from a terminal type:   
-`curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "approve", "amount": 100}' http://localhost:5000/expense/1`  
-`curl -H "Content-type: application/json" -X POST -d '{"id": 2, "subject": "approved"}' http://localhost:5000/expense/1`  
-`curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "approve", "amount": 100}' http://localhost:5000/expense/2`  
-`curl -H "Content-type: application/json" -X POST -d '{"id": 2, "subject": "denied"}' http://localhost:5000/expense/2`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "approve", "amount": 100}' http://localhost:5000/expense/events`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "approved"}' http://localhost:5000/expense/events`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "approve", "amount": 100}' http://localhost:5000/expense/events/2`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "denied"}' http://localhost:5000/expense/events/2`  
 </sub>
 ### Node.js
 ```javascript
@@ -168,21 +168,21 @@ d.statechart('expense', function() {
     input: {
         to: 'denied'
         whenAll: m.subject == 'approve' && m.amount > 1000
-        run: console.log('expense denied: ' + s.sid)
+        run: console.log('expense denied')
 
         to: 'pending'
         whenAll: m.subject == 'approve' && m.amount <= 1000
-        run: console.log('requesting expense approval: ' + s.sid)
+        run: console.log('requesting expense approval')
     }
 
     pending: {
         to: 'approved'
         whenAll: m.subject == 'approved'
-        run: console.log('expense approved by: ' + s.sid)
+        run: console.log('expense approved by')
             
         to: 'denied'
         whenAll: m.subject == 'denied'
-        run: console.log('expense denied by: ' + s.sid)
+        run: console.log('expense denied by')
     }
     
     denied: {}
@@ -255,9 +255,9 @@ Durable.run_all
 durable_rules provides string pattern matching. Expressions are compiled down to a DFA, guaranteeing linear execution time in the order of single digit nano seconds per character (note: backtracking expressions are not supported).
 
 <sub>Tip: once the test is running, from a terminal type:  
-`curl -H "Content-type: application/json" -X POST -d '{"id": 1, "subject": "375678956789765"}' http://localhost:5000/test/1`  
-`curl -H "Content-type: application/json" -X POST -d '{"id": 2, "subject": "4345634566789888"}' http://localhost:5000/test/1`  
-`curl -H "Content-type: application/json" -X POST -d '{"id": 3, "subject": "2228345634567898"}' http://localhost:5000/test/1`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "375678956789765"}' http://localhost:5000/test`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "4345634566789888"}' http://localhost:5000/test`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "2228345634567898"}' http://localhost:5000/test`  
 </sub>
 
 ### Node.js
