@@ -670,6 +670,7 @@ static unsigned int loadAddMessageCommand(ruleset *tree, binding *rulesBinding) 
 "local events_hashset = \"%s!e!\" .. sid\n"
 "local facts_hashset = \"%s!f!\" .. sid\n"
 "local visited_hashset = \"%s!v!\" .. sid\n"
+"local mid_count_hashset = \"%s!c\"\n"
 "local message = {}\n"
 "local primary_message_keys = {}\n"
 "local input_keys = {}\n"
@@ -696,14 +697,19 @@ static unsigned int loadAddMessageCommand(ruleset *tree, binding *rulesBinding) 
 "    end\n"
 "end\n"
 "local mid = message[\"id\"]\n"
-"if redis.call(\"hsetnx\", visited_hashset, message[\"id\"], 1) == 0 then\n"
-"    if assert_fact == 0 then\n"
-"        if not redis.call(\"hget\", events_hashset, mid) then\n"
-"            return %d\n"
-"        end\n"
-"    else\n"
-"        if not redis.call(\"hget\", facts_hashset, mid) then\n"
-"            return %d\n"
+"if not mid then\n"
+"    mid = \"$m-\" .. redis.call(\"hincrby\", mid_count_hashset, mid, 1)\n"
+"    message[\"id\"] = mid\n"
+"else\n"
+"    if redis.call(\"hsetnx\", visited_hashset, mid, 1) == 0 then\n"
+"        if assert_fact == 0 then\n"
+"            if not redis.call(\"hget\", events_hashset, mid) then\n"
+"                return %d\n"
+"            end\n"
+"        else\n"
+"            if not redis.call(\"hget\", facts_hashset, mid) then\n"
+"                return %d\n"
+"            end\n"
 "        end\n"
 "    end\n"
 "end\n"
@@ -722,6 +728,7 @@ static unsigned int loadAddMessageCommand(ruleset *tree, binding *rulesBinding) 
 "        save_message(key, message, key .. \"!e!\" .. sid, events_hashset)\n"
 "    end\n"
 "end\n",
+                name,
                 name,
                 name,
                 name,
@@ -1059,7 +1066,7 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
 "        end\n"
 "    end\n"
 "    for i = #packed_frames, 1, -1 do\n"
-"        redis.call(\"rpush\", rule_action_key, packed_frames[i])\n"
+"        redis.call(\"lpush\", rule_action_key, packed_frames[i])\n"
 "    end\n"
 "    if #packed_frames == 0 then\n"
 "        return nil, nil\n"
@@ -1189,12 +1196,11 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
 "end\n"
 "if frame then\n"
 "    redis.call(\"zadd\", action_key, tonumber(ARGV[1]), new_sid)\n"
-"    local state_version = redis.call(\"hget\", state_key .. \"!v\", new_sid)\n"
 "    if #ARGV == 2 then\n"
 "        local state = redis.call(\"hget\", state_key, new_sid)\n"
-"        return {new_sid, tonumber(state_version), state, cjson.encode({[action_name] = fixup_frame(frame)})}\n"
+"        return {new_sid, state, cjson.encode({[action_name] = fixup_frame(frame)})}\n"
 "    else\n"
-"        return {new_sid, tonumber(state_version), cjson.encode({[action_name] = fixup_frame(frame)})}\n"
+"        return {new_sid, cjson.encode({[action_name] = fixup_frame(frame)})}\n"
 "    end\n"
 "end\n",
                 name,
@@ -1707,6 +1713,7 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "local visited_hashset = \"%s!v!\" .. sid\n"
 "local actions_key = \"%s!a\"\n"
 "local state_key = \"%s!s\"\n"
+"local mid_count_hashset = \"%s!c\"\n"
 "local queue_action = false\n"
 "local facts_message_cache = {}\n"
 "local events_message_cache = {}\n"
@@ -2143,14 +2150,21 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "        message[\"$f\"] = 1\n"
 "    end\n"
 "end\n"
-"if redis.call(\"hsetnx\", visited_hashset, mid, 1) == 0 then\n"
-"    if assert_fact == 0 then\n"
-"        if message and redis.call(\"hexists\", events_hashset, mid) == 0 then\n"
-"            return %d\n"
-"        end\n"
-"    else\n"
-"        if message and redis.call(\"hexists\", facts_hashset, mid) == 0 then\n"
-"            return %d\n"
+"if mid == \"\" then\n"
+"    mid = \"$m-\" .. redis.call(\"hincrby\", mid_count_hashset, sid, 1)\n"
+"    if message then\n"
+"        message[\"id\"] = mid\n"
+"    end\n"
+"else\n"
+"    if redis.call(\"hsetnx\", visited_hashset, mid, 1) == 0 then\n"
+"        if assert_fact == 0 then\n"
+"            if message and redis.call(\"hexists\", events_hashset, mid) == 0 then\n"
+"                return %d\n"
+"            end\n"
+"        else\n"
+"            if message and redis.call(\"hexists\", facts_hashset, mid) == 0 then\n"
+"                return %d\n"
+"            end\n"
 "        end\n"
 "    end\n"
 "end\n"
@@ -2163,12 +2177,12 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
                  name,
                  name,
                  name,
+                 name,
                  ERR_EVENT_OBSERVED,
                  ERR_EVENT_OBSERVED,
                  lua)  == -1) {
         return ERR_OUT_OF_MEMORY;
     }
-
     free(oldLua);
     unsigned int result = redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
     GET_REPLY(result, "loadEvalMessageCommand", reply);
@@ -2569,8 +2583,7 @@ unsigned int formatStoreSession(void *rulesBinding,
                                 char *sid, 
                                 char *state,
                                 unsigned char tryExists, 
-                                char **storeCommand,
-                                char **versionCommand) {
+                                char **storeCommand) {
     binding *currentBinding = (binding*)rulesBinding;
 
     int result;
@@ -2580,29 +2593,12 @@ unsigned int formatStoreSession(void *rulesBinding,
                                     currentBinding->sessionHashset, 
                                     sid, 
                                     state);
-        if (result == 0) {
-            return ERR_OUT_OF_MEMORY;
-        }
-
-        result = redisFormatCommand(versionCommand,
-                                    "hsetnx %s!v %s 0", 
-                                    currentBinding->sessionHashset, 
-                                    sid);
     } else {
         result = redisFormatCommand(storeCommand,
                                     "hset %s %s %s", 
                                     currentBinding->sessionHashset, 
                                     sid, 
                                     state);
-
-        if (result == 0) {
-            return ERR_OUT_OF_MEMORY;
-        }
-
-        result = redisFormatCommand(versionCommand,
-                                    "hincrby %s!v %s 1", 
-                                    currentBinding->sessionHashset, 
-                                    sid);
     }
 
     if (result == 0) {
@@ -2894,7 +2890,7 @@ unsigned int peekAction(ruleset *tree, void **bindingContext, redisReply **reply
         }
         
         if ((*reply)->type == REDIS_REPLY_ARRAY) {
-            if ((*reply)->elements < 4) {
+            if ((*reply)->elements < 3) {
                 freeReplyObject(*reply);
                 return ERR_REDIS_ERROR;       
             }

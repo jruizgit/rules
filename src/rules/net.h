@@ -74,8 +74,7 @@ unsigned int formatStoreSession(void *rulesBinding,
                                 char *sid, 
                                 char *state, 
                                 unsigned char tryExists,
-                                char **storeCommand,
-                                char **versionCommand);
+                                char **storeCommand);
 
 unsigned int formatStoreSessionFact(void *rulesBinding, 
                                     char *sid, 

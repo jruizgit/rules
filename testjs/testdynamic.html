@@ -19,7 +19,7 @@
                 rulesetDefinition[rulesetName] = ruleset;
             } 
 
-            server = d3.xhr('http://localhost:5000/' + rulesetName)
+            server = d3.xhr('http://localhost:5000/' + rulesetName + '/definition')
                        .header('content-type', 'application/json; charset=utf-8');
 
             server.post(JSON.stringify(rulesetDefinition), function(err) {
@@ -37,7 +37,7 @@
 
     function load() {
         var rulesetName = document.getElementById('name').value;    
-        d3.json('http://localhost:5000/' + rulesetName, function(err, result) {
+        d3.json('http://localhost:5000/' + rulesetName + '/definition', function(err, result) {
             if (err) {
                 alert('Server error ' + err.responseText);
             }
@@ -56,7 +56,7 @@
             var messageText = document.getElementById('messagepad').value;
             var message = JSON.parse(messageText);
             var rulesetName = document.getElementById('name').value;
-            server = d3.xhr('http://localhost:5000/' + rulesetName + '/sample')
+            server = d3.xhr('http://localhost:5000/' + rulesetName + '/events')
                        .header('content-type', 'application/json; charset=utf-8');
 
             server.post(messageText, function(err, result) {

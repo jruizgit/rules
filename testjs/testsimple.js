@@ -862,7 +862,7 @@ d.ruleset('t0', function() {
 
     whenAll: m.t == 'purchase'
     span: 5
-    run: console.log('t0 pulse ->' + m.length);
+    run: console.log('t0 pulse ->' + s.count);
 
     whenStart: {
         patchState('t0', {sid: 1, count: 0}); 
@@ -874,14 +874,14 @@ d.ruleset('t1', function() {
     run: {
         s.start = new Date();
         startTimer('myFirstTimer', 3);
-        startTimer('mySecondTimer', 6);
+        startTimer('mySecondTimer', 6, 'mySecondTimer');
     }
 
     whenAll: timeout('myFirstTimer')
     run: {
         console.log('t1 first timer started ' + s.start);
         console.log('t1 first timer ended ' + new Date());
-        cancelTimer('mySecondTimer');
+        cancelTimer('mySecondTimer', 'mySecondTimer');
     }
 
     whenAll: timeout('mySecondTimer')

@@ -46,7 +46,6 @@
 #define OP_NIL_NIL 0x0707
 
 typedef struct actionContext {
-    unsigned long stateVersion;
     void *rulesBinding;
     redisReply *reply;
 } actionContext;
@@ -1052,14 +1051,15 @@ static unsigned int handleMessageCore(ruleset *tree,
                                       char **commands,
                                       unsigned int *commandCount,
                                       void **rulesBinding) {
-    jsonProperty *midProperty;
+    jsonProperty *midProperty = NULL;
     int midLength; 
-    jsonProperty *sidProperty;
+    jsonProperty *sidProperty = NULL;
     int sidLength;
     char *storeCommand;
-    char *versionCommand;
     int result = getId(properties, sidIndex, &sidProperty, &sidLength);
-    if (result != RULES_OK) {
+    if (result == ERR_NO_ID_DEFINED) {
+        sidLength = 1;
+    } else if (result != RULES_OK) {
         return result;
     }
 #ifdef _WIN32
@@ -1067,19 +1067,27 @@ static unsigned int handleMessageCore(ruleset *tree,
 #else
     char sid[sidLength + 1];
 #endif  
-    strncpy(sid, message + sidProperty->valueOffset, sidLength);
+    if (result == ERR_NO_ID_DEFINED) {
+        *sid = '0';
+    } else {
+        strncpy(sid, message + sidProperty->valueOffset, sidLength);
+    }
     sid[sidLength] = '\0';
-
+    
     result = getId(properties, midIndex, &midProperty, &midLength);
-    if (result != RULES_OK) {
+    if (result == ERR_NO_ID_DEFINED) {
+        midLength = 0;
+    } else if (result != RULES_OK) {
         return result;
     }
 #ifdef _WIN32
     char *mid = (char *)_alloca(sizeof(char)*(midLength + 1));
 #else
     char mid[midLength + 1];
-#endif  
-    strncpy(mid, message + midProperty->valueOffset, midLength);
+#endif
+    if (midLength) {  
+        strncpy(mid, message + midProperty->valueOffset, midLength);
+    }
     mid[midLength] = '\0';
     if (*commandCount == MAX_COMMAND_COUNT) {
         return ERR_MAX_COMMAND_COUNT;
@@ -1093,19 +1101,12 @@ static unsigned int handleMessageCore(ruleset *tree,
             }
         }
 
-        result = formatStoreSession(*rulesBinding, sid, state, 0, &storeCommand, &versionCommand);
+        result = formatStoreSession(*rulesBinding, sid, state, 0, &storeCommand);
         if (result != RULES_OK) {
             return result;
         }
 
         commands[*commandCount] = storeCommand;
-        ++*commandCount;
-
-        if (*commandCount == MAX_COMMAND_COUNT) {
-            return ERR_MAX_COMMAND_COUNT;
-        }
-
-        commands[*commandCount] = versionCommand;
         ++*commandCount;
     }
     char *removeCommand = NULL;
@@ -1156,7 +1157,6 @@ static unsigned int handleMessageCore(ruleset *tree,
                                         addKeys,
                                         addCount,
                                         &addCommand);
-
             for (unsigned int i = 0; i < addCount; ++i) {
                 free(addKeys[i]);
             }
@@ -1185,6 +1185,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                                         evalKeys,
                                         evalCount,
                                         &evalCommand);
+
             for (unsigned int i = 0; i < evalCount; ++i) {
                 free(evalKeys[i]);
             }
@@ -1224,23 +1225,21 @@ static unsigned int handleMessageCore(ruleset *tree,
 #ifdef _WIN32
             char *stateMessage = (char *)_alloca(sizeof(char)*(36 + sidLength));
             char *newState = (char *)_alloca(sizeof(char)*(12 + sidLength));
-            if (sidProperty->type == JSON_STRING) {
-                sprintf_s(stateMessage, sizeof(char)*(36 + sidLength), "{\"id\":\"$s\", \"sid\":\"%s\", \"$s\":1}", sid);
+            if (sidProperty && sidProperty->type == JSON_STRING) {
+                sprintf_s(stateMessage, sizeof(char)*(26 + sidLength), "{\"sid\":\"%s\", \"$s\":1}", sid);
                 sprintf_s(newState, sizeof(char)*(12 + sidLength), "{\"sid\":\"%s\"}", sid);
-            }
-            else {
-                sprintf_s(stateMessage, sizeof(char)*(36 + sidLength), "{\"id\":\"$s\", \"sid\":%s, \"$s\":1}", sid);
+            } else {
+                sprintf_s(stateMessage, sizeof(char)*(26 + sidLength), "{\"sid\":%s, \"$s\":1}", sid);
                 sprintf_s(newState, sizeof(char)*(12 + sidLength), "{\"sid\":%s}", sid);
             }
 #else
             char stateMessage[36 + sidLength];
             char newState[12 + sidLength];
-            if (sidProperty->type == JSON_STRING) {
-                snprintf(stateMessage, sizeof(char)*(36 + sidLength), "{\"id\":\"$s\", \"sid\":\"%s\", \"$s\":1}", sid);
+            if (sidProperty && sidProperty->type == JSON_STRING) {
+                snprintf(stateMessage, sizeof(char)*(26 + sidLength), "{\"sid\":\"%s\", \"$s\":1}", sid);
                 snprintf(newState, sizeof(char)*(12 + sidLength), "{\"sid\":\"%s\"}", sid);
-            }
-            else {
-                snprintf(stateMessage, sizeof(char)*(36 + sidLength), "{\"id\":\"$s\", \"sid\":%s, \"$s\":1}", sid);
+            } else {
+                snprintf(stateMessage, sizeof(char)*(26 + sidLength), "{\"sid\":%s, \"$s\":1}", sid);
                 snprintf(newState, sizeof(char)*(12 + sidLength), "{\"sid\":%s}", sid);
             }
 #endif
@@ -1249,21 +1248,13 @@ static unsigned int handleMessageCore(ruleset *tree,
                 return ERR_MAX_COMMAND_COUNT;
             }
 
-            result = formatStoreSession(*rulesBinding, sid, newState, 1, &storeCommand, &versionCommand);
+            result = formatStoreSession(*rulesBinding, sid, newState, 1, &storeCommand);
             if (result != RULES_OK) {
                 return result;
             }
 
             commands[*commandCount] = storeCommand;
             ++*commandCount;
-
-            if (*commandCount == MAX_COMMAND_COUNT) {
-                return ERR_MAX_COMMAND_COUNT;
-            }
-
-            commands[*commandCount] = versionCommand;
-            ++*commandCount;
-
             result = handleMessage(tree, 
                                    NULL,
                                    stateMessage,  
@@ -1399,7 +1390,6 @@ static unsigned int handleMessages(void *handle,
 
 static unsigned int handleState(ruleset *tree, 
                                 char *state,
-                                unsigned long stateVersion, 
                                 char **commands,
                                 unsigned int *commandCount,
                                 void **rulesBinding) {
@@ -1414,15 +1404,15 @@ static unsigned int handleState(ruleset *tree,
 
     char *stateMessagePostfix = state + 1;
 #ifdef _WIN32
-    char *stateMessage = (char *)_alloca(sizeof(char)*(40 + stateLength - 1));
+    char *stateMessage = (char *)_alloca(sizeof(char)*(24 + stateLength - 1));
 #else
-    char stateMessage[40 + stateLength - 1];
+    char stateMessage[24 + stateLength - 1];
 #endif
     
 #ifdef _WIN32
-    sprintf_s(stateMessage, sizeof(char)*(40 + stateLength - 1), "{\"id\":\"$v-%016lu\", \"$s\":1, %s", stateVersion, stateMessagePostfix);
+    sprintf_s(stateMessage, sizeof(char)*(24 + stateLength - 1), "{\"$s\":1, %s", stateMessagePostfix);
 #else
-    snprintf(stateMessage, sizeof(char)*(40 + stateLength - 1), "{\"id\":\"$v-%016lu\", \"$s\":1, %s", stateVersion, stateMessagePostfix);
+    snprintf(stateMessage, sizeof(char)*(24 + stateLength - 1), "{\"$s\":1, %s", stateMessagePostfix);
 #endif
     unsigned int result = handleMessage(tree, 
                                         state,
@@ -1679,18 +1669,12 @@ unsigned int assertState(void *handle, char *sid, char *state) {
     char *commands[MAX_COMMAND_COUNT];
     unsigned int commandCount = 0;
     void *rulesBinding = NULL;
-    unsigned long stateVersion;
-    unsigned int result = getStateVersion(handle, sid, &stateVersion);
-    if (result != RULES_OK) {
-        return result;
-    }
 
-    result = handleState(handle, 
-                         state,
-                         stateVersion, 
-                         commands,
-                         &commandCount,
-                         &rulesBinding);
+    unsigned int result = handleState(handle, 
+                                      state, 
+                                      commands,
+                                      &commandCount,
+                                      &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         freeCommands(commands, commandCount);
         return result;
@@ -1737,14 +1721,13 @@ unsigned int startAction(void *handle,
         return result;
     }
 
-    *state = reply->element[2]->str;
-    *messages = reply->element[3]->str;
+    *state = reply->element[1]->str;
+    *messages = reply->element[2]->str;
     actionContext *context = malloc(sizeof(actionContext));
     if (!context) {
         return ERR_OUT_OF_MEMORY;
     }
     
-    context->stateVersion = reply->element[1]->integer;
     context->reply = reply;
     context->rulesBinding = rulesBinding;
     *actionHandle = context;
@@ -1760,10 +1743,8 @@ unsigned int startUpdateState(void *handle,
     char *commands[MAX_COMMAND_COUNT];
     unsigned int result = RULES_OK;
     unsigned int commandCount = 0;
-    unsigned long stateVersion = ((actionContext*)actionHandle)->stateVersion;
     result = handleState(handle, 
-                         state, 
-                         stateVersion,
+                         state,
                          commands,
                          &commandCount,
                          rulesBinding);
@@ -1798,7 +1779,6 @@ unsigned int completeAction(void *handle,
     ++commandCount;
     result = handleState(handle, 
                          state,
-                         context->stateVersion, 
                          commands,
                          &commandCount,
                          &rulesBinding);
@@ -1871,8 +1851,7 @@ unsigned int completeAndStartAction(void *handle,
         return ERR_NO_ACTION_AVAILABLE;
     }
 
-    *messages = newReply->element[2]->str;
-    context->stateVersion = newReply->element[1]->integer;
+    *messages = newReply->element[1]->str;
     context->reply = newReply;
     return RULES_OK;
 }

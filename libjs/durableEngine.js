@@ -209,48 +209,31 @@ exports = module.exports = durableEngine = function () {
             retractList.push(fact);
         };
 
-        that.delete = function (rules, sid) {
-            if (!rules) {
-                rules = rulesetName;
-            }
-
-            if (!sid) {
-                sid = that.s.sid;
-            }
-            
-            if ((rules === rulesetName) && (sid === that.s.sid)) {
-                deleted = true;
-            } else { 
-                var sidList;
-                if (deleteDirectory[rules]) {
-                    sidList = deleteDirectory[rules];
-                } else {
-                    sidList = [];
-                    targetRulesets[rules] = true;
-                    deleteDirectory[rules] = sidList;
-                }
-
-                sidList.push(sid);
-            }
+        that.deleteState = function () {
+            deleted = true;
         };
 
         that.startTimer = function (name, duration, id) {
             if (!id) {
-                id = name;
-            }
-
-            if (timerDirectory[id]) {
-                throw 'timer with id ' + id + ' already added';
+                if (timerDirectory[name]) {
+                    throw 'timer with name ' + name + ' already added';
+                } else {
+                    timerDirectory[name] = [{sid: that.s.sid, $t: name}, duration];
+                }
             } else {
-                timerDirectory[id] = [{sid: that.s.sid, id: id, $t: name}, duration];
-                
+                if (timerDirectory[id]) {
+                    throw 'timer with id ' + id + ' already added';
+                } else {
+                    timerDirectory[id] = [{sid: that.s.sid, id: id, $t: name}, duration];
+                    
+                }
             }
         };
 
         that.cancelTimer = function (name, id) {
             if (!id) {
-                id = name;
-            }
+                throw 'id required to cancel a timer';
+            } 
 
             if (cancelledTimerDirectory[id]) {
                 throw 'timer with id ' + id + ' already cancelled';
@@ -266,7 +249,7 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
-        that._hasEnded = function () {
+        that.hasEnded = function () {
             if ((new Date().getTime() - startTime) > 10000) {
                 ended = true;
             }
@@ -274,11 +257,11 @@ exports = module.exports = durableEngine = function () {
             return ended;
         };
 
-        that._end = function () {
+        that.end = function () {
             ended = true;
         }
 
-        that._isDeleted = function () {
+        that.isDeleted = function () {
             return deleted;
         };
 
@@ -326,7 +309,7 @@ exports = module.exports = durableEngine = function () {
                 if (new Date().getTime() > maxTime) {
                     c.s.exception = 'timeout expired';
                     complete(null, c)
-                } else if (!c._hasEnded()) {
+                } else if (!c.hasEnded()) {
                     c.renewActionLease();
                     setTimeout(timeoutCallback, 5000, maxTime);
                 }
@@ -386,9 +369,9 @@ exports = module.exports = durableEngine = function () {
                 }
                 
                 if (assertState) {
-                    c.assert({label: toState, chart: 1, id: Math.ceil(Math.random() * 1000000000 + 1)});
+                    c.assert({label: toState, chart: 1});
                 } else {
-                    c.post({label: toState, chart: 1, id: Math.ceil(Math.random() * 1000000000 + 1)});
+                    c.post({label: toState, chart: 1});
                 }
             }
         };
@@ -598,10 +581,10 @@ exports = module.exports = durableEngine = function () {
                     } else {
                         var rulesetNames = c.getTargetRulesets();
                         ensureRulesets(rulesetNames, 0, c, function(err, c) {
-                            if (c._hasEnded()) {
+                            if (c.hasEnded()) {
                                 return;
                             } else {
-                                c._end();
+                                c.end();
                             }
 
                             if (err) {
@@ -736,9 +719,13 @@ exports = module.exports = durableEngine = function () {
                                 complete(reason);
                             }
 
-                            if (c._isDeleted()) {
+                            if (c.isDeleted()) {
                                 try {
-                                    host.deleteState(rulesetName, c.s.sid);
+                                    if (!c.s.id) {
+                                        host.deleteState(name, 0);
+                                    } else {
+                                        host.deleteState(name, c.s.id);
+                                    }
                                 } catch (reason) {
                                     complete(reason);
                                 }
@@ -1369,7 +1356,7 @@ exports = module.exports = durableEngine = function () {
         that.use(bodyParser.json());
         that.run = function () {
 
-            that.get(basePath + '/:rulesetName/:sid', function (request, response) {
+            that.get(basePath + '/:rulesetName/state/:sid', function (request, response) {
                 response.contentType = 'application/json; charset=utf-8';
                 host.ensureRuleset(request.params.rulesetName, function (err, result) {
                     if (err) {
@@ -1385,7 +1372,59 @@ exports = module.exports = durableEngine = function () {
                 });
             });
 
-            that.post(basePath + '/:rulesetName/:sid', function (request, response) {
+            that.get(basePath + '/:rulesetName/state', function (request, response) {
+                response.contentType = 'application/json; charset=utf-8';
+                host.ensureRuleset(request.params.rulesetName, function (err, result) {
+                    if (err) {
+                        response.send({ error: err }, 500);
+                    }
+                    else {
+                        try {
+                            response.send(host.getState(request.params.rulesetName, "0"));
+                        } catch (reason) {
+                            response.send({ error: reason }, 500);
+                        }
+                    }
+                });
+            });
+
+
+            that.post(basePath + '/:rulesetName/state/:sid', function (request, response) {
+                response.contentType = 'application/json; charset=utf-8';
+                var document = request.body;
+                document.id = request.params.sid;
+                host.ensureRuleset(request.params.rulesetName, function (err, result) {
+                    if (err)
+                        response.send({ error: err }, 500);
+                    else {
+                        try {
+                            var result = host.patchState(request.params.rulesetName, document);
+                            response.send({ outcome: result }, 200);
+                        } catch (reason) {
+                            response.send({ error: reason }, 500);
+                        }
+                    }
+                });
+            });
+
+            that.post(basePath + '/:rulesetName/state', function (request, response) {
+                response.contentType = 'application/json; charset=utf-8';
+                var document = request.body;
+                host.ensureRuleset(request.params.rulesetName, function (err, result) {
+                    if (err)
+                        response.send({ error: err }, 500);
+                    else {
+                        try {
+                            var result = host.patchState(request.params.rulesetName, document);
+                            response.send({ outcome: result }, 200);
+                        } catch (reason) {
+                            response.send({ error: reason }, 500);
+                        }
+                    }
+                });
+            });
+
+            that.post(basePath + '/:rulesetName/events/:sid', function (request, response) {
                 response.contentType = "application/json; charset=utf-8";
                 var message = request.body;
                 message.sid = request.params.sid;
@@ -1405,16 +1444,16 @@ exports = module.exports = durableEngine = function () {
                 });
             });
 
-            that.patch(basePath + '/:rulesetName/:sid', function (request, response) {
-                response.contentType = 'application/json; charset=utf-8';
-                var document = request.body;
-                document.id = request.params.sid;
+            that.post(basePath + '/:rulesetName/events', function (request, response) {
+                response.contentType = "application/json; charset=utf-8";
+                var message = request.body;
                 host.ensureRuleset(request.params.rulesetName, function (err, result) {
-                    if (err)
+                    if (err) {
                         response.send({ error: err }, 500);
+                    }
                     else {
                         try {
-                            var result = host.patchState(request.params.rulesetName, document);
+                            var result = host.post(request.params.rulesetName, message);
                             response.send({ outcome: result }, 200);
                         } catch (reason) {
                             response.send({ error: reason }, 500);
@@ -1423,7 +1462,45 @@ exports = module.exports = durableEngine = function () {
                 });
             });
 
-            that.get(basePath + '/:rulesetName', function (request, response) {
+            that.post(basePath + '/:rulesetName/facts/:sid', function (request, response) {
+                response.contentType = "application/json; charset=utf-8";
+                var message = request.body;
+                message.sid = request.params.sid;
+
+                host.ensureRuleset(request.params.rulesetName, function (err, result) {
+                    if (err) {
+                        response.send({ error: err }, 500);
+                    }
+                    else {
+                        try {
+                            var result = host.assert(request.params.rulesetName, message);
+                            response.send({ outcome: result }, 200);
+                        } catch (reason) {
+                            response.send({ error: reason }, 500);
+                        }
+                    }
+                });
+            });
+
+            that.post(basePath + '/:rulesetName/facts', function (request, response) {
+                response.contentType = "application/json; charset=utf-8";
+                var message = request.body;
+                host.ensureRuleset(request.params.rulesetName, function (err, result) {
+                    if (err) {
+                        response.send({ error: err }, 500);
+                    }
+                    else {
+                        try {
+                            var result = host.assert(request.params.rulesetName, message);
+                            response.send({ outcome: result }, 200);
+                        } catch (reason) {
+                            response.send({ error: reason }, 500);
+                        }
+                    }
+                });
+            });
+
+            that.get(basePath + '/:rulesetName/definition', function (request, response) {
                 response.contentType = 'application/json; charset=utf-8';
                 host.ensureRuleset(request.params.rulesetName, function (err, result) {
                     if (err)
@@ -1438,7 +1515,7 @@ exports = module.exports = durableEngine = function () {
                 });
             });
 
-            that.post(basePath + '/:rulesetName', function (request, response) {
+            that.post(basePath + '/:rulesetName/definition', function (request, response) {
                 response.contentType = "application/json; charset=utf-8";
                 host.setRuleset(request.params.rulesetName, request.body, function (err, result) {
                     if (err) {
