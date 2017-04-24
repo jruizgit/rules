@@ -229,7 +229,7 @@ with statechart('expense'):
         @to('pending')    
         @when_all((m.subject == 'approve') & (m.amount <= 1000))
         def request(c):
-            print ('requesting expense approva')
+            print ('requesting expense approval')
         
     with state('pending'):
         @to('approved')
