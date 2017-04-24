@@ -279,9 +279,9 @@ Durable.run_all
 durable_rules provides string pattern matching. Expressions are compiled down to a DFA, guaranteeing linear execution time in the order of single digit nano seconds per character (note: backtracking expressions are not supported).
 
 <sub>Tip: once the test is running, from a terminal type:  
-`curl -H "Content-type: application/json" -X POST -d '{"subject": "375678956789765"}' http://localhost:5000/test`  
-`curl -H "Content-type: application/json" -X POST -d '{"subject": "4345634566789888"}' http://localhost:5000/test`  
-`curl -H "Content-type: application/json" -X POST -d '{"subject": "2228345634567898"}' http://localhost:5000/test`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "375678956789765"}' http://localhost:5000/test/events`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "4345634566789888"}' http://localhost:5000/test/events`  
+`curl -H "Content-type: application/json" -X POST -d '{"subject": "2228345634567898"}' http://localhost:5000/test/events`  
 </sub>
 
 ### Node.js
