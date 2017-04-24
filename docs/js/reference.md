@@ -1,27 +1,31 @@
 Reference Manual
 =====
 ## Table of contents
-* [Local Setup](reference.md#setup)
-* [Cloud Setup](reference.md#setup)
-* [Rules](reference.md#rules)
+* [Setup](reference.md#setup)
+* [Basics](reference.md#basics)
+  * [Rules](reference.md#rules)
+  * [Facts](reference.md#facts)
+  * [Events](reference.md#events)
+  * [State](reference.md#state)
+* [Antecedents](reference.md#antecedents)
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
   * [Correlated Sequence](reference.md#correlated-sequence)
   * [Lack of Information](reference.md#lack-of-information)
   * [Choice of Sequences](reference.md#choice-of-sequences)
+* [Consequents](reference.md#consequents)  
   * [Conflict Resolution](reference.md#conflict-resolution)
-  * [Action Windows](reference.md#action-windows)
-* [Data Model](reference.md#data-model)
-  * [Events](reference.md#events)
-  * [Facts](reference.md#facts)
-  * [Context](reference.md#context)
-  * [Timers](reference.md#timers) 
+  * [Action Batches](reference.md#action-batches)
+  * [Tumbling Window](reference.md#tumbling-window)
+  * [Async Actions](reference.md#async-actions)
+  * [Unhandled Exceptions](reference.md#unhandled-exceptions)
 * [Flow Structures](reference.md#flow-structures)
+  * [Timers](reference.md#timers) 
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
   * [Flowchart](reference.md#flowchart) 
 
-## Local Setup
+## Setup
 durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
 ### Redis install
 durable.js relies on Redis version 2.8  
@@ -46,7 +50,7 @@ durable.js uses Node.js version  0.10.15.
 2. Run the installer and follow the instructions  
 3. The installer will set all the necessary environment variables, so you are ready to go  
 
-For more information go to: http://nodejs.org/download  
+For more information go to: http://nodejs.org/download   
 
 ### First App
 Now that your cache and web server are ready, let's write a simple rule:  
@@ -60,10 +64,10 @@ Now that your cache and web server are ready, let's write a simple rule:
   var d = require('durable');
   d.ruleset('a0', function() {
       whenAll: m.amount < 100
-      run: console.log('a0 approved from ' + s.sid)
+      run: console.log('a0 approved')
     
       whenStart: {
-          post('a0', {id: 1, sid: 1, amount: 10});
+          post('a0', { amount: 10 });
       }
   });
   d.runAll();
@@ -71,86 +75,160 @@ Now that your cache and web server are ready, let's write a simple rule:
 7. In the terminal type `node test.js`  
 8. You should see the message: `a0 approved from 1`  
 
-Note 1: If you are using [Redis To Go](https://redistogo.com), replace the last line.
+Note 1: If you are using a redis service outside your local host, replace the last line with:
   ```javascript
   d.runAll([{host: 'hostName', port: port, password: 'password'}]);
   ```
-Note 2: If you are running in Windows, you will need VS2013 express edition and Python 2.7, make sure both the VS build tools and the python directory are in your path.  
+Note 2: If you are running in Windows, you will need VS2013 express edition and Python 2.7 for the package to build during npm install. Make sure both the VS build tools and the python directory are in your path. 
 
 [top](reference.md#table-of-contents) 
-## Cloud Setup
-### Redis install
-Redis To Go has worked well for me and is very fast if you are deploying an app using Heroku or AWS.   
-1. Go to: [Redis To Go](https://redistogo.com)  
-2. Create an account (the free instance with 5MB has enough space for you to evaluate durable_rules)  
-3. Make sure you write down the host, port and password, which represents your new account  
-### Heroku install
-Heroku is a good platform to create a cloud application in just a few minutes.  
-1. Go to: [Heroku](https://www.heroku.com)  
-2. Create an account (the free instance with 1 dyno works well for evaluating durable_rules)  
-### First app
-1. Follow the instructions in the [tutorial](https://devcenter.heroku.com/articles/getting-started-with-nodejs#introduction), with the following changes:
-  * procfile  
-  `web: node test.js`
-  * package.json  
-  ```javascript
-  {
-    "name": "test",
-    "version": "0.0.6",
-    "dependencies": {
-      "durable": "0.36.x"
-    },
-    "engines": {
-      "node": "0.10.x",
-      "npm": "1.3.x"
-    }
-  }
-  ```
-  * test.js
-  ```javascript
-  var d = require('durable');
-  d.ruleset('a0', function() {
-      whenAll: m.amount < 100
-      run: console.log('a0 approved from ' + s.sid)
-    
-      whenStart: {
-          post('a0', {id: 1, sid: 1, amount: 10});
-      }
-  });
 
-  d.runAll([{host: 'hostName', port: port, password: 'password'}]);
-  ```  
-2. Deploy and scale the App
-3. Run `heroku logs`, you should see the message: `a0 approved from 1`  
+## Basics
+### Rules
+A rule is the basic building block of the framework. The rule antecendent defines the conditions that need to be satisfied to execute the rule consequent (action). By convention `m` represents the data to be evaluated by a given rule.
+
+* `whenAll` and `whenAny` label the antecendent definition of a rule
+* `run` and `runAsync` label the consequent definition of a rule 
+* `whenStart` labels the action to be taken when starting the ruleset  
+  
+```javascript
+var d = require('durable');
+
+d.ruleset('test', function() {
+    // antecedent
+    whenAll: m.subject == 'World'
+    // consequent
+    run: console.log('Hello ' + m.subject)
+    // on ruleset start
+    whenStart: post('test', { subject: 'World' })
+});
+
+d.runAll();
+```
+### Facts
+Facts represent the data that defines a knowledge base. After facts are asserted as JSON objects. Facts are stored until they are retracted. When a fact satisfies a rule antecedent, the rule consequent is executed.
+
+```javascript
+var d = require('durable');
+
+d.ruleset('animal', function() {
+    whenAll: m.verb == 'eats' && m.predicate == 'flies' 
+    run: assert({ subject: m.subject, verb: 'is', predicate: 'frog' })
+
+    whenAll: m.verb == 'eats' && m.predicate == 'worms' 
+    run: assert({ subject: m.subject, verb: 'is', predicate: 'bird' })
+
+    whenAll: m.verb == 'is' && m.predicate == 'frog' 
+    run: assert({ subject: m.subject, verb: 'is', predicate: 'green'})
+
+    whenAll: m.verb == 'is' && m.predicate == 'bird' 
+    run: assert({ subject: m.subject, verb: 'is', predicate: 'black'})
+
+    whenAll: +m.subject
+    run: console.log('fact: ' + m.subject + ' ' + m.verb + ' ' + m.predicate)
+
+    whenStart: {
+        assert('animal', { subject: 'Kermit', verb: 'eats', predicate: 'flies' });
+    }
+});
+
+d.runAll();
+```
+
+Facts can also be asserted using the http API. For the example above, run the following command:  
+
+<sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "verb": "eats", "predicate": "worms"}' http://localhost:5000/animal/facts`</sub>
+
 [top](reference.md#table-of-contents)  
 
-## Rules
-### Simple Filter
-Rules are the basic building blocks. All rules have a condition, which defines the events and facts that trigger an action.  
-* The rule condition is an expression. Its left side represents an event or fact property, followed by a logical operator and its right side defines a pattern to be matched. By convention events or facts originated by calling post or assert are represented with the `m` name; events or facts originated by changing the context state are represented with the `s` name.  
-* The rule action is a function to which the context is passed as a parameter. Actions can be synchronous and asynchronous. Asynchronous actions take a completion function as a parameter.  
+### Events
+Events can be posted to and evaluated by rules. An event is an ephemeral fact, that is, a fact retracted right before executing a consequent. Thus, events can only be observed once. Events are stored until they are observed. 
 
-Below is an example of the typical rule structure. 
+```javascript
+var d = require('durable');
+
+d.ruleset('risk', function() {
+    whenAll: {
+        first = m.t == 'purchase'
+        second = m.location != first.location
+    }
+    run: console.log('fraud detected ->' + first.location + ', ' + second.location)
+   
+    whenStart: {
+        post('risk', { t: 'purchase', location: 'US' });
+        post('risk', { t: 'purchase', location: 'CA' });
+    }
+});
+
+d.runAll();
+```
+
+Events can be posted using the http API. When the example above is listening, run the following commands:  
+
+<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:5000/risk/events`</sub>  
+<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:5000/risk/events`</sub>  
+
+[top](reference.md#table-of-contents)  
+### State
+Context state is available when a consequent is executed. The same context state is passed across rule execution. Context state is stored until it is deleted. Context state changes can be evaluated by rules. By convention `s` represents the state to be evaluated by a rule.
+
+```javascript
+var d = require('durable');
+
+d.ruleset('flow', function() {
+    whenAll: s.state == 'start'
+    run: {
+        s.state = 'next';
+        console.log('start');
+    }
+
+    whenAll: s.state == 'next'
+    run: {
+        s.state = 'last';
+        console.log('next');
+    }
+
+    whenAll: s.state == 'last'
+    run: {
+        s.state = 'end';
+        console.log('last');
+        deleteState();
+    }
+
+    whenStart: patchState('flow', { state: 'start' })
+});
+
+d.runAll();
+```
+State can also be retrieved and modified using the http API. When the example above is running, try the following commands:  
+<sub>`curl -H "content-type: application/json" -X POST -d '{"state": "next"}' http://localhost:5000/flow/state`</sub>  
+
+[top](reference.md#table-of-contents)  
+
+## Antecendents
+### Simple Filter
+A rule antecedent is an expression. The left side of the expression represents an event or fact property. The right side defines a pattern to be matched. By convention events or facts are represented with the `m` name. Context state are represented with the `s` name.  
 
 Logical operators:  
 * Unary: ~ (does not exist), + (exists)  
 * Logical operators: &&, ||  
 * Relational operators: < , >, <=, >=, ==, !=  
+
 ```javascript
 var d = require('durable');
 
-d.ruleset('a0', function() {
-    whenAll: m.subject < 100 || m.subject == 'approve' || m.subject == 'ok'
-    run: console.log('a0 approved from ' + s.sid)
+d.ruleset('expense', function() {
+    whenAll: m.subject == 'approve' || m.subject == 'ok'
+    run: console.log('Approved')
     
-    whenStart: post('a0', {id: 1, sid: 1, subject: 10})
+    whenStart: post('expense', { subject: 'approve' })
 });
 
 d.runAll();
 ```  
 [top](reference.md#table-of-contents)
 ### Pattern Matching
-durable_rules implements a simple pattern matching dialect. Similar to lua, it uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. The expressiveness of the dialect is not as rich as that of ruby, python or jscript. Event processing is O(n) guaranteed (n being the size of the event).  
+durable_rules implements a simple pattern matching dialect. Similar to lua, it uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. Event processing is O(n) guaranteed (n being the size of the event).  
 
 **Repetition**  
 \+ 1 or more repetitions  
@@ -183,11 +261,11 @@ d.ruleset('match', function() {
     run: console.log('match url ' + m.url)
         
     whenStart: {
-        post('match', {id: 1, sid: 1, url: 'https://github.com'});
-        post('match', {id: 2, sid: 1, url: 'http://github.com/jruizgit/rul!es'});
-        post('match', {id: 3, sid: 1, url: 'https://github.com/jruizgit/rules/reference.md'});
-        post('match', {id: 4, sid: 1, url: '//rules'});
-        post('match', {id: 5, sid: 1, url: 'https://github.c/jruizgit/rules'});
+        post('match', { url: 'https://github.com' });
+        post('match', { url: 'http://github.com/jruizgit/rul!es' });
+        post('match', { url: 'https://github.com/jruizgit/rules/reference.md' });
+        post('match', { url: '//rules'});
+        post('match', { url: 'https://github.c/jruizgit/rules' });
     }
 });
 
@@ -195,7 +273,7 @@ d.runAll();
 ```  
 [top](reference.md#table-of-contents) 
 ### Correlated Sequence
-The ability to express and efficiently evaluate sequences of correlated events or facts represents the forward inference hallmark. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
+Rules can be used to efficiently evaluate sequences of correlated events or facts. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
 The `whenAll` label expresses a sequence of events or facts. The assignment operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
 
@@ -203,7 +281,7 @@ Arithmetic operators: +, -, *, /
 ```javascript
 var d = require('durable');
 
-d.ruleset('fraudDetection', function() {
+d.ruleset('risk', function() {
     whenAll: {
         first = m.amount > 100
         second = m.amount > first.amount * 2
@@ -216,9 +294,9 @@ d.ruleset('fraudDetection', function() {
     }
 
     whenStart: {
-        host.post('fraudDetection', {id: 1, sid: 1, amount: 200});
-        host.post('fraudDetection', {id: 2, sid: 1, amount: 500});
-        host.post('fraudDetection', {id: 3, sid: 1, amount: 1000});
+        host.post('risk', { amount: 200 });
+        host.post('risk', { amount: 500 });
+        host.post('risk', { amount: 1000 });
     }
 });
 
@@ -226,23 +304,23 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents) 
 ### Lack of Information
-In some cases lack of information is meaningful. The `none` function enables such tests. 
+In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.
 ```javascript
 var d = require('durable');
 
-d.ruleset('fraud6', function() {
+d.ruleset('risk', function() {
     whenAll: {
         first = m.t == 'deposit'
         none(m.t == 'balance')
         third = m.t == 'withrawal'
         fourth = m.t == 'chargeback'
     }
-    run: console.log('fraud6 detected ' + first.t + ' ' + third.t + ' ' + fourth.t + ' from ' + s.sid);
+    run: console.log('fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
 
     whenStart: {
-        post('fraud6', {id: 1, sid: 1, t: 'deposit'});
-        post('fraud6', {id: 2, sid: 1, t: 'withrawal'});
-        post('fraud6', {id: 3, sid: 1, t: 'chargeback'});
+        post('risk', { t: 'deposit' });
+        post('risk', { t: 'withrawal' });
+        post('risk', { t: 'chargeback' });
     }
 });
 
@@ -251,7 +329,7 @@ d.runAll();
 
 [top](reference.md#table-of-contents)  
 ### Choice of Sequences
-durable_rules allows expressing and efficiently evaluating richer events sequences leveraging forward inference. In the example below any of the two event\fact sequences will trigger an action. 
+durable_rules allows expressing and efficiently evaluating richer events sequences In the example below any of the two event\fact sequences will trigger an action. 
 
 The following two labels can be used and combined to define richer event sequences:  
 * whenAll: a set of event or fact patterns. All of them are required to match to trigger an action.  
@@ -260,7 +338,7 @@ The following two labels can be used and combined to define richer event sequenc
 ```javascript
 var d = require('durable');
 
-d.ruleset('a8', function() {
+d.ruleset('expense', function() {
     whenAny: {
         whenAll: {
             first = m.subject == 'approve'
@@ -273,25 +351,27 @@ d.ruleset('a8', function() {
     }
     run: {
         if (first) {
-            console.log('a8 action from: ' + s.sid + ' ' + first.subject + ' ' + second.amount);     
+            console.log('Approved ' + first.subject + ' ' + second.amount);     
         } else {
-            console.log('a8 action from: ' + s.sid + ' ' + third.subject + ' ' + fourth.amount);        
+            console.log('Approved ' + third.subject + ' ' + fourth.amount);        
         }
     }
 
     whenStart: {
-        post('a8', {id: 1, sid: 1, subject: 'approve'});
-        post('a8', {id: 2, sid: 1, amount: 1000});
-        post('a8', {id: 3, sid: 2, subject: 'jumbo'});
-        post('a8', {id: 4, sid: 2, amount: 10000});
+        post('expense', { subject: 'approve' });
+        post('expense', { amount: 1000 });
+        post('expense', { subject: 'jumbo' });
+        post('expense', { amount: 10000 });
     }
 });
 
 d.runAll();
 ```
 [top](reference.md#table-of-contents) 
+
+## Consequents
 ### Conflict Resolution
-Event and fact evaluation can lead to multiple actions.The triggering order can be defined by setting the priority (salience) attribute on the rule.
+Event and fact evaluation can lead to multiple consequents. The triggering order can be controlled by using the priority (salience) attribute.
 
 In this example, notice how the last rule is triggered first, as it has the highest priority.
 ```javascript
@@ -311,232 +391,181 @@ d.ruleset('attributes', function() {
     run: console.log('attributes P1 ->' + m.amount);
        
     whenStart: {
-        assert('attributes', {id: 1, sid: 1, amount: 50});
-        assert('attributes', {id: 2, sid: 1, amount: 150});
-        assert('attributes', {id: 3, sid: 1, amount: 250});
+        assert('attributes', { amount: 50 });
+        assert('attributes', { amount: 150 });
+        assert('attributes', { amount: 250 });
     }
 });
 
 d.runAll();
 ```
 [top](reference.md#table-of-contents) 
-### Action Windows
-durable_rules enables aggregating actions using count windows or time tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
+### Action Batches
+When a high number of events or facts satisfy a consequent, the consequent results can be delivered in batches.
 
-Summary of rule attributes:  
-* count: defines the number of times the rule needs to be satisfied befure scheduling the action.   
+* count: defines the exact number of times the rule needs to be satisfied before scheduling the action.   
+* cap: defines the maximum number of times the rule needs to be satisfied before scheduling the action.  
+
+This example batches exaclty three approvals and caps the number of rejects to two:  
+```javascript
+var d = require('durable');
+
+d.ruleset('expense', function() {
+    whenAll: m.amount < 100
+    count: 3
+    run: console.log('approved ' + JSON.stringify(m));
+
+    whenAll: {
+        expense = m.amount >= 100
+        approval = m.review == true
+    }
+    cap: 2
+    run: console.log('rejected ' + JSON.stringify(m));
+
+    whenStart: {
+        postBatch('expense', { amount: 10 },
+                             { amount: 20 },
+                             { amount: 100 },
+                             { amount: 30 },
+                             { amount: 200 },
+                             { amount: 400 });
+        assert('expense', { review: true })
+    }
+});
+
+d.runAll();
+```
+
+### Tumbling Window
+Actions can also be batched using time tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
+
 * span: defines the tumbling time in seconds between scheduled actions.  
 
-This example generates events at random times and schedules an action every 5 seconds (tumbling window).
+This example generates events with random amounts. An action is scheduled every 5 seconds (tumbling window).
 ```javascript
 var d = require('durable');
 
-d.ruleset('t0', function() {
-    whenAll: m.count == 0 || timeout('myTimer')
+d.ruleset('risk', function() {
+    whenAll: m.amount > 100
+    span: 5
+    run: console.log('high value purchases ->' + JSON.stringify(m));
+
+    whenStart: {
+        var callback = function() {
+            post('risk', { amount: Math.random() * 200 });
+            setTimeout(callback, 1000); 
+        }
+        callback();
+    }
+});
+
+d.runAll();
+```
+[top](reference.md#table-of-contents)  
+
+### Async Actions  
+The consequent action can be asynchronous. When the action is finished, the `complete` function has to be called. By default an action is considered abandoned after 5 seconds. This value can be changed by returning a different number in the action function or extended by calling `renewActionLease`.
+
+```javascript
+var d = require('durable');
+
+d.ruleset('flow', function() {
+    whenAll: s.state == 'first'
+    // runAsync labels an async action
+    runAsync: {
+        setTimeout(function() {
+            s.state = 'second';
+            console.log('first completed');
+            
+            // completes the async action after 3 seconds
+            complete();
+        }, 3000);
+    }
+
+    whenAll: s.state == 'second'
+    runAsync: {
+        setTimeout(function() {
+            console.log('second completed');
+            
+            // completes the async action after 6 seconds
+            complete();
+        }, 6000);
+        
+        // overrides the 5 second default abandon timeout
+        return 10;
+    }
+
+    whenStart: {
+        patchState('flow', { state: 'first' });
+    }
+});
+
+d.runAll();
+```
+### Unhandled Exceptions  
+When exceptions are not handled by actions, they are stored in the context state. This enables writing exception handling rules.
+
+```javascript
+var d = require('durable');
+
+d.ruleset('flow', function() {
+    whenAll: m.action == 'start'
+    run: throw 'Unhandled Exception!'
+
+    // when the exception property exists
+    whenAll: +s.exception
+    run: {
+        console.log(s.exception);
+        delete(s.exception); 
+    }
+
+    whenStart: {
+        post('flow', { action: 'start' });
+    }
+});
+
+d.runAll();
+```
+
+## Flow Structures
+### Timers
+Events can be scheduled with timers. A timeout condition can be included in the rule antecedent.   
+
+* startTimer: starts a timer with the name and duration specified. id is optional if planning to cancel the timer.
+* cancelTimer: cancels ongoing timer, name and id are required.
+* timeout: used as an antecedent condition.
+
+```javascript
+var d = require('durable');
+
+d.ruleset('timer', function() {
+    // when first timer or less than 5 timeouts
+    whenAny: {
+        whenAll: s.count == 0
+        whenAll: {
+            s.count < 5 
+            // when a timeout for 'Timer' occurs
+            timeout('Timer')
+        }
+    }
     run: {
         s.count += 1;
-        post('t0', {id: s.count, sid: 1, t: 'purchase'});
-        startTimer('myTimer', Math.random() * 2 + 1, 't0_' + s.count);
+        // start the 'Timer', wait 3 seconds for timeout
+        startTimer('Timer', 3);
+        console.log('Pusle ->' + new Date());
     }
-
-    whenAll: m.t == 'purchase'
-    span: 5
-    run: console.log('t0 pulse ->' + s.count);
 
     whenStart: {
-        patchState('t0', {sid: 1, count: 0}); 
-    }
-});
-
-d.runAll();
-```
-
-In this example, when the rule is satisfied three times, the action is scheduled.
-```javascript
-d.ruleset('a15', function() {
-    whenAll: {
-        first = m.amount < 100
-        second = m.subject == 'approve'
-    }
-    count: 3
-    run: console.log('a15 approved ->' + JSON.stringify(m));
-
-    whenStart: {
-        postBatch('a15', {id: 1, sid: 1, amount: 10},
-                         {id: 2, sid: 1, amount: 10},
-                         {id: 3, sid: 1, amount: 10},
-                         {id: 4, sid: 1, subject: 'approve'});
-        postBatch('a15', {id: 5, sid: 1, subject: 'approve'},
-                         {id: 6, sid: 1, subject: 'approve'});
+        patchState('timer', { count: 0 }); 
     }
 });
 
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
-## Data Model
-### Events
-Inference based on events is the main purpose of `durable_rules`. What makes events unique is they can only be consumed once by an action. Events are removed from inference sets as soon as they are scheduled for dispatch. The join combinatorics are significantly reduced, thus improving the rule evaluation performance, in some cases, by orders of magnitude.  
 
-Event rules:  
-* Events can be posted in the `start` handler via the host parameter.   
-* Events be posted in an `action` handler using the context parameter.   
-* Events can be posted one at a time or in batches.  
-* Events don't need to be retracted.  
-* Events can co-exist with facts.  
-* The post event operation is idempotent.    
-
-The example below shows how two events will cause only one action to be scheduled, as a given event can only be observed once. You can contrast this with the example in the facts section, which will schedule two actions.
-
-API:  
-* `c.post(rulesetName, {event})`  
-* `c.postBatch(rulesetName, {event}, {event}...)`  
-* `host.post(rulesetName, {event})`  
-* `host.postBatch(rulesetName, {event}, {event}...)`  
-```javascript
-var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
-
-d.ruleset('fraudDetection', {
-        whenAll: [
-            c.first = m.t.eq('purchase'),
-            c.second = m.location.neq(c.first.location)
-        ],
-        run: function(c) {
-            console.log('fraud detected ->' + c.first.location + ', ' + c.second.location);
-        }
-    },
-    function (host) {
-        host.post('fraudDetection', {id: 1, sid: 1, t: 'purchase', location: 'US'});
-        host.post('fraudDetection', {id: 2, sid: 1, t: 'purchase', location: 'CA'});
-    }
-);
-d.runAll();
-```
-
-[top](reference.md#table-of-contents)  
-
-### Facts
-Facts are used for defining more permanent state, which lifetime spans at least more than one action execution.
-
-Fact rules:  
-* Facts can be asserted in the `start` handler via the host parameter.   
-* Facts can asserted in an `action` handler using the context parameter.   
-* Facts have to be explicitly retracted.  
-* Once retracted all related scheduled actions are cancelled.  
-* Facts can co-exist with events.  
-* The assert and retract fact operations are idempotent.  
-
-This example shows how asserting two facts lead to scheduling two actions: one for each combination.  
-
-API:  
-* `host.assert(rulesetName, {fact})`
-* `host.assertFacts(rulesetName, {fact}, {fact}...)`  
-* `host.retract(rulesetName, {fact})`  
-* `c.assert(rulesetName, {fact})`  
-* `c.assertFacts(rulesetName, {fact}, {fact}...)`  
-* `c.retract(rulesetName, {fact})`  
-```javascript
-var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
-
-d.ruleset('fraudDetection', {
-        whenAll: [
-            c.first = m.t.eq('purchase'),
-            c.second = m.location.neq(c.first.location)
-        ],
-        count: 2,
-        run: function(c) {
-            console.log('fraud detected ->' + c.m[0].first.location + ', ' + c.m[0].second.location);
-            console.log('               ->' + c.m[1].first.location + ', ' + c.m[1].second.location);
-        }
-    },
-    function (host) {
-        host.assert('fraudDetection', {id: 1, sid: 1, t: 'purchase', location: 'US'});
-        host.assert('fraudDetection', {id: 2, sid: 1, t: 'purchase', location: 'CA'});
-    }
-);
-d.runAll();
-```
-[top](reference.md#table-of-contents)  
-
-### Context
-Context state is permanent. It is used for controlling the ruleset flow or for storing configuration information. `durable_rules` implements a client cache with LRU eviction policy to reference contexts by id, this helps reducing the combinatorics in joins which otherwise would be used for configuration facts.  
-
-Context rules:
-* Context state can be modified in the `start` handler via the host parameter.   
-* Context state can modified in an `action` handler simply by modifying the context state object.  
-* All events and facts are addressed to a context id.  
-* Rules can be written for context changes. By convention the `s` name is used for naming the context state.  
-* The right side of a rule can reference a context, the references will be resolved in the Rete tree alpha nodes.  
-
-API:  
-* `host.patchState(rulesetName, {state})`  
-* `c.state.property = ...`  
-```javascript
-var d = require('durable');
-var m = d.m, s = d.s, c = d.c, add = d.add;
-
-d.ruleset('a8', {
-        whenAll: [ m.amount.lt(add(c.s.maxAmount, c.s.refId('global').minAmount)) ],
-        run: function(c) {
-            console.log('a8 approved ' +  c.m.amount);
-        }
-    },
-    function (host) {
-        host.patchState('a8', {sid: 1, maxAmount: 500});
-        host.patchState('a8', {sid: 'global', minAmount: 100});
-        host.post('a8', {id: 1, sid: 1, amount: 10});
-    }
-);
-d.runAll();
-```
-[top](reference.md#table-of-contents)  
-### Timers
-`durable_rules` supports scheduling timeout events and writing rules, which observe such events.  
-
-Timer rules:  
-* Timers can be started in the `start` handler via the host parameter.   
-* Timers can started in an `action` handler using the context parameter.   
-* A timeout is an event. 
-* A timeout is raised only once.  
-* Timeouts can be observed in rules given the timer name.  
-* The start timer operation is idempotent.  
-
-This example shows an event scheduled to be raised after 5 seconds and a rule which reacts to such an event.  
-
-API:  
-* `host.startTimer(timerName, seconds)`
-* `c.startTimer(timerName, seconds)`  
-* `when... timeout(timerName)`  
-```javascript
-var d = require('durable');
-var m = d.m, s = d.s, c = d.c, timeout = d.timeout;
-
-d.ruleset('t1', {
-        whenAll: m.start.eq('yes'),
-        run: function(c) {
-            c.s.start = new Date();
-            c.startTimer('myTimer', 5);
-        }
-    }, {
-        whenAll: timeout('myTimer'),
-        run: function(c) {
-            console.log('t1 end');
-            console.log('t1 started ' + c.s.start);
-            console.log('t1 ended ' + new Date());
-        }
-    },
-    function (host) {
-        host.post('t1', {id: 1, sid: 1, start: 'yes'});
-    }
-);
-d.runAll();
-```
-[top](reference.md#table-of-contents)  
-## Flow Structures
 ### Statechart
-`durable_rules` lets you organize the ruleset flow such that its context is always in exactly one of a number of possible states with well-defined conditional transitions between these states. Actions depend on the state of the context and a triggering event.  
+Rules can be organized using statecharts. A statechart is a deterministic finite automaton (DFA). The state context is in one of a number of possible states with conditional transitions between these states. 
 
 Statechart rules:  
 * A statechart can have one or more states.  
@@ -548,39 +577,49 @@ Statechart rules:
 * A trigger can have a rule (absence means state enter).  
 * A trigger can have an action.  
 
-The example shows an approval state machine, which detects an anomaly if three consecutive events happen in less than 30 seconds.
-
-API:  
-* `with (statechart(rulesetName)) statesBlock`  
-* `with (state(stateName)) triggersAndStatesBlock`  
-* `to(stateName, [actionBlock]).[ruleAntecedent, actionBlock]`   
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c, timeout = d.timeout;
 
-d.statechart('fraud', {
-    start: {
-        to: 'metering',
-        whenAll: m.amount.gt(100),
-        run: function (c) { c.startTimer('velocity', 30); }
-    },
-    metering: [{
-        to: 'fraud',
-        count: 3,
-        whenAll: m.amount.gt(100),
-        run: function (c) { console.log('fraud detected'); }
-    }, {
-        to: 'cleared',
-        whenAll: timeout('velocity'),
-        run: function (c) { console.log('fraud cleared'); }
-    }],
-    cleared: {},
-    fraud: {},
-    whenStart: function (host) {
-        host.post('fraud', {id: 1, sid: 1, amount: 200});
-        host.post('fraud', {id: 2, sid: 1, amount: 200});
-        host.post('fraud', {id: 3, sid: 1, amount: 200});
-        host.post('fraud', {id: 4, sid: 1, amount: 200});
+d.statechart('expense', function() {
+    // initial state 'input' with two triggers
+    input: {
+        // trigger to move to 'denied' given a condition
+        to: 'denied'
+        whenAll: m.subject == 'approve' && m.amount > 1000
+        // action executed before state change
+        run: console.log('Denied amount: ' + m.amount)
+
+        to: 'pending'
+        whenAll: m.subject == 'approve' && m.amount <= 1000
+        run: console.log('Requesting approve amount: ' + m.amount);
+    }
+
+    // intermediate state 'pending' with two triggers
+    pending: {
+        to: 'approved'
+        whenAll: m.subject == 'approved'
+        run: console.log('Expense approved')
+
+        to: 'denied'
+        whenAll: m.subject == 'denied'
+        run: console.log('Expense denied')
+    }
+    
+    // 'denied' and 'approved' are final states
+    denied: {}
+    approved: {}
+    
+    whenStart: {
+        // events directed to default statechart instance
+        post('expense', { subject: 'approve', amount: 100 });
+        post('expense', { subject: 'approved' });
+        
+        // events directed to statechart instance with id '1'
+        post('expense', { sid: 1, subject: 'approve', amount: 100 });
+        post('expense', { sid: 1, subject: 'denied' });
+        
+        // events directed to statechart instance with id '2'
+        post('expense', { sid: 2, subject: 'approve', amount: 10000 });
     }
 });
 
@@ -588,45 +627,53 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 ### Nested States
-`durable_rules` supports nested states. Which implies that, along with the [statechart](reference.md#statechart) description from the previous section, most of the [UML statechart](http://en.wikipedia.org/wiki/UML_state_machine) semantics is supported. If a context is in the nested state, it also (implicitly) is in the surrounding state. The state machine will attempt to handle any event in the context of the substate, which conceptually is at the lower level of the hierarchy. However, if the substate does not prescribe how to handle the event, the event is not discarded, but it is automatically handled at the higher level context of the superstate.
-
-The example below shows a statechart, where the `canceled` transition is reused for both the `enter` and the `process` states. 
+Nested states allow for writing compact statecharts. If a context is in the nested state, it also (implicitly) is in the surrounding state. The statechart will attempt to handle any event in the context of the sub-state. If the sub-state does not  handle an event, the event is automatically handled at the context of the super-state.
 
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
 
-d.statechart('a6', {
-    work: [{
+d.statechart('worker', function() {
+    // super-state 'work' has two states and one trigger
+    work: {
+        // sub-sate 'enter' has only one trigger
         enter: {
-            to: 'process',
-            whenAll: m.subject.eq('enter'),
-            run: function (c) { console.log('a6 continue process'); }
-        },
-        process: {
-            to: 'process',
-            whenAll: m.subject.eq('continue'),
-            run: function (c) { console.log('a6 processing'); }
+            to: 'process'
+            whenAll: m.subject == 'enter'
+            run: console.log('start process')
         }
-    }, {
-        to: 'canceled',
-        pri: 1,
-        whenAll: m.subject.eq('cancel'),
-        run: function (c) { console.log('a6 canceling');}
-    }],
-    canceled: {},
-    whenStart: function (host) {
-        host.post('a6', {id: 1, sid: 1, subject: 'enter'});
-        host.post('a6', {id: 2, sid: 1, subject: 'continue'});
-        host.post('a6', {id: 3, sid: 1, subject: 'continue'});
-        host.post('a6', {id: 4, sid: 1, subject: 'cancel'});
+
+        process: {
+            to: 'process'
+            whenAll: m.subject == 'continue'
+            run: console.log('continue processing')
+        }
+    
+        // the super-state trigger will be evaluated for all sub-state triggers
+        to: 'canceled'
+        pri: 1
+        whenAll: m.subject == 'cancel'
+        run: console.log('cancel process')
+    }
+
+    canceled: {}
+    whenStart: {
+        // will move the statechart to the 'work.process' sub-state
+        post('worker', { subject: 'enter' });
+        
+        // will keep the statechart to the 'work.process' sub-state
+        post('worker', { subject: 'continue' });
+        post('worker', { subject: 'continue' });
+        
+        // will move the statechart out of the work state
+        post('worker', { subject: 'cancel' });
     }
 });
+
 d.runAll();
 ```
 [top](reference.md#table-of-contents)
 ### Flowchart
-In addition to [statechart](reference.md#statechart), flowchart is another way for organizing a ruleset flow. In a flowchart each stage represents an action to be executed. So (unlike the statechart state), when applied to the context state, it results in a transition to another stage.  
+A flowchart is another way of organizing a ruleset flow. In a flowchart each stage represents an action to be executed. So (unlike the statechart state), when applied to the context state, it results in a transition to another stage.  
 
 Flowchart rules:  
 * A flowchart can have one or more stages.  
@@ -636,47 +683,49 @@ Flowchart rules:
 * A stage can have zero or more conditions.  
 * A condition has a rule and a destination stage.  
 
-API:  
-* `flowchart(rulesetName) stageConditionBlock`  
-* `with (stage(stageName)) [actionConditionbBlock]` 
-* `run(actionFunction)`  
-* `to(stageName).[rule]`  
-Note: conditions have to be defined immediately after the stage definition  
 ```javascript
 var d = require('durable');
-var m = d.m, s = d.s, c = d.c;
 
-d.flowchart('a3', {
+d.flowchart('expense', function() {
+    // initial stage 'input' has two conditions
     input: {
-        request: { whenAll: m.subject.eq('approve').and(m.amount.lte(1000)) }, 
-        deny: { whenAll: m.subject.eq('approve').and(m.amount.gt(1000)) }, 
-    },
+        request: m.subject == 'approve' && m.amount <= 1000 
+        deny:  m.subject == 'approve' && m.amount > 1000
+    }
+
+    // intermediate stage 'request' has an action and three conditions
     request: {
-        run: function (c) {
-            console.log('a3_0 request approval from: ' + c.s.sid);
-            if (c.s.status) 
-                c.s.status = 'approved';
-            else
-                c.s.status = 'pending';
-        },
-        approve: { whenAll: s.status.eq('approved') },
-        deny: { whenAll: m.subject.eq('denied') },
-        request: { whenAll: m.subject.eq('approved') }
-    },
+        run: console.log('Requesting approve')
+        approve: m.subject == 'approved'
+        deny: m.subject == 'denied'
+        // self is a reflexive condition: if met, returns to the same stage
+        self: m.subject == 'retry'
+    }
+
+    // two final stages 'approve' and 'deny' with no conditions
     approve: {
-        run: function (c) { console.log('a3 approved from: ' + c.s.sid); }
-    },
+        run: console.log('Expense approved')
+    }
+
     deny: {
-        run: function (c) { console.log('a3 denied from: ' + c.s.sid); }
-    },
-    whenStart: function (host) {
-        host.post('a3', {id: 1, sid: 1, subject: 'approve', amount: 100});
-        host.post('a3', {id: 2, sid: 1, subject: 'approved'});
-        host.post('a3', {id: 3, sid: 2, subject: 'approve', amount: 100});
-        host.post('a3', {id: 4, sid: 2, subject: 'denied'});
-        host.post('a3', {id: 5, sid: 3, subject: 'approve', amount: 10000});
+        run: console.log('Expense denied')
+    }
+
+    whenStart: {
+        // events for the default flowchart instance, approved after retry
+        post('expense', { subject: 'approve', amount: 100 });
+        post('expense', { subject: 'retry' });
+        post('expense', { subject: 'approved' });
+        
+        // events for the flowchart instance '1', denied after first try
+        post('expense', {sid: 1, subject: 'approve', amount: 100});
+        post('expense', {sid: 1, subject: 'denied'});
+        
+        // event for the flowchart instance '2' immediately denied
+        post('expense', {sid: 2, subject: 'approve', amount: 10000});
     }
 });
+
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
