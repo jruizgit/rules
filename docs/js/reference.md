@@ -112,12 +112,14 @@ Facts represent the data that defines a knowledge base. After facts are asserted
 var d = require('durable');
 
 d.ruleset('animal', function() {
+    // will be satisfied by 'Kermit eats flies'
     whenAll: m.verb == 'eats' && m.predicate == 'flies' 
     run: assert({ subject: m.subject, verb: 'is', predicate: 'frog' })
 
     whenAll: m.verb == 'eats' && m.predicate == 'worms' 
     run: assert({ subject: m.subject, verb: 'is', predicate: 'bird' })
 
+    // will be chained after asserting 'Kermit is frog'
     whenAll: m.verb == 'is' && m.predicate == 'frog' 
     run: assert({ subject: m.subject, verb: 'is', predicate: 'green'})
 
@@ -176,8 +178,10 @@ Context state is available when a consequent is executed. The same context state
 var d = require('durable');
 
 d.ruleset('flow', function() {
+    // state condition uses 's'
     whenAll: s.status == 'start'
     run: {
+        // state update on 's'
         s.status = 'next';
         console.log('start');
     }
@@ -192,9 +196,11 @@ d.ruleset('flow', function() {
     run: {
         s.status = 'end';
         console.log('last');
+        // deletes state at the end
         deleteState();
     }
 
+    // modifies default context state
     whenStart: patchState('flow', { status: 'start' })
 });
 
