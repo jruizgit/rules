@@ -158,22 +158,46 @@ run_all()
 ```ruby
 require "durable"
 
-Durable.ruleset :fibonacci do
-  when_all(c.first = (m.value != 0),
-           c.second = (m.id == first.id + 1)) do
-    puts "Value: #{first.value}"
-    if second.id > 100
-        puts "Value: #{second.value}"
-    else
-        assert(:id => second.id + 1, :value => first.value + second.value)
-        retract first
-    end
+Durable.ruleset :animal do
+  when_all c.first = (m.verb == "eats") & (m.predicate == "flies"),  
+          (m.verb == "lives") & (m.predicate == "water") & (m.subject == first.subject) do
+    assert :subject => first.subject, :verb => "is", :predicate => "frog"
   end
+
+  when_all c.first = (m.verb == "eats") & (m.predicate == "flies"),  
+          (m.verb == "lives") & (m.predicate == "land") & (m.subject == first.subject) do
+    assert :subject => first.subject, :verb => "is", :predicate => "chameleon"
+  end
+
+  when_all (m.verb == "eats") & (m.predicate == "worms") do
+    assert :subject => m.subject, :verb => "is", :predicate => "bird"
+  end
+  
+  when_all (m.verb == "is") & (m.predicate == "frog") do
+    assert :subject => m.subject, :verb => "is", :predicate => "green"
+  end
+    
+  when_all (m.verb == "is") & (m.predicate == "chameleon") do
+    assert :subject => m.subject, :verb => "is", :predicate => "green"
+  end
+
+  when_all (m.verb == "is") & (m.predicate == "bird") do
+    assert :subject => m.subject, :verb => "is", :predicate => "black"
+  end
+    
+  when_all +m.subject, count(11) do
+    m.each { |f| puts "fact: #{f.subject} #{f.verb} #{f.predicate}" }
+  end
+    
   when_start do
-    assert :fibonacci, {:id => 1, :sid => 1, :value => 1}
-    assert :fibonacci, {:id => 2, :sid => 1, :value => 1}
+    assert :animal, { :subject => "Kermit", :verb => "eats", :predicate => "flies" }
+    assert :animal, { :subject => "Kermit", :verb => "lives", :predicate => "water" }
+    assert :animal, { :subject => "Greedy", :verb => "eats", :predicate => "flies" }
+    assert :animal, { :subject => "Greedy", :verb => "lives", :predicate => "land" }
+    assert :animal, { :subject => "Tweety", :verb => "eats", :predicate => "worms" }
   end
 end
+
 Durable.run_all
 ```
 ## Flow Structures
