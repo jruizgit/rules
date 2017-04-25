@@ -112,7 +112,7 @@ Facts represent the data that defines a knowledge base. After facts are asserted
 var d = require('durable');
 
 d.ruleset('animal', function() {
-    // will be satisfied by 'Kermit eats flies'
+    // will be triggered by 'Kermit eats flies'
     whenAll: m.verb == 'eats' && m.predicate == 'flies' 
     run: assert({ subject: m.subject, verb: 'is', predicate: 'frog' })
 
@@ -154,9 +154,11 @@ d.ruleset('risk', function() {
         first = m.t == 'purchase'
         second = m.location != first.location
     }
+    // the event pair will only be observed once
     run: console.log('fraud detected ->' + first.location + ', ' + second.location)
    
     whenStart: {
+        // 'post' submits events, try 'assert' instead and to see differt behavior
         post('risk', { t: 'purchase', location: 'US' });
         post('risk', { t: 'purchase', location: 'CA' });
     }
@@ -417,10 +419,12 @@ This example batches exaclty three approvals and caps the number of rejects to t
 var d = require('durable');
 
 d.ruleset('expense', function() {
+    // this rule will trigger as soon as three events match the condition
     whenAll: m.amount < 100
     count: 3
     run: console.log('approved ' + JSON.stringify(m));
 
+    // this rule will be triggered when 'expense' is asserted batching at most two results
     whenAll: {
         expense = m.amount >= 100
         approval = m.review == true
@@ -457,6 +461,7 @@ d.ruleset('risk', function() {
     run: console.log('high value purchases ->' + JSON.stringify(m));
 
     whenStart: {
+        // will post an event every second
         var callback = function() {
             post('risk', { amount: Math.random() * 200 });
             setTimeout(callback, 1000); 
