@@ -176,26 +176,26 @@ Context state is available when a consequent is executed. The same context state
 var d = require('durable');
 
 d.ruleset('flow', function() {
-    whenAll: s.state == 'start'
+    whenAll: s.status == 'start'
     run: {
-        s.state = 'next';
+        s.status = 'next';
         console.log('start');
     }
 
-    whenAll: s.state == 'next'
+    whenAll: s.status == 'next'
     run: {
-        s.state = 'last';
+        s.status = 'last';
         console.log('next');
     }
 
-    whenAll: s.state == 'last'
+    whenAll: s.status == 'last'
     run: {
-        s.state = 'end';
+        s.status = 'end';
         console.log('last');
         deleteState();
     }
 
-    whenStart: patchState('flow', { state: 'start' })
+    whenStart: patchState('flow', { status: 'start' })
 });
 
 d.runAll();
