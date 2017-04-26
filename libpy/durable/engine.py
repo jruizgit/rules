@@ -458,7 +458,11 @@ class Ruleset(object):
         rules.cancel_timer(self._handle, str(sid), json.dumps(timer, ensure_ascii=False))
 
     def assert_state(self, state):
-        return rules.assert_state(self._handle, str(state['sid']), json.dumps(state, ensure_ascii=False))
+        sid = None
+        if 'sid' in state:
+            state = state['sid']
+
+        return rules.assert_state(self._handle, str(sid), json.dumps(state, ensure_ascii=False))
         
     def get_state(self, sid):
         return json.loads(rules.get_state(self._handle, str(sid)))
