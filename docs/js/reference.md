@@ -112,12 +112,14 @@ Facts represent the data that defines a knowledge base. After facts are asserted
 var d = require('durable');
 
 d.ruleset('animal', function() {
+    // will be triggered by 'Kermit eats flies'
     whenAll: m.verb == 'eats' && m.predicate == 'flies' 
     run: assert({ subject: m.subject, verb: 'is', predicate: 'frog' })
 
     whenAll: m.verb == 'eats' && m.predicate == 'worms' 
     run: assert({ subject: m.subject, verb: 'is', predicate: 'bird' })
 
+    // will be chained after asserting 'Kermit is frog'
     whenAll: m.verb == 'is' && m.predicate == 'frog' 
     run: assert({ subject: m.subject, verb: 'is', predicate: 'green'})
 
@@ -152,9 +154,11 @@ d.ruleset('risk', function() {
         first = m.t == 'purchase'
         second = m.location != first.location
     }
+    // the event pair will only be observed once
     run: console.log('fraud detected ->' + first.location + ', ' + second.location)
    
     whenStart: {
+        // 'post' submits events, try 'assert' instead and to see differt behavior
         post('risk', { t: 'purchase', location: 'US' });
         post('risk', { t: 'purchase', location: 'CA' });
     }
@@ -176,26 +180,30 @@ Context state is available when a consequent is executed. The same context state
 var d = require('durable');
 
 d.ruleset('flow', function() {
-    whenAll: s.state == 'start'
+    // state condition uses 's'
+    whenAll: s.status == 'start'
     run: {
-        s.state = 'next';
+        // state update on 's'
+        s.status = 'next';
         console.log('start');
     }
 
-    whenAll: s.state == 'next'
+    whenAll: s.status == 'next'
     run: {
-        s.state = 'last';
+        s.status = 'last';
         console.log('next');
     }
 
-    whenAll: s.state == 'last'
+    whenAll: s.status == 'last'
     run: {
-        s.state = 'end';
+        s.status = 'end';
         console.log('last');
+        // deletes state at the end
         deleteState();
     }
 
-    whenStart: patchState('flow', { state: 'start' })
+    // modifies default context state
+    whenStart: patchState('flow', { status: 'start' })
 });
 
 d.runAll();
@@ -411,10 +419,12 @@ This example batches exaclty three approvals and caps the number of rejects to t
 var d = require('durable');
 
 d.ruleset('expense', function() {
+    // this rule will trigger as soon as three events match the condition
     whenAll: m.amount < 100
     count: 3
     run: console.log('approved ' + JSON.stringify(m));
 
+    // this rule will be triggered when 'expense' is asserted batching at most two results
     whenAll: {
         expense = m.amount >= 100
         approval = m.review == true
@@ -451,6 +461,7 @@ d.ruleset('risk', function() {
     run: console.log('high value purchases ->' + JSON.stringify(m));
 
     whenStart: {
+        // will post an event every second
         var callback = function() {
             post('risk', { amount: Math.random() * 200 });
             setTimeout(callback, 1000); 
