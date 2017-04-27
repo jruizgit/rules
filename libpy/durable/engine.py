@@ -460,7 +460,7 @@ class Ruleset(object):
     def assert_state(self, state):
         sid = None
         if 'sid' in state:
-            state = state['sid']
+            sid = state['sid']
 
         return rules.assert_state(self._handle, str(sid), json.dumps(state, ensure_ascii=False))
         
