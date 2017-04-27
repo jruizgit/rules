@@ -204,32 +204,31 @@ State can also be retrieved and modified using the http API. When the example ab
 [top](reference.md#table-of-contents)  
 ## Antecendents
 ### Simple Filter
-Rules are the basic building blocks. All rules have a condition, which defines the events and facts that trigger an action.  
-* The rule condition is an expression. Its left side represents an event or fact property, followed by a logical operator and its right side defines a pattern to be matched. By convention events or facts originated by calling post or assert are represented with the `m` name; events or facts originated by changing the context state are represented with the `s` name.  
-* The rule action is a function to which the context is passed as a parameter. Actions can be synchronous and asynchronous. Asynchronous actions take a completion function as a parameter.  
+A rule antecedent is an expression. The left side of the expression represents an event or fact property. The right side defines a pattern to be matched. By convention events or facts are represented with the `m` name. Context state are represented with the `s` name.  
 
-Below is an example of the typical rule structure. 
+Logical operators:  
+* Unary: - (does not exist), + (exists)  
+* Logical operators: &, |  
+* Relational operators: < , >, <=, >=, ==, !=  
 
-Logical operator precedence:  
-1. Unary: `-` (does not exist), `+` (exists)  
-2. Logical operators: `|` (or) , `&` (and)  
-3. Relational operators: >, <, >=, <=, ==, !=  
 ```python
 from durable.lang import *
-with ruleset('a0'):
-    @when_all((m.subject < 100) | (m.subject == 'approve') | (m.subject == 'ok'))
+
+with ruleset('expense'):
+    @when_all((m.subject == 'approve') | (m.subject == 'ok'))
     def approved(c):
-        print ('a0 approved ->{0}'.format(c.m.subject))
+        print ('Approved subject: {0}'.format(c.m.subject))
         
     @when_start
     def start(host):
-        host.post('a0', {'id': 1, 'sid': 1, 'subject': 10})
+        host.post('expense', { 'subject': 'approve'})
         
 run_all()
-```
-[top](reference.md#table-of-contents) 
+```  
+[top](reference.md#table-of-contents)  
+
 ### Pattern Matching
-durable_rules implements a simple pattern matching dialect. Similar to lua, it uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. The expressiveness of the dialect is not as rich as that of ruby, python or jscript. Event processing is O(n) guaranteed (n being the size of the event).  
+durable_rules implements a simple pattern matching dialect. Similar to lua, it uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. Event processing is O(n) guaranteed (n being the size of the event).  
 
 **Repetition**  
 \+ 1 or more repetitions  
@@ -256,33 +255,35 @@ durable_rules implements a simple pattern matching dialect. Similar to lua, it u
 
 ```python
 from durable.lang import *
-with ruleset('match3'):
+
+with ruleset('match'):
     @when_all(m.url.matches('(https?://)?([0-9a-z.-]+)%.[a-z]{2,6}(/[A-z0-9_.-]+/?)*'))
     def approved(c):
-        print ('match3 url ->{0}'.format(c.m.url))
+        print ('match url ->{0}'.format(c.m.url))
 
     @when_start
     def start(host):
-        host.post('match3', {'id': 1, 'sid': 1, 'url': 'https://github.com'})
-        host.post('match3', {'id': 2, 'sid': 1, 'url': 'http://github.com/jruizgit/rul!es'})
-        host.post('match3', {'id': 3, 'sid': 1, 'url': 'https://github.com/jruizgit/rules/reference.md'})
-        host.post('match3', {'id': 4, 'sid': 1, 'url': '//rules'})
-        host.post('match3', {'id': 5, 'sid': 1, 'url': 'https://github.c/jruizgit/rules'})
+        host.post('match', { 'url': 'https://github.com' })
+        host.post('match', { 'url': 'http://github.com/jruizgit/rul!es' })
+        host.post('match', { 'url': 'https://github.com/jruizgit/rules/reference.md' })
+        host.post('match', { 'url': '//rules'})
+        host.post('match', { 'url': 'https://github.c/jruizgit/rules' })
 
 run_all()
 ```  
-[top](reference.md#table-of-contents) 
+
+[top](reference.md#table-of-contents)  
+
 ### Correlated Sequence
-The ability to express and efficiently evaluate sequences of correlated events or facts represents the forward inference hallmark. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
+Rules can be used to efficiently evaluate sequences of correlated events or facts. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
-The `when_all` decorator expresses a sequence of events or facts separated by `,`. The `<<` operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
+The `when_all` annotation expresses a sequence of events or facts. The `<<` operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
 
-Arithmetic operator precedence:  
-1. `*`, `/`  
-2. `+`, `-`  
+Arithmetic operators: +, -, *, /
 ```python
 from durable.lang import *
-with ruleset('fraud_detection'):
+
+with ruleset('risk'):
     @when_all(c.first << m.amount > 10,
               c.second << m.amount > c.first.amount * 2,
               c.third << m.amount > (c.first.amount + c.second.amount) / 2)
@@ -293,13 +294,15 @@ with ruleset('fraud_detection'):
         
     @when_start
     def start(host):
-        host.post('fraud_detection', {'id': 1, 'sid': 1, 'amount': 50})
-        host.post('fraud_detection', {'id': 2, 'sid': 1, 'amount': 200})
-        host.post('fraud_detection', {'id': 3, 'sid': 1, 'amount': 300})
+        host.post('risk', { 'amount': 50 })
+        host.post('risk', { 'amount': 200 })
+        host.post('risk', { 'amount': 300 })
 
 run_all()
-```
+```  
+
 [top](reference.md#table-of-contents)  
+
 ### Choice of Sequences
 durable_rules allows expressing and efficiently evaluating richer events sequences leveraging forward inference. In the example below any of the two event\fact sequences will trigger the `a4` action. 
 
