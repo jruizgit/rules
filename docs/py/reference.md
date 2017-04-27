@@ -1,20 +1,21 @@
 Reference Manual
 =====
 ## Table of contents
-* [Setup](reference.md#local-setup)
-* [Rules](reference.md#rules)
+* [Setup](reference.md#setup)
+* [Basics](reference.md#basics)
+  * [Rules](reference.md#rules)
+  * [Facts](reference.md#facts)
+  * [Events](reference.md#events)
+  * [State](reference.md#state)
+* [Antecedents](reference.md#antecedents)
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
   * [Correlated Sequence](reference.md#correlated-sequence)
   * [Choice of Sequences](reference.md#choice-of-sequences)
   * [Conflict Resolution](reference.md#conflict-resolution)
-  * [Tumbling Window](reference.md#tumbling-window)
-* [Data Model](reference.md#data-model)
-  * [Events](reference.md#events)
-  * [Facts](reference.md#facts)
-  * [Context](reference.md#context)
-  * [Timers](reference.md#timers) 
+  * [Tumbling Window](reference.md#tumbling-window)  
 * [Flow Structures](reference.md#flow-structures)
+  * [Timers](reference.md#timers) 
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
   * [Flowchart](reference.md#flowchart)
@@ -55,21 +56,153 @@ Now that your cache ready, let's write a simple rule:
 
       @when_start
       def start(host):
-          host.post('test', {'id': 1, 'sid': 1, 'subject': 'World'})
+          host.post('test', { 'subject': 'World' })
 
   run_all()
   ```
 7. In the terminal type `python test.py`  
 8. You should see the message: `Hello World`  
 
-Note: If you are using [Redis To Go](https://redistogo.com), replace the last line.
+Note 1: If you are using a redis service outside your local host, replace the last line with:
   ```python
   run_all([{'host': 'host_name', 'port': port, 'password': 'password'}]);
   ```
 
 [top](reference.md#table-of-contents) 
+## Basics
+### Rules
+A rule is the basic building block of the framework. The rule antecendent defines the conditions that need to be satisfied to execute the rule consequent (action). By convention `m` represents the data to be evaluated by a given rule.
 
-## Rules
+* `when_all` and `when_any` annotate the antecendent definition of a rule
+* `when_start` annotates the action to be taken when starting the ruleset  
+  
+```python
+from durable.lang import *
+
+with ruleset('test'):
+    # antecedent
+    @when_all(m.subject == 'World')
+    def say_hello(c):
+        # consequent
+        print('Hello {0}'.format(c.m.subject))
+
+    # on ruleset start
+    @when_start
+    def start(host):    
+        host.post('test', { 'subject': 'World' })
+
+run_all()
+```
+### Facts
+Facts represent the data that defines a knowledge base. After facts are asserted as JSON objects. Facts are stored until they are retracted. When a fact satisfies a rule antecedent, the rule consequent is executed.
+
+```python
+from durable.lang import *
+
+with ruleset('animal'):
+    # will be triggered by 'Kermit eats flies'
+    @when_all((m.verb == 'eats') & (m.predicate == 'flies'))
+    def frog(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'frog' })
+
+    @when_all((m.verb == 'eats') & (m.predicate == 'worms'))
+    def bird(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'bird' })
+
+    # will be chained after asserting 'Kermit is frog'
+    @when_all((m.verb == 'is') & (m.predicate == 'frog'))
+    def green(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'green' })
+
+    @when_all((m.verb == 'is') & (m.predicate == 'bird'))
+    def black(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'black' })
+
+    @when_all(count(3), +m.subject)
+    def output(c):
+        for f in c.m:
+            print('Fact: {0} {1} {2}'.format(f.subject, f.verb, f.predicate))
+
+    @when_start
+    def start(host):
+        host.assert_fact('animal', { 'subject': 'Kermit', 'verb': 'eats', 'predicate': 'flies' })
+
+run_all()
+```
+
+Facts can also be asserted using the http API. For the example above, run the following command:  
+
+<sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "verb": "eats", "predicate": "worms"}' http://localhost:5000/animal/facts`</sub>
+
+[top](reference.md#table-of-contents)  
+
+### Events
+Events can be posted to and evaluated by rules. An event is an ephemeral fact, that is, a fact retracted right before executing a consequent. Thus, events can only be observed once. Events are stored until they are observed. 
+
+```python
+from durable.lang import *
+
+with ruleset('risk'):
+    @when_all(c.first << m.t == 'purchase',
+              c.second << m.location != c.first.location)
+    # the event pair will only be observed once
+    def fraud(c):
+        print('Fraud detected -> {0}, {1}'.format(c.first.location, c.second.location))
+
+    @when_start
+    def start(host):
+        # 'post' submits events, try 'assert' instead and to see differt behavior
+        host.post('risk', {'t': 'purchase', 'location': 'US'});
+        host.post('risk', {'t': 'purchase', 'location': 'CA'});
+
+run_all()
+```
+
+Events can be posted using the http API. When the example above is listening, run the following commands:  
+
+<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:5000/risk/events`</sub>  
+<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:5000/risk/events`</sub>  
+
+[top](reference.md#table-of-contents)  
+
+### State
+Context state is available when a consequent is executed. The same context state is passed across rule execution. Context state is stored until it is deleted. Context state changes can be evaluated by rules. By convention `s` represents the state to be evaluated by a rule.
+
+```python
+from durable.lang import *
+
+with ruleset('flow'):
+    # state condition uses 's'
+    @when_all(s.status == 'start')
+    def start(c):
+        # state update on 's'
+        c.s.status = 'next' 
+        print('start')
+
+    @when_all(s.status == 'next')
+    def next(c):
+        c.s.status = 'last' 
+        print('next')
+
+    @when_all(s.status == 'last')
+    def last(c):
+        c.s.status = 'end' 
+        print('last')
+        # deletes state at the end
+        c.delete_state()
+
+    @when_start
+    def on_start(host):
+        # modifies default context state
+        host.patch_state('flow', { 'status': 'start' })
+
+run_all()
+```
+State can also be retrieved and modified using the http API. When the example above is running, try the following commands:  
+<sub>`curl -H "content-type: application/json" -X POST -d '{"state": "next"}' http://localhost:5000/flow/state`</sub>  
+
+[top](reference.md#table-of-contents)  
+## Antecendents
 ### Simple Filter
 Rules are the basic building blocks. All rules have a condition, which defines the events and facts that trigger an action.  
 * The rule condition is an expression. Its left side represents an event or fact property, followed by a logical operator and its right side defines a pattern to be matched. By convention events or facts originated by calling post or assert are represented with the `m` name; events or facts originated by changing the context state are represented with the `s` name.  

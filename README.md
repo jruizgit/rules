@@ -1,4 +1,6 @@
-<sub>*note: The new node.js syntax was just pushed as of npm 0.36.57. It is a level up from the previous iteration. Your feedback is welcomed. The old syntax is still supported.*</sub>  
+<sub>*note 1: The new node.js syntax was just pushed as of npm 0.36.57. The old syntax is still supported. Your feedback is welcomed.*</sub>  
+<sub>*note 2: Passing 'sid' and 'id' in events and facts is no longer required as of npm 0.36.59, gem 0.34.25 and pypi 0.33.96.*</sub> 
+
 
 # durable_rules    
 #### for real time analytics (a Ruby, Python and Node.js Rules Engine)
