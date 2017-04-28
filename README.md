@@ -96,8 +96,7 @@ d.ruleset('animal', function() {
     run: assert({ subject: m.subject, verb: 'is', predicate: 'black' })
 
     whenAll: +m.subject
-    count: 11
-    run: m.forEach(function(f, i) {console.log('fact: ' + f.subject + ' ' + f.verb + ' ' + f.predicate)})
+    run: console.log('fact: ' + m.subject + ' ' + m.verb + ' ' + m.predicate)
 
     whenStart: {
         assert('animal', { subject: 'Kermit', verb: 'eats', predicate: 'flies' });
@@ -141,10 +140,9 @@ with ruleset('animal'):
     def black(c):
         c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'black' })
 
-    @when_all(count(11), +m.subject)
+    @when_all(+m.subject)
     def output(c):
-        for f in c.m:
-            print ('Fact: {0} {1} {2}'.format(f.subject, f.verb, f.predicate))
+        print('Fact: {0} {1} {2}'.format(c.m.subject, c.m.verb, c.m.predicate))
 
     @when_start
     def start(host):
@@ -187,8 +185,8 @@ Durable.ruleset :animal do
     assert :subject => m.subject, :verb => "is", :predicate => "black"
   end
     
-  when_all +m.subject, count(11) do
-    m.each { |f| puts "fact: #{f.subject} #{f.verb} #{f.predicate}" }
+  when_all +m.subject do
+    puts "fact: #{m.subject} #{m.verb} #{m.predicate}"
   end
     
   when_start do
