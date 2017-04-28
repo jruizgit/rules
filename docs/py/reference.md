@@ -11,7 +11,9 @@ Reference Manual
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
   * [Correlated Sequence](reference.md#correlated-sequence)
+  * [Lack of Information](reference.md#lack-of-information)
   * [Choice of Sequences](reference.md#choice-of-sequences)
+* [Consequents](reference.md#consequents)  
   * [Conflict Resolution](reference.md#conflict-resolution)
   * [Tumbling Window](reference.md#tumbling-window)  
 * [Flow Structures](reference.md#flow-structures)
@@ -302,34 +304,61 @@ run_all()
 ```  
 
 [top](reference.md#table-of-contents)  
-
-### Choice of Sequences
-durable_rules allows expressing and efficiently evaluating richer events sequences leveraging forward inference. In the example below any of the two event\fact sequences will trigger the `a4` action. 
-
-The following two decorators can be used for the rule definition:  
-* when_all: a set of event or fact patterns separated by `,`. All of them are required to match to trigger an action.  
-* when_any: a set of event or fact patterns separated by `,`. Any one match will trigger an action.  
-
-The following functions can be combined to form richer sequences:
-* all: patterns separated by `,`, all of them are required to match.
-* any: patterns separated by `,`, any of the patterns can match.    
-* none: no event or fact matching the pattern.  
+### Lack of Information
+In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.
 ```python
 from durable.lang import *
-with ruleset('a4'):
-    @when_any(all(m.subject == 'approve', m.amount == 1000), 
-              all(m.subject == 'jumbo', m.amount == 10000))
+
+with ruleset('risk'):
+    @when_all(c.first << m.t == 'deposit',
+              none(m.t == 'balance'),
+              c.third << m.t == 'withrawal',
+              c.fourth << m.t == 'chargeback')
+    def detected(c):
+        print('fraud detected {0} {1} {2}'.format(c.first.t, c.third.t, c.fourth.t))
+        
+    @when_start
+    def start(host):
+        host.post('risk', { 't': 'deposit' })
+        host.post('risk', { 't': 'withrawal' })
+        host.post('risk', { 't': 'chargeback' })
+        
+run_all()
+```
+
+[top](reference.md#table-of-contents)  
+### Choice of Sequences
+durable_rules allows expressing and efficiently evaluating richer events sequences In the example below any of the two event\fact sequences will trigger an action. 
+
+The following two functions can be used and combined to define richer event sequences:  
+* all: a set of event or fact patterns. All of them are required to match to trigger an action.  
+* any: a set of event or fact patterns. Any one match will trigger an action.  
+
+```python
+from durable.lang import *
+
+with ruleset('expense'):
+    @when_any(all(c.first << m.subject == 'approve', 
+                  c.second << m.amount == 1000), 
+              all(c.third << m.subject == 'jumbo', 
+                  c.fourth << m.amount == 10000))
     def action(c):
-        print ('a4 action {0}'.format(c.s.sid))
+        if c.first:
+            print ('Approved {0} {1}'.format(c.first.subject, c.second.amount))
+        else:
+            print ('Approved {0} {1}'.format(c.third.subject, c.fourth.amount))
     
     @when_start
     def start(host):
-        host.post('a4', {'id': 1, 'sid': 2, 'subject': 'jumbo'})
-        host.post('a4', {'id': 2, 'sid': 2, 'amount': 10000})
+        host.post('expense', { 'subject': 'approve' })
+        host.post('expense', { 'amount': 1000 })
+        host.post('expense', { 'subject': 'jumbo' })
+        host.post('expense', { 'amount': 10000 })
 
 run_all()
 ```
 [top](reference.md#table-of-contents) 
+## Consequents
 ### Conflict Resolution
 Events or facts can produce multiple results in a single fact, in which case durable_rules will choose the result with the most recent events or facts. In addition events or facts can trigger more than one action simultaneously, the triggering order can be defined by setting the priority (salience) attribute on the rule.
 
