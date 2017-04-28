@@ -120,10 +120,9 @@ with ruleset('animal'):
     def black(c):
         c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'black' })
 
-    @when_all(count(3), +m.subject)
+    @when_all(+m.subject)
     def output(c):
-        for f in c.m:
-            print('Fact: {0} {1} {2}'.format(f.subject, f.verb, f.predicate))
+        print('Fact: {0} {1} {2}'.format(c.m.subject, c.m.verb, c.m.predicate))
 
     @when_start
     def start(host):
