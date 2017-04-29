@@ -456,6 +456,7 @@ This example generates events with random amounts. An action is scheduled every 
 var d = require('durable');
 
 d.ruleset('risk', function() {
+    // the action will be called every 5 seconds
     whenAll: m.amount > 100
     span: 5
     run: console.log('high value purchases ->' + JSON.stringify(m));
