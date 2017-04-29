@@ -15,7 +15,10 @@ Reference Manual
   * [Choice of Sequences](reference.md#choice-of-sequences)
 * [Consequents](reference.md#consequents)  
   * [Conflict Resolution](reference.md#conflict-resolution)
-  * [Tumbling Window](reference.md#tumbling-window)  
+  * [Action Batches](reference.md#action-batches)
+  * [Tumbling Window](reference.md#tumbling-window)
+  * [Async Actions](reference.md#async-actions)
+  * [Unhandled Exceptions](reference.md#unhandled-exceptions)
 * [Flow Structures](reference.md#flow-structures)
   * [Timers](reference.md#timers) 
   * [Statechart](reference.md#statechart)
@@ -359,67 +362,181 @@ run_all()
 [top](reference.md#table-of-contents) 
 ## Consequents
 ### Conflict Resolution
-Events or facts can produce multiple results in a single fact, in which case durable_rules will choose the result with the most recent events or facts. In addition events or facts can trigger more than one action simultaneously, the triggering order can be defined by setting the priority (salience) attribute on the rule.
+Event and fact evaluation can lead to multiple consequents. The triggering order can be controlled by using the `pri` (salience) function. Actions with lower value are executed first. The default value for all actions is 0.
 
-In this example, notice how the last rule is triggered first, as it has the highest priority. In the last rule result facts are ordered starting with the most recent.
+In this example, notice how the last rule is triggered first, as it has the highest priority.
 ```python
 from durable.lang import *
+
 with ruleset('attributes'):
-    @when_all(pri(3), count(3), m.amount < 300)
+    @when_all(pri(3), m.amount < 300)
     def first_detect(c):
-        print('attributes ->{0}'.format(c.m[0].amount))
-        print('           ->{0}'.format(c.m[1].amount))
-        print('           ->{0}'.format(c.m[2].amount))
-
-    @when_all(pri(2), count(2), m.amount < 200)
+        print('attributes P3 ->{0}'.format(c.m.amount))
+        
+    @when_all(pri(2), m.amount < 200)
     def second_detect(c):
-        print('attributes ->{0}'.format(c.m[0].amount))
-        print('           ->{0}'.format(c.m[1].amount))
-
+        print('attributes P2 ->{0}'.format(c.m.amount))
+        
     @when_all(pri(1), m.amount < 100)
     def third_detect(c):
-        print('attributes ->{0}'.format(c.m.amount))
+        print('attributes P1 ->{0}'.format(c.m.amount))
         
     @when_start
     def start(host):
-        host.assert_fact('attributes', {'id': 1, 'sid': 1, 'amount': 50})
-        host.assert_fact('attributes', {'id': 2, 'sid': 1, 'amount': 150})
-        host.assert_fact('attributes', {'id': 3, 'sid': 1, 'amount': 250})
-
+        host.assert_fact('attributes', { 'amount': 50 })
+        host.assert_fact('attributes', { 'amount': 150 })
+        host.assert_fact('attributes', { 'amount': 250 })
+        
 run_all()
 ```
-[top](reference.md#table-of-contents) 
-### Tumbling Window
-durable_rules enables aggregating events or observed facts over time with tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
+[top](reference.md#table-of-contents)  
+### Action Batches
+When a high number of events or facts satisfy a consequent, the consequent results can be delivered in batches.
 
-Summary of rule attributes:  
-* count: defines the number of events or facts, which need to be matched when scheduling an action.   
-* span: defines the tumbling time in seconds between scheduled actions.  
-* pri: defines the scheduled action order in case of conflict.  
+* count: defines the exact number of times the rule needs to be satisfied before scheduling the action.   
+* cap: defines the maximum number of times the rule needs to be satisfied before scheduling the action.  
 
+This example batches exaclty three approvals and caps the number of rejects to two:  
 ```python
 from durable.lang import *
-import random
 
-with ruleset('t0'):
-    @when_all(timeout('my_timer') | (s.count == 0))
-    def start_timer(c):
-        c.s.count += 1
-        c.post('t0', {'id': c.s.count, 'sid': 1, 't': 'purchase'})
-        c.start_timer('my_timer', random.randint(1, 3), 't_{0}'.format(c.s.count))
+with ruleset('expense'):
+    # this rule will trigger as soon as three events match the condition
+    @when_all(count(3), m.amount < 100)
+    def approve(c):
+        print('approved {0}'.format(c.m))
 
-    @when_all(span(5), m.t == 'purchase')
-    def pulse(c):
-        print('t0 pulse -> {0}'.format(len(c.m)))
+    # this rule will be triggered when 'expense' is asserted batching at most two results       
+    @when_all(cap(2),
+              c.expense << m.amount >= 100,
+              c.approval << m.review == True)
+    def reject(c):
+        print('rejected {0}'.format(c.m))
 
     @when_start
     def start(host):
-        host.patch_state('t0', {'sid': 1, 'count': 0})
+        host.post_batch('expense', [{ 'amount': 10 },
+                                    { 'amount': 20 },
+                                    { 'amount': 100 },
+                                    { 'amount': 30 },
+                                    { 'amount': 200 },
+                                    { 'amount': 400 }])
+        host.assert_fact('expense', { 'review': True })
 
 run_all()
 ```
 [top](reference.md#table-of-contents)  
+### Tumbling Window
+Actions can also be batched using time tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
 
+* span: defines the tumbling time in seconds between scheduled actions.  
+
+This example generates events with random amounts. An action is scheduled every 5 seconds (tumbling window).
+```python
+from durable.lang import *
+import threading
+import random
+
+with ruleset('risk'):
+    timer = None
+
+    def start_timer(time, callback):
+        timer = threading.Timer(time, callback)
+        timer.daemon = True    
+        timer.start()
+
+    @when_all(span(5), m.amount > 100)
+    # the action will be called every 5 seconds
+    def high_value(c):
+        print('high value purchases ->{0}'.format(c.m))
+        
+    @when_start
+    def start(host):
+        # will post an event every second
+        def callback():
+            host.post('risk', { 'amount': random.randint(1, 200) })
+            start_timer(1, callback)
+
+        start_timer(1, callback)
+
+run_all()
+```
+[top](reference.md#table-of-contents)   
+
+### Async Actions  
+The consequent action can be asynchronous. When the action is finished, the `complete` function has to be called. By default an action is considered abandoned after 5 seconds. This value can be changed by returning a different number in the action function or extended by calling `renew_action_lease`.
+
+```python
+from durable.lang import *
+import threading
+
+with ruleset('flow'):
+    timer = None
+
+    def start_timer(time, callback):
+        timer = threading.Timer(time, callback)
+        timer.daemon = True    
+        timer.start()
+
+    @when_all(s.state == 'first')
+    # async actions take a callback argument to signal completion
+    def first(c, complete):
+        def end_first():
+            c.s.state = 'second'     
+            print('first completed')
+
+            # completes the action after 3 seconds
+            complete(None)
+        
+        start_timer(3, end_first)
+        
+    @when_all(s.state == 'second')
+    def second(c, complete):
+        def end_second():
+            c.s.state = 'third'
+            print('second completed')
+
+            # completes the action after 6 seconds
+            # use the first argument to signal an error
+            complete(Exception('error detected'))
+
+        start_timer(6, end_second)
+
+        # overrides the 5 second default abandon timeout
+        return 10
+
+    @when_start
+    def on_start(host):
+        host.patch_state('flow', { 'state': 'first' })
+        
+run_all()
+```
+[top](reference.md#table-of-contents)  
+### Unhandled Exceptions  
+When exceptions are not handled by actions, they are stored in the context state. This enables writing exception handling rules.
+
+```python
+from durable.lang import *
+
+with ruleset('flow'):
+    
+    @when_all(m.action == 'start')
+    def first(c):
+        raise Exception('Unhandled Exception!')
+
+    # when the exception property exists
+    @when_all(+s.exception)
+    def second(c):
+        print(c.s.exception)
+        c.s.exception = None
+        
+    @when_start
+    def on_start(host):
+        host.post('flow', { 'action': 'start' })
+        
+run_all()
+```
+[top](reference.md#table-of-contents)  
 ### Timers
 `durable_rules` supports scheduling timeout events and writing rules, which observe such events.  
 
