@@ -379,7 +379,7 @@ d.runAll();
 
 ## Consequents
 ### Conflict Resolution
-Event and fact evaluation can lead to multiple consequents. The triggering order can be controlled by using the priority (salience) attribute.
+Event and fact evaluation can lead to multiple consequents. The triggering order can be controlled by using the `pri` (salience) attribute. Actions with lower value are executed first. The default value for all actions is 0.
 
 In this example, notice how the last rule is triggered first, as it has the highest priority.
 ```javascript
@@ -445,7 +445,7 @@ d.ruleset('expense', function() {
 
 d.runAll();
 ```
-
+[top](reference.md#table-of-contents)  
 ### Tumbling Window
 Actions can also be batched using time tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
 
@@ -516,6 +516,7 @@ d.ruleset('flow', function() {
 
 d.runAll();
 ```
+[top](reference.md#table-of-contents)  
 ### Unhandled Exceptions  
 When exceptions are not handled by actions, they are stored in the context state. This enables writing exception handling rules.
 
@@ -540,7 +541,7 @@ d.ruleset('flow', function() {
 
 d.runAll();
 ```
-
+[top](reference.md#table-of-contents)  
 ## Flow Structures
 ### Timers
 Events can be scheduled with timers. A timeout condition can be included in the rule antecedent.   
