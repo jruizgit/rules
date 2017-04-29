@@ -497,10 +497,12 @@ d.ruleset('flow', function() {
     whenAll: s.state == 'second'
     runAsync: {
         setTimeout(function() {
+            s.state = 'third';
             console.log('second completed');
             
             // completes the async action after 6 seconds
-            complete();
+            // use the first argument to signal an error
+            complete('error detected');
         }, 6000);
         
         // overrides the 5 second default abandon timeout
