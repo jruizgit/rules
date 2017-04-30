@@ -307,6 +307,7 @@ run_all()
 ```  
 
 [top](reference.md#table-of-contents)  
+
 ### Nested Objects
 Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.  
 
