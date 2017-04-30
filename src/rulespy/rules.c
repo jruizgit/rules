@@ -204,7 +204,7 @@ static PyObject *pyQueueAssertEvent(PyObject *self, PyObject *args) {
     char *sid = NULL;
     char *destination = NULL;
     char *event = NULL;
-    if (!PyArg_ParseTuple(args, "Ksss", &handle, &sid, &destination, &event)) {
+    if (!PyArg_ParseTuple(args, "Kzss", &handle, &sid, &destination, &event)) {
         PyErr_SetString(RulesError, "pyQueueAssertEvent Invalid argument");
         return NULL;
     }
@@ -372,7 +372,7 @@ static PyObject *pyQueueAssertFact(PyObject *self, PyObject *args) {
     char *sid = NULL;
     char *destination = NULL;
     char *event = NULL;
-    if (!PyArg_ParseTuple(args, "Ksss", &handle, &sid, &destination, &event)) {
+    if (!PyArg_ParseTuple(args, "Kzss", &handle, &sid, &destination, &event)) {
         PyErr_SetString(RulesError, "pyQueueAssertFact Invalid argument");
         return NULL;
     }
@@ -513,7 +513,7 @@ static PyObject *pyQueueRetractFact(PyObject *self, PyObject *args) {
     char *sid = NULL;
     char *destination = NULL;
     char *event = NULL;
-    if (!PyArg_ParseTuple(args, "Ksss", &handle, &sid, &destination, &event)) {
+    if (!PyArg_ParseTuple(args, "Kzss", &handle, &sid, &destination, &event)) {
         PyErr_SetString(RulesError, "pyQueueRetractFact Invalid argument");
         return NULL;
     }
@@ -626,7 +626,7 @@ static PyObject *pyAssertState(PyObject *self, PyObject *args) {
     void *handle;
     char *state;
     char *sid;
-    if (!PyArg_ParseTuple(args, "Kss", &handle, &sid, &state)) {
+    if (!PyArg_ParseTuple(args, "Kzs", &handle, &sid, &state)) {
         PyErr_SetString(RulesError, "pyAssertState Invalid argument");
         return NULL;
     }
@@ -805,7 +805,7 @@ static PyObject *pyStartTimer(PyObject *self, PyObject *args) {
     char *sid;
     int duration = 0;
     char *timer = NULL;
-    if (!PyArg_ParseTuple(args, "Ksis", &handle, &sid, &duration, &timer)) {
+    if (!PyArg_ParseTuple(args, "Kzis", &handle, &sid, &duration, &timer)) {
         PyErr_SetString(RulesError, "pyStartTimer Invalid argument");
         return NULL;
     }
@@ -833,7 +833,7 @@ static PyObject *pyCancelTimer(PyObject *self, PyObject *args) {
     void *handle;
     char *sid;
     char *timer = NULL;
-    if (!PyArg_ParseTuple(args, "Kss", &handle, &sid, &timer)) {
+    if (!PyArg_ParseTuple(args, "Kzs", &handle, &sid, &timer)) {
         PyErr_SetString(RulesError, "pyCancelTimer Invalid argument");
         return NULL;
     }
@@ -888,7 +888,7 @@ static PyObject *pyAssertTimers(PyObject *self, PyObject *args) {
 static PyObject *pyGetState(PyObject *self, PyObject *args) {
     void *handle;
     char *sid;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &sid)) {
+    if (!PyArg_ParseTuple(args, "Kz", &handle, &sid)) {
         PyErr_SetString(RulesError, "pyGetState Invalid argument");
         return NULL;
     }
@@ -917,7 +917,7 @@ static PyObject *pyGetState(PyObject *self, PyObject *args) {
 static PyObject *pyDeleteState(PyObject *self, PyObject *args) {
     void *handle;
     char *sid;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &sid)) {
+    if (!PyArg_ParseTuple(args, "Kz", &handle, &sid)) {
         PyErr_SetString(RulesError, "pyDeleteState Invalid argument");
         return NULL;
     }
@@ -944,7 +944,7 @@ static PyObject *pyDeleteState(PyObject *self, PyObject *args) {
 static PyObject *pyRenewActionLease(PyObject *self, PyObject *args) {
     void *handle;
     char *sid;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &sid)) {
+    if (!PyArg_ParseTuple(args, "Kz", &handle, &sid)) {
         PyErr_SetString(RulesError, "pyRenewActionLease Invalid argument");
         return NULL;
     }

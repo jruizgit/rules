@@ -369,8 +369,7 @@ d.ruleset('animal', function() {
     run: assert({ subject: m.subject, verb: 'is', predicate: 'black'})
 
     whenAll: +m.subject
-    count: 11
-    run: m.forEach(function(f, i) { console.log('fact: ' + f.subject + ' ' + f.verb + ' ' + f.predicate) })
+    run: console.log('fact: ' + m.subject + ' ' + m.verb + ' ' + m.predicate)
 
     whenStart: {
         assert('animal', { subject: 'Kermit', verb: 'eats', predicate: 'flies'});
@@ -378,6 +377,26 @@ d.ruleset('animal', function() {
         assert('animal', { subject: 'Greedy', verb: 'eats', predicate: 'flies'});
         assert('animal', { subject: 'Greedy', verb: 'lives', predicate: 'land'});
         assert('animal', { subject: 'Tweety', verb: 'eats', predicate: 'worms'});
+    }
+});
+
+d.ruleset('expense4', function() {
+    // use the '.' notation to match properties in nested objects
+    whenAll: {
+        bill = m.t == 'bill' && m.invoice.amount > 50
+        account = m.t == 'account' && m.payment.invoice.amount == bill.invoice.amount
+    }
+    run: {
+        console.log('bill amount ->' + bill.invoice.amount);
+        console.log('account payment amount ->' + account.payment.invoice.amount);
+    }
+
+    whenStart: {
+        // one level of nesting
+        post('expense4', {t: 'bill', invoice: {amount: 100}});  
+
+        // two levels of nesting
+        post('expense4', {t: 'account', payment: {invoice: {amount: 100}}}); 
     }
 });
 

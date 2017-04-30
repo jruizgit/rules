@@ -115,7 +115,7 @@ class Closure(object):
             ruleset_name = self.ruleset_name
 
         if not 'sid' in message:
-            message['sid'] = self.s['sid']
+            message['sid'] = self.s.sid
 
         if isinstance(message, Content):
             message = message._d
@@ -133,9 +133,9 @@ class Closure(object):
             ruleset_name = self.ruleset_name
             
         if not sid:
-            sid = self.s['sid']
+            sid = self.s.sid
 
-        if (ruleset_name == self.ruleset_name) and (sid == self.s['sid']):
+        if (ruleset_name == self.ruleset_name) and (sid == self.s.sid):
             self._deleted = True
 
         sid_list = []
@@ -147,23 +147,29 @@ class Closure(object):
         sid_list.append(sid)
 
     def start_timer(self, timer_name, duration, timer_id = None):
+        timer = None
         if not timer_id:
-            timer_id = timer_name
-
-        if timer_id in self._timer_directory:
-            raise Exception('Timer with id {0} already added'.format(timer_id))
+            if timer_name in self._timer_directory:
+                raise Exception('Timer with name {0} already added'.format(timer_name))
+            else:
+                timer = {'sid': self.s.sid, '$t': timer_name}
+                self._timer_directory[timer_name] = (timer, duration)
         else:
-            timer = {'sid':self.s['sid'], 'id': timer_id, '$t': timer_name}
-            self._timer_directory[timer_id] = (timer, duration)
+            if timer_id in self._timer_directory:
+                raise Exception('Timer with id {0} already added'.format(timer_id))
+            else:
+                timer = {'sid': self.s.sid, 'id': timer_id, '$t': timer_name}
+                self._timer_directory[timer_id] = (timer, duration)
 
-    def cancel_timer(self, timer_name, timer_id = None):
+    def cancel_timer(self, timer_name, timer_id):
+        timer = None
         if not timer_id:
-            timer_id = timer_name
+            raise Exception('Timer with id is required to cancel a timer')
 
         if timer_id in self._cancelled_timer_directory:
             raise Exception('Timer with id {0} already cancelled'.format(timer_id))
         else:
-            timer = {'sid':self.s['sid'], 'id': timer_id, '$t': timer_name}
+            timer = {'sid': self.s.sid, 'id': timer_id, '$t': timer_name}
             self._cancelled_timer_directory[timer_id] = timer
 
     def assert_fact(self, ruleset_name, fact = None):
@@ -172,7 +178,7 @@ class Closure(object):
             ruleset_name = self.ruleset_name
 
         if not 'sid' in fact:
-            fact['sid'] = self.s['sid']
+            fact['sid'] = self.s.sid
 
         if isinstance(fact, Content):
             fact = copy.deepcopy(fact._d)
@@ -191,7 +197,7 @@ class Closure(object):
             ruleset_name = self.ruleset_name
 
         if not 'sid' in fact:
-            fact['sid'] = self.s['sid']
+            fact['sid'] = self.s.sid
 
         if isinstance(fact, Content):
             fact = copy.deepcopy(fact._d)
@@ -207,7 +213,7 @@ class Closure(object):
     def renew_action_lease(self):
         if _unix_now() - self._start_time < 10:
             self._start_time = _unix_now()
-            self.host.renew_action_lease(self.ruleset_name, self.s['sid']) 
+            self.host.renew_action_lease(self.ruleset_name, self.s.sid) 
 
     def _has_completed(self):
         if _unix_now() - self._start_time > 10:
@@ -369,9 +375,9 @@ class To(Promise):
                     c.retract_fact(c.chart_context)
 
             if self._assert_state:
-                c.assert_fact({'label': self._to_state, 'chart': 1, 'id': random.randint(1, 1000000000)})
+                c.assert_fact({ 'label': self._to_state, 'chart': 1 })
             else:
-                c.post({'label': self._to_state, 'chart': 1, 'id': random.randint(1, 1000000000)})
+                c.post({ 'label': self._to_state, 'chart': 1 })
         
 
 class Ruleset(object):
@@ -410,7 +416,10 @@ class Ruleset(object):
         return rules.assert_event(self._handle, json.dumps(message, ensure_ascii=False))
 
     def queue_assert_event(self, sid, ruleset_name, message):
-        rules.queue_assert_event(self._handle, str(sid), ruleset_name, json.dumps(message, ensure_ascii=False))
+        if sid: 
+            sid = str(sid)
+
+        rules.queue_assert_event(self._handle, sid, ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def start_assert_event(self, message):
         return rules.start_assert_event(self._handle, json.dumps(message, ensure_ascii=False))
@@ -425,7 +434,10 @@ class Ruleset(object):
         return rules.assert_fact(self._handle, json.dumps(fact, ensure_ascii=False))
 
     def queue_assert_fact(self, sid, ruleset_name, message):
-        rules.queue_assert_fact(self._handle, str(sid), ruleset_name, json.dumps(message, ensure_ascii=False))
+        if sid: 
+            sid = str(sid)
+
+        rules.queue_assert_fact(self._handle, sid, ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def start_assert_fact(self, fact):
         return rules.start_assert_fact(self._handle, json.dumps(fact, ensure_ascii=False))
@@ -440,7 +452,10 @@ class Ruleset(object):
         return rules.retract_fact(self._handle, json.dumps(fact, ensure_ascii=False))
 
     def queue_retract_fact(self, sid, ruleset_name, message):
-        rules.queue_retract_fact(self._handle, str(sid), ruleset_name, json.dumps(message, ensure_ascii=False))
+        if sid: 
+            sid = str(sid)
+
+        rules.queue_retract_fact(self._handle, sid, ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def start_retract_fact(self, fact):
         return rules.start_retract_fact(self._handle, json.dumps(fact, ensure_ascii=False))
@@ -452,26 +467,40 @@ class Ruleset(object):
         return rules.start_retract_facts(self._handle, json.dumps(facts, ensure_ascii=False))
 
     def start_timer(self, sid, timer, timer_duration):
-        rules.start_timer(self._handle, str(sid), timer_duration, json.dumps(timer, ensure_ascii=False))
+        if sid: 
+            sid = str(sid)
+
+        rules.start_timer(self._handle, sid, timer_duration, json.dumps(timer, ensure_ascii=False))
 
     def cancel_timer(self, sid, timer):
-        rules.cancel_timer(self._handle, str(sid), json.dumps(timer, ensure_ascii=False))
+        if sid: 
+            sid = str(sid)
+
+        rules.cancel_timer(self._handle, sid, json.dumps(timer, ensure_ascii=False))
 
     def assert_state(self, state):
-        sid = None
         if 'sid' in state:
-            sid = state['sid']
+            return rules.assert_state(self._handle, str(state['sid']), json.dumps(state, ensure_ascii=False))
+        else:
+            return rules.assert_state(self._handle, None, json.dumps(state, ensure_ascii=False))
 
-        return rules.assert_state(self._handle, str(sid), json.dumps(state, ensure_ascii=False))
-        
     def get_state(self, sid):
-        return json.loads(rules.get_state(self._handle, str(sid)))
+        if sid: 
+            sid = str(sid)
+
+        return json.loads(rules.get_state(self._handle, sid))
 
     def delete_state(self, sid):
-        rules.delete_state(self._handle, str(sid))
+        if sid: 
+            sid = str(sid)
+
+        rules.delete_state(self._handle, sid)
     
     def renew_action_lease(self, sid):
-        rules.renew_action_lease(self._handle, str(sid))
+        if sid: 
+            sid = str(sid)
+
+        rules.renew_action_lease(self._handle, sid)
 
     def get_definition(self):
         return self._definition
@@ -1078,13 +1107,22 @@ class Queue(object):
         
 
     def post(self, message):
-        rules.queue_assert_event(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
+        if 'sid' in message:
+            rules.queue_assert_event(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
+        else:
+            rules.queue_assert_event(self._handle, None, self._ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def assert_fact(self, message):
-        rules.queue_assert_fact(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
+        if 'sid' in message:
+            rules.queue_assert_fact(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
+        else: 
+            rules.queue_assert_fact(self._handle, None, self._ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def retract_fact(self, message):
-        rules.queue_retract_fact(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
+        if 'sid' in message:
+            rules.queue_retract_fact(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
+        else:
+            rules.queue_retract_fact(self._handle, None, self._ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def close(self):
         rules.delete_client(self._handle)

@@ -57,7 +57,7 @@ class Application(object):
         request = Request(environ)
         result = None
         if request.method == 'GET':
-            result = self._host.get_state(ruleset_name, '0')
+            result = self._host.get_state(ruleset_name, None)
             return Response(json.dumps(result))(environ, start_response)
         elif request.method == 'POST':
             message = json.loads(request.stream.read())

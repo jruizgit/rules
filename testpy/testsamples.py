@@ -1,0 +1,504 @@
+from durable.lang import *
+
+
+with statechart('expense'):
+    with state('input'):
+        @to('denied')
+        @when_all((m.subject == 'approve') & (m.amount > 1000))
+        def denied(c):
+            print ('expense denied')
+        
+        @to('pending')    
+        @when_all((m.subject == 'approve') & (m.amount <= 1000))
+        def request(c):
+            print ('requesting expense approva')
+        
+    with state('pending'):
+        @to('approved')
+        @when_all(m.subject == 'approved')
+        def approved(c):
+            print ('expense approved')
+            
+        @to('denied')
+        @when_all(m.subject == 'denied')
+        def denied(c):
+            print ('expense denied')
+        
+    state('denied')
+    state('approved')
+
+
+with ruleset('animal'):
+    @when_all(c.first << (m.verb == 'eats') & (m.predicate == 'flies'),
+              (m.verb == 'lives') & (m.predicate == 'water') & (m.subject == c.first.subject))
+    def frog(c):
+        c.assert_fact({ 'subject': c.first.subject, 'verb': 'is', 'predicate': 'frog' })
+
+    @when_all(c.first << (m.verb == 'eats') & (m.predicate == 'flies'),
+              (m.verb == 'lives') & (m.predicate == 'land') & (m.subject == c.first.subject))
+    def chameleon(c):
+        c.assert_fact({ 'subject': c.first.subject, 'verb': 'is', 'predicate': 'chameleon' })
+
+    @when_all((m.verb == 'eats') & (m.predicate == 'worms'))
+    def bird(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'bird' })
+
+    @when_all((m.verb == 'is') & (m.predicate == 'frog'))
+    def green(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'green' })
+
+    @when_all((m.verb == 'is') & (m.predicate == 'chameleon'))
+    def grey(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'grey' })
+
+    @when_all((m.verb == 'is') & (m.predicate == 'bird'))
+    def black(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'black' })
+
+    @when_all(+m.subject)
+    def output(c):
+        print ('Fact: {0} {1} {2}'.format(c.m.subject, c.m.verb, c.m.predicate))
+
+    @when_start
+    def start(host):
+        host.assert_fact('animal', { 'subject': 'Kermit', 'verb': 'eats', 'predicate': 'flies' })
+        host.assert_fact('animal', { 'subject': 'Kermit', 'verb': 'lives', 'predicate': 'water' })
+        host.assert_fact('animal', { 'subject': 'Greedy', 'verb': 'eats', 'predicate': 'flies' })
+        host.assert_fact('animal', { 'subject': 'Greedy', 'verb': 'lives', 'predicate': 'land' })
+        host.assert_fact('animal', { 'subject': 'Tweety', 'verb': 'eats', 'predicate': 'worms' })
+
+with ruleset('test'):
+    # antecedent
+    @when_all(m.subject == 'World')
+    def say_hello(c):
+        # consequent
+        print('Hello {0}'.format(c.m.subject))
+
+    # on ruleset start
+    @when_start
+    def start(host):    
+        host.post('test', { 'subject': 'World' })
+
+
+with ruleset('animal0'):
+    # will be triggered by 'Kermit eats flies'
+    @when_all((m.verb == 'eats') & (m.predicate == 'flies'))
+    def frog(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'frog' })
+
+    @when_all((m.verb == 'eats') & (m.predicate == 'worms'))
+    def bird(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'bird' })
+
+    # will be chained after asserting 'Kermit is frog'
+    @when_all((m.verb == 'is') & (m.predicate == 'frog'))
+    def green(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'green' })
+
+    @when_all((m.verb == 'is') & (m.predicate == 'bird'))
+    def black(c):
+        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'black' })
+
+    @when_all(+m.subject)
+    def output(c):
+        print('Fact: {0} {1} {2}'.format(c.m.subject, c.m.verb, c.m.predicate))
+
+    @when_start
+    def start(host):
+        host.assert_fact('animal0', { 'subject': 'Kermit', 'verb': 'eats', 'predicate': 'flies' })
+
+
+with ruleset('risk'):
+    @when_all(c.first << m.t == 'purchase',
+              c.second << m.location != c.first.location)
+    # the event pair will only be observed once
+    def fraud(c):
+        print('Fraud detected -> {0}, {1}'.format(c.first.location, c.second.location))
+
+    @when_start
+    def start(host):
+        # 'post' submits events, try 'assert' instead and to see differt behavior
+        host.post('risk', {'t': 'purchase', 'location': 'US'});
+        host.post('risk', {'t': 'purchase', 'location': 'CA'});
+
+
+with ruleset('flow'):
+    # state condition uses 's'
+    @when_all(s.status == 'start')
+    def start(c):
+        # state update on 's'
+        c.s.status = 'next' 
+        print('start')
+
+    @when_all(s.status == 'next')
+    def next(c):
+        c.s.status = 'last' 
+        print('next')
+
+    @when_all(s.status == 'last')
+    def last(c):
+        c.s.status = 'end' 
+        print('last')
+        # deletes state at the end
+        c.delete_state()
+
+    @when_start
+    def on_start(host):
+        # modifies default context state
+        host.patch_state('flow', { 'status': 'start' })
+
+
+
+with ruleset('expense0'):
+    @when_all((m.subject == 'approve') | (m.subject == 'ok'))
+    def approved(c):
+        print ('Approved subject: {0}'.format(c.m.subject))
+        
+    @when_start
+    def start(host):
+        host.post('expense0', { 'subject': 'approve'})
+
+
+with ruleset('match'):
+    @when_all(m.url.matches('(https?://)?([0-9a-z.-]+)%.[a-z]{2,6}(/[A-z0-9_.-]+/?)*'))
+    def approved(c):
+        print ('match url ->{0}'.format(c.m.url))
+
+    @when_start
+    def start(host):
+        host.post('match', { 'url': 'https://github.com' })
+        host.post('match', { 'url': 'http://github.com/jruizgit/rul!es' })
+        host.post('match', { 'url': 'https://github.com/jruizgit/rules/reference.md' })
+        host.post('match', { 'url': '//rules'})
+        host.post('match', { 'url': 'https://github.c/jruizgit/rules' })
+
+
+with ruleset('risk0'):
+    @when_all(c.first << m.amount > 10,
+              c.second << m.amount > c.first.amount * 2,
+              c.third << m.amount > (c.first.amount + c.second.amount) / 2)
+    def detected(c):
+        print('fraud detected -> {0}'.format(c.first.amount))
+        print('               -> {0}'.format(c.second.amount))
+        print('               -> {0}'.format(c.third.amount))
+        
+    @when_start
+    def start(host):
+        host.post('risk0', { 'amount': 50 })
+        host.post('risk0', { 'amount': 200 })
+        host.post('risk0', { 'amount': 300 })
+
+
+with ruleset('expense1'):
+    @when_any(all(c.first << m.subject == 'approve', 
+                  c.second << m.amount == 1000), 
+              all(c.third << m.subject == 'jumbo', 
+                  c.fourth << m.amount == 10000))
+    def action(c):
+        if c.first:
+            print ('Approved {0} {1}'.format(c.first.subject, c.second.amount))
+        else:
+            print ('Approved {0} {1}'.format(c.third.subject, c.fourth.amount))
+    
+    @when_start
+    def start(host):
+        host.post('expense1', { 'subject': 'approve' })
+        host.post('expense1', { 'amount': 1000 })
+        host.post('expense1', { 'subject': 'jumbo' })
+        host.post('expense1', { 'amount': 10000 })
+
+
+with ruleset('risk1'):
+    @when_all(c.first << m.t == 'deposit',
+              none(m.t == 'balance'),
+              c.third << m.t == 'withrawal',
+              c.fourth << m.t == 'chargeback')
+    def detected(c):
+        print('fraud detected {0} {1} {2}'.format(c.first.t, c.third.t, c.fourth.t))
+        
+    @when_start
+    def start(host):
+        host.post('risk1', { 't': 'deposit' })
+        host.post('risk1', { 't': 'withrawal' })
+        host.post('risk1', { 't': 'chargeback' })
+
+
+with ruleset('attributes'):
+    @when_all(pri(3), m.amount < 300)
+    def first_detect(c):
+        print('attributes P3 ->{0}'.format(c.m.amount))
+        
+    @when_all(pri(2), m.amount < 200)
+    def second_detect(c):
+        print('attributes P2 ->{0}'.format(c.m.amount))
+        
+    @when_all(pri(1), m.amount < 100)
+    def third_detect(c):
+        print('attributes P1 ->{0}'.format(c.m.amount))
+        
+    @when_start
+    def start(host):
+        host.assert_fact('attributes', { 'amount': 50 })
+        host.assert_fact('attributes', { 'amount': 150 })
+        host.assert_fact('attributes', { 'amount': 250 })
+
+with ruleset('expense2'):
+    # this rule will trigger as soon as three events match the condition
+    @when_all(count(3), m.amount < 100)
+    def approve(c):
+        print('approved {0}'.format(c.m))
+
+    # this rule will be triggered when 'expense' is asserted batching at most two results       
+    @when_all(cap(2),
+              c.expense << m.amount >= 100,
+              c.approval << m.review == True)
+    def reject(c):
+        print('rejected {0}'.format(c.m))
+
+    @when_start
+    def start(host):
+        host.post_batch('expense2', [{ 'amount': 10 },
+                                    { 'amount': 20 },
+                                    { 'amount': 100 },
+                                    { 'amount': 30 },
+                                    { 'amount': 200 },
+                                    { 'amount': 400 }])
+        host.assert_fact('expense2', { 'review': True })
+
+import threading
+import random
+
+with ruleset('risk2'):
+    timer = None
+
+    def start_timer(time, callback):
+        timer = threading.Timer(time, callback)
+        timer.daemon = True    
+        timer.start()
+
+    @when_all(span(5), m.amount > 100)
+    # the action will be called every 5 seconds
+    def high_value(c):
+        print('high value purchases ->{0}'.format(c.m))
+        
+    @when_start
+    def start(host):
+        # will post an event every second
+        def callback():
+            host.post('risk2', { 'amount': random.randint(1, 200) })
+            start_timer(1, callback)
+
+        start_timer(1, callback)
+
+
+with ruleset('flow0'):
+    timer = None
+
+    def start_timer(time, callback):
+        timer = threading.Timer(time, callback)
+        timer.daemon = True    
+        timer.start()
+
+    @when_all(s.state == 'first')
+    # async actions take a callback argument to signal completion
+    def first(c, complete):
+        def end_first():
+            c.s.state = 'second'     
+            print('first completed')
+
+            # completes the action after 3 seconds
+            complete(None)
+        
+        start_timer(3, end_first)
+
+    @when_all(s.state == 'second')
+    def second(c, complete):
+        def end_second():
+            c.s.state = 'third'
+            print('second completed')
+
+            # completes the action after 6 seconds
+            # use the first argument to signal an error
+            complete(Exception('error detected'))
+
+        start_timer(6, end_second)
+
+        # overrides the 5 second default abandon timeout
+        return 10
+
+
+    @when_start
+    def on_start(host):
+        host.patch_state('flow0', { 'state': 'first' })
+
+
+with ruleset('flow1'):
+    
+    @when_all(m.action == 'start')
+    def first(c):
+        raise Exception('Unhandled Exception!')
+
+    # when the exception property exists
+    @when_all(+s.exception)
+    def second(c):
+        print(c.s.exception)
+        c.s.exception = None
+        
+    @when_start
+    def on_start(host):
+        host.post('flow1', { 'action': 'start' })
+
+import datetime
+
+with ruleset('timer'):
+    # when first timer or less than 5 timeouts
+    @when_any(all(s.count == 0),
+              all(s.count < 5,
+                  timeout('Timer')))
+    def pulse(c):
+        c.s.count += 1
+        c.start_timer('Timer', 3)
+        print('pulse ->{0}'.format(datetime.datetime.now().strftime('%I:%M:%S%p')))
+        
+    @when_start
+    def on_start(host):
+        host.patch_state('timer', { 'count': 0 })
+
+with statechart('expense3'):
+    # initial state 'input' with two triggers
+    with state('input'):
+        # trigger to move to 'denied' given a condition
+        @to('denied')
+        @when_all((m.subject == 'approve') & (m.amount > 1000))
+        # action executed before state change
+        def denied(c):
+            print ('denied amount {0}'.format(c.m.amount))
+        
+        @to('pending')    
+        @when_all((m.subject == 'approve') & (m.amount <= 1000))
+        def request(c):
+            print ('requesting approve amount {0}'.format(c.m.amount))
+    
+    # intermediate state 'pending' with two triggers
+    with state('pending'):
+        @to('approved')
+        @when_all(m.subject == 'approved')
+        def approved(c):
+            print ('expense approved')
+            
+        @to('denied')
+        @when_all(m.subject == 'denied')
+        def denied(c):
+            print ('expense denied')
+    
+    # 'denied' and 'approved' are final states    
+    state('denied')
+    state('approved')
+
+    @when_start
+    def on_start(host):
+        # events directed to default statechart instance
+        host.post('expense3', { 'subject': 'approve', 'amount': 100 });
+        host.post('expense3', { 'subject': 'approved' });
+        
+        # events directed to statechart instance with id '1'
+        host.post('expense3', { 'sid': 1, 'subject': 'approve', 'amount': 100 });
+        host.post('expense3', { 'sid': 1, 'subject': 'denied' });
+        
+        # events directed to statechart instance with id '2'
+        host.post('expense3', { 'sid': 2, 'subject': 'approve', 'amount': 10000 });
+
+
+with statechart('worker'):
+    # super-state 'work' has two states and one trigger
+    with state('work'):
+        # sub-sate 'enter' has only one trigger
+        with state('enter'):
+            @to('process')
+            @when_all(m.subject == 'enter')
+            def continue_process(c):
+                print('start process')
+    
+        with state('process'):
+            @to('process')
+            @when_all(m.subject == 'continue')
+            def continue_process(c):
+                print('continue processing')
+
+        # the super-state trigger will be evaluated for all sub-state triggers
+        @to('canceled')
+        @when_all(m.subject == 'cancel')
+        def cancel(c):
+            print('cancel process')
+
+    state('canceled')
+
+    @when_start
+    def start(host):
+        # will move the statechart to the 'work.process' sub-state
+        host.post('worker', { 'subject': 'enter' })
+
+        # will keep the statechart to the 'work.process' sub-state
+        host.post('worker', { 'subject': 'continue' })
+        host.post('worker', { 'subject': 'continue' })
+
+        # will move the statechart out of the work state
+        host.post('worker', { 'subject': 'cancel' })
+
+
+with flowchart('expense4'):
+    # initial stage 'input' has two conditions
+    with stage('input'): 
+        to('request').when_all((m.subject == 'approve') & (m.amount <= 1000))
+        to('deny').when_all((m.subject == 'approve') & (m.amount > 1000))
+    
+    # intermediate stage 'request' has an action and three conditions
+    with stage('request'):
+        @run
+        def request(c):
+            print('requesting approve')
+            
+        to('approve').when_all(m.subject == 'approved')
+        to('deny').when_all(m.subject == 'denied')
+        # reflexive condition: if met, returns to the same stage
+        to('request').when_all(m.subject == 'retry')
+    
+    with stage('approve'):
+        @run 
+        def approved(c):
+            print('expense approved')
+
+    with stage('deny'):
+        @run
+        def denied(c):
+            print('expense denied')
+
+    @when_start
+    def start(host):
+        # events for the default flowchart instance, approved after retry
+        host.post('expense4', { 'subject': 'approve', 'amount': 100 })
+        host.post('expense4', { 'subject': 'retry' })
+        host.post('expense4', { 'subject': 'approved' })
+
+        # events for the flowchart instance '1', denied after first try
+        host.post('expense4', { 'sid': 1, 'subject': 'approve', 'amount': 100})
+        host.post('expense4', { 'sid': 1, 'subject': 'denied'})
+
+        # event for the flowchart instance '2' immediately denied
+        host.post('expense4', { 'sid': 2, 'subject': 'approve', 'amount': 10000})
+
+
+with ruleset('expense5'):
+    @when_all(c.bill << (m.t == 'bill') & (m.invoice.amount > 50),
+              c.account << (m.t == 'account') & (m.payment.invoice.amount == c.bill.invoice.amount))
+    def approved(c):
+        print ('bill amount  ->{0}'.format(c.bill.invoice.amount))
+        print ('account payment amount ->{0}'.format(c.account.payment.invoice.amount))
+        
+    @when_start
+    def start(host):
+        host.post('expense5', {'t': 'bill', 'invoice': {'amount': 100}})
+        host.post('expense5', {'t': 'account', 'payment': {'invoice': {'amount': 100}}})
+
+run_all()
+

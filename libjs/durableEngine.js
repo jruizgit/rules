@@ -482,6 +482,10 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.startTimer = function (sid, timer, timerDuration) {
+            if (sid == undefined) {
+                sid = null;
+            }
+
             return r.startTimer(handle, sid, timerDuration, JSON.stringify(timer));
         };
 
@@ -1380,7 +1384,7 @@ exports = module.exports = durableEngine = function () {
                     }
                     else {
                         try {
-                            response.send(host.getState(request.params.rulesetName, "0"));
+                            response.send(host.getState(request.params.rulesetName, null));
                         } catch (reason) {
                             response.send({ error: reason }, 500);
                         }

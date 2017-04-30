@@ -445,6 +445,10 @@ unsigned int fetchStateProperty(void *tree,
 
 unsigned int getState(void *handle, char *sid, char **state) {
     void *rulesBinding = NULL;
+    if (!sid) {
+        sid = "0";
+    }
+
     unsigned int result = resolveBinding(handle, sid, &rulesBinding);
     if (result != RULES_OK) {
       return result;
@@ -465,6 +469,10 @@ unsigned int getStateVersion(void *handle, char *sid, unsigned long *stateVersio
 
 
 unsigned int deleteState(void *handle, char *sid) {
+    if (!sid) {
+        sid = "0";
+    }
+
     void *rulesBinding = NULL;
     unsigned int result = resolveBinding(handle, sid, &rulesBinding);
     if (result != RULES_OK) {

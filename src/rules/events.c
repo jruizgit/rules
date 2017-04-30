@@ -1032,6 +1032,8 @@ static unsigned int getId(jsonProperty *allProperties,
             *idLength = *idLength + 1;
         case JSON_STRING:
             break;
+        case JSON_NIL:
+            return ERR_NO_ID_DEFINED;
         default:
             return ERR_INVALID_ID;
     }
@@ -1864,6 +1866,10 @@ unsigned int abandonAction(void *handle, void *actionHandle) {
 
 unsigned int queueMessage(void *handle, unsigned int queueAction, char *sid, char *destination, char *message) {
     void *rulesBinding;
+    if (!sid) {
+        sid = "0";
+    }
+
     unsigned int result = resolveBinding(handle, sid, &rulesBinding);
     if (result != RULES_OK) {
         return result;
@@ -1874,6 +1880,10 @@ unsigned int queueMessage(void *handle, unsigned int queueAction, char *sid, cha
 
 unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *timer) {
     void *rulesBinding;
+    if (!sid) {
+        sid = "0";
+    }
+    
     unsigned int result = resolveBinding(handle, sid, &rulesBinding);
     if (result != RULES_OK) {
         return result;
@@ -1884,6 +1894,10 @@ unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *ti
 
 unsigned int cancelTimer(void *handle, char *sid, char *timer) {
     void *rulesBinding;
+    if (!sid) {
+        sid = "0";
+    }
+
     unsigned int result = resolveBinding(handle, sid, &rulesBinding);
     if (result != RULES_OK) {
         return result;
@@ -1894,6 +1908,10 @@ unsigned int cancelTimer(void *handle, char *sid, char *timer) {
 
 unsigned int renewActionLease(void *handle, char *sid) {
     void *rulesBinding;
+    if (!sid) {
+        sid = "0";
+    }
+
     unsigned int result = resolveBinding(handle, sid, &rulesBinding);
     if (result != RULES_OK) {
         return result;
