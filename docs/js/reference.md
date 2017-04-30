@@ -11,6 +11,7 @@ Reference Manual
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
   * [Correlated Sequence](reference.md#correlated-sequence)
+  * [Nested Objects](reference.md#nested-objects)
   * [Lack of Information](reference.md#lack-of-information)
   * [Choice of Sequences](reference.md#choice-of-sequences)
 * [Consequents](reference.md#consequents)  
@@ -310,7 +311,38 @@ d.ruleset('risk', function() {
 
 d.runAll();
 ```
-[top](reference.md#table-of-contents) 
+[top](reference.md#table-of-contents)  
+
+### Nested Objects
+Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.  
+
+```javascript
+var d = require('durable');
+
+d.ruleset('expense4', function() {
+    // use the '.' notation to match properties in nested objects
+    whenAll: {
+        bill = m.t == 'bill' && m.invoice.amount > 50
+        account = m.t == 'account' && m.payment.invoice.amount == bill.invoice.amount
+    }
+    run: {
+        console.log('bill amount ->' + bill.invoice.amount);
+        console.log('account payment amount ->' + account.payment.invoice.amount);
+    }
+
+    whenStart: {
+        // one level of nesting
+        post('expense4', {t: 'bill', invoice: {amount: 100}});  
+
+        // two levels of nesting
+        post('expense4', {t: 'account', payment: {invoice: {amount: 100}}}); 
+    }
+});
+
+d.runAll();
+```
+[top](reference.md#table-of-contents)  
+
 ### Lack of Information
 In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.
 ```javascript
@@ -379,7 +411,7 @@ d.runAll();
 
 ## Consequents
 ### Conflict Resolution
-Event and fact evaluation can lead to multiple consequents. The triggering order can be controlled by using the priority (salience) attribute.
+Event and fact evaluation can lead to multiple consequents. The triggering order can be controlled by using the `pri` (salience) attribute. Actions with lower value are executed first. The default value for all actions is 0.
 
 In this example, notice how the last rule is triggered first, as it has the highest priority.
 ```javascript
@@ -445,7 +477,7 @@ d.ruleset('expense', function() {
 
 d.runAll();
 ```
-
+[top](reference.md#table-of-contents)  
 ### Tumbling Window
 Actions can also be batched using time tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
 
@@ -456,6 +488,7 @@ This example generates events with random amounts. An action is scheduled every 
 var d = require('durable');
 
 d.ruleset('risk', function() {
+    // the action will be called every 5 seconds
     whenAll: m.amount > 100
     span: 5
     run: console.log('high value purchases ->' + JSON.stringify(m));
@@ -496,10 +529,12 @@ d.ruleset('flow', function() {
     whenAll: s.state == 'second'
     runAsync: {
         setTimeout(function() {
+            s.state = 'third';
             console.log('second completed');
             
             // completes the async action after 6 seconds
-            complete();
+            // use the first argument to signal an error
+            complete('error detected');
         }, 6000);
         
         // overrides the 5 second default abandon timeout
@@ -513,6 +548,7 @@ d.ruleset('flow', function() {
 
 d.runAll();
 ```
+[top](reference.md#table-of-contents)  
 ### Unhandled Exceptions  
 When exceptions are not handled by actions, they are stored in the context state. This enables writing exception handling rules.
 
@@ -537,7 +573,7 @@ d.ruleset('flow', function() {
 
 d.runAll();
 ```
-
+[top](reference.md#table-of-contents)  
 ## Flow Structures
 ### Timers
 Events can be scheduled with timers. A timeout condition can be included in the rule antecedent.   
@@ -661,7 +697,6 @@ d.statechart('worker', function() {
     
         // the super-state trigger will be evaluated for all sub-state triggers
         to: 'canceled'
-        pri: 1
         whenAll: m.subject == 'cancel'
         run: console.log('cancel process')
     }
