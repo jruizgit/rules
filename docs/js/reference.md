@@ -11,6 +11,7 @@ Reference Manual
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
   * [Correlated Sequence](reference.md#correlated-sequence)
+  * [Nested Objects](reference.md#nested-objects)
   * [Lack of Information](reference.md#lack-of-information)
   * [Choice of Sequences](reference.md#choice-of-sequences)
 * [Consequents](reference.md#consequents)  
@@ -310,7 +311,38 @@ d.ruleset('risk', function() {
 
 d.runAll();
 ```
-[top](reference.md#table-of-contents) 
+[top](reference.md#table-of-contents)  
+
+### Nested Objects
+Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.  
+
+```javascript
+var d = require('durable');
+
+d.ruleset('expense4', function() {
+    // use the '.' notation to match properties in nested objects
+    whenAll: {
+        bill = m.t == 'bill' && m.invoice.amount > 50
+        account = m.t == 'account' && m.payment.invoice.amount == bill.invoice.amount
+    }
+    run: {
+        console.log('bill amount ->' + bill.invoice.amount);
+        console.log('account payment amount ->' + account.payment.invoice.amount);
+    }
+
+    whenStart: {
+        // one level of nesting
+        post('expense4', {t: 'bill', invoice: {amount: 100}});  
+
+        // two levels of nesting
+        post('expense4', {t: 'account', payment: {invoice: {amount: 100}}}); 
+    }
+});
+
+d.runAll();
+```
+[top](reference.md#table-of-contents)  
+
 ### Lack of Information
 In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.
 ```javascript
