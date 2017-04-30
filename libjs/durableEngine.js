@@ -725,11 +725,7 @@ exports = module.exports = durableEngine = function () {
 
                             if (c.isDeleted()) {
                                 try {
-                                    if (!c.s.id) {
-                                        host.deleteState(name, 0);
-                                    } else {
-                                        host.deleteState(name, c.s.id);
-                                    }
+                                    host.deleteState(name, c.s.sid);
                                 } catch (reason) {
                                     complete(reason);
                                 }

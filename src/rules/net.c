@@ -698,7 +698,7 @@ static unsigned int loadAddMessageCommand(ruleset *tree, binding *rulesBinding) 
 "end\n"
 "local mid = message[\"id\"]\n"
 "if not mid then\n"
-"    mid = \"$m-\" .. redis.call(\"hincrby\", mid_count_hashset, mid, 1)\n"
+"    mid = \"$m-\" .. redis.call(\"hincrby\", mid_count_hashset, sid, 1)\n"
 "    message[\"id\"] = mid\n"
 "else\n"
 "    if redis.call(\"hsetnx\", visited_hashset, mid, 1) == 0 then\n"

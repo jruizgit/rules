@@ -206,6 +206,12 @@ exports = module.exports = durableEngine = function () {
                     };
                 };
                break;
+            case 'ForStatement':
+                transformRunStatement(statement.init, cmap);
+                transformRunStatement(statement.test, cmap);
+                transformRunStatement(statement.update, cmap);
+                transformRunStatement(statement.body, cmap);
+                break;
             case 'SwitchStatement':
                statement.cases.forEach(function(c, i){
                   transformRunStatement(c, cmap);
