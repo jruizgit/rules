@@ -665,7 +665,6 @@ d.statechart('worker', function() {
     
         // the super-state trigger will be evaluated for all sub-state triggers
         to: 'canceled'
-        pri: 1
         whenAll: m.subject == 'cancel'
         run: console.log('cancel process')
     }
