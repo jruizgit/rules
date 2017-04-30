@@ -537,48 +537,38 @@ with ruleset('flow'):
 run_all()
 ```
 [top](reference.md#table-of-contents)  
+## Flow Structures
 ### Timers
-`durable_rules` supports scheduling timeout events and writing rules, which observe such events.  
+Events can be scheduled with timers. A timeout condition can be included in the rule antecedent.   
 
-Timer rules:  
-* Timers can be started in the `start` handler via the host parameter.   
-* Timers can started in an `action` handler using the context parameter.   
-* A timeout is an event. 
-* A timeout is raised only once.  
-* Timeouts can be observed in rules given the timer name.  
-* The start timer operation is idempotent.  
+* start_timer: starts a timer with the name and duration specified. id is optional if planning to cancel the timer.
+* cancel_timer: cancels ongoing timer, name and id are required.
+* timeout: used as an antecedent condition.
 
-The example shows an event scheduled to be raised after 5 seconds and a rule which reacts to such an event.  
-
-API:  
-* `host.start_timer(timer_name, seconds)`
-* `c.start_timer(timer_name, seconds)`  
-* `when... timeout(timer_name)`  
 ```python
 from durable.lang import *
 import datetime
 
-with ruleset('t1'): 
-    @when_all(m.start == 'yes')
-    def start_timer(c):
-        c.s.start = datetime.datetime.now().strftime('%I:%M:%S%p')
-        c.start_timer('my_timer', 5)
-
-    @when_all(timeout('my_timer'))
-    def end_timer(c):
-        print('t1 started @%s' % c.s.start)
-        print('t1 ended @%s' % datetime.datetime.now().strftime('%I:%M:%S%p'))
-
+with ruleset('timer'):
+    # when first timer or less than 5 timeouts
+    @when_any(all(s.count == 0),
+              all(s.count < 5,
+                  timeout('Timer')))
+    def pulse(c):
+        c.s.count += 1
+        c.start_timer('Timer', 3)
+        print('pulse ->{0}'.format(datetime.datetime.now().strftime('%I:%M:%S%p')))
+        
     @when_start
-    def start(host):
-        host.post('t1', {'id': 1, 'sid': 1, 'start': 'yes'})
-
+    def on_start(host):
+        host.patch_state('timer', { 'count': 0 })
+        
 run_all()
 ```
 [top](reference.md#table-of-contents)  
-## Flow Structures
+
 ### Statechart
-`durable_rules` lets you organize the ruleset flow such that its context is always in exactly one of a number of possible states with well-defined conditional transitions between these states. Actions depend on the state of the context and a triggering event.  
+Rules can be organized using statecharts. A statechart is a deterministic finite automaton (DFA). The state context is in one of a number of possible states with conditional transitions between these states. 
 
 Statechart rules:  
 * A statechart can have one or more states.  
@@ -590,97 +580,103 @@ Statechart rules:
 * A trigger can have a rule (absence means state enter).  
 * A trigger can have an action.  
 
-The example shows an approval state machine, which waits for two consecutive events (`subject = "approve"` and `subject = "approved"`) to reach the `approved` state.  
-
-API:  
-* `with statechart(ruleset_name): states_block`  
-* `with state(state_name): [triggers_and_states_block]`  
-
-Action decorators:  
-* `@to(state_name)`  
-* `@rule`  
 ```python
 from durable.lang import *
-with statechart('a2'):
+
+with statechart('expense'):
+    # initial state 'input' with two triggers
     with state('input'):
+        # trigger to move to 'denied' given a condition
         @to('denied')
         @when_all((m.subject == 'approve') & (m.amount > 1000))
+        # action executed before state change
         def denied(c):
-            print ('a2 denied from: {0}'.format(c.s.sid))
+            print ('denied amount {0}'.format(c.m.amount))
         
         @to('pending')    
         @when_all((m.subject == 'approve') & (m.amount <= 1000))
         def request(c):
-            print ('a2 request approval from: {0}'.format(c.s.sid))
-        
+            print ('requesting approve amount {0}'.format(c.m.amount))
+    
+    # intermediate state 'pending' with two triggers
     with state('pending'):
-        @to('pending')
-        @when_all(m.subject == 'approved')
-        def second_request(c):
-            print ('a2 second request approval from: {0}'.format(c.s.sid))
-            c.s.status = 'approved'
-
         @to('approved')
-        @when_all(s.status == 'approved')
+        @when_all(m.subject == 'approved')
         def approved(c):
-            print ('a2 approved from: {0}'.format(c.s.sid))
-        
+            print ('expense approved')
+            
         @to('denied')
         @when_all(m.subject == 'denied')
         def denied(c):
-            print ('a2 denied from: {0}'.format(c.s.sid))
-        
+            print ('expense denied')
+    
+    # 'denied' and 'approved' are final states    
     state('denied')
     state('approved')
-    @when_start
-    def start(host):
-        host.post('a2', {'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100})
-        host.post('a2', {'id': 2, 'sid': 1, 'subject': 'approved'})
-        host.post('a2', {'id': 3, 'sid': 2, 'subject': 'approve', 'amount': 100})
-        host.post('a2', {'id': 4, 'sid': 2, 'subject': 'denied'})
-        host.post('a2', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000})
 
+    @when_start
+    def on_start(host):
+        # events directed to default statechart instance
+        host.post('expense', { 'subject': 'approve', 'amount': 100 });
+        host.post('expense', { 'subject': 'approved' });
+        
+        # events directed to statechart instance with id '1'
+        host.post('expense', { 'sid': 1, 'subject': 'approve', 'amount': 100 });
+        host.post('expense', { 'sid': 1, 'subject': 'denied' });
+        
+        # events directed to statechart instance with id '2'
+        host.post('expense', { 'sid': 2, 'subject': 'approve', 'amount': 10000 });
+        
 run_all()
 ```
 [top](reference.md#table-of-contents)  
 ### Nested States
-`durable_rules` supports nested states. Which implies that, along with the [statechart](reference.md#statechart) description from the previous section, most of the [UML statechart](http://en.wikipedia.org/wiki/UML_state_machine) semantics is supported. If a context is in the nested state, it also (implicitly) is in the surrounding state. The state machine will attempt to handle any event in the context of the substate, which conceptually is at the lower level of the hierarchy. However, if the substate does not prescribe how to handle the event, the event is not discarded, but it is automatically handled at the higher level context of the superstate.
+Nested states allow for writing compact statecharts. If a context is in the nested state, it also (implicitly) is in the surrounding state. The statechart will attempt to handle any event in the context of the sub-state. If the sub-state does not  handle an event, the event is automatically handled at the context of the super-state.
 
-The example below shows a statechart, where the `canceled` transition is reused for both the `enter` and the `process` states. 
 ```python
 from durable.lang import *
-with statechart('a6'):
+
+with statechart('worker'):
+    # super-state 'work' has two states and one trigger
     with state('work'):
+        # sub-sate 'enter' has only one trigger
         with state('enter'):
             @to('process')
             @when_all(m.subject == 'enter')
             def continue_process(c):
-                print('a6 continue_process')
+                print('start process')
     
         with state('process'):
             @to('process')
             @when_all(m.subject == 'continue')
             def continue_process(c):
-                print('a6 processing')
+                print('continue processing')
 
+        # the super-state trigger will be evaluated for all sub-state triggers
         @to('canceled')
         @when_all(m.subject == 'cancel')
         def cancel(c):
-            print('a6 canceling')
+            print('cancel process')
 
     state('canceled')
+
     @when_start
     def start(host):
-        host.post('a6', {'id': 1, 'sid': 1, 'subject': 'enter'})
-        host.post('a6', {'id': 2, 'sid': 1, 'subject': 'continue'})
-        host.post('a6', {'id': 3, 'sid': 1, 'subject': 'continue'})
-        host.post('a6', {'id': 4, 'sid': 1, 'subject': 'cancel'})
+        # will move the statechart to the 'work.process' sub-state
+        host.post('worker', { 'subject': 'enter' })
+
+        # will keep the statechart to the 'work.process' sub-state
+        host.post('worker', { 'subject': 'continue' })
+        host.post('worker', { 'subject': 'continue' })
+
+        # will move the statechart out of the work state
+        host.post('worker', { 'subject': 'cancel' })
         
 run_all()
 ```
 [top](reference.md#table-of-contents)
 ### Flowchart
-In addition to [statechart](reference.md#statechart), flowchart is another way for organizing a ruleset flow. In a flowchart each stage represents an action to be executed. So (unlike the statechart state), when applied to the context state, it results in a transition to another stage.  
+A flowchart is another way of organizing a ruleset flow. In a flowchart each stage represents an action to be executed. So (unlike the statechart state), when applied to the context state, it results in a transition to another stage.  
 
 Flowchart rules:  
 * A flowchart can have one or more stages.  
@@ -690,53 +686,50 @@ Flowchart rules:
 * A stage can have zero or more conditions.  
 * A condition has a rule and a destination stage.  
 
-API:  
-* `flowchart(ruleset_name): stage_condition_block`  
-* `with stage(stage_name): [action_condition_block]`  
-* `to(stage_name).[rule]`  
-
-Decorators:  
-* `@run`  
-Note: conditions have to be defined immediately after the stage definition  
 ```python
 from durable.lang import *
-with flowchart('a3'):
+
+with flowchart('expense'):
+    # initial stage 'input' has two conditions
     with stage('input'): 
         to('request').when_all((m.subject == 'approve') & (m.amount <= 1000))
         to('deny').when_all((m.subject == 'approve') & (m.amount > 1000))
     
+    # intermediate stage 'request' has an action and three conditions
     with stage('request'):
         @run
         def request(c):
-            print ('a3 request approval from: {0}'.format(c.s.sid))
-            if c.s.status:
-                c.s.status = 'approved'
-            else:
-                c.s.status = 'pending'
-
-        to('approve').when_all(s.status == 'approved')
+            print('requesting approve')
+            
+        to('approve').when_all(m.subject == 'approved')
         to('deny').when_all(m.subject == 'denied')
-        to('request').when_all(m.subject == 'approved')
+        # reflexive condition: if met, returns to the same stage
+        to('request').when_all(m.subject == 'retry')
     
     with stage('approve'):
         @run 
         def approved(c):
-            print ('a3 approved from: {0}'.format(c.s.sid))
+            print('expense approved')
 
     with stage('deny'):
         @run
         def denied(c):
-            print ('a3 denied from: {0}'.format(c.s.sid))
+            print('expense denied')
 
     @when_start
     def start(host):
-        host.post('a3', {'id': 1, 'sid': 1, 'subject': 'approve', 'amount': 100})
-        host.post('a3', {'id': 2, 'sid': 1, 'subject': 'approved'})
-        host.post('a3', {'id': 3, 'sid': 2, 'subject': 'approve', 'amount': 100})
-        host.post('a3', {'id': 4, 'sid': 2, 'subject': 'denied'})
-        host.post('a3', {'id': 5, 'sid': 3, 'subject': 'approve', 'amount': 10000})
+        # events for the default flowchart instance, approved after retry
+        host.post('expense', { 'subject': 'approve', 'amount': 100 })
+        host.post('expense', { 'subject': 'retry' })
+        host.post('expense', { 'subject': 'approved' })
 
+        # events for the flowchart instance '1', denied after first try
+        host.post('expense', { 'sid': 1, 'subject': 'approve', 'amount': 100})
+        host.post('expense', { 'sid': 1, 'subject': 'denied'})
+
+        # event for the flowchart instance '2' immediately denied
+        host.post('expense', { 'sid': 2, 'subject': 'approve', 'amount': 10000})
+        
 run_all()
 ```
 [top](reference.md#table-of-contents)  
-
