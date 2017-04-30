@@ -11,6 +11,7 @@ Reference Manual
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
   * [Correlated Sequence](reference.md#correlated-sequence)
+  * [Nested Objects](reference.md#nested-objects)
   * [Lack of Information](reference.md#lack-of-information)
   * [Choice of Sequences](reference.md#choice-of-sequences)
 * [Consequents](reference.md#consequents)  
@@ -306,6 +307,31 @@ run_all()
 ```  
 
 [top](reference.md#table-of-contents)  
+### Nested Objects
+Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.  
+
+```python
+
+with ruleset('expense'):
+    # use the '.' notation to match properties in nested objects
+    @when_all(c.bill << (m.t == 'bill') & (m.invoice.amount > 50),
+              c.account << (m.t == 'account') & (m.payment.invoice.amount == c.bill.invoice.amount))
+    def approved(c):
+        print ('bill amount  ->{0}'.format(c.bill.invoice.amount))
+        print ('account payment amount ->{0}'.format(c.account.payment.invoice.amount))
+        
+    @when_start
+    def start(host):
+        # one level of nesting
+        host.post('expense', {'t': 'bill', 'invoice': {'amount': 100}})
+        
+        #two levels of nesting
+        host.post('expense', {'t': 'account', 'payment': {'invoice': {'amount': 100}}})
+
+run_all()
+```  
+[top](reference.md#table-of-contents)  
+
 ### Lack of Information
 In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.
 ```python
