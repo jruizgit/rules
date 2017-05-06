@@ -850,5 +850,5 @@ with ruleset('waltzdb'):
         host.assert_fact('waltzdb', {'t':'stage', 'l':'duplicate', 'sid': 1, 'id': 999})
         host.patch_state('waltzdb', {'sid': 1, 'gid': 1000, 'start_time': unix_time_millis(datetime.datetime.now())})
 
-run_all(['/tmp/redis0.sock'])
+run_all()
 

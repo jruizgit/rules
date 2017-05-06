@@ -1,4 +1,6 @@
 from durable.lang import *
+import threading
+import datetime
 
 
 with statechart('expense'):
@@ -66,6 +68,7 @@ with ruleset('animal'):
         host.assert_fact('animal', { 'subject': 'Greedy', 'verb': 'eats', 'predicate': 'flies' })
         host.assert_fact('animal', { 'subject': 'Greedy', 'verb': 'lives', 'predicate': 'land' })
         host.assert_fact('animal', { 'subject': 'Tweety', 'verb': 'eats', 'predicate': 'worms' })
+
 
 with ruleset('test'):
     # antecedent
@@ -176,7 +179,7 @@ with ruleset('match'):
 with ruleset('risk0'):
     @when_all(c.first << m.amount > 10,
               c.second << m.amount > c.first.amount * 2,
-              c.third << m.amount > (c.first.amount + c.second.amount) / 2)
+              c.third << m.amount > c.first.amount + c.second.amount)
     def detected(c):
         print('fraud detected -> {0}'.format(c.first.amount))
         print('               -> {0}'.format(c.second.amount))
@@ -242,6 +245,7 @@ with ruleset('attributes'):
         host.assert_fact('attributes', { 'amount': 150 })
         host.assert_fact('attributes', { 'amount': 250 })
 
+
 with ruleset('expense2'):
     # this rule will trigger as soon as three events match the condition
     @when_all(count(3), m.amount < 100)
@@ -264,31 +268,6 @@ with ruleset('expense2'):
                                     { 'amount': 200 },
                                     { 'amount': 400 }])
         host.assert_fact('expense2', { 'review': True })
-
-import threading
-import random
-
-with ruleset('risk2'):
-    timer = None
-
-    def start_timer(time, callback):
-        timer = threading.Timer(time, callback)
-        timer.daemon = True    
-        timer.start()
-
-    @when_all(span(5), m.amount > 100)
-    # the action will be called every 5 seconds
-    def high_value(c):
-        print('high value purchases ->{0}'.format(c.m))
-        
-    @when_start
-    def start(host):
-        # will post an event every second
-        def callback():
-            host.post('risk2', { 'amount': random.randint(1, 200) })
-            start_timer(1, callback)
-
-        start_timer(1, callback)
 
 
 with ruleset('flow0'):
@@ -348,7 +327,6 @@ with ruleset('flow1'):
     def on_start(host):
         host.post('flow1', { 'action': 'start' })
 
-import datetime
 
 with ruleset('timer'):
     # when first timer or less than 5 timeouts
@@ -363,6 +341,7 @@ with ruleset('timer'):
     @when_start
     def on_start(host):
         host.patch_state('timer', { 'count': 0 })
+
 
 with statechart('expense3'):
     # initial state 'input' with two triggers
@@ -409,43 +388,6 @@ with statechart('expense3'):
         host.post('expense3', { 'sid': 2, 'subject': 'approve', 'amount': 10000 });
 
 
-with statechart('worker'):
-    # super-state 'work' has two states and one trigger
-    with state('work'):
-        # sub-sate 'enter' has only one trigger
-        with state('enter'):
-            @to('process')
-            @when_all(m.subject == 'enter')
-            def continue_process(c):
-                print('start process')
-    
-        with state('process'):
-            @to('process')
-            @when_all(m.subject == 'continue')
-            def continue_process(c):
-                print('continue processing')
-
-        # the super-state trigger will be evaluated for all sub-state triggers
-        @to('canceled')
-        @when_all(m.subject == 'cancel')
-        def cancel(c):
-            print('cancel process')
-
-    state('canceled')
-
-    @when_start
-    def start(host):
-        # will move the statechart to the 'work.process' sub-state
-        host.post('worker', { 'subject': 'enter' })
-
-        # will keep the statechart to the 'work.process' sub-state
-        host.post('worker', { 'subject': 'continue' })
-        host.post('worker', { 'subject': 'continue' })
-
-        # will move the statechart out of the work state
-        host.post('worker', { 'subject': 'cancel' })
-
-
 with flowchart('expense4'):
     # initial stage 'input' has two conditions
     with stage('input'): 
@@ -486,6 +428,43 @@ with flowchart('expense4'):
 
         # event for the flowchart instance '2' immediately denied
         host.post('expense4', { 'sid': 2, 'subject': 'approve', 'amount': 10000})
+
+
+with statechart('worker'):
+    # super-state 'work' has two states and one trigger
+    with state('work'):
+        # sub-sate 'enter' has only one trigger
+        with state('enter'):
+            @to('process')
+            @when_all(m.subject == 'enter')
+            def continue_process(c):
+                print('start process')
+    
+        with state('process'):
+            @to('process')
+            @when_all(m.subject == 'continue')
+            def continue_process(c):
+                print('continue processing')
+
+        # the super-state trigger will be evaluated for all sub-state triggers
+        @to('canceled')
+        @when_all(m.subject == 'cancel')
+        def cancel(c):
+            print('cancel process')
+
+    state('canceled')
+
+    @when_start
+    def start(host):
+        # will move the statechart to the 'work.process' sub-state
+        host.post('worker', { 'subject': 'enter' })
+
+        # will keep the statechart to the 'work.process' sub-state
+        host.post('worker', { 'subject': 'continue' })
+        host.post('worker', { 'subject': 'continue' })
+
+        # will move the statechart out of the work state
+        host.post('worker', { 'subject': 'cancel' })
 
 
 with ruleset('expense5'):
