@@ -146,31 +146,39 @@ class Closure(object):
 
         sid_list.append(sid)
 
-    def start_timer(self, timer_name, duration, timer_id = None):
-        timer = None
-        if not timer_id:
-            if timer_name in self._timer_directory:
-                raise Exception('Timer with name {0} already added'.format(timer_name))
-            else:
-                timer = {'sid': self.s.sid, '$t': timer_name}
-                self._timer_directory[timer_name] = (timer, duration)
+    def start_timer(self, timer_name, duration, manual_reset = False):
+        if timer_name in self._timer_directory:
+            raise Exception('Timer with name {0} already added'.format(timer_name))
         else:
-            if timer_id in self._timer_directory:
-                raise Exception('Timer with id {0} already added'.format(timer_id))
-            else:
-                timer = {'sid': self.s.sid, 'id': timer_id, '$t': timer_name}
-                self._timer_directory[timer_id] = (timer, duration)
-
-    def cancel_timer(self, timer_name, timer_id):
-        timer = None
-        if not timer_id:
-            raise Exception('Timer with id is required to cancel a timer')
-
-        if timer_id in self._cancelled_timer_directory:
-            raise Exception('Timer with id {0} already cancelled'.format(timer_id))
+            timer = {'sid': self.s.sid, '$t': timer_name}
+            self._timer_directory[timer_name] = (timer, duration, manual_reset)
+        
+    def cancel_timer(self, timer_name):
+        if timer_name in self._cancelled_timer_directory:
+            raise Exception('Timer with name {0} already cancelled'.format(timer_name))
         else:
-            timer = {'sid': self.s.sid, 'id': timer_id, '$t': timer_name}
-            self._cancelled_timer_directory[timer_id] = timer
+            self._cancelled_timer_directory[timer_name] = True
+
+    def _retract_timer(self, timer_name, message):
+        if '$t' in message and message['$t'] == timer_name:
+            self.retract_fact(message)
+            return True
+
+        for property_name, property_value in message.items():
+            if isinstance(property_value, dict) and self._retract_timer(timer_name, property_value):
+                return True
+
+        return False
+
+    def reset_timer(self, timer_name):
+        if self._m:
+            return self._retract_timer(timer_name, self._m)
+        else:
+            for message in self.m:
+                if self._retract_timer(timer_name, message):
+                    return True
+
+            return False
 
     def assert_fact(self, ruleset_name, fact = None):
         if not fact: 
@@ -226,13 +234,19 @@ class Closure(object):
     def _is_deleted(self):
         return self._deleted
 
-    def __getattr__(self, name):   
+    def __getattr__(self, name):
+        if name == '_m':
+            return None
+
         if name in self._m:
             return Content(self._m[name])
         else:
             return None
 
 class Content(object):
+
+    def items(self):
+        return self._d.items()
 
     def __init__(self, data):
         self._d = data
@@ -416,7 +430,7 @@ class Ruleset(object):
         return rules.assert_event(self._handle, json.dumps(message, ensure_ascii=False))
 
     def queue_assert_event(self, sid, ruleset_name, message):
-        if sid: 
+        if sid != None: 
             sid = str(sid)
 
         rules.queue_assert_event(self._handle, sid, ruleset_name, json.dumps(message, ensure_ascii=False))
@@ -434,7 +448,7 @@ class Ruleset(object):
         return rules.assert_fact(self._handle, json.dumps(fact, ensure_ascii=False))
 
     def queue_assert_fact(self, sid, ruleset_name, message):
-        if sid: 
+        if sid != None: 
             sid = str(sid)
 
         rules.queue_assert_fact(self._handle, sid, ruleset_name, json.dumps(message, ensure_ascii=False))
@@ -450,9 +464,9 @@ class Ruleset(object):
 
     def retract_fact(self, fact):
         return rules.retract_fact(self._handle, json.dumps(fact, ensure_ascii=False))
-
+        
     def queue_retract_fact(self, sid, ruleset_name, message):
-        if sid: 
+        if sid != None: 
             sid = str(sid)
 
         rules.queue_retract_fact(self._handle, sid, ruleset_name, json.dumps(message, ensure_ascii=False))
@@ -466,17 +480,17 @@ class Ruleset(object):
     def start_retract_facts(self, facts):
         return rules.start_retract_facts(self._handle, json.dumps(facts, ensure_ascii=False))
 
-    def start_timer(self, sid, timer, timer_duration):
-        if sid: 
+    def start_timer(self, sid, timer, timer_duration, manual_reset):
+        if sid != None: 
             sid = str(sid)
 
-        rules.start_timer(self._handle, sid, timer_duration, json.dumps(timer, ensure_ascii=False))
+        rules.start_timer(self._handle, timer_duration, manual_reset, json.dumps(timer, ensure_ascii=False), sid)
 
-    def cancel_timer(self, sid, timer):
-        if sid: 
+    def cancel_timer(self, sid, timer_name):
+        if sid != None: 
             sid = str(sid)
 
-        rules.cancel_timer(self._handle, sid, json.dumps(timer, ensure_ascii=False))
+        rules.cancel_timer(self._handle, sid, timer_name)
 
     def assert_state(self, state):
         if 'sid' in state:
@@ -485,19 +499,19 @@ class Ruleset(object):
             return rules.assert_state(self._handle, None, json.dumps(state, ensure_ascii=False))
 
     def get_state(self, sid):
-        if sid: 
+        if sid != None: 
             sid = str(sid)
 
         return json.loads(rules.get_state(self._handle, sid))
 
     def delete_state(self, sid):
-        if sid: 
+        if sid != None: 
             sid = str(sid)
 
         rules.delete_state(self._handle, sid)
     
     def renew_action_lease(self, sid):
-        if sid: 
+        if sid != None: 
             sid = str(sid)
 
         rules.renew_action_lease(self._handle, sid)
@@ -588,11 +602,11 @@ class Ruleset(object):
                     complete(e, True)
                 else:
                     try:
-                        for timer_id, timer in c.get_cancelled_timers().items():
-                            self.cancel_timer(c.s['sid'], timer)
+                        for timer_name, timer in c.get_cancelled_timers().items():
+                            self.cancel_timer(c.s['sid'], timer_name)
 
-                        for timer_id, timer_duration in c.get_timers().items():
-                            self.start_timer(c.s['sid'], timer_duration[0], timer_duration[1])
+                        for timer_id, timer_tuple in c.get_timers().items():
+                            self.start_timer(c.s['sid'], timer_tuple[0], timer_tuple[1], timer_tuple[2])
 
                         for ruleset_name, q in c.get_queues().items():
                             for message in q.get_queued_posts():
@@ -713,7 +727,7 @@ class Statechart(Ruleset):
             start_state[qualified_name] = True
 
             for trigger_name, trigger in state.items():
-                if ('to' in trigger and trigger['to'] == state_name) or 'count' in trigger or 'cap' in trigger or 'span' in trigger:
+                if ('to' in trigger and trigger['to'] == state_name) or 'count' in trigger or 'cap' in trigger:
                     reflexive_states[qualified_name] = True
 
         for state_name, state in chart_definition.items():
@@ -744,9 +758,6 @@ class Statechart(Ruleset):
 
                     if 'count' in trigger:
                         rule['count'] = trigger['count']
-
-                    if 'span' in trigger:
-                        rule['span'] = trigger['span']
 
                     if 'cap' in trigger:
                         rule['cap'] = trigger['cap']
@@ -829,7 +840,7 @@ class Flowchart(Ruleset):
                         reflexive_stages[stage_name] = True
                 else:
                     for transition_name, transition in stage['to'].items():
-                        if transition_name == stage_name or 'count' in transition or 'span' in transition or 'cap' in transition:
+                        if transition_name == stage_name or 'count' in transition or 'cap' in transition:
                             reflexive_stages[stage_name] = True
 
         for stage_name, stage in chart_definition.items():
@@ -871,9 +882,6 @@ class Flowchart(Ruleset):
 
                         if 'count' in transition:
                             rule['count'] = transition['count']
-
-                        if 'span' in transition:
-                            rule['span'] = transition['span']
 
                         if 'cap' in transition:
                             rule['cap'] = transition['cap']

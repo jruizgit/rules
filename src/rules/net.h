@@ -30,6 +30,7 @@ typedef struct binding {
     functionHash removeActionHash;
     functionHash partitionHash;
     functionHash timersHash;
+    functionHash removeTimerHash;
     functionHash updateActionHash;
     functionHash deleteSessionHash;
     char *sessionHashset;
@@ -132,10 +133,11 @@ unsigned int peekTimers(ruleset *tree,
 
 unsigned int registerTimer(void *rulesBinding, 
                            unsigned int duration, 
+                           char assert,
                            char *timer);
 
 unsigned int removeTimer(void *rulesBinding, 
-                         char *timer);
+                         char *timerName);
 
 unsigned int registerMessage(void *rulesBinding, 
                              unsigned int queueAction,

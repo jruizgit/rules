@@ -3,6 +3,12 @@
 
 static PyObject *RulesError;
 
+#define PRINT_ARGS(args) do { \
+    PyObject* or = PyObject_Repr(args); \
+    const char* s = PyString_AsString(or); \
+    printf("args %s\n", s); \
+} while(0)
+
 static PyObject *pyCreateRuleset(PyObject *self, PyObject *args) {
     char *name;
     char *rules;
@@ -804,13 +810,14 @@ static PyObject *pyStartTimer(PyObject *self, PyObject *args) {
     void *handle;
     char *sid;
     int duration = 0;
-    char *timer = NULL;
-    if (!PyArg_ParseTuple(args, "Kzis", &handle, &sid, &duration, &timer)) {
+    char manualReset = 0;
+    char *timer = NULL;   
+    if (!PyArg_ParseTuple(args, "Kibsz", &handle, &duration, &manualReset, &timer, &sid)) {
         PyErr_SetString(RulesError, "pyStartTimer Invalid argument");
         return NULL;
     }
 
-    unsigned int result = startTimer(handle, sid, duration, timer);
+    unsigned int result = startTimer(handle, sid, duration, manualReset, timer);
     if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -832,13 +839,13 @@ static PyObject *pyStartTimer(PyObject *self, PyObject *args) {
 static PyObject *pyCancelTimer(PyObject *self, PyObject *args) {
     void *handle;
     char *sid;
-    char *timer = NULL;
-    if (!PyArg_ParseTuple(args, "Kzs", &handle, &sid, &timer)) {
+    char *timerName = NULL;
+    if (!PyArg_ParseTuple(args, "Kzs", &handle, &sid, &timerName)) {
         PyErr_SetString(RulesError, "pyCancelTimer Invalid argument");
         return NULL;
     }
 
-    unsigned int result = cancelTimer(handle, sid, timer);
+    unsigned int result = cancelTimer(handle, sid, timerName);
     if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();

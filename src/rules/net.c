@@ -431,12 +431,10 @@ static unsigned int loadTimerCommand(ruleset *tree, binding *rulesBinding) {
 "local timestamp = tonumber(ARGV[1])\n"
 "local res = redis.call(\"zrangebyscore\", timer_key, 0, timestamp, \"limit\", 0, 50)\n"
 "if #res > 0 then\n"
-"  for i = 0, #res, 1 do\n"
-"    if res[i] then\n"
-"      redis.call(\"zincrby\", timer_key, 10, tostring(res[i]))\n"
+"    for i = 1, #res, 1 do\n"
+"        redis.call(\"zincrby\", timer_key, 10, tostring(res[i]))\n"
 "    end\n"
-"  end\n"
-"  return res\n"
+"    return res\n"
 "end\n"
 "return 0\n", name)  == -1) {
         return ERR_OUT_OF_MEMORY;
@@ -447,6 +445,34 @@ static unsigned int loadTimerCommand(ruleset *tree, binding *rulesBinding) {
 
     strncpy(rulesBinding->timersHash, reply->str, 40);
     rulesBinding->timersHash[40] = '\0';
+    freeReplyObject(reply);
+    free(lua);
+    return RULES_OK;
+}
+
+static unsigned int loadRemoveTimerCommand(ruleset *tree, binding *rulesBinding) {
+    char *name = &tree->stringPool[tree->nameOffset];
+    redisContext *reContext = rulesBinding->reContext;
+    redisReply *reply;
+    char *lua = NULL;
+    if (asprintf(&lua,
+"local timer_key = \"%s!t\"\n"
+"local timer_name = ARGV[1]\n"
+"local res = redis.call(\"zrange\", timer_key, 0, -1)\n"
+"for i = 1, #res, 1 do\n"
+"    if string.find(res[i], \"\\\"%%$t\\\"%%s*:%%s*\\\"\" .. timer_name .. \"\\\"\") then\n"
+"        redis.call(\"zrem\", timer_key, res[i])\n"
+"    end\n"
+"end\n"
+"return 0\n", name)  == -1) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    unsigned int result = redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
+    GET_REPLY(result, "loadRemoveTimerCommand", reply);
+
+    strncpy(rulesBinding->removeTimerHash, reply->str, 40);
+    rulesBinding->removeTimerHash[40] = '\0';
     freeReplyObject(reply);
     free(lua);
     return RULES_OK;
@@ -2172,6 +2198,11 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
         return result;
     }
 
+    result = loadRemoveTimerCommand(tree, rulesBinding);
+    if (result != RULES_OK) {
+        return result;
+    }
+
     result = loadEvalMessageCommand(tree, rulesBinding);
     if (result != RULES_OK) {
         return result;
@@ -2856,28 +2887,37 @@ unsigned int peekTimers(ruleset *tree, void **bindingContext, redisReply **reply
     return ERR_NO_TIMERS_AVAILABLE;
 }
 
-unsigned int registerTimer(void *rulesBinding, unsigned int duration, char *timer) {
+unsigned int registerTimer(void *rulesBinding, unsigned int duration, char assert, char *timer) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;   
     time_t currentTime = time(NULL);
 
-    int result = redisAppendCommand(reContext, 
+    int result = RULES_OK;
+    if (assert) {
+        result = redisAppendCommand(reContext, 
+                                    "zadd %s %ld a:%s", 
+                                    currentBinding->timersSortedset, 
+                                    currentTime + duration, 
+                                    timer);
+    } else {
+        result = redisAppendCommand(reContext, 
                                     "zadd %s %ld p:%s", 
                                     currentBinding->timersSortedset, 
                                     currentTime + duration, 
                                     timer);
+    } 
+
     VERIFY(result, "registerTimer");   
     return RULES_OK;
 }
 
-unsigned int removeTimer(void *rulesBinding, char *timer) {
+unsigned int removeTimer(void *rulesBinding, char *timerName) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;   
-    
     int result = redisAppendCommand(reContext, 
-                                    "zrem %s p:%s", 
-                                    currentBinding->timersSortedset,
-                                    timer);
+                                    "evalsha %s 0 %s", 
+                                    currentBinding->removeTimerHash,
+                                    timerName); 
     VERIFY(result, "removeTimer");  
     return RULES_OK;
 }
@@ -2887,7 +2927,7 @@ unsigned int registerMessage(void *rulesBinding, unsigned int queueAction, char 
     redisContext *reContext = currentBinding->reContext;   
     time_t currentTime = time(NULL);
 
-    int result = REDIS_OK;
+    int result = RULES_OK;
 
     switch (queueAction) {
         case QUEUE_ASSERT_FACT:

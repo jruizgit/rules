@@ -269,6 +269,25 @@ d.ruleset('match21', function() {
     }
 });
 
+d.ruleset('match22', function() {
+    whenAll: m.subject.imatches('hello.*')
+    run: console.log('match 22 starts with case insensitive hello: ' + m.subject)
+
+    whenAll: m.subject.imatches('.*hello')
+    run: console.log('match 22 ends with case insensitive hello: ' + m.subject)
+
+    whenAll: m.subject.imatches('.*hello.*')
+    run: console.log('match 22 contains case insensitive hello: ' + m.subject)
+
+    whenStart: {
+        assert('match22', {id: 1, sid: 1, subject: 'HELLO world'});
+        assert('match22', {id: 2, sid: 1, subject: 'world hello'});
+        assert('match22', {id: 3, sid: 1, subject: 'world hello hi'});
+        assert('match22', {id: 4, sid: 1, subject: 'has Hello string'});
+        assert('match22', {id: 5, sid: 1, subject: 'does not match'});
+    }
+});
+
 d.statechart('fraud0', function() {
     start: {
         to: 'standby'
@@ -849,23 +868,6 @@ d.ruleset('a19', function() {
 
     whenStart: {
         post('a19', {id: 1, sid: 1, payment: {invoice: {amount: 100}}});  
-    }
-});
-
-d.ruleset('t0', function() {
-    whenAll: m.count == 0 || timeout('myTimer')
-    run: {
-        s.count += 1;
-        post('t0', {id: s.count, sid: 1, t: 'purchase'});
-        startTimer('myTimer', Math.random() * 3 + 1, 't0_' + s.count);
-    }
-
-    whenAll: m.t == 'purchase'
-    span: 5
-    run: console.log('t0 pulse ->' + s.count);
-
-    whenStart: {
-        patchState('t0', {sid: 1, count: 0}); 
     }
 });
 

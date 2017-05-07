@@ -213,34 +213,54 @@ exports = module.exports = durableEngine = function () {
             deleted = true;
         };
 
-        that.startTimer = function (name, duration, id) {
-            if (!id) {
-                if (timerDirectory[name]) {
-                    throw 'timer with name ' + name + ' already added';
-                } else {
-                    timerDirectory[name] = [{sid: that.s.sid, $t: name}, duration];
-                }
+        that.startTimer = function (name, duration, manualReset) {
+            manualReset = manualReset ? 1 : 0;
+            if (timerDirectory[name]) {
+                throw 'timer with name ' + name + ' already added';
             } else {
-                if (timerDirectory[id]) {
-                    throw 'timer with id ' + id + ' already added';
-                } else {
-                    timerDirectory[id] = [{sid: that.s.sid, id: id, $t: name}, duration];
-                    
-                }
+                timerDirectory[name] = [{sid: that.s.sid, $t: name}, duration, manualReset];
             }
         };
 
-        that.cancelTimer = function (name, id) {
-            if (!id) {
-                throw 'id required to cancel a timer';
-            } 
-
-            if (cancelledTimerDirectory[id]) {
-                throw 'timer with id ' + id + ' already cancelled';
+        that.cancelTimer = function (name) {
+            if (cancelledTimerDirectory[name]) {
+                throw 'timer with name ' + name + ' already cancelled';
             } else {
-                cancelledTimerDirectory[id] = {sid: that.s.sid, id: id, $t: name};
+                cancelledTimerDirectory[name] = true;
             }
         };
+
+        var retractTimer = function(timerName, object) {
+            if (object.$t === timerName) {
+                that.retract(object);
+                return true;
+            }
+
+            for (var propertyName in object) {
+                var propertyType = typeof(object[propertyName]);
+                if (propertyType === 'object' && object[propertyName] !== null) {
+                    if (retractTimer(timerName, object[propertyName])) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        that.resetTimer = function (timerName) {
+            if (output && output.constructor !== Array) {
+                return retractTimer(timerName, output);
+            } else if (output) {
+                for (var i = 0; i < output.length; ++i) {
+                    if (retractTimer(timerName, output[i])) {
+                        return true;
+                    }
+                }
+            }    
+
+            return false;
+        }
 
         that.renewActionLease = function() {
             if ((new Date().getTime() - startTime) < 10000) {
@@ -481,16 +501,12 @@ exports = module.exports = durableEngine = function () {
             return r.assertState(handle, state.sid, JSON.stringify(state));
         };
 
-        that.startTimer = function (sid, timer, timerDuration) {
-            if (sid == undefined) {
-                sid = null;
-            }
-
-            return r.startTimer(handle, sid, timerDuration, JSON.stringify(timer));
+        that.startTimer = function (sid, timer, timerDuration, manualReset) {
+            return r.startTimer(handle, sid, timerDuration, manualReset, JSON.stringify(timer));
         };
 
-        that.cancelTimer = function (sid, timer) {
-            return r.cancelTimer(handle, sid, JSON.stringify(timer));
+        that.cancelTimer = function (sid, timer_name) {
+            return r.cancelTimer(handle, sid, timer_name);
         };        
 
         that.getState = function (sid) {
@@ -606,14 +622,14 @@ exports = module.exports = durableEngine = function () {
                                 var pending = {};
                                 
                                 var timers = c.getCancelledTimers();
-                                for (var timerId in timers) {
-                                    that.cancelTimer(c.s.sid, timers[timerId]);
+                                for (var timerName in timers) {
+                                    that.cancelTimer(c.s.sid, timerName);
                                 }
 
                                 timers = c.getTimers();
-                                for (var timerId in timers) {
-                                    var timerTuple = timers[timerId];
-                                    that.startTimer(c.s.sid, timerTuple[0], timerTuple[1]);
+                                for (var timerName in timers) {
+                                    var timerTuple = timers[timerName];
+                                    that.startTimer(c.s.sid, timerTuple[0], timerTuple[1], timerTuple[2]);
                                 }
 
                                 var queues = c.getQueues();
@@ -782,7 +798,7 @@ exports = module.exports = durableEngine = function () {
                 state = chart[stateName];
                 for (triggerName in state) {
                     trigger = state[triggerName];
-                    if ((trigger.to && trigger.to === stateName) || trigger.count || trigger.cap || trigger.span) {
+                    if ((trigger.to && trigger.to === stateName) || trigger.count || trigger.cap) {
                         reflexiveStates[qualifiedStateName] = true;
                     }
 
@@ -830,10 +846,6 @@ exports = module.exports = durableEngine = function () {
                             rule.count = trigger.count;
                         }
 
-                        if (trigger.span) {
-                            rule.span = trigger.span;
-                        }
-
                         if (trigger.cap) {
                             rule.cap = trigger.cap;
                         }
@@ -846,7 +858,7 @@ exports = module.exports = durableEngine = function () {
                             rule.all = [stateTest];
                         }    
 
-                        if (trigger.run) {
+                        if (trigger.run) {    
                             if (typeof(trigger.run) === 'string') {
                                 rule.run = promise(host.getAction(trigger.run));
                             } else if (typeof(trigger.run) === 'function') {
@@ -935,7 +947,7 @@ exports = module.exports = durableEngine = function () {
                     } else {
                         for (var transitionName  in stage.to) {
                             var transition = stage.to[transitionName];
-                            if ((transitionName === stageName) || transition.count || transition.span || transition.cap) {
+                            if ((transitionName === stageName) || transition.count || transition.cap) {
                                 reflexiveStages[stageName] = true;
                             }
                         }
@@ -985,10 +997,6 @@ exports = module.exports = durableEngine = function () {
 
                             if (transition.count) {
                                 rule.count = transition.count;
-                            }
-
-                            if (transition.span) {
-                                rule.span = transition.span;
                             }
 
                             if (transition.cap) {

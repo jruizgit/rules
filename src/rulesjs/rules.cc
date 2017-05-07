@@ -792,15 +792,16 @@ void jsAbandonAction(const FunctionCallbackInfo<Value>& args) {
 void jsStartTimer(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
-    if (args.Length() < 4) {
+    if (args.Length() < 5) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[2]->IsNumber() || !args[3]->IsString()) {
+    } else if (!args[0]->IsNumber() || !args[2]->IsNumber() || !args[3]->IsNumber() || !args[4]->IsString()) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int result = startTimer((void *)args[0]->IntegerValue(),
                                          TO_STRING(args[1]),
                                          args[2]->IntegerValue(),
-                                         TO_STRING(args[3]));
+                                         args[3]->IntegerValue(),
+                                         TO_STRING(args[4]));
         
         if (result != RULES_OK) {
             char *message = NULL;

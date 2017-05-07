@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include "rules.h"
 #include "rete.h"
 #include "regex.h"
@@ -899,6 +900,7 @@ static unsigned int ensureState(unsigned short *id,
                                 unsigned short stateListLength, 
                                 state **newState) {
     CREATE_STATE(id, newState);
+    unsigned short dotTransitions = 0;
     for (unsigned short i = 0; i < stateListLength; ++i) {
         state *targetState = list[i];
         for (unsigned short ii = 0; ii < targetState->transitionsLength; ++ii) {
@@ -906,6 +908,10 @@ static unsigned int ensureState(unsigned short *id,
             unsigned int result = linkStates(*newState, targetTransition->next, targetTransition->symbol, targetTransition->deterministic);
             if (result != RULES_OK) {
                 return result;
+            }
+
+            if (targetTransition->symbol == REGEX_DOT) {
+                ++dotTransitions;
             }
         }
 
@@ -921,6 +927,19 @@ static unsigned int ensureState(unsigned short *id,
             return ERR_REGEX_CONFLICT;
         }        
     }
+
+    // when merging two states results in two or more dot transitions
+    // all specific transitions are cancelled, this allows for the
+    // first match to succeed.
+    if (dotTransitions > 1) {
+        for (unsigned short i = 0; i < (*newState)->transitionsLength; ++i) {
+            transition *currentTransition = &(*newState)->transitions[i];
+            if (currentTransition->symbol != REGEX_DOT) {
+                unlinkStates(*newState, currentTransition->next, currentTransition->symbol);
+            }
+        }
+    }
+
     return RULES_OK;
 }
 
@@ -1130,7 +1149,7 @@ static unsigned int transformToDFA(state *nfa,
 }
 
 static unsigned int expandDot(state *nfa, 
-                                   unsigned short *id) {
+                              unsigned short *id) {
 
     CREATE_HASHSET(state*);
     CREATE_QUEUE(state*);
@@ -1216,7 +1235,8 @@ static unsigned short getIndex(symbolEntry *symbolHashSet, unsigned short vocabu
 static unsigned int packGraph(state *start, 
                               void *stateMachine,
                               unsigned short vocabularyLength,
-                              unsigned short statesLength) {
+                              unsigned short statesLength,
+                              char caseInsensitive) {
     CREATE_QUEUE(state*);
     unsigned short visited[MAX_STATES] = {0};
     symbolEntry *symbolHashSet = (symbolEntry *)stateMachine;
@@ -1237,7 +1257,12 @@ static unsigned int packGraph(state *start,
             transition *currentTransition = &currentState->transitions[i];
 
             if (!getIndex(symbolHashSet, vocabularyLength, currentTransition->symbol)) {
-                setIndex(symbolHashSet, vocabularyLength, currentTransition->symbol, vocabularyNumber);
+                if (caseInsensitive) {
+                    setIndex(symbolHashSet, vocabularyLength, tolower(currentTransition->symbol), vocabularyNumber);
+                } else {
+                    setIndex(symbolHashSet, vocabularyLength, currentTransition->symbol, vocabularyNumber);
+                }
+
                 ++vocabularyNumber;
             }
 
@@ -1265,6 +1290,7 @@ unsigned int validateRegex(char *first,
 unsigned int compileRegex(void *tree, 
                           char *first, 
                           char *last, 
+                          char caseInsensitive,
                           unsigned short *vocabularyLength,
                           unsigned short *statesLength,
                           unsigned int *regexStateMachineOffset) {
@@ -1288,10 +1314,20 @@ unsigned int compileRegex(void *tree,
         return result;
     }
 
+#ifdef _PRINT
+    printf("*** DFA 1 ***\n");
+    printGraph(start);
+#endif
+
     result = expandDot(start, &id);
     if (result != RULES_OK) {
         return result;
     }
+
+#ifdef _PRINT
+    printf("*** DOT 1 ***\n");
+    printGraph(start);
+#endif
 
     result = transformToDFA(start, &id);
     if (result != RULES_OK) {
@@ -1321,12 +1357,14 @@ unsigned int compileRegex(void *tree,
     return packGraph(start, 
                      newStateMachine, 
                      *vocabularyLength,
-                     *statesLength);
+                     *statesLength,
+                     caseInsensitive);
 }
 
 unsigned char evaluateRegex(void *tree,
                             char *first,
                             unsigned short length, 
+                            char caseInsensitive,
                             unsigned short vocabularyLength,
                             unsigned short statesLength,
                             unsigned int regexStateMachineOffset) {
@@ -1340,6 +1378,10 @@ unsigned char evaluateRegex(void *tree,
         if (utf8ToUnicode(&first, last, &unicodeSymbol) != REGEX_PARSE_OK) {
             return 0;
         } else {
+            if (caseInsensitive) {
+                unicodeSymbol = tolower(unicodeSymbol);
+            }
+
             unsigned short currentSymbol = getIndex(symbolHashSet, vocabularyLength, unicodeSymbol);
             if (!currentSymbol) {
                 currentSymbol = getIndex(symbolHashSet, vocabularyLength, REGEX_DOT);

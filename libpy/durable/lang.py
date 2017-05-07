@@ -133,6 +133,11 @@ class value(object):
         self._right = other
         return self
 
+    def imatches(self, other):
+        self._op = '$imt'
+        self._right = other
+        return self
+
     def __and__(self, other):
         return value(self._type, self, '$and', other, self.alias)
     
@@ -205,7 +210,6 @@ class rule(object):
 
         self.count = None
         self.pri = None
-        self.span = None
         self.cap = None
         self.func = []
         new_args = []
@@ -215,8 +219,6 @@ class rule(object):
                     self.count = arg['count']
                 elif 'pri' in arg:
                     self.pri = arg['pri']
-                elif 'span' in arg:
-                    self.span = arg['span']
                 elif 'cap' in arg:
                     self.cap = arg['cap']
                 else:
@@ -289,9 +291,6 @@ class rule(object):
 
         if self.pri:
             defined_expression['pri'] = self.pri
-
-        if self.span:
-            defined_expression['span'] = self.span
 
         if self.cap:
             defined_expression['cap'] = self.cap
@@ -596,9 +595,6 @@ def count(value):
 
 def pri(value):
     return {'pri': value}
-
-def span(value):
-    return {'span': value}
 
 def cap(value):
     return {'cap': value}

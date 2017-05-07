@@ -714,22 +714,6 @@ with ruleset('a16'):
         host.post('a16', {'id': 2, 'sid': 1, 'amount': None})
 
 
-with ruleset('t0'):
-    @when_all(timeout('my_timer') | (s.count == 0))
-    def start_timer(c):
-        c.s.count += 1
-        c.post('t0', {'id': c.s.count, 'sid': 1, 't': 'purchase'})
-        c.start_timer('my_timer', random.randint(1, 3), 't_{0}'.format(c.s.count))
-
-    @when_all(span(5), m.t == 'purchase')
-    def pulse(c):
-        print('t0 pulse -> {0}'.format(len(c.m)))
-
-    @when_start
-    def start(host):
-        host.patch_state('t0', {'sid': 1, 'count': 0})
-
-
 with ruleset('t1'): 
     @when_all(m.start == 'yes')
     def start_timer(c):

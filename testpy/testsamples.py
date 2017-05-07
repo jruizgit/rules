@@ -176,6 +176,28 @@ with ruleset('match'):
         host.post('match', { 'url': 'https://github.c/jruizgit/rules' })
 
 
+with ruleset('strings'):
+    @when_all(m.subject.matches('hello.*'))
+    def starts_with(c):
+        print ('string starts with hello -> {0}'.format(c.m.subject))
+
+    @when_all(m.subject.matches('.*hello'))
+    def ends_with(c):
+        print ('string ends with hello -> {0}'.format(c.m.subject))
+
+    @when_all(m.subject.imatches('.*hello.*'))
+    def contains(c):
+        print ('string contains hello (case insensitive) -> {0}'.format(c.m.subject))
+
+    @when_start
+    def start(host):
+        host.assert_fact('strings', { 'subject': 'HELLO world' })
+        host.assert_fact('strings', { 'subject': 'world hello' })
+        host.assert_fact('strings', { 'subject': 'hello hi' })
+        host.assert_fact('strings', { 'subject': 'has Hello string' })
+        host.assert_fact('strings', { 'subject': 'does not match' })
+        
+
 with ruleset('risk0'):
     @when_all(c.first << m.amount > 10,
               c.second << m.amount > c.first.amount * 2,
@@ -329,19 +351,94 @@ with ruleset('flow1'):
 
 
 with ruleset('timer'):
-    # when first timer or less than 5 timeouts
+    # will trigger when MyTimer expires
     @when_any(all(s.count == 0),
               all(s.count < 5,
-                  timeout('Timer')))
+                  timeout('MyTimer')))
     def pulse(c):
         c.s.count += 1
-        c.start_timer('Timer', 3)
+        # MyTimer will expire in 5 seconds
+        c.start_timer('MyTimer', 5)
         print('pulse ->{0}'.format(datetime.datetime.now().strftime('%I:%M:%S%p')))
         
+    @when_all(m.cancel == True)
+    def cancel(c):
+        c.cancel_timer('MyTimer')
+        print('canceled timer')
+
     @when_start
     def on_start(host):
         host.patch_state('timer', { 'count': 0 })
 
+# curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:5000/timer/events
+
+with statechart('risk3'):
+    with state('start'):
+        @to('meter')
+        def start(c):
+            c.start_timer('RiskTimer', 5)
+
+    with state('meter'):
+        @to('fraud')
+        @when_all(count(3), c.message << m.amount > 100)
+        def fraud(c):
+            for e in c.m:
+                print(e.message) 
+
+        @to('exit')
+        @when_all(timeout('RiskTimer'))
+        def exit(c):
+            print('exit')
+
+    state('fraud')
+    state('exit')
+
+    @when_start
+    def on_start(host):
+        # three events in a row will trigger the fraud rule
+        host.post('risk3', { 'amount': 200 })
+        host.post('risk3', { 'amount': 300 })
+        host.post('risk3', { 'amount': 400 })
+
+        # two events will exit after 5 seconds
+        host.post('risk3', { 'sid': 1, 'amount': 500 })
+        host.post('risk3', { 'sid': 1, 'amount': 600 })
+
+
+with statechart('risk4'):
+    with state('start'):
+        @to('meter')
+        def start(c):
+            c.start_timer('VelocityTimer', 5, True)
+
+    with state('meter'):
+        @to('meter')
+        @when_all(cap(5), 
+                  m.amount > 100,
+                  timeout('VelocityTimer'))
+        def some_events(c):
+            print('velocity: {0} in 5 seconds'.format(len(c.m)))
+            # resets and restarts the manual reset timer
+            c.reset_timer('VelocityTimer')
+            c.start_timer('VelocityTimer', 5, True)
+
+        @to('meter')
+        @when_all(pri(1), timeout('VelocityTimer'))
+        def no_events(c):
+            print('velocity: no events in 5 seconds')
+            c.reset_timer('VelocityTimer')
+            c.start_timer('VelocityTimer', 5, True)
+
+    @when_start
+    def on_start(host):
+        # the velocity will be 4 events in 5 seconds
+        host.post('risk4', { 'amount': 200 })
+        host.post('risk4', { 'amount': 300 })
+        host.post('risk4', { 'amount': 50 })
+        host.post('risk4', { 'amount': 500 })
+        host.post('risk4', { 'amount': 600 })
+
+# curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk4/events
 
 with statechart('expense3'):
     # initial state 'input' with two triggers

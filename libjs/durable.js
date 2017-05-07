@@ -507,8 +507,7 @@ exports = module.exports = durableEngine = function () {
                     value: transformRunStatements(statement.body, cmap, true)
                 });
             } else if ((statement.label.name === 'pri') ||
-                      (statement.label.name === 'count')||
-                      (statement.label.name === 'span')||
+                      (statement.label.name === 'count') ||
                       (statement.label.name === 'cap')) {
                 currentRule.properties.push({
                     type: 'Property',
@@ -599,8 +598,7 @@ exports = module.exports = durableEngine = function () {
                     value: transformRunStatements(statement.body, cmap, true)
                 });
             } else if ((statement.label.name === 'pri') ||
-                      (statement.label.name === 'count')||
-                      (statement.label.name === 'span')||
+                      (statement.label.name === 'count') ||
                       (statement.label.name === 'cap')) {
                 currentTrigger.properties.push({
                     type: 'Property',
@@ -718,8 +716,7 @@ exports = module.exports = durableEngine = function () {
                         value: transformExpressions(statement.body, cmap)
                     });
                 } else if ((statement.label.name === 'pri') ||
-                          (statement.label.name === 'count')||
-                          (statement.label.name === 'span')||
+                          (statement.label.name === 'count') ||
                           (statement.label.name === 'cap')) {
                     currentCondition.properties.push({
                         type: 'Property',
@@ -727,7 +724,7 @@ exports = module.exports = durableEngine = function () {
                         value: statement.body.expression
                     });
                 } else {
-                    throw 'syntax error: whenAll, pri, count, span or cap labels expected';   
+                    throw 'syntax error: whenAll, pri, count or cap labels expected';   
                 }
             });
         }
@@ -952,6 +949,12 @@ exports = module.exports = durableEngine = function () {
             return that;
         };
 
+        var imatches = function (rvalue) {
+            op = '$imt';
+            right = rvalue;
+            return that;
+        };
+
         var ex = function () {
             op = '$ex';
             right  = 1;
@@ -1033,6 +1036,8 @@ exports = module.exports = durableEngine = function () {
                         return mt;
                     case 'matches':
                         return matches;
+                    case 'imatches':
+                        return imatches;
                     case 'ex':
                         return ex;
                     case 'nex':
@@ -1267,9 +1272,6 @@ exports = module.exports = durableEngine = function () {
                 if (argRule.count) {
                     newDefinition['count'] = argRule.count;
                 }
-                if (argRule.span) {
-                    newDefinition['span'] = argRule.span;
-                }
                 if (argRule.cap) {
                     newDefinition['cap'] = argRule.cap;
                 }
@@ -1301,8 +1303,6 @@ exports = module.exports = durableEngine = function () {
                     newDefinition['count'] = expDefinition['count'];
                 } else if (expDefinition['pri']) {
                     newDefinition['pri'] = expDefinition['pri'];
-                } else if (expDefinition['span']) {
-                    newDefinition['span'] = expDefinition['span'];
                 } else if (expDefinition['cap']) {
                     newDefinition['cap'] = expDefinition['cap'];
                 } else {
@@ -1462,14 +1462,6 @@ exports = module.exports = durableEngine = function () {
             var that = {};
             that.define = function () {
                 return {count: count};
-            }
-            return that;
-        };
-
-        obj.span = function(span) {
-            var that = {};
-            that.define = function () {
-                return {span: span};
             }
             return that;
         };
@@ -1649,7 +1641,7 @@ exports = module.exports = durableEngine = function () {
             for (var i = 0; i < triggerObjects.length; ++i) {
                 var triggerStatesObject = triggerObjects[i];
                 if (triggerStatesObject.to) {
-                    triggers.push(stateTrigger(triggerStatesObject.to, null, that, triggerStatesObject));
+                    triggers.push(stateTrigger(triggerStatesObject.to, triggerStatesObject.run, that, triggerStatesObject));
                 } else {
                     for (var stateName in triggerStatesObject) {
                         if (triggerStatesObject[stateName].length) {

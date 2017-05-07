@@ -8,13 +8,15 @@ unsigned int validateRegex(char *first,
 unsigned int compileRegex(void *tree, 
                           char *first, 
                           char *last, 
+                          char caseInsensitive,
                           unsigned short *vocabularyLength,
                           unsigned short *statesLength,
                           unsigned int *regexStateMachineOffset);
 
 unsigned char evaluateRegex(void *tree,
                             char *first,
-                            unsigned short length, 
+                            unsigned short length,
+                            char caseInsensitive, 
                             unsigned short vocabularyLength,
                             unsigned short statesLength,
                             unsigned int regexStateMachineOffset);

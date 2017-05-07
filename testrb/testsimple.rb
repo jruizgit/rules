@@ -575,19 +575,6 @@ q.post({:id => 7, :sid => 2, :t => "chargeback"})
 q.retract({:id => 4, :sid => 2, :t => "balance"})
 q.close
 
-Durable.ruleset :t0 do
-  when_all (timeout :my_timer) | (m.count == 0) do
-    s.count += 1
-    post :t0, {:id => s.count, :sid => 1, :t => "purchase"}
-    start_timer(:my_timer, rand(3), "t_#{s.count}")
-  end
-  when_all span(5), m.t == "purchase" do 
-    puts("t0 pulse -> #{m.count}")
-  end 
-  when_start do
-    patch_state :t0, {:sid => 1, :count => 0}
-  end
-end
 
 Durable.ruleset :t1 do
   when_all m.start == "yes" do

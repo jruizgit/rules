@@ -39,6 +39,7 @@
 #define OP_STRING_STRING 0x0101
 #define OP_STRING_NIL 0x0107
 #define OP_STRING_REGEX 0x010C
+#define OP_STRING_IREGEX 0x010D
 #define OP_NIL_BOOL 0x0704
 #define OP_NIL_INT 0x0702
 #define OP_NIL_DOUBLE 0x0703
@@ -885,9 +886,11 @@ static unsigned int isMatch(ruleset *tree,
 
             break;
         case OP_STRING_REGEX:
+        case OP_STRING_IREGEX:
             *propertyMatch = evaluateRegex(tree,
                                            message + currentProperty->valueOffset, 
                                            currentProperty->valueLength, 
+                                           (type == OP_STRING_REGEX) ? 0 : 1,
                                            currentAlpha->right.value.regex.vocabularyLength,
                                            currentAlpha->right.value.regex.statesLength,
                                            currentAlpha->right.value.regex.stateMachineOffset);
@@ -1878,7 +1881,7 @@ unsigned int queueMessage(void *handle, unsigned int queueAction, char *sid, cha
     return registerMessage(rulesBinding, queueAction, destination, message);
 }
 
-unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *timer) {
+unsigned int startTimer(void *handle, char *sid, unsigned int duration, char manualReset, char *timer) {
     void *rulesBinding;
     if (!sid) {
         sid = "0";
@@ -1889,10 +1892,10 @@ unsigned int startTimer(void *handle, char *sid, unsigned int duration, char *ti
         return result;
     }
 
-    return registerTimer(rulesBinding, duration, timer);
+    return registerTimer(rulesBinding, duration, manualReset, timer);
 }
 
-unsigned int cancelTimer(void *handle, char *sid, char *timer) {
+unsigned int cancelTimer(void *handle, char *sid, char *timerName) {
     void *rulesBinding;
     if (!sid) {
         sid = "0";
@@ -1903,7 +1906,7 @@ unsigned int cancelTimer(void *handle, char *sid, char *timer) {
         return result;
     }
 
-    return removeTimer(rulesBinding, timer);
+    return removeTimer(rulesBinding, timerName);
 }
 
 unsigned int renewActionLease(void *handle, char *sid) {

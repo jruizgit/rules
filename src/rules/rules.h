@@ -164,11 +164,12 @@ unsigned int abandonAction(void *handle,
 unsigned int startTimer(void *handle, 
                         char *sid, 
                         unsigned int duration, 
+                        char manualReset,
                         char *timer);
 
 unsigned int cancelTimer(void *handle, 
                          char *sid, 
-                         char *timer);
+                         char *timerName);
 
 unsigned int queueMessage(void *handle,
                           unsigned int queueAction, 

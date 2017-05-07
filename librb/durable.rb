@@ -424,10 +424,6 @@ module Durable
       {:pri => value}
     end
 
-    def span(value)
-      {:span => value}
-    end
-
     def cap(value)
       {:cap => value}
     end
@@ -480,10 +476,6 @@ module Durable
 
       if options.key? :pri
         rule["pri"] = options[:pri]
-      end
-
-      if options.key? :span
-        rule["span"] = options[:span]
       end
 
       if options.key? :cap

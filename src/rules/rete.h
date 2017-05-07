@@ -21,6 +21,7 @@
 #define OP_TYPE 0x12
 #define OP_NOT 0x13
 #define OP_MT 0x14
+#define OP_IMT 0x15
 
 #define NODE_ALPHA 0
 #define NODE_BETA_CONNECTOR 1

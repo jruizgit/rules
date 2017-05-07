@@ -26,7 +26,7 @@ d.ruleset('risk1', function() {
     whenAll: {
         first = m.amount > 100
         second = m.amount > first.amount * 2
-        third = m.amount > (first.amount + second.amount) / 2
+        third = m.amount > first.amount + second.amount
     }
     run: {
         console.log('fraud detected -> ' + first.amount);
@@ -106,6 +106,25 @@ d.ruleset('match', function() {
     }
 });
 
+d.ruleset('strings', function() {
+    whenAll: m.subject.matches('hello.*')
+    run: console.log('string starts with hello: ' + m.subject)
+
+    whenAll: m.subject.imatches('.*hello')
+    run: console.log('string ends with hello: ' + m.subject)
+
+    whenAll: m.subject.imatches('.*hello.*')
+    run: console.log('string contains hello (case insensitive): ' + m.subject)
+
+    whenStart: {
+        assert('strings', { subject: 'HELLO world' });
+        assert('strings', { subject: 'world hello' });
+        assert('strings', { subject: 'hello hi' });
+        assert('strings', { subject: 'has Hello string' });
+        assert('strings', { subject: 'does not match' });
+    }
+});
+
 d.ruleset('attributes', function() {
     whenAll: m.amount < 300
     pri: 3 
@@ -171,21 +190,7 @@ d.ruleset('expense2', function() {
         assert('expense2', { review: true })
     }
 });
-
-d.ruleset('risk', function() {
-    whenAll: m.amount > 100
-    span: 5
-    run: console.log('high value purchases ->' + JSON.stringify(m));
-
-    whenStart: {
-        var callback = function() {
-            post('risk', { amount: Math.random() * 200 });
-            setTimeout(callback, 1000); 
-        }
-        callback();
-    }
-});
-
+    
 d.ruleset('flow1', function() {
     whenAll: s.state == 'first'
     // runAsync labels an async action
@@ -233,15 +238,25 @@ d.ruleset('flow', function() {
 d.ruleset('timer', function() {
     whenAny: {
         whenAll: s.count == 0
+        // will trigger when MyTimer expires
         whenAll: {
             s.count < 5 
-            timeout('Timer')
+            timeout('MyTimer')
         }
     }
     run: {
         s.count += 1;
-        startTimer('Timer', 3);
+        // MyTimer will expire in 5 seconds
+        startTimer('MyTimer', 5);
         console.log('Pusle ->' + new Date());
+    }
+
+    whenAll: {
+        m.cancel == true
+    }
+    run: {
+        cancelTimer('MyTimer');
+        console.log('canceled timer');
     }
 
     whenStart: {
@@ -249,6 +264,85 @@ d.ruleset('timer', function() {
     }
 });
 
+// curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:5000/timer/events
+
+d.statechart('risk3', function() {
+    start: {
+        to: 'meter'
+        run: startTimer('RiskTimer', 5)
+    }
+
+    meter: {
+        to: 'fraud'
+        whenAll: message = m.amount > 100
+        count: 3
+        run: m.forEach(function(e, i){ console.log(JSON.stringify(e.message)) });
+
+        to: 'exit'
+        whenAll: timeout('RiskTimer')
+        run: console.log('exit')    
+    }
+
+    fraud: {}
+    exit:{}
+
+    whenStart: {
+        // three events in a row will trigger the fraud rule
+        post('risk3', { amount: 200 }); 
+        post('risk3', { amount: 300 }); 
+        post('risk3', { amount: 400 }); 
+
+        // two events will exit after 5 seconds
+        post('risk3', { sid: 1, amount: 500 }); 
+        post('risk3', { sid: 1, amount: 600 }); 
+        
+    }
+});
+
+
+d.statechart('risk4', function() {
+    start: {
+        to: 'meter'
+        // will start a manual reset timer
+        run: startTimer('VelocityTimer', 5, true)
+    }
+
+    meter: {
+        to: 'meter'
+        whenAll: { 
+            message = m.amount > 100
+            timeout('VelocityTimer')
+        }
+        cap: 100
+        run: {
+            console.log('velocity: ' + m.length + ' events in 5 seconds');
+            // resets and restarts the manual reset timer
+            resetTimer('VelocityTimer');
+            startTimer('VelocityTimer', 5, true);
+        }  
+
+        to: 'meter'
+        whenAll: {
+            timeout('VelocityTimer')
+        }
+        run: {
+            console.log('velocity: no events in 5 seconds');
+            resetTimer('VelocityTimer');
+            startTimer('VelocityTimer', 5, true);
+        }
+    }
+
+    whenStart: {
+        // the velocity will 4 events in 5 seconds
+        post('risk4', { amount: 200 }); 
+        post('risk4', { amount: 300 }); 
+        post('risk4', { amount: 50 }); 
+        post('risk4', { amount: 500 }); 
+        post('risk4', { amount: 600 }); 
+    }
+});
+
+// curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk4/events
 
 d.statechart('expense3', function() {
     input: {

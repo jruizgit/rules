@@ -22,6 +22,7 @@
 #define HASH_EQ 193419647 // $eq
 #define HASH_NEQ 2087890573 // $neq
 #define HASH_MT 193419914 // $mt
+#define HASH_IMT 2087885395 // $imt
 #define HASH_EX 193419654 // $ex
 #define HASH_NEX 2087890580 // $nex
 #define HASH_OR 193419978 // $or
@@ -339,6 +340,7 @@ static unsigned int copyValue(ruleset *tree,
             right->value.b = leftb;
             break;
         case JSON_REGEX:
+        case JSON_IREGEX:
             leftLength = last - first;
             result = storeString(tree, first, &right->value.regex.stringOffset, leftLength);
             if (result != RULES_OK) {
@@ -348,6 +350,7 @@ static unsigned int copyValue(ruleset *tree,
             result = compileRegex(tree, 
                                   first, 
                                   last,
+                                  (type == JSON_REGEX) ? 0 : 1,
                                   &right->value.regex.vocabularyLength,
                                   &right->value.regex.statesLength,
                                   &right->value.regex.stateMachineOffset);
@@ -385,7 +388,7 @@ static unsigned char compareValue(ruleset *tree,
         case JSON_STRING:
             {
                 char *rightString;
-                if (right->type == JSON_REGEX) {
+                if (right->type == JSON_REGEX || right->type == JSON_IREGEX) {
                     rightString = &tree->stringPool[right->value.regex.stringOffset];
                 } else {
                     rightString = &tree->stringPool[right->value.stringOffset];
@@ -590,6 +593,9 @@ static unsigned int validateExpression(char *rule) {
         case HASH_MT:
             operator = OP_MT;
             break;
+        case HASH_IMT:
+            operator = OP_IMT;
+            break;
         case HASH_LT:
             operator = OP_LT;
             break;
@@ -640,7 +646,7 @@ static unsigned int validateExpression(char *rule) {
         return result;
     }
 
-    if (operator == OP_MT) {
+    if (operator == OP_MT || operator == OP_IMT) {
         if (type != JSON_STRING) {
             return ERR_UNEXPECTED_TYPE; 
         }  
@@ -1069,6 +1075,10 @@ static unsigned int findAlpha(ruleset *tree,
         type = JSON_REGEX;
     }
 
+    if (operator == OP_IMT) {
+        type = JSON_IREGEX;
+    }
+
     result = copyValue(tree, &newAlpha->value.a.right, first, last, idiomOffset, &ref, type);
     if (result != RULES_OK) {
         return result;
@@ -1154,6 +1164,9 @@ static unsigned int createAlpha(ruleset *tree,
             break;
         case HASH_MT:
             operator = OP_MT;
+            break;
+        case HASH_IMT:
+            operator = OP_IMT;
             break;
         case HASH_LT:
             operator = OP_LT;
