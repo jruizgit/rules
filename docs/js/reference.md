@@ -742,7 +742,7 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 ### Timers
-Events can be scheduled with timers. A timeout condition can be included in the rule antecedent. By default a timeuot is triggered as an event (observed only once). Timeouts can also be triggered as facts, the timers can be reset during action execution (see last example). 
+Events can be scheduled with timers. A timeout condition can be included in the rule antecedent. By default a timeuot is triggered as an event (observed only once). Timeouts can also be triggered as facts by 'manual reset' timers, the timers can be reset during action execution (see last example). 
 
 * startTimer: starts a timer with the name and duration specified (manual_reset is optional).
 * resetTimer: resets a `manual_reset` timer.
