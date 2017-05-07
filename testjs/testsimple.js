@@ -276,7 +276,7 @@ d.ruleset('match22', function() {
     whenAll: m.subject.imatches('.*hello')
     run: console.log('match 22 ends with case insensitive hello: ' + m.subject)
 
-    whenAll: m.subject.imatches('.*hello.*')
+    whenAll: m.subject.imatches('.*Hello.*')
     run: console.log('match 22 contains case insensitive hello: ' + m.subject)
 
     whenStart: {

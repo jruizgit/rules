@@ -1255,14 +1255,13 @@ static unsigned int packGraph(state *start,
 
         for (int i = 0; i < currentState->transitionsLength; ++ i) {
             transition *currentTransition = &currentState->transitions[i];
+            unsigned int currentTransitionSymbol = currentTransition->symbol;
+            if (caseInsensitive) {
+                currentTransitionSymbol = tolower(currentTransitionSymbol);
+            }
 
-            if (!getIndex(symbolHashSet, vocabularyLength, currentTransition->symbol)) {
-                if (caseInsensitive) {
-                    setIndex(symbolHashSet, vocabularyLength, tolower(currentTransition->symbol), vocabularyNumber);
-                } else {
-                    setIndex(symbolHashSet, vocabularyLength, currentTransition->symbol, vocabularyNumber);
-                }
-
+            if (!getIndex(symbolHashSet, vocabularyLength, currentTransitionSymbol)) {
+                setIndex(symbolHashSet, vocabularyLength, currentTransitionSymbol, vocabularyNumber);
                 ++vocabularyNumber;
             }
 
@@ -1272,7 +1271,7 @@ static unsigned int packGraph(state *start,
                 ENQUEUE(currentTransition->next);
             }
 
-            unsigned short targetSymbolNumber = getIndex(symbolHashSet, vocabularyLength, currentTransition->symbol);
+            unsigned short targetSymbolNumber = getIndex(symbolHashSet, vocabularyLength, currentTransitionSymbol);
             stateTable[statesLength * (targetSymbolNumber - 1) + (targetStateNumber - 1)] = visited[currentTransition->next->id];
         }
 
