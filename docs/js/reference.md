@@ -291,7 +291,7 @@ d.ruleset('strings', function() {
     whenAll: m.subject.matches('hello.*')
     run: console.log('string starts with hello: ' + m.subject)
 
-    whenAll: m.subject.imatches('.*hello')
+    whenAll: m.subject.matches('.*hello')
     run: console.log('string ends with hello: ' + m.subject)
 
     whenAll: m.subject.imatches('.*hello.*')
