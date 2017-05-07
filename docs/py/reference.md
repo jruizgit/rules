@@ -10,6 +10,7 @@ Reference Manual
 * [Antecedents](reference.md#antecedents)
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
+  * [String Operations](reference.md#string-operations)
   * [Correlated Sequence](reference.md#correlated-sequence)
   * [Nested Objects](reference.md#nested-objects)
   * [Lack of Information](reference.md#lack-of-information)
@@ -17,7 +18,6 @@ Reference Manual
 * [Consequents](reference.md#consequents)  
   * [Conflict Resolution](reference.md#conflict-resolution)
   * [Action Batches](reference.md#action-batches)
-  * [Tumbling Window](reference.md#tumbling-window)
   * [Async Actions](reference.md#async-actions)
   * [Unhandled Exceptions](reference.md#unhandled-exceptions)
 * [Flow Structures](reference.md#flow-structures)
@@ -279,6 +279,38 @@ run_all()
 
 [top](reference.md#table-of-contents)  
 
+### String Operations  
+The pattern matching dialect can be used for common string operations. The `imatches` function enables case insensitive pattern matching.
+
+```python
+from durable.lang import *
+
+with ruleset('strings'):
+    @when_all(m.subject.matches('hello.*'))
+    def starts_with(c):
+        print ('string starts with hello -> {0}'.format(c.m.subject))
+
+    @when_all(m.subject.matches('.*hello'))
+    def ends_with(c):
+        print ('string ends with hello -> {0}'.format(c.m.subject))
+
+    @when_all(m.subject.imatches('.*hello.*'))
+    def contains(c):
+        print ('string contains hello (case insensitive) -> {0}'.format(c.m.subject))
+
+    @when_start
+    def start(host):
+        host.assert_fact('strings', { 'subject': 'HELLO world' })
+        host.assert_fact('strings', { 'subject': 'world hello' })
+        host.assert_fact('strings', { 'subject': 'hello hi' })
+        host.assert_fact('strings', { 'subject': 'has Hello string' })
+        host.assert_fact('strings', { 'subject': 'does not match' })
+
+run_all()
+```  
+
+[top](reference.md#table-of-contents) 
+
 ### Correlated Sequence
 Rules can be used to efficiently evaluate sequences of correlated events or facts. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
@@ -453,43 +485,6 @@ with ruleset('expense'):
 run_all()
 ```
 [top](reference.md#table-of-contents)  
-### Tumbling Window
-Actions can also be batched using time tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
-
-* span: defines the tumbling time in seconds between scheduled actions.  
-
-This example generates events with random amounts. An action is scheduled every 5 seconds (tumbling window).
-```python
-from durable.lang import *
-import threading
-import random
-
-with ruleset('risk'):
-    timer = None
-
-    def start_timer(time, callback):
-        timer = threading.Timer(time, callback)
-        timer.daemon = True    
-        timer.start()
-
-    @when_all(span(5), m.amount > 100)
-    # the action will be called every 5 seconds
-    def high_value(c):
-        print('high value purchases ->{0}'.format(c.m))
-        
-    @when_start
-    def start(host):
-        # will post an event every second
-        def callback():
-            host.post('risk', { 'amount': random.randint(1, 200) })
-            start_timer(1, callback)
-
-        start_timer(1, callback)
-
-run_all()
-```
-[top](reference.md#table-of-contents)   
-
 ### Async Actions  
 The consequent action can be asynchronous. When the action is finished, the `complete` function has to be called. By default an action is considered abandoned after 5 seconds. This value can be changed by returning a different number in the action function or extended by calling `renew_action_lease`.
 
@@ -565,35 +560,6 @@ run_all()
 ```
 [top](reference.md#table-of-contents)  
 ## Flow Structures
-### Timers
-Events can be scheduled with timers. A timeout condition can be included in the rule antecedent.   
-
-* start_timer: starts a timer with the name and duration specified. id is optional if planning to cancel the timer.
-* cancel_timer: cancels ongoing timer, name and id are required.
-* timeout: used as an antecedent condition.
-
-```python
-from durable.lang import *
-import datetime
-
-with ruleset('timer'):
-    # when first timer or less than 5 timeouts
-    @when_any(all(s.count == 0),
-              all(s.count < 5,
-                  timeout('Timer')))
-    def pulse(c):
-        c.s.count += 1
-        c.start_timer('Timer', 3)
-        print('pulse ->{0}'.format(datetime.datetime.now().strftime('%I:%M:%S%p')))
-        
-    @when_start
-    def on_start(host):
-        host.patch_state('timer', { 'count': 0 })
-        
-run_all()
-```
-[top](reference.md#table-of-contents)  
-
 ### Statechart
 Rules can be organized using statecharts. A statechart is a deterministic finite automaton (DFA). The state context is in one of a number of possible states with conditional transitions between these states. 
 
@@ -759,4 +725,126 @@ with flowchart('expense'):
         
 run_all()
 ```
+[top](reference.md#table-of-contents)  
+### Timers
+Events can be scheduled with timers. A timeout condition can be included in the rule antecedent. By default a timeuot is triggered as an event (observed only once). Timeouts can also be triggered as facts by 'manual reset' timers, the timers can be reset during action execution (see last example). 
+
+* start_timer: starts a timer with the name and duration specified (manual_reset is optional).
+* reset_timer: resets a 'manual reset' timer.
+* cancel_timer: cancels ongoing timer.
+* timeout: used as an antecedent condition.
+
+In this example, the timer can be canceled by running the following command:  
+
+<sub>`curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:5000/timer/events`</sub>  
+
+```python
+from durable.lang import *
+
+with ruleset('timer'):
+    # will trigger when MyTimer expires
+    @when_any(all(s.count == 0),
+              all(s.count < 5,
+                  timeout('MyTimer')))
+    def pulse(c):
+        c.s.count += 1
+        # MyTimer will expire in 5 seconds
+        c.start_timer('MyTimer', 5)
+        print('pulse ->{0}'.format(datetime.datetime.now().strftime('%I:%M:%S%p')))
+        
+    @when_all(m.cancel == True)
+    def cancel(c):
+        c.cancel_timer('MyTimer')
+        print('canceled timer')
+
+    @when_start
+    def on_start(host):
+        host.patch_state('timer', { 'count': 0 })
+
+run_all()
+```
+
+The example below use a timer to detect higher event rate:  
+
+```python
+from durable.lang import *
+
+with statechart('risk'):
+    with state('start'):
+        @to('meter')
+        def start(c):
+            c.start_timer('RiskTimer', 5)
+
+    with state('meter'):
+        @to('fraud')
+        @when_all(count(3), c.message << m.amount > 100)
+        def fraud(c):
+            for e in c.m:
+                print(e.message) 
+
+        @to('exit')
+        @when_all(timeout('RiskTimer'))
+        def exit(c):
+            print('exit')
+
+    state('fraud')
+    state('exit')
+
+    @when_start
+    def on_start(host):
+        # three events in a row will trigger the fraud rule
+        host.post('risk', { 'amount': 200 })
+        host.post('risk', { 'amount': 300 })
+        host.post('risk', { 'amount': 400 })
+
+        # two events will exit after 5 seconds
+        host.post('risk', { 'sid': 1, 'amount': 500 })
+        host.post('risk', { 'sid': 1, 'amount': 600 })
+        
+run_all()
+```
+
+In this example a manual reset timer is used for measuring velocity. Try issuing the command below multiple times.
+
+<sub>`curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk/events`</sub>  
+
+```python
+from durable.lang import *
+
+with statechart('risk'):
+    with state('start'):
+        @to('meter')
+        def start(c):
+            c.start_timer('VelocityTimer', 5, True)
+
+    with state('meter'):
+        @to('meter')
+        @when_all(cap(5), 
+                  m.amount > 100,
+                  timeout('VelocityTimer'))
+        def some_events(c):
+            print('velocity: {0} in 5 seconds'.format(len(c.m)))
+            # resets and restarts the manual reset timer
+            c.reset_timer('VelocityTimer')
+            c.start_timer('VelocityTimer', 5, True)
+
+        @to('meter')
+        @when_all(pri(1), timeout('VelocityTimer'))
+        def no_events(c):
+            print('velocity: no events in 5 seconds')
+            c.reset_timer('VelocityTimer')
+            c.start_timer('VelocityTimer', 5, True)
+
+    @when_start
+    def on_start(host):
+        # the velocity will be 4 events in 5 seconds
+        host.post('risk', { 'amount': 200 })
+        host.post('risk', { 'amount': 300 })
+        host.post('risk', { 'amount': 50 })
+        host.post('risk', { 'amount': 500 })
+        host.post('risk', { 'amount': 600 })
+
+run_all()
+```
+
 [top](reference.md#table-of-contents)  
