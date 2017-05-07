@@ -10,6 +10,7 @@ Reference Manual
 * [Antecedents](reference.md#antecedents)
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
+  * [String Operations](reference.md#string-operations)
   * [Correlated Sequence](reference.md#correlated-sequence)
   * [Nested Objects](reference.md#nested-objects)
   * [Lack of Information](reference.md#lack-of-information)
@@ -17,14 +18,13 @@ Reference Manual
 * [Consequents](reference.md#consequents)  
   * [Conflict Resolution](reference.md#conflict-resolution)
   * [Action Batches](reference.md#action-batches)
-  * [Tumbling Window](reference.md#tumbling-window)
   * [Async Actions](reference.md#async-actions)
   * [Unhandled Exceptions](reference.md#unhandled-exceptions)
-* [Flow Structures](reference.md#flow-structures)
-  * [Timers](reference.md#timers) 
+* [Flow Structures](reference.md#flow-structures) 
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
-  * [Flowchart](reference.md#flowchart) 
+  * [Flowchart](reference.md#flowchart)
+  * [Timers](reference.md#timers)
 
 ## Setup
 durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
@@ -281,6 +281,35 @@ d.ruleset('match', function() {
 d.runAll();
 ```  
 [top](reference.md#table-of-contents) 
+### String Operations  
+The pattern matching dialect can be used for common string operations. The `imatches` function enables case insensitive pattern matching.
+
+```javascript
+var d = require('durable');
+
+d.ruleset('strings', function() {
+    whenAll: m.subject.matches('hello.*')
+    run: console.log('string starts with hello: ' + m.subject)
+
+    whenAll: m.subject.imatches('.*hello')
+    run: console.log('string ends with hello: ' + m.subject)
+
+    whenAll: m.subject.imatches('.*hello.*')
+    run: console.log('string contains hello (case insensitive): ' + m.subject)
+
+    whenStart: {
+        assert('strings', { subject: 'HELLO world' });
+        assert('strings', { subject: 'world hello' });
+        assert('strings', { subject: 'hello hi' });
+        assert('strings', { subject: 'has Hello string' });
+        assert('strings', { subject: 'does not match' });
+    }
+});
+
+d.runAll();
+```  
+[top](reference.md#table-of-contents)
+
 ### Correlated Sequence
 Rules can be used to efficiently evaluate sequences of correlated events or facts. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
@@ -478,34 +507,6 @@ d.ruleset('expense', function() {
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
-### Tumbling Window
-Actions can also be batched using time tumbling windows. Tumbling windows are a series of fixed-sized, non-overlapping and contiguous time intervals.  
-
-* span: defines the tumbling time in seconds between scheduled actions.  
-
-This example generates events with random amounts. An action is scheduled every 5 seconds (tumbling window).
-```javascript
-var d = require('durable');
-
-d.ruleset('risk', function() {
-    // the action will be called every 5 seconds
-    whenAll: m.amount > 100
-    span: 5
-    run: console.log('high value purchases ->' + JSON.stringify(m));
-
-    whenStart: {
-        // will post an event every second
-        var callback = function() {
-            post('risk', { amount: Math.random() * 200 });
-            setTimeout(callback, 1000); 
-        }
-        callback();
-    }
-});
-
-d.runAll();
-```
-[top](reference.md#table-of-contents)  
 
 ### Async Actions  
 The consequent action can be asynchronous. When the action is finished, the `complete` function has to be called. By default an action is considered abandoned after 5 seconds. This value can be changed by returning a different number in the action function or extended by calling `renewActionLease`.
@@ -575,41 +576,6 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 ## Flow Structures
-### Timers
-Events can be scheduled with timers. A timeout condition can be included in the rule antecedent.   
-
-* startTimer: starts a timer with the name and duration specified. id is optional if planning to cancel the timer.
-* cancelTimer: cancels ongoing timer, name and id are required.
-* timeout: used as an antecedent condition.
-
-```javascript
-var d = require('durable');
-
-d.ruleset('timer', function() {
-    // when first timer or less than 5 timeouts
-    whenAny: {
-        whenAll: s.count == 0
-        whenAll: {
-            s.count < 5 
-            // when a timeout for 'Timer' occurs
-            timeout('Timer')
-        }
-    }
-    run: {
-        s.count += 1;
-        // start the 'Timer', wait 3 seconds for timeout
-        startTimer('Timer', 3);
-        console.log('Pusle ->' + new Date());
-    }
-
-    whenStart: {
-        patchState('timer', { count: 0 }); 
-    }
-});
-
-d.runAll();
-```
-[top](reference.md#table-of-contents)  
 
 ### Statechart
 Rules can be organized using statecharts. A statechart is a deterministic finite automaton (DFA). The state context is in one of a number of possible states with conditional transitions between these states. 
@@ -775,6 +741,146 @@ d.flowchart('expense', function() {
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
+### Timers
+Events can be scheduled with timers. A timeout condition can be included in the rule antecedent. By default a timeuot is triggered as an event (observed only once). Timeouts can also be triggered as facts, the timers can be reset during action execution (see last example). 
 
+* startTimer: starts a timer with the name and duration specified (manual_reset is optional).
+* resetTimer: resets a `manual_reset` timer.
+* cancelTimer: cancels ongoing timer.
+* timeout: used as an antecedent condition.
+
+In this example, the timer can be canceled by running the following command:  
+
+<sub>`curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:5000/timer/events`</sub>  
+
+```javascript
+var d = require('durable');
+
+d.ruleset('timer', function() {
+    whenAny: {
+        whenAll: s.count == 0
+        // will trigger when MyTimer expires
+        whenAll: {
+            s.count < 5 
+            timeout('MyTimer')
+        }
+    }
+    run: {
+        s.count += 1;
+        // MyTimer will expire in 5 seconds
+        startTimer('MyTimer', 5);
+        console.log('Pusle ->' + new Date());
+    }
+
+    whenAll: {
+        m.cancel == true
+    }
+    run: {
+        cancelTimer('MyTimer');
+        console.log('canceled timer');
+    }
+
+    whenStart: {
+        patchState('timer', { count: 0 }); 
+    }
+});
+
+d.runAll();
+```
+
+The example below use a timer to detect higher event rate:  
+
+```javascript
+var d = require('durable');
+
+d.statechart('risk', function() {
+    start: {
+        to: 'meter'
+        run: startTimer('RiskTimer', 5)
+    }
+
+    meter: {
+        to: 'fraud'
+        whenAll: message = m.amount > 100
+        count: 3
+        run: m.forEach(function(e, i){ console.log(JSON.stringify(e.message)) });
+
+        to: 'exit'
+        whenAll: timeout('RiskTimer')
+        run: console.log('exit')    
+    }
+
+    fraud: {}
+    exit:{}
+
+    whenStart: {
+        // three events in a row will trigger the fraud rule
+        post('risk', { amount: 200 }); 
+        post('risk', { amount: 300 }); 
+        post('risk', { amount: 400 }); 
+
+        // two events will exit after 5 seconds
+        post('risk', { sid: 1, amount: 500 }); 
+        post('risk', { sid: 1, amount: 600 }); 
+        
+    }
+});
+
+d.runAll();
+```
+
+In this example a manual reset timer is used for measuring velocity. Try issuing the command below multiple times.
+
+<sub>`curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk/events`</sub>  
+
+```javascript
+var d = require('durable');
+
+d.statechart('risk', function() {
+    start: {
+        to: 'meter'
+        // will start a manual reset timer
+        run: startTimer('VelocityTimer', 5, true)
+    }
+
+    meter: {
+        to: 'meter'
+        whenAll: { 
+            message = m.amount > 100
+            timeout('VelocityTimer')
+        }
+        cap: 100
+        run: {
+            console.log('velocity: ' + m.length + ' events in 5 seconds');
+            // resets and restarts the manual reset timer
+            resetTimer('VelocityTimer');
+            startTimer('VelocityTimer', 5, true);
+        }  
+
+        to: 'meter'
+        whenAll: {
+            timeout('VelocityTimer')
+        }
+        run: {
+            console.log('velocity: no events in 5 seconds');
+            resetTimer('VelocityTimer');
+            startTimer('VelocityTimer', 5, true);
+        }
+    }
+
+    whenStart: {
+        // the velocity will 4 events in 5 seconds
+        post('risk', { amount: 200 }); 
+        post('risk', { amount: 300 }); 
+        post('risk', { amount: 50 }); 
+        post('risk', { amount: 500 }); 
+        post('risk', { amount: 600 }); 
+    }
+});
+
+d.runAll();
+```
+
+[top](reference.md#table-of-contents)  
  
 
