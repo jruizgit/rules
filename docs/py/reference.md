@@ -20,11 +20,11 @@ Reference Manual
   * [Action Batches](reference.md#action-batches)
   * [Async Actions](reference.md#async-actions)
   * [Unhandled Exceptions](reference.md#unhandled-exceptions)
-* [Flow Structures](reference.md#flow-structures)
-  * [Timers](reference.md#timers) 
+* [Flow Structures](reference.md#flow-structures) 
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
   * [Flowchart](reference.md#flowchart)
+  * [Timers](reference.md#timers)
 
 ## Setup
 durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
