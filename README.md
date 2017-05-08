@@ -212,6 +212,8 @@ The combination of forward inference and durable_rules tolerance to failures on 
 </sub>
 ### Node.js
 ```javascript
+var d = require('durable');
+
 d.statechart('expense', function() {
     input: {
         to: 'denied'
