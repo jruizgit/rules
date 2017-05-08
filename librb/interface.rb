@@ -77,7 +77,7 @@ module Interface
       end
     end
 
-    post "/:ruleset_name/fact/:sid" do
+    post "/:ruleset_name/facts/:sid" do
       begin
         request.body.rewind
         message = JSON.parse request.body.read

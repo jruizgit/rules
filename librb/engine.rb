@@ -124,29 +124,38 @@ module Engine
       @_queues[ruleset_name]
     end
 
-    def start_timer(timer_name, duration, timer_id = nil)
-      if !timer_id
-        timer_id = timer_name
+    def start_timer(timer_name, duration, manual_reset = false)
+      if manual_reset
+        manual_reset = 1
+      else
+        manual_reset = 0
       end
 
-      if @_timers.key? timer_id
-        raise ArgumentError, "Timer with id #{timer_id} already added"
+      if @_timers.key? timer_name
+        raise ArgumentError, "Timer with name #{timer_name} already added"
       else
-        timer = {:sid => @s.sid, :id => timer_id, :$t => timer_name}
-        @_timers[timer_id] = [timer, duration]
+        timer = {:sid => @s.sid, :$t => timer_name}
+        @_timers[timer_id] = [timer, duration, manual_reset]
       end
     end
 
-    def cancel_timer(timer_name, timer_id = nil)
-      if !timer_id
-        timer_id = timer_name
-      end
-
-      if @_cancelled_timers.key? timer_id
-        raise ArgumentError, "Timer with id #{timer_id} already cancelled"
+    def cancel_timer(timer_name)
+      if @_cancelled_timers.key? timer_name
+        raise ArgumentError, "Timer with id #{timer_name} already cancelled"
       else
-        timer = {:sid => @s.sid, :id => timer_id, :$t => timer_name}
-        @_cancelled_timers[timer_id] = timer
+        @_cancelled_timers[timer_name] = true
+      end
+    end
+
+    def reset_timer(timer_name)
+      if @m.kind_of? Hash 
+        retract_timer timer_name, @m
+      else
+        for m in @m do
+          return true if retract_timer(timer_name, m)
+        end
+
+        return false
       end
     end
 
@@ -213,6 +222,22 @@ module Engine
     end
 
     private
+
+    def retract_timer(timer_name, message) 
+      if ((message.key? :$t) && (message[:$t] == timer_name)) ||
+         ((message.key? '$t') && (message['$t'] == timer_name))
+         retract(message)
+         return true
+      end
+
+      for property_name, property_value in message do
+        if (property_value.kind_of? Hash) && retract_timer(timer_name, property_value)
+          return true
+        end
+      end
+
+      return false
+    end
 
     def handle_property(name, value=nil)
       name = name.to_s
@@ -369,11 +394,10 @@ module Engine
             end
           end
 
-          id = rand(1000000000)
           if assert_state
-            c.assert(:label => to_state, :chart => 1, :id => id)
+            c.assert(:label => to_state, :chart => 1)
           else
-            c.post(:label => to_state, :chart => 1, :id => id)
+            c.post(:label => to_state, :chart => 1)
           end
         end
       }
@@ -453,12 +477,12 @@ module Engine
       Rules.start_assert_events @handle, JSON.generate(messages)
     end
 
-    def start_timer(sid, timer, timer_duration)
-      Rules.start_timer @handle, sid.to_s, timer_duration, JSON.generate(timer)
+    def start_timer(sid, timer, timer_duration, manual_reset)
+      Rules.start_timer @handle, sid.to_s, timer_duration, manual_reset, JSON.generate(timer)
     end
 
-    def cancel_timer(sid, timer)
-      Rules.cancel_timer @handle, sid.to_s, JSON.generate(timer)
+    def cancel_timer(sid, timer_name)
+      Rules.cancel_timer @handle, sid.to_s, timer_name.to_s
     end
 
     def assert_fact(fact)
@@ -608,12 +632,12 @@ module Engine
             complete.call e, true
           else
             begin
-              for timer_id, timer in c._cancelled_timers do
-                cancel_timer c.s.sid, timer
+              for timer_name, timer_value in c._cancelled_timers do
+                cancel_timer c.s.sid, timer_name
               end
 
-              for timer_id, timer_duration in c._timers do
-                start_timer c.s.sid, timer_duration[0], timer_duration[1]
+              for timer_id, timer_tuple in c._timers do
+                start_timer c.s.sid, timer_tuple[0], timer_tuple[1], timer_tuple[2]
               end
 
               for ruleset_name, q in c._queues do
@@ -752,8 +776,7 @@ module Engine
           if ((trigger.key? :to) && (trigger[:to] == state_name)) ||
               ((trigger.key? "to") && (trigger["to"] == state_name)) ||
               (trigger.key? :count) || (trigger.key? "count") ||
-              (trigger.key? :cap) || (trigger.key? "cap") ||
-              (trigger.key? :span) || (trigger.key? "span")
+              (trigger.key? :cap) || (trigger.key? "cap") 
             reflexive_states[qualified_name] = true
           end
         end
@@ -805,12 +828,6 @@ module Engine
               rule[:count] = trigger[:count]
             elsif trigger.key? "count"
               rule[:count] = trigger["count"]
-            end
-
-            if trigger.key? :span
-              rule[:span] = trigger[:span]
-            elsif trigger.key? "span"
-              rule[:span] = trigger["span"]
             end
 
             if trigger.key? :cap
@@ -936,8 +953,7 @@ module Engine
             for transition_name, transition in stage_to do
               if (transition_name == stage_name) ||
                   (transition.key? :count) || (transition.key? "count") ||
-                  (transition.key? :cap) || (transition.key? "cap") ||
-                  (transition.key? :span) || (transition.key? "span")
+                  (transition.key? :cap) || (transition.key? "cap")
                 reflexive_stages[stage_name] = true
               end
             end
@@ -1000,12 +1016,6 @@ module Engine
                 rule[:count] = transition[:count]
               elsif transition.key? "count"
                 rule[:count] = transition["count"]
-              end
-
-              if transition.key? :span
-                rule[:span] = transition[:span]
-              elsif transition.key? "span"
-                rule[:span] = transition["span"]
               end
 
               if transition.key? :cap

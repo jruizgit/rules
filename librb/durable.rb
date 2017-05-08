@@ -141,6 +141,10 @@ module Durable
       return Expression.new(@name, @left).matches(other)
     end
 
+    def imatches(other)
+      return Expression.new(@name, @left).imatches(other)
+    end
+
     def ref_id(sid)
       Arithmetic.new @name, @left, sid
     end
@@ -247,6 +251,12 @@ module Durable
 
     def matches(other)
       @__op = :$mt
+      @right = other
+      self
+    end
+
+    def imatches(other)
+      @__op = :$imt
       @right = other
       self
     end

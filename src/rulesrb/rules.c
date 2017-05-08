@@ -544,13 +544,14 @@ static VALUE rbAbandonAction(VALUE self, VALUE handle, VALUE actionHandle) {
     return Qnil;
 }
 
-static VALUE rbStartTimer(VALUE self, VALUE handle, VALUE sid, VALUE duration, VALUE timer) {
+static VALUE rbStartTimer(VALUE self, VALUE handle, VALUE sid, VALUE duration, VALUE manualReset, VALUE timer) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(sid, T_STRING);
     Check_Type(duration, T_FIXNUM);
+    Check_Type(manualReset, T_FIXNUM);
     Check_Type(timer, T_STRING);    
 
-    unsigned int result = startTimer((void *)FIX2LONG(handle), RSTRING_PTR(sid), FIX2UINT(duration), RSTRING_PTR(timer));
+    unsigned int result = startTimer((void *)FIX2LONG(handle), RSTRING_PTR(sid), FIX2UINT(duration), FIX2SHORT(manualReset), RSTRING_PTR(timer));
     if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -562,12 +563,12 @@ static VALUE rbStartTimer(VALUE self, VALUE handle, VALUE sid, VALUE duration, V
     return Qnil;
 }
 
-static VALUE rbCancelTimer(VALUE self, VALUE handle, VALUE sid, VALUE timer) {
+static VALUE rbCancelTimer(VALUE self, VALUE handle, VALUE sid, VALUE timerName) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(sid, T_STRING);
-    Check_Type(timer, T_STRING);    
+    Check_Type(timerName, T_STRING);    
 
-    unsigned int result = cancelTimer((void *)FIX2LONG(handle), RSTRING_PTR(sid), RSTRING_PTR(timer));
+    unsigned int result = cancelTimer((void *)FIX2LONG(handle), RSTRING_PTR(sid), RSTRING_PTR(timerName));
     if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -679,7 +680,7 @@ void Init_rules() {
     rb_define_singleton_method(rulesModule, "complete_action", rbCompleteAction, 3);
     rb_define_singleton_method(rulesModule, "complete_and_start_action", rbCompleteAndStartAction, 3);
     rb_define_singleton_method(rulesModule, "abandon_action", rbAbandonAction, 2);
-    rb_define_singleton_method(rulesModule, "start_timer", rbStartTimer, 4);
+    rb_define_singleton_method(rulesModule, "start_timer", rbStartTimer, 5);
     rb_define_singleton_method(rulesModule, "cancel_timer", rbCancelTimer, 3);
     rb_define_singleton_method(rulesModule, "assert_timers", rbAssertTimers, 1);
     rb_define_singleton_method(rulesModule, "get_state", rbGetState, 2);
