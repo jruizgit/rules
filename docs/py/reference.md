@@ -764,7 +764,7 @@ with ruleset('timer'):
 run_all()
 ```
 
-The example below use a timer to detect higher event rate:  
+The example below uses a timer to detect higher event rate:  
 
 ```python
 from durable.lang import *
