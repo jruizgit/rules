@@ -282,18 +282,22 @@ Durable.statechart :expense do
     to :denied, when_all((m.subject == "approve") & (m.amount > 1000)) do
       puts "expense denied"
     end
+    
     to :pending, when_all((m.subject == "approve") & (m.amount <= 1000)) do
       puts "requesting expense approval"
     end
   end  
+  
   state :pending do
     to :approved, when_all(m.subject == "approved") do
       puts "expense approved"
     end
+    
     to :denied, when_all(m.subject == "denied") do
       puts "expense denied"
     end
   end
+  
   state :approved
   state :denied
 end
@@ -353,9 +357,11 @@ Durable.ruleset :test do
   when_all m.subject.matches('3[47][0-9]{13}') do
     puts "Amex detected in #{m.subject}"
   end
+  
   when_all m.subject.matches('4[0-9]{12}([0-9]{3})?') do
     puts "Visa detected in #{m.subject}"
   end
+  
   when_all m.subject.matches('(5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|2720)[0-9]{12}') do
     puts "Mastercard detected in #{m.subject}"
   end
