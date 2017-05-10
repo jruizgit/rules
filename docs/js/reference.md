@@ -203,14 +203,14 @@ d.ruleset('flow', function() {
         deleteState();
     }
 
-    // modifies default context state
+    // modifies context state
     whenStart: patchState('flow', { status: 'start' })
 });
 
 d.runAll();
 ```
 State can also be retrieved and modified using the http API. When the example above is running, try the following commands:  
-<sub>`curl -H "content-type: application/json" -X POST -d '{"state": "next"}' http://localhost:5000/flow/state`</sub>  
+<sub>`curl -H "content-type: application/json" -X POST -d '{"status": "next"}' http://localhost:5000/flow/state`</sub>  
 
 [top](reference.md#table-of-contents)  
 
