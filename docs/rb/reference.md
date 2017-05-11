@@ -262,6 +262,19 @@ durable_rules implements a simple pattern matching dialect. Similar to lua, it u
 ```ruby
 require "durable"
 
+Durable.ruleset :match do
+  when_all (m.url.matches("(https?://)?([0-9a-z.-]+)%.[a-z]{2,6}(/[A-z0-9_.-]+/?)*")) do
+    puts "match -> #{m.url}"
+  end
+  when_start do
+    post :match, { :url => "https://github.com" }
+    post :match, { :url => "http://github.com/jruizgit/rul!es" }
+    post :match, { :url => "https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md" }
+    post :match, { :url => "//rules" }
+    post :match, { :url => "https://github.c/jruizgit/rules" }
+  end
+end
+
 Durable.run_all
 ```  
 
