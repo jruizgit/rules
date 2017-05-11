@@ -322,6 +322,21 @@ Arithmetic operators: +, -, *, /
 ```ruby
 require "durable"
 
+Durable.ruleset :risk do
+  when_all c.first = m.t == "purchase",
+           c.second = m.amount > first.amount * 2,
+           c.third = m.amount > first.amount + second.amount do
+    puts "fraud detected -> " + first.amount.to_s 
+    puts "               -> " + second.amount.to_s
+    puts "               -> " + third.amount.to_s 
+  end
+  when_start do
+    post :risk, { :t => "purchase", :amount => 50 }
+    post :risk, { :t => "purchase", :amount => 200 }
+    post :risk, { :t => "purchase", :amount => 300 } 
+  end
+end
+
 Durable.run_all
 ```  
 
