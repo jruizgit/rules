@@ -326,9 +326,9 @@ Durable.ruleset :risk do
   when_all c.first = m.t == "purchase",
            c.second = m.amount > first.amount * 2,
            c.third = m.amount > first.amount + second.amount do
-    puts "fraud detected -> " + first.amount.to_s 
-    puts "               -> " + second.amount.to_s
-    puts "               -> " + third.amount.to_s 
+    puts "fraud detected -> #{first.amount}" 
+    puts "               -> #{second.amount}"
+    puts "               -> #{third.amount}"
   end
   when_start do
     post :risk, { :t => "purchase", :amount => 50 }
@@ -347,6 +347,18 @@ Queries on nested events or facts are also supported. The `.` notation is used f
 
 ```ruby
 require "durable"
+
+Durable.ruleset :expense do
+  when_all c.bill = (m.t == "bill") & (m.invoice.amount > 50),
+           c.account = (m.t == "account") & (m.payment.invoice.amount == bill.invoice.amount) do
+    puts "bill amount -> #{bill.invoice.amount}" 
+    puts "account payment amount -> #{account.payment.invoice.amount}" 
+  end
+  when_start do
+    post :expense, { t:"bill", :invoice => { :amount => 1000 }}
+    post :expense, { t:"account", :payment => { :invoice => { :amount => 1000 }}}
+  end
+end
 
 Durable.run_all
 ```  
