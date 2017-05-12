@@ -330,6 +330,7 @@ Durable.ruleset :risk do
     puts "               -> #{second.amount}"
     puts "               -> #{third.amount}"
   end
+  
   when_start do
     post :risk, { :t => "purchase", :amount => 50 }
     post :risk, { :t => "purchase", :amount => 200 }
@@ -354,6 +355,7 @@ Durable.ruleset :expense do
     puts "bill amount -> #{bill.invoice.amount}" 
     puts "account payment amount -> #{account.payment.invoice.amount}" 
   end
+  
   when_start do
     post :expense, { t:"bill", :invoice => { :amount => 1000 }}
     post :expense, { t:"account", :payment => { :invoice => { :amount => 1000 }}}
@@ -376,6 +378,7 @@ Durable.ruleset :risk do
            c.fourth = m.t == "chargeback" do
     puts "fraud detected #{first.t} #{third.t} #{fourth.t}"
   end
+  
   when_start do
     post :risk, { :t => "deposit" }
     post :risk, { :t => "withrawal" }
@@ -408,6 +411,7 @@ Durable.ruleset :expense do
       puts "Approved #{third.subject} #{fourth.amount}"
     end
   end
+  
   when_start do
     post :expense, { :subject => "approve" }
     post :expense, { :amount => 1000 }
@@ -426,6 +430,26 @@ Event and fact evaluation can lead to multiple consequents. The triggering order
 In this example, notice how the last rule is triggered first, as it has the highest priority.
 ```ruby
 require "durable"
+
+Durable.ruleset :attributes do
+  when_all pri(3), m.amount < 300 do
+    puts "attributes P3 -> #{m.amount}"
+  end
+
+  when_all pri(2), m.amount < 200 do
+    puts "attributes P2 -> #{m.amount}"
+  end
+
+  when_all pri(1), m.amount < 100  do
+    puts "attributes P1 -> #{m.amount}"
+  end
+
+  when_start do
+    assert :attributes, { :amount => 50 }
+    assert :attributes, { :amount => 150 }
+    assert :attributes, { :amount => 250 }
+  end
+end
 
 Durable.run_all
 ```  
