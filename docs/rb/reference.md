@@ -397,6 +397,25 @@ The following two functions can be used and combined to define richer event sequ
 ```ruby
 require "durable"
 
+Durable.ruleset :expense do
+  when_any all(c.first = m.subject == "approve", 
+               c.second = m.amount == 1000),
+           all(c.third = m.subject == "jumbo", 
+               c.fourth = m.amount == 10000) do
+    if first
+      puts "Approved #{first.subject} #{second.amount}"
+    else
+      puts "Approved #{third.subject} #{fourth.amount}"
+    end
+  end
+  when_start do
+    post :expense, { :subject => "approve" }
+    post :expense, { :amount => 1000 }
+    post :expense, { :subject => "jumbo" }
+    post :expense, { :amount => 10000 }
+  end
+end
+
 Durable.run_all
 ```  
 [top](reference.md#table-of-contents) 
