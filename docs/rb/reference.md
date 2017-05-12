@@ -464,6 +464,34 @@ This example batches exaclty three approvals and caps the number of rejects to t
 ```ruby
 require "durable"
 
+Durable.ruleset :expense do
+  # this rule will trigger as soon as three events match the condition
+  when_all count(3), m.amount < 100 do
+    for f in m do
+      puts "approved ->#{f}"
+    end
+  end
+
+  # this rule will be triggered when 'expense' is asserted batching at most two results
+  when_all cap(2), 
+           c.expense = m.amount >= 100,
+           c.approval = m.review == true do
+    for f in m do
+      puts "rejected ->#{f}"
+    end
+  end
+
+  when_start do
+    post_batch :expense, { :amount => 10 },
+                         { :amount => 20 },
+                         { :amount => 100 },
+                         { :amount => 30 },
+                         { :amount => 200 },
+                         { :amount => 400 }
+    assert :expense, { :review => true }
+  end
+end
+
 Durable.run_all
 ```  
 [top](reference.md#table-of-contents)  
