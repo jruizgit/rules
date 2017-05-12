@@ -369,6 +369,20 @@ In some cases lack of information is meaningful. The `none` function can be used
 ```ruby
 require "durable"
 
+Durable.ruleset :risk do
+  when_all c.first = m.t == "deposit",
+           none(m.t == "balance"),
+           c.third = m.t == "withrawal",
+           c.fourth = m.t == "chargeback" do
+    puts "fraud detected #{first.t} #{third.t} #{fourth.t}"
+  end
+  when_start do
+    post :risk, { :t => "deposit" }
+    post :risk, { :t => "withrawal" }
+    post :risk, { :t => "chargeback" }
+  end
+end
+
 Durable.run_all
 ```  
 
