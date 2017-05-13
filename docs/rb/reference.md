@@ -524,6 +524,22 @@ When exceptions are not handled by actions, they are stored in the context state
 ```ruby
 require "durable"
 
+Durable.ruleset :flow do
+  when_all m.action == "start" do
+    raise "Unhandled Exception!"
+  end
+  
+  # when the exception property exists
+  when_all +s.exception do
+    puts "#{s.exception}"
+    s.exception = nil
+  end
+
+  when_start do
+    post :flow, { :action => "start" }
+  end
+end
+
 Durable.run_all
 ```  
 [top](reference.md#table-of-contents)  
