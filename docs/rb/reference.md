@@ -171,6 +171,20 @@ Events can be posted using the http API. When the example above is listening, ru
 <sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:4567/risk/events`</sub>  
 <sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:4567/risk/events`</sub>  
 
+**Note:**  
+
+*Using facts in the example above will produce the following output:*   
+
+<sub>`Fraud detected -> US, CA`</sub>  
+<sub>`Fraud detected -> CA, US`</sub>  
+
+*The reason is because both facts satisfy the first condition m.t == 'purchase' and each fact satisfies the second condition m.location != c.first.location in relation to the facts which satisfied the first.*  
+
+*Given that, you might be wondering why post behaves differently: the reason is because an event is an ephemeral fact, as soon as it is scheduled to be dispatched, it is retracted. When using post in the example above, by the time the second pair is calculated the events have already been retracted.*  
+
+*And why is the difference between events and facts important? Retracting events before dispatch reduces the number of combinations to be calculated for dispatch. Thus, processing events is much more efficient (orders of magnitude faster in some cases).*  
+
+
 [top](reference.md#table-of-contents)  
 
 ### State
