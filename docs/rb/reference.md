@@ -563,6 +563,48 @@ Statechart rules:
 ```ruby
 require "durable"
 
+Durable.statechart :expense do
+  # initial state 'input' with two triggers
+  state :input do
+    # trigger to move to 'denied' given a condition
+    to :denied, when_all((m.subject == "approve") & (m.amount > 1000)) do
+      # action executed before state change
+      puts "denied amount #{m.amount}"
+    end
+
+    to :pending, when_all((m.subject == "approve") & (m.amount <= 1000)) do
+      puts "requesting approve amount #{m.amount}"
+    end
+  end  
+
+  # intermediate state 'pending' with two triggers
+  state :pending do
+    to :approved, when_all(m.subject == "approved") do
+      puts "expense approved"
+    end
+
+    to :denied, when_all(m.subject == "denied") do
+      puts "expense denied"
+    end
+  end
+
+  state :approved
+  state :denied
+
+  when_start do
+    # events directed to default statechart instance
+    post :expense, { :subject => 'approve', :amount => 100 }
+    post :expense, { :subject => 'approved' }
+
+    # events directed to statechart instance with id '1'
+    post :expense, { :sid => 1, :subject => 'approve', :amount => 100 }
+    post :expense, { :sid => 1, :subject => 'denied' }
+
+    # events directed to statechart instance with id '2'
+    post :expense, { :sid => 2, :subject => 'approve', :amount => 10000 }
+  end
+end
+
 Durable.run_all
 ```  
 [top](reference.md#table-of-contents)  
