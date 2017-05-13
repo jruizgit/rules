@@ -20,6 +20,7 @@ Reference Manual
   * [Action Batches](reference.md#action-batches)
   * [Async Actions](reference.md#async-actions)
   * [Unhandled Exceptions](reference.md#unhandled-exceptions)
+  * [Fault Tolerance](reference.md#fault-tolerance)
 * [Flow Structures](reference.md#flow-structures) 
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
@@ -194,7 +195,9 @@ Context state is available when a consequent is executed. The same context state
 require "durable"
 
 Durable.ruleset :flow do
+  # state condition uses 's'
   when_all s.status == "start" do
+    # state update on 's'
     s.status = "next"
     puts "start"
   end
@@ -207,6 +210,7 @@ Durable.ruleset :flow do
   when_all s.status == "last" do
     s.status = "end"
     puts "last"
+    # deletes state at the end
     delete_state
   end
   # modifies context state
@@ -515,6 +519,36 @@ The consequent action can be asynchronous. When the action is finished, the `com
 ```ruby
 require "durable"
 
+Durable.ruleset :flow do
+  # async actions take a callback argument to signal completion
+  when_all s.state == "first" do |c, complete|
+    Thread.new do
+      sleep 3
+      s.state = "second"
+      puts "first completed"
+      complete.call nil
+    end
+  end
+
+  when_all s.state == "second" do |c, complete|
+    Thread.new do
+      sleep 6
+      s.state = "third"
+      puts "second completed"
+
+      # completes the action after 6 seconds
+      # use the first argument to signal an error
+      complete.call Exception('error detected')
+    end
+    # overrides the 5 second default abandon timeout
+    10
+  end
+  
+  when_start do
+    patch_state :flow, { :state => "first" }
+  end
+end
+
 Durable.run_all
 ```  
 [top](reference.md#table-of-contents)  
@@ -524,9 +558,58 @@ When exceptions are not handled by actions, they are stored in the context state
 ```ruby
 require "durable"
 
+Durable.ruleset :flow do
+  when_all m.action == "start" do
+    raise "Unhandled Exception!"
+  end
+  
+  # when the exception property exists
+  when_all +s.exception do
+    puts "#{s.exception}"
+    s.exception = nil
+  end
+
+  when_start do
+    post :flow, { :action => "start" }
+  end
+end
+
 Durable.run_all
 ```  
 [top](reference.md#table-of-contents)  
+### Fault Tolerance  
+Consequent execution is transactional and atomic. That is, if the process crashes in the middle of a consequent execution, no facts will be asserted nor retracted, no events will posted and the context state will not be changed. The consequent will be retried a few seconds after process restart.  
+
+```ruby
+require "durable"
+
+Durable.ruleset :flow do
+
+  when_all m.status == "start" do
+    post :status => "next"
+    puts "start"
+  end
+  # the process will always exit here every time the action is run
+  # when restarting the process this action will be retried after a few seconds
+  when_all m.status == "next" do
+    post :status => "last"
+    puts "next"
+    Process.kill 9, Process.pid
+  end
+
+  when_all m.status == "last" do
+    puts "last"
+  end
+  
+  when_start do
+    post :flow, { :status => "start" }
+  end
+end
+
+
+Durable.run_all
+```
+[top](reference.md#table-of-contents)   
 ## Flow Structures
 ### Statechart
 Rules can be organized using statecharts. A statechart is a deterministic finite automaton (DFA). The state context is in one of a number of possible states with conditional transitions between these states. 
@@ -544,6 +627,48 @@ Statechart rules:
 ```ruby
 require "durable"
 
+Durable.statechart :expense do
+  # initial state :input with two triggers
+  state :input do
+    # trigger to move to :denied given a condition
+    to :denied, when_all((m.subject == "approve") & (m.amount > 1000)) do
+      # action executed before state change
+      puts "denied amount #{m.amount}"
+    end
+
+    to :pending, when_all((m.subject == "approve") & (m.amount <= 1000)) do
+      puts "requesting approve amount #{m.amount}"
+    end
+  end  
+
+  # intermediate state :pending with two triggers
+  state :pending do
+    to :approved, when_all(m.subject == "approved") do
+      puts "expense approved"
+    end
+
+    to :denied, when_all(m.subject == "denied") do
+      puts "expense denied"
+    end
+  end
+
+  state :approved
+  state :denied
+
+  when_start do
+    # events directed to default statechart instance
+    post :expense, { :subject => 'approve', :amount => 100 }
+    post :expense, { :subject => 'approved' }
+
+    # events directed to statechart instance with id '1'
+    post :expense, { :sid => 1, :subject => 'approve', :amount => 100 }
+    post :expense, { :sid => 1, :subject => 'denied' }
+
+    # events directed to statechart instance with id '2'
+    post :expense, { :sid => 2, :subject => 'approve', :amount => 10000 }
+  end
+end
+
 Durable.run_all
 ```  
 [top](reference.md#table-of-contents)  
@@ -552,6 +677,43 @@ Nested states allow for writing compact statecharts. If a context is in the nest
 
 ```ruby
 require "durable"
+
+Durable.statechart :worker do
+  # super-state :work has two states and one trigger
+  state :work do
+    # sub-sate :enter has only one trigger   
+    state :enter do
+      to :process, when_all(m.subject == "enter") do
+        puts "start process"
+      end
+    end
+
+    state :process do
+      to :process, when_all(m.subject == "continue") do
+        puts "continue processing"
+      end
+    end
+
+    # the super-state trigger will be evaluated for all sub-state triggers
+    to :canceled, when_all(pri(1), m.subject == "cancel") do
+      puts "cancel process"
+    end
+  end
+
+  state :canceled
+  
+  when_start do
+    # will move the statechart to the 'work.process' sub-state
+    post :worker, { :subject => "enter" }
+
+     # will keep the statechart to the 'work.process' sub-state
+    post :worker, { :subject => "continue" }
+    post :worker, { :subject => "continue" }
+
+    # will move the statechart out of the work state
+    post :worker, { :subject => "cancel" }
+  end
+end
 
 Durable.run_all
 ```  
@@ -569,6 +731,44 @@ Flowchart rules:
 
 ```ruby
 require "durable"
+
+Durable.flowchart :expense do
+  # initial stage :input has two conditions
+  stage :input
+  to :request, when_all((m.subject == "approve") & (m.amount <= 1000))
+  to :deny, when_all((m.subject == "approve") & (m.amount > 1000))
+  
+  # intermediate stage :request has an action and three conditions
+  stage :request do
+    puts "requesting approve"
+  end
+  to :approve, when_all(m.subject == "approved")
+  to :deny, when_all(m.subject == "denied")
+  # reflexive condition: if met, returns to the same stage
+  to :request, when_any(m.subject == "retry")
+  
+  stage :approve do
+    puts "expense approved"
+  end
+
+  stage :deny do
+    puts "expense denied"
+  end
+
+  when_start do
+    # events for the default flowchart instance, approved after retry
+    post :expense, { :subject => "approve", :amount => 100 }
+    post :expense, { :subject => "retry" }
+    post :expense, { :subject => "approved" }
+
+    # events for the flowchart instance '1', denied after first try
+    post :expense, {:sid => 1, :subject => "approve", :amount => 100}
+    post :expense, {:sid => 1, :subject => "denied"}
+
+     # event for the flowchart instance '2' immediately denied    
+    post :expense, {:sid => 2, :subject => "approve", :amount => 10000}
+  end
+end
 
 Durable.run_all
 ```  
