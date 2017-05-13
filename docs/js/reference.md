@@ -20,6 +20,7 @@ Reference Manual
   * [Action Batches](reference.md#action-batches)
   * [Async Actions](reference.md#async-actions)
   * [Unhandled Exceptions](reference.md#unhandled-exceptions)
+  * [Fault Tolerance](reference.md#fault-tolerance)
 * [Flow Structures](reference.md#flow-structures) 
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
@@ -588,6 +589,41 @@ d.ruleset('flow', function() {
 d.runAll();
 ```
 [top](reference.md#table-of-contents)  
+
+### Fault Tolerance  
+Consequent execution is transactional and atomic. That is, if the process crashes in the middle of a consequent execution, no facts will be asserted nor retracted, no events will posted and the context state will not be changed. The consequent will be retried a few seconds after process restart.  
+
+```javascript
+var d = require('durable');
+
+d.ruleset('flow', function() {
+    whenAll: m.state == 'start'
+    run: {
+        post({state: 'next'});
+        console.log('start');
+    }
+
+    whenAll: m.state == 'next'
+    // the process will always exit here every time the action is run
+    // when restarting the process this action will be retried after a few seconds
+    run: {
+        post({state: 'last'});
+        console.log('next');
+        process.exit();
+    }
+
+    whenAll: m.state == 'last'
+    run: {
+        console.log('last');
+    }
+
+    whenStart: post('flow', {state: 'start'})
+});
+
+d.runAll();
+```
+[top](reference.md#table-of-contents)
+ 
 ## Flow Structures
 
 ### Statechart
