@@ -597,27 +597,27 @@ Consequent execution is transactional and atomic. That is, if the process crashe
 var d = require('durable');
 
 d.ruleset('flow', function() {
-    whenAll: m.state == 'start'
+    whenAll: m.status == 'start'
     run: {
-        post({state: 'next'});
+        post({ status: 'next' });
         console.log('start');
     }
 
-    whenAll: m.state == 'next'
+    whenAll: m.status == 'next'
     // the process will always exit here every time the action is run
     // when restarting the process this action will be retried after a few seconds
     run: {
-        post({state: 'last'});
+        post({ status: 'last' });
         console.log('next');
         process.exit();
     }
 
-    whenAll: m.state == 'last'
+    whenAll: m.status == 'last'
     run: {
         console.log('last');
     }
 
-    whenStart: post('flow', {state: 'start'})
+    whenStart: post('flow', { status: 'start' })
 });
 
 d.runAll();
