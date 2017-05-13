@@ -576,5 +576,27 @@ with ruleset('expense5'):
         host.post('expense5', {'t': 'bill', 'invoice': {'amount': 100}})
         host.post('expense5', {'t': 'account', 'payment': {'invoice': {'amount': 100}}})
 
+
+# with ruleset('flow'):
+#     @when_all(m.status == 'start')
+#     def start(c):
+#         c.post({ 'status': 'next' })
+#         print('start')
+#     # the process will always exit here every time the action is run
+#     # when restarting the process this action will be retried after a few seconds
+#     @when_all(m.status == 'next')
+#     def next(c):
+#         c.post({ 'status': 'last' })
+#         print('next')
+#         os._exit(1)
+
+#     @when_all(m.status == 'last')
+#     def last(c):
+#         print('last')
+        
+#     @when_start
+#     def on_start(host):
+#         host.post('flow', { 'status': 'start' })
+
 run_all()
 

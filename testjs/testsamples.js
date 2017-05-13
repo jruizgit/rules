@@ -494,5 +494,28 @@ d.ruleset('expense4', function() {
     }
 });
 
+// d.ruleset('flow', function() {
+//     whenAll: m.state == 'start'
+//     run: {
+//         post({state: 'next'});
+//         console.log('start');
+//     }
+//     // the process will always exit here every time the action is run
+//     // when restarting the process this action will be retried after a few seconds
+//     whenAll: m.state == 'next'
+//     run: {
+//         post({state: 'last'});
+//         console.log('next');
+//         process.exit();
+//     }
+
+//     whenAll: m.state == 'last'
+//     run: {
+//         console.log('last');
+//     }
+
+//     whenStart: post('flow', {state: 'start'})
+// });
+
 
 d.runAll();
