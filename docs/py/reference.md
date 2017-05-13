@@ -108,37 +108,37 @@ from durable.lang import *
 
 with ruleset('animal'):
     # will be triggered by 'Kermit eats flies'
-    @when_all((m.verb == 'eats') & (m.predicate == 'flies'))
+    @when_all((m.predicate == 'eats') & (m.object == 'flies'))
     def frog(c):
-        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'frog' })
+        c.assert_fact({ 'subject': c.m.subject, 'predicate': 'is', 'object': 'frog' })
 
-    @when_all((m.verb == 'eats') & (m.predicate == 'worms'))
+    @when_all((m.predicate == 'eats') & (m.object == 'worms'))
     def bird(c):
-        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'bird' })
+        c.assert_fact({ 'subject': c.m.subject, 'predicate': 'is', 'object': 'bird' })
 
     # will be chained after asserting 'Kermit is frog'
-    @when_all((m.verb == 'is') & (m.predicate == 'frog'))
+    @when_all((m.predicate == 'is') & (m.object == 'frog'))
     def green(c):
-        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'green' })
+        c.assert_fact({ 'subject': c.m.subject, 'predicate': 'is', 'object': 'green' })
 
-    @when_all((m.verb == 'is') & (m.predicate == 'bird'))
+    @when_all((m.predicate == 'is') & (m.object == 'bird'))
     def black(c):
-        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'black' })
+        c.assert_fact({ 'subject': c.m.subject, 'predicate': 'is', 'object': 'black' })
 
     @when_all(+m.subject)
     def output(c):
-        print('Fact: {0} {1} {2}'.format(c.m.subject, c.m.verb, c.m.predicate))
+        print('Fact: {0} {1} {2}'.format(c.m.subject, c.m.predicate, c.m.object))
 
     @when_start
     def start(host):
-        host.assert_fact('animal', { 'subject': 'Kermit', 'verb': 'eats', 'predicate': 'flies' })
+        host.assert_fact('animal', { 'subject': 'Kermit', 'predicate': 'eats', 'object': 'flies' })
 
 run_all()
 ```
 
 Facts can also be asserted using the http API. For the example above, run the following command:  
 
-<sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "verb": "eats", "predicate": "worms"}' http://localhost:5000/animal/facts`</sub>
+<sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "predicate": "eats", "object": "worms"}' http://localhost:5000/animal/facts`</sub>
 
 [top](reference.md#table-of-contents)  
 

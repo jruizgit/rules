@@ -115,24 +115,24 @@ var d = require('durable');
 
 d.ruleset('animal', function() {
     // will be triggered by 'Kermit eats flies'
-    whenAll: m.verb == 'eats' && m.predicate == 'flies' 
-    run: assert({ subject: m.subject, verb: 'is', predicate: 'frog' })
+    whenAll: m.predicate == 'eats' && m.object == 'flies' 
+    run: assert({ subject: m.subject, predicate: 'is', object: 'frog' })
 
-    whenAll: m.verb == 'eats' && m.predicate == 'worms' 
-    run: assert({ subject: m.subject, verb: 'is', predicate: 'bird' })
+    whenAll: m.predicate == 'eats' && m.object == 'worms' 
+    run: assert({ subject: m.subject, predicate: 'is', object: 'bird' })
 
     // will be chained after asserting 'Kermit is frog'
-    whenAll: m.verb == 'is' && m.predicate == 'frog' 
-    run: assert({ subject: m.subject, verb: 'is', predicate: 'green'})
+    whenAll: m.predicate == 'is' && m.object == 'frog' 
+    run: assert({ subject: m.subject, predicate: 'is', object: 'green'})
 
-    whenAll: m.verb == 'is' && m.predicate == 'bird' 
-    run: assert({ subject: m.subject, verb: 'is', predicate: 'black'})
+    whenAll: m.predicate == 'is' && m.object == 'bird' 
+    run: assert({ subject: m.subject, predicate: 'is', object: 'black'})
 
     whenAll: +m.subject
-    run: console.log('fact: ' + m.subject + ' ' + m.verb + ' ' + m.predicate)
+    run: console.log('fact: ' + m.subject + ' ' + m.predicate + ' ' + m.object)
 
     whenStart: {
-        assert('animal', { subject: 'Kermit', verb: 'eats', predicate: 'flies' });
+        assert('animal', { subject: 'Kermit', predicate: 'eats', object: 'flies' });
     }
 });
 
@@ -141,7 +141,7 @@ d.runAll();
 
 Facts can also be asserted using the http API. For the example above, run the following command:  
 
-<sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "verb": "eats", "predicate": "worms"}' http://localhost:5000/animal/facts`</sub>
+<sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "predicate": "eats", "object": "worms"}' http://localhost:5000/animal/facts`</sub>
 
 [top](reference.md#table-of-contents)  
 
