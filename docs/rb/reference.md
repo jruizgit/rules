@@ -518,6 +518,36 @@ The consequent action can be asynchronous. When the action is finished, the `com
 ```ruby
 require "durable"
 
+Durable.ruleset :flow do
+  # async actions take a callback argument to signal completion
+  when_all s.state == "first" do |c, complete|
+    Thread.new do
+      sleep 3
+      s.state = "second"
+      puts "first completed"
+      complete.call nil
+    end
+  end
+
+  when_all s.state == "second" do |c, complete|
+    Thread.new do
+      sleep 6
+      s.state = "third"
+      puts "second completed"
+
+      # completes the action after 6 seconds
+      # use the first argument to signal an error
+      complete.call Exception('error detected')
+    end
+    # overrides the 5 second default abandon timeout
+    10
+  end
+  
+  when_start do
+    patch_state :flow, { :state => "first" }
+  end
+end
+
 Durable.run_all
 ```  
 [top](reference.md#table-of-contents)  
