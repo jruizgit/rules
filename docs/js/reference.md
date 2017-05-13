@@ -177,8 +177,8 @@ Events can be posted using the http API. When the example above is listening, ru
 
 *Using facts in the example above will produce the following output:*   
 
-`Fraud detected -> US, CA`  
-`Fraud detected -> CA, US`  
+<sub>`Fraud detected -> US, CA`</sub>  
+<sub>`Fraud detected -> CA, US`</sub>  
 
 *The reason is because both facts satisfy the first condition m.t == 'purchase' and each fact satisfies the second condition m.location != c.first.location in relation to the facts which satisfied the first.*  
 
