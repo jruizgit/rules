@@ -572,6 +572,40 @@ with ruleset('flow'):
 run_all()
 ```
 [top](reference.md#table-of-contents)  
+
+### Fault Tolerance  
+Consequent execution is transactional and atomic. That is, if the process crashes in the middle of a consequent execution, no facts will be asserted nor retracted, no events will posted and the context state will not be changed. The consequent will be retried a few seconds after process restart.  
+
+```python
+from durable.lang import *
+import os
+
+with ruleset('flow'):
+    @when_all(m.status == 'start')
+    def start(c):
+        c.post({ 'status': 'next' })
+        print('start')
+
+    @when_all(m.status == 'next')
+    # the process will always exit here every time the action is run
+    # when restarting the process this action will be retried after a few seconds
+    def next(c):
+        c.post({ 'status': 'last' })
+        print('next')
+        os._exit(1)
+
+    @when_all(m.status == 'last')
+    def last(c):
+        print('last')
+        
+    @when_start
+    def on_start(host):
+        host.post('flow', { 'status': 'start' })
+        
+run_all()
+```
+[top](reference.md#table-of-contents)  
+
 ## Flow Structures
 ### Statechart
 Rules can be organized using statecharts. A statechart is a deterministic finite automaton (DFA). The state context is in one of a number of possible states with conditional transitions between these states. 
