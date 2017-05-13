@@ -583,6 +583,31 @@ Consequent execution is transactional and atomic. That is, if the process crashe
 ```ruby
 require "durable"
 
+Durable.ruleset :flow do
+
+  when_all m.status == "start" do
+    post :status => "next"
+    puts "start"
+  end
+  # the process will always exit here every time the action is run
+  # when restarting the process this action will be retried after a few seconds
+  when_all m.status == "next" do
+    post :status => "last"
+    puts "next"
+    Process.kill 9, Process.pid
+  end
+
+  when_all m.status == "last" do
+    puts "last"
+  end
+  
+  when_start do
+    post :flow, { :status => "start" }
+  end
+end
+
+
+Durable.run_all
 ```
 [top](reference.md#table-of-contents)   
 ## Flow Structures
