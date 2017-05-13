@@ -194,7 +194,9 @@ Context state is available when a consequent is executed. The same context state
 require "durable"
 
 Durable.ruleset :flow do
+  # state condition uses 's'
   when_all s.status == "start" do
+    # state update on 's'
     s.status = "next"
     puts "start"
   end
@@ -207,6 +209,7 @@ Durable.ruleset :flow do
   when_all s.status == "last" do
     s.status = "end"
     puts "last"
+    # deletes state at the end
     delete_state
   end
   # modifies context state
