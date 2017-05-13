@@ -668,6 +668,44 @@ Flowchart rules:
 ```ruby
 require "durable"
 
+Durable.flowchart :expense do
+  # initial stage :input has two conditions
+  stage :input
+  to :request, when_all((m.subject == "approve") & (m.amount <= 1000))
+  to :deny, when_all((m.subject == "approve") & (m.amount > 1000))
+  
+  # intermediate stage :request has an action and three conditions
+  stage :request do
+    puts "requesting approve"
+  end
+  to :approve, when_all(m.subject == "approved")
+  to :deny, when_all(m.subject == "denied")
+  # reflexive condition: if met, returns to the same stage
+  to :request, when_any(m.subject == "retry")
+  
+  stage :approve do
+    puts "expense approved"
+  end
+
+  stage :deny do
+    puts "expense denied"
+  end
+
+  when_start do
+    # events for the default flowchart instance, approved after retry
+    post :expense, { :subject => "approve", :amount => 100 }
+    post :expense, { :subject => "retry" }
+    post :expense, { :subject => "approved" }
+
+    # events for the flowchart instance '1', denied after first try
+    post :expense, {:sid => 1, :subject => "approve", :amount => 100}
+    post :expense, {:sid => 1, :subject => "denied"}
+
+     # event for the flowchart instance '2' immediately denied    
+    post :expense, {:sid => 2, :subject => "approve", :amount => 10000}
+  end
+end
+
 Durable.run_all
 ```  
 [top](reference.md#table-of-contents)  
