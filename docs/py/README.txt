@@ -37,44 +37,44 @@ durable_rules super-power is the foward-chaining evaluation of rules. In other w
     from durable.lang import *
 
     with ruleset('animal'):
-        @when_all(c.first << (m.verb == 'eats') & (m.predicate == 'flies'),
-                  (m.verb == 'lives') & (m.predicate == 'water') & (m.subject == c.first.subject))
+        @when_all(c.first << (m.predicate == 'eats') & (m.object == 'flies'),
+                  (m.predicate == 'lives') & (m.object == 'water') & (m.subject == c.first.subject))
         def frog(c):
-            c.assert_fact({ 'subject': c.first.subject, 'verb': 'is', 'predicate': 'frog' })
+            c.assert_fact({ 'subject': c.first.subject, 'predicate': 'is', 'object': 'frog' })
 
-        @when_all(c.first << (m.verb == 'eats') & (m.predicate == 'flies'),
-                  (m.verb == 'lives') & (m.predicate == 'land') & (m.subject == c.first.subject))
+        @when_all(c.first << (m.predicate == 'eats') & (m.object == 'flies'),
+                  (m.predicate == 'lives') & (m.object == 'land') & (m.subject == c.first.subject))
         def chameleon(c):
-            c.assert_fact({ 'subject': c.first.subject, 'verb': 'is', 'predicate': 'chameleon' })
+            c.assert_fact({ 'subject': c.first.subject, 'predicate': 'is', 'object': 'chameleon' })
 
-        @when_all((m.verb == 'eats') & (m.predicate == 'worms'))
+        @when_all((m.predicate == 'eats') & (m.object == 'worms'))
         def bird(c):
-            c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'bird' })
+            c.assert_fact({ 'subject': c.m.subject, 'predicate': 'is', 'object': 'bird' })
 
-        @when_all((m.verb == 'is') & (m.predicate == 'frog'))
+        @when_all((m.predicate == 'is') & (m.object == 'frog'))
         def green(c):
-            c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'green' })
+            c.assert_fact({ 'subject': c.m.subject, 'predicate': 'is', 'object': 'green' })
 
-        @when_all((m.verb == 'is') & (m.predicate == 'chameleon'))
+        @when_all((m.predicate == 'is') & (m.object == 'chameleon'))
         def grey(c):
-            c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'grey' })
+            c.assert_fact({ 'subject': c.m.subject, 'predicate': 'is', 'object': 'grey' })
 
-        @when_all((m.verb == 'is') & (m.predicate == 'bird'))
+        @when_all((m.predicate == 'is') & (m.object == 'bird'))
         def black(c):
-            c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'black' })
+            c.assert_fact({ 'subject': c.m.subject, 'predicate': 'is', 'object': 'black' })
 
         @when_all(count(11), +m.subject)
         def output(c):
             for f in c.m:
-                print ('Fact: {0} {1} {2}'.format(f.subject, f.verb, f.predicate))
+                print ('Fact: {0} {1} {2}'.format(f.subject, f.predicate, f.object))
 
         @when_start
         def start(host):
-            host.assert_fact('animal', { 'subject': 'Kermit', 'verb': 'eats', 'predicate': 'flies' })
-            host.assert_fact('animal', { 'subject': 'Kermit', 'verb': 'lives', 'predicate': 'water' })
-            host.assert_fact('animal', { 'subject': 'Greedy', 'verb': 'eats', 'predicate': 'flies' })
-            host.assert_fact('animal', { 'subject': 'Greedy', 'verb': 'lives', 'predicate': 'land' })
-            host.assert_fact('animal', { 'subject': 'Tweety', 'verb': 'eats', 'predicate': 'worms' })
+            host.assert_fact('animal', { 'subject': 'Kermit', 'predicate': 'eats', 'object': 'flies' })
+            host.assert_fact('animal', { 'subject': 'Kermit', 'predicate': 'lives', 'object': 'water' })
+            host.assert_fact('animal', { 'subject': 'Greedy', 'predicate': 'eats', 'object': 'flies' })
+            host.assert_fact('animal', { 'subject': 'Greedy', 'predicate': 'lives', 'object': 'land' })
+            host.assert_fact('animal', { 'subject': 'Tweety', 'predicate': 'eats', 'object': 'worms' })
             
     run_all()
 

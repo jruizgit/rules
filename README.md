@@ -72,38 +72,38 @@ var d = require('durable');
 
 d.ruleset('animal', function() {
     whenAll: {
-        first = m.verb == 'eats' && m.predicate == 'flies' 
-        m.verb == 'lives' && m.predicate == 'water' && m.subject == first.subject
+        first = m.predicate == 'eats' && m.object == 'flies' 
+        m.predicate == 'lives' && m.object == 'water' && m.subject == first.subject
     }
-    run: assert({ subject: first.subject, verb: 'is', predicate: 'frog' })
+    run: assert({ subject: first.subject, predicate: 'is', object: 'frog' })
 
     whenAll: {
-        first = m.verb == 'eats' && m.predicate == 'flies' 
-        m.verb == 'lives' && m.predicate == 'land' && m.subject == first.subject
+        first = m.predicate == 'eats' && m.object == 'flies' 
+        m.predicate == 'lives' && m.object == 'land' && m.subject == first.subject
     }
-    run: assert({ subject: first.subject, verb: 'is', predicate: 'chameleon' })
+    run: assert({ subject: first.subject, predicate: 'is', object: 'chameleon' })
 
-    whenAll: m.verb == 'eats' && m.predicate == 'worms' 
-    run: assert({ subject: m.subject, verb: 'is', predicate: 'bird' })
+    whenAll: m.predicate == 'eats' && m.object == 'worms' 
+    run: assert({ subject: m.subject, predicate: 'is', object: 'bird' })
 
-    whenAll: m.verb == 'is' && m.predicate == 'frog'
-    run: assert({ subject: m.subject, verb: 'is', predicate: 'green' })
+    whenAll: m.predicate == 'is' && m.object == 'frog'
+    run: assert({ subject: m.subject, predicate: 'is', object: 'green' })
 
-    whenAll: m.verb == 'is' && m.predicate == 'chameleon'
-    run: assert({ subject: m.subject, verb: 'is', predicate: 'green' })
+    whenAll: m.predicate == 'is' && m.object == 'chameleon'
+    run: assert({ subject: m.subject, predicate: 'is', object: 'green' })
 
-    whenAll: m.verb == 'is' && m.predicate == 'bird' 
-    run: assert({ subject: m.subject, verb: 'is', predicate: 'black' })
+    whenAll: m.predicate == 'is' && m.object == 'bird' 
+    run: assert({ subject: m.subject, predicate: 'is', object: 'black' })
 
     whenAll: +m.subject
-    run: console.log('fact: ' + m.subject + ' ' + m.verb + ' ' + m.predicate)
+    run: console.log('fact: ' + m.subject + ' ' + m.predicate + ' ' + m.object)
 
     whenStart: {
-        assert('animal', { subject: 'Kermit', verb: 'eats', predicate: 'flies' });
-        assert('animal', { subject: 'Kermit', verb: 'lives', predicate: 'water' });
-        assert('animal', { subject: 'Greedy', verb: 'eats', predicate: 'flies' });
-        assert('animal', { subject: 'Greedy', verb: 'lives', predicate: 'land' });
-        assert('animal', { subject: 'Tweety', verb: 'eats', predicate: 'worms' });
+        assert('animal', { subject: 'Kermit', predicate: 'eats', object: 'flies' });
+        assert('animal', { subject: 'Kermit', predicate: 'lives', object: 'water' });
+        assert('animal', { subject: 'Greedy', predicate: 'eats', object: 'flies' });
+        assert('animal', { subject: 'Greedy', predicate: 'lives', object: 'land' });
+        assert('animal', { subject: 'Tweety', predicate: 'eats', object: 'worms' });
     }
 });
 
@@ -114,43 +114,43 @@ d.runAll();
 from durable.lang import *
 
 with ruleset('animal'):
-    @when_all(c.first << (m.verb == 'eats') & (m.predicate == 'flies'),
-              (m.verb == 'lives') & (m.predicate == 'water') & (m.subject == c.first.subject))
+    @when_all(c.first << (m.predicate == 'eats') & (m.object == 'flies'),
+              (m.predicate == 'lives') & (m.object == 'water') & (m.subject == c.first.subject))
     def frog(c):
-        c.assert_fact({ 'subject': c.first.subject, 'verb': 'is', 'predicate': 'frog' })
+        c.assert_fact({ 'subject': c.first.subject, 'predicate': 'is', 'object': 'frog' })
 
-    @when_all(c.first << (m.verb == 'eats') & (m.predicate == 'flies'),
-              (m.verb == 'lives') & (m.predicate == 'land') & (m.subject == c.first.subject))
+    @when_all(c.first << (m.predicate == 'eats') & (m.object == 'flies'),
+              (m.predicate == 'lives') & (m.object == 'land') & (m.subject == c.first.subject))
     def chameleon(c):
-        c.assert_fact({ 'subject': c.first.subject, 'verb': 'is', 'predicate': 'chameleon' })
+        c.assert_fact({ 'subject': c.first.subject, 'predicate': 'is', 'object': 'chameleon' })
 
-    @when_all((m.verb == 'eats') & (m.predicate == 'worms'))
+    @when_all((m.predicate == 'eats') & (m.object == 'worms'))
     def bird(c):
-        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'bird' })
+        c.assert_fact({ 'subject': c.m.subject, 'predicate': 'is', 'object': 'bird' })
 
-    @when_all((m.verb == 'is') & (m.predicate == 'frog'))
+    @when_all((m.predicate == 'is') & (m.object == 'frog'))
     def green(c):
-        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'green' })
+        c.assert_fact({ 'subject': c.m.subject, 'predicate': 'is', 'object': 'green' })
 
-    @when_all((m.verb == 'is') & (m.predicate == 'chameleon'))
+    @when_all((m.predicate == 'is') & (m.object == 'chameleon'))
     def grey(c):
-        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'grey' })
+        c.assert_fact({ 'subject': c.m.subject, 'predicate': 'is', 'object': 'grey' })
 
-    @when_all((m.verb == 'is') & (m.predicate == 'bird'))
+    @when_all((m.predicate == 'is') & (m.object == 'bird'))
     def black(c):
-        c.assert_fact({ 'subject': c.m.subject, 'verb': 'is', 'predicate': 'black' })
+        c.assert_fact({ 'subject': c.m.subject, 'predicate': 'is', 'object': 'black' })
 
     @when_all(+m.subject)
     def output(c):
-        print('Fact: {0} {1} {2}'.format(c.m.subject, c.m.verb, c.m.predicate))
+        print('Fact: {0} {1} {2}'.format(c.m.subject, c.m.predicate, c.m.object))
 
     @when_start
     def start(host):
-        host.assert_fact('animal', { 'subject': 'Kermit', 'verb': 'eats', 'predicate': 'flies' })
-        host.assert_fact('animal', { 'subject': 'Kermit', 'verb': 'lives', 'predicate': 'water' })
-        host.assert_fact('animal', { 'subject': 'Greedy', 'verb': 'eats', 'predicate': 'flies' })
-        host.assert_fact('animal', { 'subject': 'Greedy', 'verb': 'lives', 'predicate': 'land' })
-        host.assert_fact('animal', { 'subject': 'Tweety', 'verb': 'eats', 'predicate': 'worms' })
+        host.assert_fact('animal', { 'subject': 'Kermit', 'predicate': 'eats', 'object': 'flies' })
+        host.assert_fact('animal', { 'subject': 'Kermit', 'predicate': 'lives', 'object': 'water' })
+        host.assert_fact('animal', { 'subject': 'Greedy', 'predicate': 'eats', 'object': 'flies' })
+        host.assert_fact('animal', { 'subject': 'Greedy', 'predicate': 'lives', 'object': 'land' })
+        host.assert_fact('animal', { 'subject': 'Tweety', 'predicate': 'eats', 'object': 'worms' })
         
 run_all()
 ```
@@ -159,42 +159,42 @@ run_all()
 require "durable"
 
 Durable.ruleset :animal do
-  when_all c.first = (m.verb == "eats") & (m.predicate == "flies"),  
-          (m.verb == "lives") & (m.predicate == "water") & (m.subject == first.subject) do
-    assert :subject => first.subject, :verb => "is", :predicate => "frog"
+  when_all c.first = (m.predicate == "eats") & (m.object == "flies"),  
+          (m.predicate == "lives") & (m.object == "water") & (m.subject == first.subject) do
+    assert :subject => first.subject, :predicate => "is", :object => "frog"
   end
 
-  when_all c.first = (m.verb == "eats") & (m.predicate == "flies"),  
-          (m.verb == "lives") & (m.predicate == "land") & (m.subject == first.subject) do
-    assert :subject => first.subject, :verb => "is", :predicate => "chameleon"
+  when_all c.first = (m.predicate == "eats") & (m.object == "flies"),  
+          (m.predicate == "lives") & (m.object == "land") & (m.subject == first.subject) do
+    assert :subject => first.subject, :predicate => "is", :object => "chameleon"
   end
 
-  when_all (m.verb == "eats") & (m.predicate == "worms") do
-    assert :subject => m.subject, :verb => "is", :predicate => "bird"
+  when_all (m.predicate == "eats") & (m.object == "worms") do
+    assert :subject => m.subject, :predicate => "is", :object => "bird"
   end
   
-  when_all (m.verb == "is") & (m.predicate == "frog") do
-    assert :subject => m.subject, :verb => "is", :predicate => "green"
+  when_all (m.predicate == "is") & (m.object == "frog") do
+    assert :subject => m.subject, :predicate => "is", :object => "green"
   end
     
-  when_all (m.verb == "is") & (m.predicate == "chameleon") do
-    assert :subject => m.subject, :verb => "is", :predicate => "green"
+  when_all (m.predicate == "is") & (m.object == "chameleon") do
+    assert :subject => m.subject, :predicate => "is", :object => "green"
   end
 
-  when_all (m.verb == "is") & (m.predicate == "bird") do
-    assert :subject => m.subject, :verb => "is", :predicate => "black"
+  when_all (m.predicate == "is") & (m.object == "bird") do
+    assert :subject => m.subject, :predicate => "is", :object => "black"
   end
     
   when_all +m.subject do
-    puts "fact: #{m.subject} #{m.verb} #{m.predicate}"
+    puts "fact: #{m.subject} #{m.predicate} #{m.object}"
   end
     
   when_start do
-    assert :animal, { :subject => "Kermit", :verb => "eats", :predicate => "flies" }
-    assert :animal, { :subject => "Kermit", :verb => "lives", :predicate => "water" }
-    assert :animal, { :subject => "Greedy", :verb => "eats", :predicate => "flies" }
-    assert :animal, { :subject => "Greedy", :verb => "lives", :predicate => "land" }
-    assert :animal, { :subject => "Tweety", :verb => "eats", :predicate => "worms" }
+    assert :animal, { :subject => "Kermit", :predicate => "eats", :object => "flies" }
+    assert :animal, { :subject => "Kermit", :predicate => "lives", :object => "water" }
+    assert :animal, { :subject => "Greedy", :predicate => "eats", :object => "flies" }
+    assert :animal, { :subject => "Greedy", :predicate => "lives", :object => "land" }
+    assert :animal, { :subject => "Tweety", :predicate => "eats", :object => "worms" }
   end
 end
 

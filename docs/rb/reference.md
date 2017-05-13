@@ -108,29 +108,29 @@ require "durable"
 
 Durable.ruleset :animal do
   # will be triggered by 'Kermit eats flies'
-  when_all c.first = (m.verb == "eats") & (m.predicate == "flies") do
-    assert :subject => first.subject, :verb => "is", :predicate => "frog"
+  when_all c.first = (m.predicate == "eats") & (m.object == "flies") do
+    assert :subject => first.subject, :predicate => "is", :object => "frog"
   end
 
-  when_all (m.verb == "eats") & (m.predicate == "worms") do
-    assert :subject => m.subject, :verb => "is", :predicate => "bird"
+  when_all (m.predicate == "eats") & (m.object == "worms") do
+    assert :subject => m.subject, :predicate => "is", :object => "bird"
   end
   
   # will be chained after asserting 'Kermit is frog'
-  when_all (m.verb == "is") & (m.predicate == "frog") do
-    assert :subject => m.subject, :verb => "is", :predicate => "green"
+  when_all (m.predicate == "is") & (m.object == "frog") do
+    assert :subject => m.subject, :predicate => "is", :object => "green"
   end
     
-  when_all (m.verb == "is") & (m.predicate == "bird") do
-    assert :subject => m.subject, :verb => "is", :predicate => "black"
+  when_all (m.predicate == "is") & (m.object == "bird") do
+    assert :subject => m.subject, :predicate => "is", :object => "black"
   end
     
   when_all +m.subject do
-    puts "fact: #{m.subject} #{m.verb} #{m.predicate}"
+    puts "fact: #{m.subject} #{m.predicate} #{m.object}"
   end
     
   when_start do
-    assert :animal, { :subject => "Kermit", :verb => "eats", :predicate => "flies" }
+    assert :animal, { :subject => "Kermit", :predicate => "eats", :object => "flies" }
   end
 end
 
@@ -139,7 +139,7 @@ Durable.run_all
 
 Facts can also be asserted using the http API. For the example above, run the following command:  
 
-<sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "verb": "eats", "predicate": "worms"}' http://localhost:4567/animal/facts`</sub>
+<sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "predicate": "eats", "object": "worms"}' http://localhost:4567/animal/facts`</sub>
 
 [top](reference.md#table-of-contents)  
 
