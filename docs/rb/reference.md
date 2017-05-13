@@ -564,9 +564,9 @@ Statechart rules:
 require "durable"
 
 Durable.statechart :expense do
-  # initial state 'input' with two triggers
+  # initial state :input with two triggers
   state :input do
-    # trigger to move to 'denied' given a condition
+    # trigger to move to :denied given a condition
     to :denied, when_all((m.subject == "approve") & (m.amount > 1000)) do
       # action executed before state change
       puts "denied amount #{m.amount}"
@@ -577,7 +577,7 @@ Durable.statechart :expense do
     end
   end  
 
-  # intermediate state 'pending' with two triggers
+  # intermediate state :pending with two triggers
   state :pending do
     to :approved, when_all(m.subject == "approved") do
       puts "expense approved"
@@ -613,6 +613,43 @@ Nested states allow for writing compact statecharts. If a context is in the nest
 
 ```ruby
 require "durable"
+
+Durable.statechart :worker do
+  # super-state :work has two states and one trigger
+  state :work do
+    # sub-sate :enter has only one trigger   
+    state :enter do
+      to :process, when_all(m.subject == "enter") do
+        puts "start process"
+      end
+    end
+
+    state :process do
+      to :process, when_all(m.subject == "continue") do
+        puts "continue processing"
+      end
+    end
+
+    # the super-state trigger will be evaluated for all sub-state triggers
+    to :canceled, when_all(pri(1), m.subject == "cancel") do
+      puts "cancel process"
+    end
+  end
+
+  state :canceled
+  
+  when_start do
+    # will move the statechart to the 'work.process' sub-state
+    post :worker, { :subject => "enter" }
+
+     # will keep the statechart to the 'work.process' sub-state
+    post :worker, { :subject => "continue" }
+    post :worker, { :subject => "continue" }
+
+    # will move the statechart out of the work state
+    post :worker, { :subject => "cancel" }
+  end
+end
 
 Durable.run_all
 ```  
