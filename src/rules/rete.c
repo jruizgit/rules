@@ -8,34 +8,32 @@
 #include "json.h"
 #include "regex.h"
 
-#define HASH_ALL 193486302 // all
-#define HASH_ANY 193486381 // any
-#define HASH_PRI 193502832 // pri
-#define HASH_COUNT 255678574 // count
-#define HASH_SPAN 2090731639 // span
-#define HASH_CAP 193488121 // cap
-#define HASH_BY 5863264 // by
-#define HASH_LT 193419881 // $lt
-#define HASH_LTE 2087888878 // $lte
-#define HASH_GT 193419716 // $gt
-#define HASH_GTE 2087883433 // $gte
-#define HASH_EQ 193419647 // $eq
-#define HASH_NEQ 2087890573 // $neq
-#define HASH_MT 193419914 // $mt
-#define HASH_IMT 2087885395 // $imt
-#define HASH_EX 193419654 // $ex
-#define HASH_NEX 2087890580 // $nex
-#define HASH_OR 193419978 // $or
-#define HASH_AND 2087876700 // $and
-#define HASH_S 5861212 // $s
-#define HASH_NAME 2090536006 // name 
-#define HASH_ADD 2087876370 // $add
-#define HASH_SUB 2087896531 // $sub
-#define HASH_MUL 2087890007 // $mul
-#define HASH_DIV 2087879820 // $div
-#define HASH_L 5861205 // $l
-#define HASH_R 5861211 //$r
-#define HASH_FORWARD 1810358942 // $forward
+#define HASH_ALL 321211332 // all
+#define HASH_ANY 740945997 // any
+#define HASH_PRI 1450887882 // pri
+#define HASH_COUNT 967958004 // count
+#define HASH_CAP 41178555 // cap
+#define HASH_LT 542787579 // $lt
+#define HASH_LTE 2350824890 // $lte
+#define HASH_GT 507407960 // $gt
+#define HASH_GTE 3645344263 // $gte
+#define HASH_EQ 256037865 // $eq
+#define HASH_NEQ 2488026869 // $neq
+#define HASH_MT 576092554 // $mt
+#define HASH_IMT 1472564215 // $imt
+#define HASH_EX 373481198 // $ex
+#define HASH_NEX 2605470202 // $nex
+#define HASH_OR 340911698 // $or
+#define HASH_AND 3746487396 // $and
+#define HASH_S 1186729920 // $s
+#define HASH_NAME 2369371622 // name 
+#define HASH_ADD 4081054038 // $add
+#define HASH_SUB 1040718071 // $sub
+#define HASH_MUL 304370403 // $mul
+#define HASH_DIV 130502 // $div
+#define HASH_L 1706836109 // $l
+#define HASH_R 1203507539 //$r
+#define HASH_FORWARD 739185624 // $forward
 
 typedef struct path {
     unsigned char operator;
@@ -746,24 +744,13 @@ static unsigned int validateRuleset(char *rules) {
             return countResult;
         }
 
-        unsigned int spanResult = validateSetting(HASH_SPAN, first, JSON_INT);
-        if (spanResult != PARSE_OK && spanResult != ERR_SETTING_NOT_FOUND) {
-            return spanResult;
-        }
-
         unsigned int capResult = validateSetting(HASH_CAP, first, JSON_INT);
         if (capResult != PARSE_OK && capResult != ERR_SETTING_NOT_FOUND) {
             return capResult;
         }
 
-        if ((spanResult == PARSE_OK && (countResult == PARSE_OK || capResult == PARSE_OK)) ||
-            (countResult == PARSE_OK && capResult == PARSE_OK)) {
+        if (countResult == PARSE_OK && capResult == PARSE_OK) {
             return ERR_UNEXPECTED_NAME;
-        }
-
-        result = validateSetting(HASH_BY, first, JSON_STRING);
-        if (result != PARSE_OK && result != ERR_SETTING_NOT_FOUND) {
-            return result;
         }
 
         result = validateSetting(HASH_PRI, first, JSON_INT);
@@ -783,7 +770,7 @@ static unsigned int validateRuleset(char *rules) {
                 if (result != RULES_OK && result != PARSE_END) {
                     return result;
                 }
-            } else if (hash != HASH_COUNT && hash != HASH_PRI && hash != HASH_SPAN && hash != HASH_CAP && hash != HASH_BY) {
+            } else if (hash != HASH_COUNT && hash != HASH_PRI && hash != HASH_CAP) {
                 return ERR_UNEXPECTED_NAME;
             }
 
@@ -1289,7 +1276,7 @@ static unsigned int createBetaConnector(ruleset *tree,
 
             if (operator == OP_ALL || operator == OP_ANY || operator == OP_NOT) {
                 nameLength = nameLength - 4;
-                hash = djbHash(first, nameLength);
+                hash = fnv1Hash32(first, nameLength);
             }
         }        
         
@@ -1694,7 +1681,6 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         ruleAction->value.c.cap = 0;
         getSetting(HASH_PRI, first, &ruleAction->value.c.priority);
         getSetting(HASH_COUNT, first, &ruleAction->value.c.count);
-        getSetting(HASH_SPAN, first, &ruleAction->value.c.span);
         getSetting(HASH_CAP, first, &ruleAction->value.c.cap);
         if (!ruleAction->value.c.count && !ruleAction->value.c.span && !ruleAction->value.c.cap) {
             ruleAction->value.c.count = 1;

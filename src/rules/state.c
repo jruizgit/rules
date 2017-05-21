@@ -6,15 +6,13 @@
 #include "json.h"
 #include "net.h"
 
-unsigned int djbHash(char *str, unsigned int len) {
-   unsigned int hash = 5381;
-   unsigned int i = 0;
-
-   for(i = 0; i < len; str++, i++) {
-      hash = ((hash << 5) + hash) + (*str);
-   }
-
-   return hash;
+unsigned int fnv1Hash32(char *str, unsigned int len) {
+    unsigned int hash = FNV_32_OFFSET_BASIS;
+    for(unsigned int i = 0; i < len; str++, i++) {
+        hash ^= (*str);
+        hash *= FNV_32_PRIME;
+    }
+    return hash;
 }
 
 static unsigned int evictEntry(ruleset *tree) {
@@ -269,7 +267,7 @@ unsigned int constructObject(char *root,
                 property->name[parentNameLength] = '.';
                 strncpy(&property->name[parentNameLength + 1], firstName, nameLength);
                 property->nameLength = fullNameLength;
-                property->hash = djbHash(property->name, fullNameLength);
+                property->hash = fnv1Hash32(property->name, fullNameLength);
             } else {
 #ifdef _WIN32
                 char *fullName = (char *)_alloca(sizeof(char)*(fullNameLength + 1));
@@ -343,7 +341,7 @@ static unsigned int resolveBindingAndEntry(ruleset *tree,
                                           char *sid, 
                                           stateEntry **entry,
                                           void **rulesBinding) {   
-    unsigned int sidHash = djbHash(sid, strlen(sid));
+    unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
     if (!ensureEntry(tree, sid, sidHash, entry)) {
         unsigned int result = getBindingIndex(tree, sidHash, &(*entry)->bindingIndex);
         if (result != RULES_OK) {
@@ -416,7 +414,7 @@ unsigned int fetchStateProperty(void *tree,
                                 unsigned char ignoreStaleState,
                                 char **state,
                                 jsonProperty **property) {
-    unsigned int sidHash = djbHash(sid, strlen(sid));
+    unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
     stateEntry *entry = getEntry(tree, sid, sidHash);
     if (entry == NULL || entry->lastRefresh == 0) {
         return ERR_STATE_NOT_LOADED;

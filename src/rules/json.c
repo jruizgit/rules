@@ -395,7 +395,7 @@ static unsigned int getString(char *start, char **first, char **last) {
 static unsigned int getStringAndHash(char *start, char **first, char **last, unsigned int *hash) {
     unsigned char state = ST_STRING_SEEK;
     char delimiter = '\0';
-    unsigned int currentHash = 5381;
+    unsigned int currentHash = FNV_32_OFFSET_BASIS;
     while(start[0] != '\0') {
         switch (state) {
             case ST_STRING_SEEK:
@@ -417,11 +417,14 @@ static unsigned int getStringAndHash(char *start, char **first, char **last, uns
                     state = ST_STRING_ESC;  
                 }
 
-                currentHash = ((currentHash << 5) + currentHash) + (*start);
+                currentHash ^= (*start);
+                currentHash *= FNV_32_PRIME;
                 break;
             case ST_STRING_ESC:
                 state = ST_STRING_PARSE;
-                currentHash = ((currentHash << 5) + currentHash) + (*start);
+
+                currentHash ^= (*start);
+                currentHash *= FNV_32_PRIME;
                 break;
         }
 
@@ -430,3 +433,4 @@ static unsigned int getStringAndHash(char *start, char **first, char **last, uns
 
     return ERR_PARSE_STRING;
 }
+

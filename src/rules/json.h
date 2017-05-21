@@ -17,6 +17,9 @@
 #define JSON_REGEX 0x0C
 #define JSON_IREGEX 0x0D
 
+#define FNV_32_OFFSET_BASIS 0x811c9dc5
+#define FNV_32_PRIME 16777619
+
 unsigned int readNextName(char *start, char **first, char **last, unsigned int *hash);
 unsigned int readNextValue(char *start, char **first, char **last, unsigned char *type);
 unsigned int readNextArrayValue(char *start, char **first, char **last, unsigned char *type);

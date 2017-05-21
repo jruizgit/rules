@@ -1,6 +1,6 @@
 
-#define HASH_ID 5863474
-#define HASH_SID 193505797
+#define HASH_ID 926444256
+#define HASH_SID 3593476751
 #define UNDEFINED_INDEX 0xFFFFFFFF
 #define MAX_STATE_PROPERTIES 64
 #define MAX_NAME_LENGTH 256
@@ -34,7 +34,7 @@ typedef struct stateEntry {
     char *sid;
 } stateEntry;
 
-unsigned int djbHash(char *str, unsigned int len);
+unsigned int fnv1Hash32(char *str, unsigned int len);
 void rehydrateProperty(jsonProperty *property, char *state);
 unsigned int refreshState(void *tree, char *sid);
 unsigned int constructObject(char *root,
