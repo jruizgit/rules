@@ -1159,6 +1159,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                                         properties,
                                         propertiesLength,
                                         actionType == ACTION_ASSERT_FACT ? 1 : 0,
+                                        evalCount == 0 ? 1 : 0, 
                                         addKeys,
                                         addCount,
                                         &addCommand);

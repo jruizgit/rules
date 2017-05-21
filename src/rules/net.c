@@ -686,7 +686,12 @@ static unsigned int loadAddMessageCommand(ruleset *tree, binding *rulesBinding) 
     if (asprintf(&lua, 
 "local sid = ARGV[1]\n"
 "local assert_fact = tonumber(ARGV[2])\n"
-"local keys_count = tonumber(ARGV[3])\n"
+// when mark visited is set to 0, it means eval will be called immedately
+// with the same message. In that case, the function will avid setting
+// the visited bit (for events), storing the message and increasing the
+// mid count (for the case of auto generated mid)
+"local mark_visited = tonumber(ARGV[3])\n"
+"local keys_count = tonumber(ARGV[4])\n"
 "local events_hashset = \"%s!e!\" .. sid\n"
 "local facts_hashset = \"%s!f!\" .. sid\n"
 "local visited_hashset = \"%s!v!\" .. sid\n"
@@ -694,12 +699,14 @@ static unsigned int loadAddMessageCommand(ruleset *tree, binding *rulesBinding) 
 "local message = {}\n"
 "local primary_message_keys = {}\n"
 "local input_keys = {}\n"
-"local save_message = function(current_key, message, events_key, messages_key)\n"
-"    redis.call(\"hsetnx\", messages_key, message[\"id\"], cmsgpack.pack(message))\n"
+"local save_message = function(current_key, message, events_key, messages_key, save_hashset)\n"
+"    if save_hashset == 1 then\n"
+"        redis.call(\"hsetnx\", messages_key, message[\"id\"], cmsgpack.pack(message))\n"
+"    end\n"
 "    local primary_key = primary_message_keys[current_key](message)\n"
 "    redis.call(\"lpush\", events_key .. \"!m!\" .. primary_key, message[\"id\"])\n"
 "end\n"
-"for index = 4 + keys_count, #ARGV, 3 do\n"
+"for index = 5 + keys_count, #ARGV, 3 do\n"
 "    if ARGV[index + 2] == \"1\" then\n"
 "        message[ARGV[index]] = ARGV[index + 1]\n"
 "    elseif ARGV[index + 2] == \"2\" or  ARGV[index + 2] == \"3\" then\n"
@@ -718,40 +725,47 @@ static unsigned int loadAddMessageCommand(ruleset *tree, binding *rulesBinding) 
 "end\n"
 "local mid = message[\"id\"]\n"
 "if not mid then\n"
-"    mid = \"$m-\" .. redis.call(\"hincrby\", mid_count_hashset, sid, 1)\n"
+"    if mark_visited == 0 then\n"
+"        mid = \"$m-\" .. redis.call(\"hget\", mid_count_hashset, sid) + 1\n"
+"    else\n"
+"        mid = \"$m-\" .. redis.call(\"hincrby\", mid_count_hashset, sid, 1)\n"
+"    end\n"
 "    message[\"id\"] = mid\n"
 "else\n"
-"    if redis.call(\"hsetnx\", visited_hashset, mid, 1) == 0 then\n"
-"        if assert_fact == 0 then\n"
-"            if not redis.call(\"hget\", events_hashset, mid) then\n"
+"    if assert_fact == 1 then\n"
+"        if redis.call(\"hexists\", facts_hashset, mid) == 1 then\n"
+"            return %d\n"
+"        end\n"
+"    else\n"
+"        if mark_visited == 1 then\n"
+"            if redis.call(\"hsetnx\", visited_hashset, mid, 1) == 0 then\n"
 "                return %d\n"
 "            end\n"
-"        else\n"
-"            if not redis.call(\"hget\", facts_hashset, mid) then\n"
-"                return %d\n"
-"            end\n"
+"        elseif redis.call(\"hexists\", visited_hashset, mid) == 1 then \n"
+"            return %d\n"
 "        end\n"
 "    end\n"
 "end\n"
-"for index = 4, 3 + keys_count, 1 do\n"
+"for index = 5, 4 + keys_count, 1 do\n"
 "    input_keys[ARGV[index]] = true\n"
 "end\n"
 "%sif assert_fact == 1 then\n"
 "    message[\"$f\"] = 1\n"
-"    for index = 4, 3 + keys_count, 1 do\n"
+"    for index = 5, 4 + keys_count, 1 do\n"
 "        local key = ARGV[index]\n"
-"        save_message(key, message, key .. \"!f!\" .. sid, facts_hashset)\n"
+"        save_message(key, message, key .. \"!f!\" .. sid, facts_hashset, mark_visited)\n"
 "    end\n"
 "else\n"
-"    for index = 4, 3 + keys_count, 1 do\n"
+"    for index = 5, 4 + keys_count, 1 do\n"
 "        local key = ARGV[index]\n"
-"        save_message(key, message, key .. \"!e!\" .. sid, events_hashset)\n"
+"        save_message(key, message, key .. \"!e!\" .. sid, events_hashset, mark_visited)\n"
 "    end\n"
 "end\n",
                 name,
                 name,
                 name,
                 name,
+                ERR_EVENT_OBSERVED,
                 ERR_EVENT_OBSERVED,
                 ERR_EVENT_OBSERVED,
                 addMessageLua)  == -1) {
@@ -2095,15 +2109,13 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "        message[\"id\"] = mid\n"
 "    end\n"
 "else\n"
-"    if redis.call(\"hsetnx\", visited_hashset, mid, 1) == 0 then\n"
-"        if assert_fact == 0 then\n"
-"            if message and redis.call(\"hexists\", events_hashset, mid) == 0 then\n"
-"                return %d\n"
-"            end\n"
-"        else\n"
-"            if message and redis.call(\"hexists\", facts_hashset, mid) == 0 then\n"
-"                return %d\n"
-"            end\n"
+"    if assert_fact == 1 then\n"
+"        if message and redis.call(\"hexists\", facts_hashset, mid) == 1 then\n"
+"            return %d\n"
+"        end\n"
+"    else\n"
+"        if message and redis.call(\"hsetnx\", visited_hashset, mid, 1) == 0 then\n"
+"            return %d\n"
 "        end\n"
 "    end\n"
 "end\n"
@@ -2449,6 +2461,7 @@ unsigned int formatStoreMessage(void *rulesBinding,
                                 jsonProperty *allProperties,
                                 unsigned int propertiesLength,
                                 unsigned char storeFact,
+                                unsigned char markVisited,
                                 char **keys,
                                 unsigned int keysLength,
                                 char **command) {
@@ -2456,12 +2469,12 @@ unsigned int formatStoreMessage(void *rulesBinding,
     char keysLengthString[5];
 #ifdef _WIN32
     sprintf_s(keysLengthString, sizeof(char) * 5, "%d", keysLength);
-    char **argv = (char **)_alloca(sizeof(char*)*(6 + keysLength + propertiesLength * 3));
-    size_t *argvl = (size_t *)_alloca(sizeof(size_t)*(6 + keysLength + propertiesLength * 3));
+    char **argv = (char **)_alloca(sizeof(char*)*(7 + keysLength + propertiesLength * 3));
+    size_t *argvl = (size_t *)_alloca(sizeof(size_t)*(7 + keysLength + propertiesLength * 3));
 #else
     snprintf(keysLengthString, sizeof(char) * 5, "%d", keysLength);
-    char *argv[6 + keysLength + propertiesLength * 3];
-    size_t argvl[6 + keysLength + propertiesLength * 3];
+    char *argv[7 + keysLength + propertiesLength * 3];
+    size_t argvl[7 + keysLength + propertiesLength * 3];
 #endif
 
     argv[0] = "evalsha";
@@ -2474,15 +2487,17 @@ unsigned int formatStoreMessage(void *rulesBinding,
     argvl[3] = strlen(sid);
     argv[4] = storeFact ? "1" : "0";
     argvl[4] = 1;
-    argv[5] = keysLengthString;
-    argvl[5] = strlen(keysLengthString);
+    argv[5] = markVisited ? "1" : "0";
+    argvl[5] = 1;
+    argv[6] = keysLengthString;
+    argvl[6] = strlen(keysLengthString);
 
     for (unsigned int i = 0; i < keysLength; ++i) {
-        argv[6 + i] = keys[i];
-        argvl[6 + i] = strlen(keys[i]);
+        argv[7 + i] = keys[i];
+        argvl[7 + i] = strlen(keys[i]);
     }
 
-    unsigned int offset = 6 + keysLength;
+    unsigned int offset = 7 + keysLength;
     for (unsigned int i = 0; i < propertiesLength; ++i) {
         argv[offset +  i * 3] = allProperties[i].name;
         argvl[offset + i * 3] = allProperties[i].nameLength;

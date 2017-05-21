@@ -67,6 +67,7 @@ unsigned int formatStoreMessage(void *rulesBinding,
                                 jsonProperty *allProperties,
                                 unsigned int propertiesLength,
                                 unsigned char storeFact,
+                                unsigned char markVisited,
                                 char **keys,
                                 unsigned int keysLength,
                                 char **command);
