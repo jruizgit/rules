@@ -2366,12 +2366,12 @@ unsigned int formatEvalMessage(void *rulesBinding,
                                char *sid, 
                                char *mid,
                                char *message, 
-                               jsonProperty *allProperties,
-                               unsigned int propertiesLength,
+                               jsonObject *jo,
                                unsigned char actionType,
                                char **keys,
                                unsigned int keysLength,
                                char **command) {
+    unsigned int propertiesLength = jo->propertiesLength;
     if (actionType == ACTION_RETRACT_FACT || actionType == ACTION_RETRACT_EVENT) {
         propertiesLength = 0; 
     }
@@ -2416,16 +2416,16 @@ unsigned int formatEvalMessage(void *rulesBinding,
 
     unsigned int offset = 8 + keysLength;
     for (unsigned int i = 0; i < propertiesLength; ++i) {
-        argv[offset + i * 3] = allProperties[i].name;
-        argvl[offset + i * 3] = allProperties[i].nameLength;
-        argv[offset + i * 3 + 1] = message + allProperties[i].valueOffset;
-        if (allProperties[i].type == JSON_STRING) {
-            argvl[offset + i * 3 + 1] = allProperties[i].valueLength;
+        argv[offset + i * 3] = jo->properties[i].name;
+        argvl[offset + i * 3] = jo->properties[i].nameLength;
+        argv[offset + i * 3 + 1] = jo->properties[i].valueString;
+        if (jo->properties[i].type == JSON_STRING) {
+            argvl[offset + i * 3 + 1] = jo->properties[i].valueLength;
         } else {
-            argvl[offset + i * 3 + 1] = allProperties[i].valueLength + 1;
+            argvl[offset + i * 3 + 1] = jo->properties[i].valueLength + 1;
         }
 
-        switch(allProperties[i].type) {
+        switch(jo->properties[i].type) {
             case JSON_STRING:
                 argv[offset + i * 3 + 2] = "1";
                 break;
@@ -2458,13 +2458,13 @@ unsigned int formatEvalMessage(void *rulesBinding,
 unsigned int formatStoreMessage(void *rulesBinding, 
                                 char *sid, 
                                 char *message, 
-                                jsonProperty *allProperties,
-                                unsigned int propertiesLength,
+                                jsonObject *jo,
                                 unsigned char storeFact,
                                 unsigned char markVisited,
                                 char **keys,
                                 unsigned int keysLength,
                                 char **command) {
+    unsigned int propertiesLength = jo->propertiesLength;
     binding *bindingContext = (binding*)rulesBinding;
     char keysLengthString[5];
 #ifdef _WIN32
@@ -2499,16 +2499,16 @@ unsigned int formatStoreMessage(void *rulesBinding,
 
     unsigned int offset = 7 + keysLength;
     for (unsigned int i = 0; i < propertiesLength; ++i) {
-        argv[offset +  i * 3] = allProperties[i].name;
-        argvl[offset + i * 3] = allProperties[i].nameLength;
-        argv[offset + i * 3 + 1] = message + allProperties[i].valueOffset;
-        if (allProperties[i].type == JSON_STRING) {
-            argvl[offset + i * 3 + 1] = allProperties[i].valueLength;
+        argv[offset +  i * 3] = jo->properties[i].name;
+        argvl[offset + i * 3] = jo->properties[i].nameLength;
+        argv[offset + i * 3 + 1] = jo->properties[i].valueString;
+        if (jo->properties[i].type == JSON_STRING) {
+            argvl[offset + i * 3 + 1] = jo->properties[i].valueLength;
         } else {
-            argvl[offset + i * 3 + 1] = allProperties[i].valueLength + 1;
+            argvl[offset + i * 3 + 1] = jo->properties[i].valueLength + 1;
         }
 
-        switch(allProperties[i].type) {
+        switch(jo->properties[i].type) {
             case JSON_STRING:
                 argv[offset + i * 3 + 2] = "1";
                 break;

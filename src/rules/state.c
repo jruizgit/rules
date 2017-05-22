@@ -41,7 +41,7 @@ static unsigned int evictEntry(ruleset *tree) {
                 current->sidHash = 0;
                 current->bindingIndex = 0;
                 current->lastRefresh = 0;
-                current->propertiesLength = 0;
+                current->jo.propertiesLength = 0;
                 found = 1;
             }
         }
@@ -162,15 +162,70 @@ static stateEntry *getEntry(ruleset *tree, char *sid, unsigned int sidHash) {
     return NULL;
 }
 
+static unsigned int fixupIds(jsonObject *jo) {
+    jsonProperty *property;
+    // id and sid are coerced to strings
+    // to avoid unnecessary conversions
+    if (jo->sidIndex != UNDEFINED_INDEX) {
+        //coerce value to string
+        property = &jo->properties[jo->sidIndex];
+        if (property->type == JSON_DOUBLE || property->type == JSON_INT) {
+            ++property->valueLength;
+        }
+
+        property->type = JSON_STRING;
+    } else {
+        property = &jo->properties[jo->propertiesLength];
+        jo->sidIndex = jo->propertiesLength;
+        ++jo->propertiesLength;
+        if (jo->propertiesLength == MAX_OBJECT_PROPERTIES) {
+            return ERR_EVENT_MAX_PROPERTIES;
+        }
+
+        strncpy(jo->sidBuffer, "0", 1);
+        property->hash = HASH_SID;
+        property->isMaterial = 1;
+        property->valueString = jo->sidBuffer;
+        property->valueLength = 1;
+        strncpy(property->name, "sid", 3);
+        property->nameLength = 3;
+        property->type = JSON_STRING;
+    } 
+
+    if (jo->idIndex != UNDEFINED_INDEX) {
+        //coerce value to string
+        property = &jo->properties[jo->idIndex];
+        if (property->type == JSON_DOUBLE || property->type == JSON_INT) {
+            ++property->valueLength;
+        }
+
+        property->type = JSON_STRING;
+    } else {
+        property = &jo->properties[jo->propertiesLength];
+        jo->idIndex = jo->propertiesLength;
+        ++jo->propertiesLength;
+        if (jo->propertiesLength == MAX_OBJECT_PROPERTIES) {
+            return ERR_EVENT_MAX_PROPERTIES;
+        }
+
+        jo->idBuffer[0] = 0;
+        property->hash = HASH_ID;
+        property->isMaterial = 1;
+        property->valueString = jo->idBuffer;
+        property->valueLength = 0;
+        strncpy(property->name, "id", 2);
+        property->nameLength = 2;
+        property->type = JSON_STRING;
+    }
+
+    return RULES_OK;
+}
+
 unsigned int constructObject(char *root,
                              char *parentName, 
                              char *object,
-                             char createHashtable,
-                             unsigned int maxProperties,
-                             jsonProperty *properties, 
-                             unsigned int *propertiesLength, 
-                             unsigned int *midIndex, 
-                             unsigned int *sidIndex,
+                             char layout,
+                             jsonObject *jo,
                              char **next) {
     char *firstName;
     char *lastName;
@@ -178,7 +233,16 @@ unsigned int constructObject(char *root,
     char *last;
     unsigned char type;
     unsigned int hash;
-    int parentNameLength = (parentName ? strlen(parentName): 0);
+    int parentNameLength;
+    if (parentName) {
+        parentNameLength = strlen(parentName);
+    } else {
+        parentNameLength = 0;
+        jo->idIndex = UNDEFINED_INDEX;
+        jo->sidIndex = UNDEFINED_INDEX;
+        jo->propertiesLength = 0;
+    }
+
     object = (object ? object : root);
     unsigned int result = readNextName(object, &firstName, &lastName, &hash);
     while (result == PARSE_OK) {
@@ -189,35 +253,40 @@ unsigned int constructObject(char *root,
 
         jsonProperty *property = NULL;
         if (type != JSON_OBJECT) {
-            if (!createHashtable) {
-                property = &properties[*propertiesLength];
-                if (hash == HASH_ID) {
-                    *midIndex = *propertiesLength;
-                } else if (hash == HASH_SID) {
-                    *sidIndex = *propertiesLength;
-                }
-            } else {
-                unsigned int candidate = hash % maxProperties;
-                while (properties[candidate].type != 0) {
-                    candidate = (candidate + 1) % maxProperties;
-                }
+            switch (layout) {
+                case JSON_OBJECT_SEQUENCED:
+                    property = &jo->properties[jo->propertiesLength];
+                    if (hash == HASH_ID) {
+                        jo->idIndex = jo->propertiesLength;
+                    } else if (hash == HASH_SID) {
+                        jo->sidIndex = jo->propertiesLength;
+                    }
+                    break;
+                case JSON_OBJECT_HASHED: 
+                {
+                    unsigned int candidate = hash % MAX_OBJECT_PROPERTIES;
+                    while (jo->properties[candidate].type != 0) {
+                        candidate = (candidate + 1) % MAX_OBJECT_PROPERTIES;
+                    }
 
-                if (hash == HASH_ID) {
-                    *midIndex = candidate;
-                } else if (hash == HASH_SID) {
-                    *sidIndex = candidate;
+                    if (hash == HASH_ID) {
+                        jo->idIndex = candidate;
+                    } else if (hash == HASH_SID) {
+                        jo->sidIndex = candidate;
+                    }
+
+                    property = &jo->properties[candidate];
                 }
-
-                property = &properties[candidate];
-            } 
-
-            *propertiesLength = *propertiesLength + 1;
-            if (*propertiesLength == maxProperties) {
+                break;
+            }
+            
+            ++jo->propertiesLength;
+            if (jo->propertiesLength == MAX_OBJECT_PROPERTIES) {
                 return ERR_EVENT_MAX_PROPERTIES;
             }
 
             property->isMaterial = 0;
-            property->valueOffset = first - root;
+            property->valueString = first;
             property->valueLength = last - first;
             property->type = type;
         }
@@ -242,15 +311,11 @@ unsigned int constructObject(char *root,
                 strncpy(newParent, firstName, nameLength);
                 newParent[nameLength] = '\0';
                 result = constructObject(root,
-                                       newParent, 
-                                       first, 
-                                       createHashtable, 
-                                       maxProperties, 
-                                       properties, 
-                                       propertiesLength, 
-                                       midIndex, 
-                                       sidIndex, 
-                                       next);
+                                         newParent, 
+                                         first, 
+                                         layout, 
+                                         jo,
+                                         next);
                 if (result != RULES_OK) {
                     return result;
                 }
@@ -279,15 +344,11 @@ unsigned int constructObject(char *root,
                 strncpy(&fullName[parentNameLength + 1], firstName, nameLength);
                 fullName[fullNameLength] = '\0';
                 result = constructObject(root,
-                                       fullName, 
-                                       first, 
-                                       createHashtable, 
-                                       maxProperties, 
-                                       properties, 
-                                       propertiesLength, 
-                                       midIndex, 
-                                       sidIndex, 
-                                       next);
+                                         fullName, 
+                                         first, 
+                                         layout, 
+                                         jo, 
+                                         next);
                 if (result != RULES_OK) {
                     return result;
                 }
@@ -298,15 +359,20 @@ unsigned int constructObject(char *root,
         result = readNextName(last, &firstName, &lastName, &hash);
     }
  
+    if (!parentName) {
+        int idResult = fixupIds(jo);
+        if (idResult != RULES_OK) {
+            return idResult;
+        }
+    }
+
     return (result == PARSE_END ? RULES_OK: result);
 }
 
 void rehydrateProperty(jsonProperty *property, char *state) {
-    // ID and SID are treated as strings regardless of type
-    // to avoid unnecessary conversions
-    if (!property->isMaterial && property->hash != HASH_ID && property->hash != HASH_SID) {
+    if (!property->isMaterial) {
         unsigned short propertyLength = property->valueLength + 1;
-        char *propertyFirst = state + property->valueOffset;
+        char *propertyFirst = property->valueString;
         unsigned char propertyType = property->type;
         unsigned char b = 0;
         char temp;
@@ -384,20 +450,14 @@ unsigned int refreshState(void *handle,
         return result;
     }
 
-    memset(entry->properties, 0, MAX_STATE_PROPERTIES * sizeof(jsonProperty));
-    entry->propertiesLength = 0;
+    memset(entry->jo.properties, 0, MAX_OBJECT_PROPERTIES * sizeof(jsonProperty));
+    entry->jo.propertiesLength = 0;
     char *next;
-    unsigned int midIndex = UNDEFINED_INDEX;
-    unsigned int sidIndex = UNDEFINED_INDEX;
     result =  constructObject(entry->state,
                              NULL, 
                              NULL, 
-                             1, 
-                             MAX_STATE_PROPERTIES, 
-                             entry->properties, 
-                             &entry->propertiesLength, 
-                             &midIndex, 
-                             &sidIndex, 
+                             JSON_OBJECT_HASHED, 
+                             &entry->jo, 
                              &next);
     if (result != RULES_OK) {
         return result;
@@ -424,11 +484,11 @@ unsigned int fetchStateProperty(void *tree,
         return ERR_STALE_STATE;
     }
 
-    unsigned int propertyIndex = propertyHash % MAX_STATE_PROPERTIES;
-    jsonProperty *result = &entry->properties[propertyIndex];
+    unsigned int propertyIndex = propertyHash % MAX_OBJECT_PROPERTIES;
+    jsonProperty *result = &entry->jo.properties[propertyIndex];
     while (result->type != 0 && result->hash != propertyHash) {
-        propertyIndex = (propertyIndex + 1) % MAX_STATE_PROPERTIES;  
-        result = &entry->properties[propertyIndex];   
+        propertyIndex = (propertyIndex + 1) % MAX_OBJECT_PROPERTIES;  
+        result = &entry->jo.properties[propertyIndex];   
     }
 
     if (!result->type) {

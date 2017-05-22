@@ -9,7 +9,6 @@
 
 #include <time.h> 
 
-#define MAX_EVENT_PROPERTIES 64
 #define MAX_RESULT_NODES 32
 #define MAX_NODE_RESULTS 16
 #define MAX_STACK_SIZE 64
@@ -467,7 +466,7 @@ static unsigned int valueToProperty(ruleset *tree,
         case JSON_STRING:
             *state = &tree->stringPool[sourceValue->value.stringOffset];
             (*targetProperty)->valueLength = strlen(*state);
-            (*targetProperty)->valueOffset = 0;
+            (*targetProperty)->valueString = *state;
             break;
         case JSON_INT:
             (*targetProperty)->value.i = sourceValue->value.i;
@@ -507,13 +506,13 @@ static unsigned int reduceProperties(unsigned char operator,
         }
 
         if (leftProperty->type == JSON_STRING) {
-            leftTemp = leftState[leftProperty->valueOffset + leftProperty->valueLength];
-            leftState[leftProperty->valueOffset + leftProperty->valueLength] = '\0';
+            leftTemp = *(leftProperty->valueString + leftProperty->valueLength);
+            *(leftProperty->valueString + leftProperty->valueLength) = '\0';
         } 
 
         if (rightProperty->type == JSON_STRING) {
-            rightTemp = rightState[rightProperty->valueOffset + rightProperty->valueLength];
-            rightState[rightProperty->valueOffset + rightProperty->valueLength] = '\0';
+            rightTemp = *(rightProperty->valueString + rightProperty->valueLength);
+            *(rightProperty->valueString + rightProperty->valueLength) = '\0';
         }
     }
 
@@ -534,7 +533,7 @@ static unsigned int reduceProperties(unsigned char operator,
             if (asprintf(state, 
                          "%s%s", 
                          leftProperty->value.b ? "true" : "false", 
-                         rightState + rightProperty->valueOffset) == -1) {
+                         rightProperty->valueString) == -1) {
                 return ERR_OUT_OF_MEMORY;
             }
             break;
@@ -554,7 +553,7 @@ static unsigned int reduceProperties(unsigned char operator,
             if (asprintf(state, 
                          "%ld%s", 
                          leftProperty->value.i, 
-                         rightState + rightProperty->valueOffset) == -1) {
+                         rightProperty->valueString) == -1) {
                 return ERR_OUT_OF_MEMORY;
             }
             break;
@@ -574,7 +573,7 @@ static unsigned int reduceProperties(unsigned char operator,
             if (asprintf(state, 
                          "%g%s", 
                          leftProperty->value.d, 
-                         rightState + rightProperty->valueOffset) == -1) {
+                         rightProperty->valueString) == -1) {
                 return ERR_OUT_OF_MEMORY;
             }
 
@@ -582,7 +581,7 @@ static unsigned int reduceProperties(unsigned char operator,
         case OP_STRING_BOOL:
             if (asprintf(state, 
                          "%s%s",
-                         leftState + leftProperty->valueOffset,
+                         leftProperty->valueString,
                          rightProperty->value.b ? "true" : "false") == -1) {
                 return ERR_OUT_OF_MEMORY;
             }
@@ -590,7 +589,7 @@ static unsigned int reduceProperties(unsigned char operator,
         case OP_STRING_INT: 
             if (asprintf(state, 
                          "%s%ld",
-                         leftState + leftProperty->valueOffset,
+                         leftProperty->valueString,
                          rightProperty->value.i) == -1) {
                 return ERR_OUT_OF_MEMORY;
             }
@@ -598,7 +597,7 @@ static unsigned int reduceProperties(unsigned char operator,
         case OP_STRING_DOUBLE: 
             if (asprintf(state, 
                          "%s%ld",
-                         leftState + leftProperty->valueOffset,
+                         leftProperty->valueString,
                          rightProperty->value.i) == -1) {
                 return ERR_OUT_OF_MEMORY;
             }
@@ -606,8 +605,8 @@ static unsigned int reduceProperties(unsigned char operator,
         case OP_STRING_STRING:
             if (asprintf(state, 
                          "%s%s",
-                         leftState + leftProperty->valueOffset,
-                         rightState + rightProperty->valueOffset) == -1) {
+                         leftProperty->valueString,
+                         rightProperty->valueString) == -1) {
                 return ERR_OUT_OF_MEMORY;
             }
             break;
@@ -615,15 +614,15 @@ static unsigned int reduceProperties(unsigned char operator,
 
     if (leftProperty->type == JSON_STRING || rightProperty->type == JSON_STRING) {
         targetValue->type = JSON_STRING;
-        targetValue->valueOffset = 0;
+        targetValue->valueString = *state;
         targetValue->valueLength = strlen(*state);
                 
         if (leftTemp) {
-            leftState[leftProperty->valueOffset + leftProperty->valueLength] = leftTemp;
+            *(leftProperty->valueString + leftProperty->valueLength) = leftTemp;
         } 
 
         if (rightTemp) {
-            rightState[rightProperty->valueOffset + rightProperty->valueLength] = rightTemp;
+            *(rightProperty->valueString + rightProperty->valueLength) = rightTemp;
         }
     }
 
@@ -751,13 +750,13 @@ static unsigned int isMatch(ruleset *tree,
         case OP_BOOL_STRING:
             if (currentProperty->value.b) {
                 *propertyMatch = compareStringProperty("true",
-                                                       rightState + rightProperty->valueOffset, 
+                                                       rightProperty->valueString, 
                                                        rightProperty->valueLength,
                                                        alphaOp);
             }
             else {
                 *propertyMatch = compareStringProperty("false",
-                                                       rightState + rightProperty->valueOffset, 
+                                                       rightProperty->valueString, 
                                                        rightProperty->valueLength,
                                                        alphaOp);
             }
@@ -783,7 +782,7 @@ static unsigned int isMatch(ruleset *tree,
                 snprintf(leftStringInt, sizeof(char)*(rightLength), "%ld", currentProperty->value.i);
 #endif         
                 *propertyMatch = compareStringProperty(leftStringInt, 
-                                                       rightState + rightProperty->valueOffset,
+                                                       rightProperty->valueString,
                                                        rightProperty->valueLength, 
                                                        alphaOp);
             }
@@ -808,20 +807,20 @@ static unsigned int isMatch(ruleset *tree,
                 snprintf(leftStringDouble, sizeof(char)*(rightLength), "%f", currentProperty->value.d);
 #endif         
                 *propertyMatch = compareStringProperty(leftStringDouble,
-                                                       rightState + rightProperty->valueOffset,
+                                                       rightProperty->valueString,
                                                        rightProperty->valueLength, 
                                                        alphaOp);
             }
             break;
         case OP_STRING_BOOL:
             if (rightProperty->value.b) {
-                *propertyMatch = compareString(message + currentProperty->valueOffset, 
+                *propertyMatch = compareString(currentProperty->valueString, 
                                                currentProperty->valueLength, 
                                                "true", 
                                                alphaOp);
             }
             else {
-                *propertyMatch = compareString(message + currentProperty->valueOffset, 
+                *propertyMatch = compareString(currentProperty->valueString, 
                                                currentProperty->valueLength, 
                                                "false", 
                                                alphaOp);
@@ -837,7 +836,7 @@ static unsigned int isMatch(ruleset *tree,
                 char rightStringInt[leftLength];
                 snprintf(rightStringInt, sizeof(char)*(leftLength), "%ld", rightProperty->value.i);
 #endif
-                *propertyMatch = compareString(message + currentProperty->valueOffset, 
+                *propertyMatch = compareString(currentProperty->valueString, 
                                                currentProperty->valueLength, 
                                                rightStringInt, 
                                                alphaOp);
@@ -853,16 +852,16 @@ static unsigned int isMatch(ruleset *tree,
                 char rightStringDouble[leftLength];
                 snprintf(rightStringDouble, sizeof(char)*(leftLength), "%f", rightProperty->value.d);
 #endif              
-                *propertyMatch = compareString(message + currentProperty->valueOffset, 
+                *propertyMatch = compareString(currentProperty->valueString, 
                                                currentProperty->valueLength, 
                                                rightStringDouble, 
                                                alphaOp);
             }
             break;
         case OP_STRING_STRING:
-            *propertyMatch = compareStringAndStringProperty(message + currentProperty->valueOffset, 
+            *propertyMatch = compareStringAndStringProperty(currentProperty->valueString, 
                                                             currentProperty->valueLength, 
-                                                            rightState + rightProperty->valueOffset,
+                                                            rightProperty->valueString,
                                                             rightProperty->valueLength,
                                                             alphaOp);
             break;
@@ -888,7 +887,7 @@ static unsigned int isMatch(ruleset *tree,
         case OP_STRING_REGEX:
         case OP_STRING_IREGEX:
             *propertyMatch = evaluateRegex(tree,
-                                           message + currentProperty->valueOffset, 
+                                           currentProperty->valueString, 
                                            currentProperty->valueLength, 
                                            (type == OP_STRING_REGEX) ? 0 : 1,
                                            currentAlpha->right.value.regex.vocabularyLength,
@@ -908,8 +907,7 @@ static unsigned int handleAlpha(ruleset *tree,
                                 char *sid, 
                                 char *mid,
                                 char *message,
-                                jsonProperty *allProperties,
-                                unsigned int propertiesLength,
+                                jsonObject *jo,
                                 alpha *alphaNode, 
                                 unsigned char actionType,
                                 char **evalKeys,
@@ -932,8 +930,8 @@ static unsigned int handleAlpha(ruleset *tree,
             for (entry = 0; nextList[entry] != 0; ++entry) {
                 node *listNode = &tree->nodePool[nextList[entry]];
                 char exists = 0;
-                for(unsigned int propertyIndex = 0; propertyIndex < propertiesLength; ++propertyIndex) {
-                    if (listNode->value.a.hash == allProperties[propertyIndex].hash) {
+                for(unsigned int propertyIndex = 0; propertyIndex < jo->propertiesLength; ++propertyIndex) {
+                    if (listNode->value.a.hash == jo->properties[propertyIndex].hash) {
                         exists = 1;
                         break;
                     }
@@ -952,8 +950,8 @@ static unsigned int handleAlpha(ruleset *tree,
 
         if (currentAlpha->nextOffset) {
             unsigned int *nextHashset = &tree->nextPool[currentAlpha->nextOffset];
-            for(unsigned int propertyIndex = 0; propertyIndex < propertiesLength; ++propertyIndex) {
-                jsonProperty *currentProperty = &allProperties[propertyIndex];
+            for(unsigned int propertyIndex = 0; propertyIndex < jo->propertiesLength; ++propertyIndex) {
+                jsonProperty *currentProperty = &jo->properties[propertyIndex];
                 for (entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
                     node *hashNode = &tree->nodePool[nextHashset[entry]];
                     if (currentProperty->hash == hashNode->value.a.hash) {
@@ -1018,82 +1016,35 @@ static unsigned int handleAlpha(ruleset *tree,
     return result;
 }
 
-static unsigned int getId(jsonProperty *allProperties, 
-                          unsigned int idIndex, 
-                          jsonProperty **idProperty, 
-                          int *idLength) {
-    jsonProperty *currentProperty;
-    if (idIndex == UNDEFINED_INDEX) {
-        return ERR_NO_ID_DEFINED;
-    }
-
-    currentProperty = &allProperties[idIndex];
-    *idLength = currentProperty->valueLength;
-    switch(currentProperty->type) {
-        case JSON_INT:
-        case JSON_DOUBLE:
-            *idLength = *idLength + 1;
-        case JSON_STRING:
-            break;
-        case JSON_NIL:
-            return ERR_NO_ID_DEFINED;
-        default:
-            return ERR_INVALID_ID;
-    }
-
-    *idProperty = currentProperty;
-    return RULES_OK;
-}
-
 static unsigned int handleMessageCore(ruleset *tree,
                                       char *state,
                                       char *message, 
-                                      jsonProperty *properties, 
-                                      unsigned int propertiesLength, 
-                                      unsigned int midIndex, 
-                                      unsigned int sidIndex, 
+                                      jsonObject *jo, 
                                       unsigned char actionType,
                                       char **commands,
                                       unsigned int *commandCount,
                                       void **rulesBinding) {
-    jsonProperty *midProperty = NULL;
-    int midLength; 
-    jsonProperty *sidProperty = NULL;
-    int sidLength;
+    unsigned int result;
     char *storeCommand;
-    int result = getId(properties, sidIndex, &sidProperty, &sidLength);
-    if (result == ERR_NO_ID_DEFINED) {
-        sidLength = 1;
-    } else if (result != RULES_OK) {
-        return result;
-    }
-#ifdef _WIN32
-    char *sid = (char *)_alloca(sizeof(char)*(sidLength + 1));
-#else
-    char sid[sidLength + 1];
-#endif  
-    if (result == ERR_NO_ID_DEFINED) {
-        *sid = '0';
-    } else {
-        strncpy(sid, message + sidProperty->valueOffset, sidLength);
-    }
-    sid[sidLength] = '\0';
+    jsonProperty *sidProperty = &jo->properties[jo->sidIndex];
+    jsonProperty *midProperty = &jo->properties[jo->idIndex];
     
-    result = getId(properties, midIndex, &midProperty, &midLength);
-    if (result == ERR_NO_ID_DEFINED) {
-        midLength = 0;
-    } else if (result != RULES_OK) {
-        return result;
-    }
 #ifdef _WIN32
-    char *mid = (char *)_alloca(sizeof(char)*(midLength + 1));
+    char *sid = (char *)_alloca(sizeof(char)*(sidProperty->valueLength + 1));
 #else
-    char mid[midLength + 1];
+    char sid[sidProperty->valueLength + 1];
+#endif  
+    strncpy(sid, sidProperty->valueString, sidProperty->valueLength);
+    sid[sidProperty->valueLength] = '\0';
+    
+#ifdef _WIN32
+    char *mid = (char *)_alloca(sizeof(char)*(midProperty->valueLength + 1));
+#else
+    char mid[midProperty->valueLength + 1];
 #endif
-    if (midLength) {  
-        strncpy(mid, message + midProperty->valueOffset, midLength);
-    }
-    mid[midLength] = '\0';
+    strncpy(mid, midProperty->valueString, midProperty->valueLength);
+    mid[midProperty->valueLength] = '\0';
+    
     if (*commandCount == MAX_COMMAND_COUNT) {
         return ERR_MAX_COMMAND_COUNT;
     }
@@ -1123,8 +1074,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                          sid, 
                          mid,
                          message, 
-                         properties, 
-                         propertiesLength,
+                         jo,
                          &tree->nodePool[NODE_M_OFFSET].value.a, 
                          actionType, 
                          evalKeys,
@@ -1156,8 +1106,7 @@ static unsigned int handleMessageCore(ruleset *tree,
             result = formatStoreMessage(*rulesBinding,
                                         sid,
                                         message,
-                                        properties,
-                                        propertiesLength,
+                                        jo,
                                         actionType == ACTION_ASSERT_FACT ? 1 : 0,
                                         evalCount == 0 ? 1 : 0, 
                                         addKeys,
@@ -1185,8 +1134,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                                         sid,
                                         mid,
                                         message,
-                                        properties,
-                                        propertiesLength,
+                                        jo,
                                         actionType,
                                         evalKeys,
                                         evalCount,
@@ -1224,30 +1172,20 @@ static unsigned int handleMessageCore(ruleset *tree,
                 return RULES_OK;
             }
 
-            result = refreshState(tree,sid);
+            result = refreshState(tree, sid);
             if (result != ERR_NEW_SESSION) {
                 return result;
             }            
 #ifdef _WIN32
-            char *stateMessage = (char *)_alloca(sizeof(char)*(36 + sidLength));
-            char *newState = (char *)_alloca(sizeof(char)*(12 + sidLength));
-            if (sidProperty && sidProperty->type == JSON_STRING) {
-                sprintf_s(stateMessage, sizeof(char)*(26 + sidLength), "{\"sid\":\"%s\", \"$s\":1}", sid);
-                sprintf_s(newState, sizeof(char)*(12 + sidLength), "{\"sid\":\"%s\"}", sid);
-            } else {
-                sprintf_s(stateMessage, sizeof(char)*(26 + sidLength), "{\"sid\":%s, \"$s\":1}", sid);
-                sprintf_s(newState, sizeof(char)*(12 + sidLength), "{\"sid\":%s}", sid);
-            }
+            char *stateMessage = (char *)_alloca(sizeof(char)*(36 + sidProperty->valueLength));
+            char *newState = (char *)_alloca(sizeof(char)*(12 + sidProperty->valueLength));
+            sprintf_s(stateMessage, sizeof(char)*(26 + sidProperty->valueLength), "{\"sid\":\"%s\", \"$s\":1}", sid);
+            sprintf_s(newState, sizeof(char)*(12 + sidProperty->valueLength), "{\"sid\":\"%s\"}", sid); 
 #else
-            char stateMessage[36 + sidLength];
-            char newState[12 + sidLength];
-            if (sidProperty && sidProperty->type == JSON_STRING) {
-                snprintf(stateMessage, sizeof(char)*(26 + sidLength), "{\"sid\":\"%s\", \"$s\":1}", sid);
-                snprintf(newState, sizeof(char)*(12 + sidLength), "{\"sid\":\"%s\"}", sid);
-            } else {
-                snprintf(stateMessage, sizeof(char)*(26 + sidLength), "{\"sid\":%s, \"$s\":1}", sid);
-                snprintf(newState, sizeof(char)*(12 + sidLength), "{\"sid\":%s}", sid);
-            }
+            char stateMessage[36 + sidProperty->valueLength];
+            char newState[12 + sidProperty->valueLength];
+            snprintf(stateMessage, sizeof(char)*(26 + sidProperty->valueLength), "{\"sid\":\"%s\", \"$s\":1}", sid);
+            snprintf(newState, sizeof(char)*(12 + sidProperty->valueLength), "{\"sid\":\"%s\"}", sid);
 #endif
 
             if (*commandCount == MAX_COMMAND_COUNT) {
@@ -1291,19 +1229,12 @@ static unsigned int handleMessage(ruleset *tree,
                                   unsigned int *commandCount,
                                   void **rulesBinding) {
     char *next;
-    unsigned int propertiesLength = 0;
-    unsigned int midIndex = UNDEFINED_INDEX;
-    unsigned int sidIndex = UNDEFINED_INDEX;
-    jsonProperty properties[MAX_EVENT_PROPERTIES];
+    jsonObject jo;
     int result = constructObject(message,
                                  NULL, 
                                  NULL, 
-                                 0, 
-                                 MAX_EVENT_PROPERTIES,
-                                 properties, 
-                                 &propertiesLength, 
-                                 &midIndex, 
-                                 &sidIndex, 
+                                 JSON_OBJECT_SEQUENCED, 
+                                 &jo, 
                                  &next);
     if (result != RULES_OK) {
         return result;
@@ -1312,10 +1243,7 @@ static unsigned int handleMessage(ruleset *tree,
     return handleMessageCore(tree,
                             state, 
                             message, 
-                            properties, 
-                            propertiesLength, 
-                            midIndex, 
-                            sidIndex,  
+                            &jo,
                             actionType,
                             commands,
                             commandCount,
@@ -1330,11 +1258,8 @@ static unsigned int handleMessages(void *handle,
                                    void **rulesBinding) {
     unsigned int result;
     unsigned int returnResult = RULES_OK;
-    jsonProperty properties[MAX_EVENT_PROPERTIES];
-    unsigned int propertiesLength = 0;
-    unsigned int propertiesMidIndex = UNDEFINED_INDEX;
-    unsigned int propertiesSidIndex = UNDEFINED_INDEX;
-    
+    jsonObject jo;
+
     char *first = messages;
     char *last = NULL;
     char lastTemp;
@@ -1346,12 +1271,8 @@ static unsigned int handleMessages(void *handle,
     while (constructObject(first,
                            NULL, 
                            NULL, 
-                           0,
-                           MAX_EVENT_PROPERTIES,
-                           properties, 
-                           &propertiesLength, 
-                           &propertiesMidIndex,
-                           &propertiesSidIndex,
+                           JSON_OBJECT_SEQUENCED,
+                           &jo,
                            &last) == RULES_OK) {
 
         while (*last != ',' && *last != ']' ) {
@@ -1363,10 +1284,7 @@ static unsigned int handleMessages(void *handle,
         result = handleMessageCore(handle,
                                  NULL, 
                                  first, 
-                                 properties, 
-                                 propertiesLength,
-                                 propertiesMidIndex,
-                                 propertiesSidIndex, 
+                                 &jo, 
                                  actionType, 
                                  commands,
                                  commandCount,
@@ -1380,11 +1298,7 @@ static unsigned int handleMessages(void *handle,
         if (result == ERR_EVENT_NOT_HANDLED) {
             returnResult = ERR_EVENT_NOT_HANDLED;
         }
-
-        propertiesLength = 0;
-        propertiesMidIndex = UNDEFINED_INDEX;
-        propertiesSidIndex = UNDEFINED_INDEX;        
-
+       
         first = last;
         while (*first != '{' && *first != '\0' ) {
             ++first;
