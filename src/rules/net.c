@@ -724,7 +724,7 @@ static unsigned int loadAddMessageCommand(ruleset *tree, binding *rulesBinding) 
 "    end\n"
 "end\n"
 "local mid = message[\"id\"]\n"
-"if not mid then\n"
+"if mid == \"\" then\n"
 "    if mark_visited == 0 then\n"
 "        mid = \"$m-\" .. redis.call(\"hget\", mid_count_hashset, sid) + 1\n"
 "    else\n"
@@ -961,6 +961,7 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
     if (asprintf(&lua, 
 "local facts_key = \"%s!f!\"\n"
 "local events_key = \"%s!e!\"\n"
+"local visited_key = \"%s!v!\"\n"
 "local action_key = \"%s!a\"\n"
 "local state_key = \"%s!s\"\n"
 "local timers_key = \"%s!t\"\n"
@@ -1054,7 +1055,7 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
 "    if cancel then\n"
 "        for i = 1, #frame, 1 do\n"
 "            if type(frame[i]) == \"table\" then\n"
-"                redis.call(\"hsetnx\", events_hashset, frame[i][\"id\"], cmsgpack.pack(frame[i]))\n"
+"                redis.call(\"hdel\", visited_key .. sid, frame[i][\"id\"])\n"
 "                redis.call(\"zadd\", timers_key, max_score, \"p:\" .. cjson.encode(frame[i]))\n"
 "            end\n"
 "        end\n"
@@ -1220,6 +1221,7 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
 "        return {new_sid, cjson.encode({[action_name] = fixup_frame(frame)})}\n"
 "    end\n"
 "end\n",
+                name,
                 name,
                 name,
                 name,
