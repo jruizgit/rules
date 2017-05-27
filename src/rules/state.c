@@ -166,7 +166,7 @@ static unsigned int fixupIds(jsonObject *jo) {
     jsonProperty *property;
     // id and sid are coerced to strings
     // to avoid unnecessary conversions
-    if (jo->sidIndex != UNDEFINED_INDEX) {
+    if (jo->sidIndex != UNDEFINED_INDEX && jo->properties[jo->sidIndex].type != JSON_NIL) {
         //coerce value to string
         property = &jo->properties[jo->sidIndex];
         if (property->type == JSON_DOUBLE || property->type == JSON_INT) {
@@ -192,7 +192,7 @@ static unsigned int fixupIds(jsonObject *jo) {
         property->type = JSON_STRING;
     } 
 
-    if (jo->idIndex != UNDEFINED_INDEX) {
+    if (jo->idIndex != UNDEFINED_INDEX && jo->properties[jo->idIndex].type != JSON_NIL) {
         //coerce value to string
         property = &jo->properties[jo->idIndex];
         if (property->type == JSON_DOUBLE || property->type == JSON_INT) {
