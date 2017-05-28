@@ -10,7 +10,7 @@
 #define JSON_OBJECT_SEQUENCED 1
 #define JSON_OBJECT_HASHED 2
 
-#define MAX_OBJECT_PROPERTIES 64
+#define MAX_OBJECT_PROPERTIES 128
 
 typedef struct jsonProperty {
     unsigned int hash;
@@ -29,7 +29,7 @@ typedef struct jsonProperty {
 
 typedef struct jsonObject {
     jsonProperty properties[MAX_OBJECT_PROPERTIES];
-    unsigned int propertiesLength; 
+    unsigned char propertiesLength; 
     unsigned int idIndex; 
     unsigned int sidIndex;
     char sidBuffer[SID_BUFFER_LENGTH];
@@ -58,6 +58,7 @@ unsigned int constructObject(char *root,
                              char *parentName, 
                              char *object,
                              char layout,
+                             char generateId,
                              jsonObject *jo,
                              char **next);
 

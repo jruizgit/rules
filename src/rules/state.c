@@ -162,14 +162,85 @@ static stateEntry *getEntry(ruleset *tree, char *sid, unsigned int sidHash) {
     return NULL;
 }
 
-static unsigned int fixupIds(jsonObject *jo) {
+static void insertSortProperties(jsonObject *jo, jsonProperty **properties) {
+    for (unsigned short i = 1; i < jo->propertiesLength; ++i) {
+        unsigned short ii = i; 
+        while (properties[ii]->hash < properties[ii - 1]->hash) {
+            jsonProperty *temp = properties[ii];
+            properties[ii] = properties[ii - 1];
+            properties[ii - 1] = temp;
+            --ii;
+        }
+    }
+}
+
+static void radixSortProperties(jsonObject *jo, jsonProperty **properties) {
+    unsigned char counts[43] = {};
+    for (unsigned char i = 0; i < jo->propertiesLength; ++i) {
+        unsigned char mostSignificant = jo->properties[i].hash / 100000000;
+        ++counts[mostSignificant];
+    }
+
+    unsigned char previousCount = 0;
+    for (unsigned char i = 0; i < 43; ++i) {
+        unsigned char nextCount = counts[i] + previousCount;
+        counts[i] = previousCount;
+        previousCount = nextCount;
+    }
+
+    for (unsigned char i = 0; i < jo->propertiesLength; ++i) {
+        unsigned char mostSignificant = jo->properties[i].hash / 100000000;
+        properties[counts[mostSignificant]] = &jo->properties[i];
+        ++counts[mostSignificant];
+    }
+}
+
+static void calculateId(jsonObject *jo) {
+
+#ifdef _WIN32
+    jsonProperty **properties = (jsonProperty *)_alloca(sizeof(jsonProperty *) * (jo->propertiesLength));
+#else
+    jsonProperty *properties[jo->propertiesLength];
+#endif
+
+    radixSortProperties(jo, properties);
+    insertSortProperties(jo, properties);
+
+    unsigned long long hash = FNV_64_OFFSET_BASIS;
+    for (unsigned short i = 0; i < jo->propertiesLength; ++i) {
+        jsonProperty *property = properties[i];
+        for (unsigned short ii = 0; ii < property->nameLength; ++ii) {
+            hash ^= property->name[ii];
+            hash *= FNV_64_PRIME;
+        }
+
+        unsigned short valueLength = property->valueLength;
+        if (property->type != JSON_STRING) {
+            ++valueLength;
+        }
+
+        for (unsigned short ii = 0; ii < valueLength; ++ii) {
+            hash ^= property->valueString[ii];
+            hash *= FNV_64_PRIME;
+        }
+    }
+
+#ifdef _WIN32
+    sprintf_s(jo->idBuffer, sizeof(char) * 21, "%020llu", hash); 
+#else
+    snprintf(jo->idBuffer, sizeof(char) * 21, "%020llu", hash);
+#endif
+    jo->properties[jo->idIndex].valueLength = 20;
+}
+
+static unsigned int fixupIds(jsonObject *jo, char generateId) {
     jsonProperty *property;
     // id and sid are coerced to strings
     // to avoid unnecessary conversions
     if (jo->sidIndex != UNDEFINED_INDEX && jo->properties[jo->sidIndex].type != JSON_NIL) {
         //coerce value to string
         property = &jo->properties[jo->sidIndex];
-        if (property->type == JSON_DOUBLE || property->type == JSON_INT) {
+        if (property->type != JSON_STRING) {
             ++property->valueLength;
         }
 
@@ -195,7 +266,7 @@ static unsigned int fixupIds(jsonObject *jo) {
     if (jo->idIndex != UNDEFINED_INDEX && jo->properties[jo->idIndex].type != JSON_NIL) {
         //coerce value to string
         property = &jo->properties[jo->idIndex];
-        if (property->type == JSON_DOUBLE || property->type == JSON_INT) {
+        if (property->type != JSON_STRING) {
             ++property->valueLength;
         }
 
@@ -216,6 +287,9 @@ static unsigned int fixupIds(jsonObject *jo) {
         strncpy(property->name, "id", 2);
         property->nameLength = 2;
         property->type = JSON_STRING;
+        if (generateId) {
+            calculateId(jo);
+        }
     }
 
     return RULES_OK;
@@ -225,6 +299,7 @@ unsigned int constructObject(char *root,
                              char *parentName, 
                              char *object,
                              char layout,
+                             char generateId,
                              jsonObject *jo,
                              char **next) {
     char *firstName;
@@ -304,16 +379,17 @@ unsigned int constructObject(char *root,
             } else {
                 
 #ifdef _WIN32
-				char *newParent = (char *)_alloca(sizeof(char)*(nameLength + 1));
+                char *newParent = (char *)_alloca(sizeof(char)*(nameLength + 1));
 #else
-				char newParent[nameLength + 1];
+                char newParent[nameLength + 1];
 #endif
                 strncpy(newParent, firstName, nameLength);
                 newParent[nameLength] = '\0';
                 result = constructObject(root,
                                          newParent, 
                                          first, 
-                                         layout, 
+                                         layout,
+                                         0, 
                                          jo,
                                          next);
                 if (result != RULES_OK) {
@@ -337,7 +413,7 @@ unsigned int constructObject(char *root,
 #ifdef _WIN32
                 char *fullName = (char *)_alloca(sizeof(char)*(fullNameLength + 1));
 #else
-			    char fullName[fullNameLength + 1];
+                char fullName[fullNameLength + 1];
 #endif
                 strncpy(fullName, parentName, parentNameLength);
                 fullName[parentNameLength] = '.';
@@ -346,7 +422,8 @@ unsigned int constructObject(char *root,
                 result = constructObject(root,
                                          fullName, 
                                          first, 
-                                         layout, 
+                                         layout,
+                                         0, 
                                          jo, 
                                          next);
                 if (result != RULES_OK) {
@@ -360,7 +437,7 @@ unsigned int constructObject(char *root,
     }
  
     if (!parentName) {
-        int idResult = fixupIds(jo);
+        int idResult = fixupIds(jo, generateId);
         if (idResult != RULES_OK) {
             return idResult;
         }
@@ -457,6 +534,7 @@ unsigned int refreshState(void *handle,
                              NULL, 
                              NULL, 
                              JSON_OBJECT_HASHED, 
+                             0,
                              &entry->jo, 
                              &next);
     if (result != RULES_OK) {

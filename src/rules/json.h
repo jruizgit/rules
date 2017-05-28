@@ -20,6 +20,9 @@
 #define FNV_32_OFFSET_BASIS 0x811c9dc5
 #define FNV_32_PRIME 16777619
 
+#define FNV_64_OFFSET_BASIS 0xcbf29ce484222325
+#define FNV_64_PRIME 1099511628211
+
 unsigned int readNextName(char *start, char **first, char **last, unsigned int *hash);
 unsigned int readNextValue(char *start, char **first, char **last, unsigned char *type);
 unsigned int readNextArrayValue(char *start, char **first, char **last, unsigned char *type);

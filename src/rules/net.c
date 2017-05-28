@@ -2377,7 +2377,7 @@ unsigned int formatEvalMessage(void *rulesBinding,
     if (actionType == ACTION_RETRACT_FACT || actionType == ACTION_RETRACT_EVENT) {
         propertiesLength = 0; 
     }
-
+    
     binding *bindingContext = (binding*)rulesBinding;
     time_t currentTime = time(NULL);
     char score[11];
@@ -2467,6 +2467,7 @@ unsigned int formatStoreMessage(void *rulesBinding,
                                 unsigned int keysLength,
                                 char **command) {
     unsigned int propertiesLength = jo->propertiesLength;
+    
     binding *bindingContext = (binding*)rulesBinding;
     char keysLengthString[5];
 #ifdef _WIN32

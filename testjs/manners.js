@@ -120,7 +120,7 @@ d.statechart('missManners', function() {
         assert('missManners', {id: 17, t: 'guest', name: '4', sex: 'm', hobby: 'h4'});
         assert('missManners', {id: 18, t: 'guest', name: '5', sex: 'm', hobby: 'h2'});
         assert('missManners', {id: 19, t: 'guest', name: '5', sex: 'm', hobby: 'h5'});
-        assert('missManners', {id: 10, t: 'guest', name: '5', sex: 'm', hobby: 'h3'});
+        assert('missManners', {id: 20, t: 'guest', name: '5', sex: 'm', hobby: 'h3'});
         assert('missManners', {id: 21, t: 'guest', name: '6', sex: 'f', hobby: 'h1'});
         assert('missManners', {id: 22, t: 'guest', name: '6', sex: 'f', hobby: 'h4'});
         assert('missManners', {id: 23, t: 'guest', name: '6', sex: 'f', hobby: 'h2'});

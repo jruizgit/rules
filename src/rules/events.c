@@ -1135,7 +1135,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                                         mid,
                                         message,
                                         jo,
-                                        actionType,
+                                        actionType == ACTION_REMOVE_FACT ? ACTION_RETRACT_FACT : actionType,
                                         evalKeys,
                                         evalCount,
                                         &evalCommand);
@@ -1234,6 +1234,9 @@ static unsigned int handleMessage(ruleset *tree,
                                  NULL, 
                                  NULL, 
                                  JSON_OBJECT_SEQUENCED, 
+                                 actionType == ACTION_ASSERT_FACT || 
+                                 actionType == ACTION_RETRACT_FACT || 
+                                 actionType == ACTION_REMOVE_FACT,
                                  &jo, 
                                  &next);
     if (result != RULES_OK) {
@@ -1272,6 +1275,9 @@ static unsigned int handleMessages(void *handle,
                            NULL, 
                            NULL, 
                            JSON_OBJECT_SEQUENCED,
+                           actionType == ACTION_ASSERT_FACT || 
+                           actionType == ACTION_RETRACT_FACT || 
+                           actionType == ACTION_REMOVE_FACT,
                            &jo,
                            &last) == RULES_OK) {
 
