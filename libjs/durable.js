@@ -513,9 +513,7 @@ exports = module.exports = durableEngine = function () {
                     })
                 } else {
                     throw 'syntax error: whenAll, run, whenStart labels expected';
-                    }
-            } else if (statement.type !== 'VariableDeclaration') {
-                throw 'syntax error: statement type ' + statement.type + ' unexpected';
+                }
             }
         });
 
@@ -617,8 +615,6 @@ exports = module.exports = durableEngine = function () {
                         value: transformState(statement.body)
                     });
                 }
-            } else if (statement.type !== 'VariableDeclaration') {
-                throw 'syntax error: statement type ' + statement.type + ' unexpected';
             }
         });
 
@@ -723,8 +719,6 @@ exports = module.exports = durableEngine = function () {
                     } else {
                         throw 'syntax error: whenAll, pri, count or cap labels expected';   
                     }
-                } else if (statement.type !== 'VariableDeclaration') {
-                    throw 'syntax error: statement type ' + statement.type + ' unexpected';
                 }
             });
         }
@@ -766,8 +760,6 @@ exports = module.exports = durableEngine = function () {
                         value: transformCondition(statement.body) 
                     });
                 }
-            } else if (statement.type !== 'VariableDeclaration') {
-                throw 'syntax error: statement type ' + statement.type + ' unexpected';
             }
         });
 
@@ -791,8 +783,6 @@ exports = module.exports = durableEngine = function () {
                         value: transformStage(statement.body, statement.label.name)
                     });
                 }
-            } else if (statement.type !== 'VariableDeclaration') {
-                throw 'syntax error: statement type ' + statement.type + ' unexpected';
             }
         });
 

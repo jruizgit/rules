@@ -615,5 +615,6 @@ unsigned int deleteState(void *handle, char *sid) {
       return result;
     }
 
-    return deleteSession(rulesBinding, sid);
+    unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
+    return deleteSession(handle, rulesBinding, sid, sidHash);
 }

@@ -577,6 +577,7 @@ static unsigned int loadDeleteSessionCommand(ruleset *tree, binding *rulesBindin
 "        redis.call(\"del\", all_keys[i])\n"
 "    end\n"
 "end\n"
+"redis.call(\"hdel\", \"%s!p\", ARGV[2])\n"
 "redis.call(\"hdel\", \"%s!c\", sid)\n"
 "redis.call(\"hdel\", \"%s!s\", sid)\n"
 "redis.call(\"hdel\", \"%s!s!v\", sid)\n"
@@ -585,6 +586,7 @@ static unsigned int loadDeleteSessionCommand(ruleset *tree, binding *rulesBindin
 "redis.call(\"del\", \"%s!e!\" .. sid)\n"
 "redis.call(\"del\", \"%s!f!\" .. sid)\n"
 "redis.call(\"del\", \"%s!v!\" .. sid)\n%s",
+                name,
                 name,
                 name,
                 name,
@@ -2183,6 +2185,17 @@ static unsigned int setNames(ruleset *tree, binding *rulesBinding) {
     eventsHashset[nameLength + 2] = '\0';
     rulesBinding->eventsHashset = eventsHashset;
 
+    char *partitionHashset = malloc((nameLength + 3) * sizeof(char));
+    if (!partitionHashset) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    strncpy(partitionHashset, name, nameLength);
+    partitionHashset[nameLength] = '!';
+    partitionHashset[nameLength + 1] = 'p';
+    partitionHashset[nameLength + 2] = '\0';
+    rulesBinding->partitionHashset = partitionHashset;
+
     char *timersSortedset = malloc((nameLength + 3) * sizeof(char));
     if (!timersSortedset) {
         return ERR_OUT_OF_MEMORY;
@@ -3018,15 +3031,28 @@ unsigned int getSessionVersion(void *rulesBinding, char *sid, unsigned long *sta
     return REDIS_OK;
 }
 
-unsigned int deleteSession(void *rulesBinding, char *sid) {
+unsigned int deleteSession(ruleset *tree, void *rulesBinding, char *sid, unsigned int sidHash) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext; 
 
     int result = redisAppendCommand(reContext, 
-                                    "evalsha %s 0 %s", 
+                                    "evalsha %s 0 %s %d", 
                                     currentBinding->deleteSessionHash,
-                                    sid); 
+                                    sid,
+                                    sidHash); 
     VERIFY(result, "deleteSession");  
+
+    bindingsList *list = tree->bindingsList;
+    binding *firstBinding = &list->bindings[0];
+    if (firstBinding != currentBinding) {
+        reContext = firstBinding->reContext;
+        result = redisAppendCommand(reContext, 
+                                    "hdel %s %d", 
+                                    firstBinding->partitionHashset,
+                                    sidHash);
+        VERIFY(result, "deleteSession");
+    }
+
     return REDIS_OK;
 }
 
