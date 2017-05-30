@@ -459,63 +459,63 @@ exports = module.exports = durableEngine = function () {
         var currentRule = null;
         var cmap;
         block.body.forEach(function (statement, index) {
-            if (statement.type !== 'LabeledStatement') {
+            if (statement.type === 'LabeledStatement') {
+                if (statement.label.name === 'whenAll') {
+                    cmap = {};
+                    currentRule = {
+                        type: 'ObjectExpression',
+                        properties: [{
+                            type: 'Property',
+                            key: { type: 'Identifier', name: 'whenAll' },
+                            value: transformExpressions(statement.body, cmap)
+                        }]
+                    };
+                    rules.push(currentRule);
+                } else if (statement.label.name === 'whenAny') {
+                    cmap = {};
+                    currentRule = {
+                        type: 'ObjectExpression',
+                        properties: [{
+                            type: 'Property',
+                            key: { type: 'Identifier', name: 'whenAny' },
+                            value: transformExpressions(statement.body, cmap)
+                        }]
+                    };
+                    rules.push(currentRule);
+                } else if (statement.label.name === 'whenStart') {
+                    rules.push({
+                        type: 'ObjectExpression',
+                        properties: [{
+                            type: 'Property',
+                            key: { type: 'Identifier', name: 'whenStart' },
+                            value: transformStartStatements(statement.body)
+                        }]
+                    });
+                } else if (statement.label.name === 'run') {
+                    currentRule.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'run' },
+                        value: transformRunStatements(statement.body, cmap)
+                    });
+                } else if (statement.label.name === 'runAsync') {
+                    currentRule.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'run' },
+                        value: transformRunStatements(statement.body, cmap, true)
+                    });
+                } else if ((statement.label.name === 'pri') ||
+                          (statement.label.name === 'count') ||
+                          (statement.label.name === 'cap')) {
+                    currentRule.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: statement.label.name },
+                        value: statement.body.expression
+                    })
+                } else {
+                    throw 'syntax error: whenAll, run, whenStart labels expected';
+                    }
+            } else if (statement.type !== 'VariableDeclaration') {
                 throw 'syntax error: statement type ' + statement.type + ' unexpected';
-            }
-
-            if (statement.label.name === 'whenAll') {
-                cmap = {};
-                currentRule = {
-                    type: 'ObjectExpression',
-                    properties: [{
-                        type: 'Property',
-                        key: { type: 'Identifier', name: 'whenAll' },
-                        value: transformExpressions(statement.body, cmap)
-                    }]
-                };
-                rules.push(currentRule);
-            } else if (statement.label.name === 'whenAny') {
-                cmap = {};
-                currentRule = {
-                    type: 'ObjectExpression',
-                    properties: [{
-                        type: 'Property',
-                        key: { type: 'Identifier', name: 'whenAny' },
-                        value: transformExpressions(statement.body, cmap)
-                    }]
-                };
-                rules.push(currentRule);
-            } else if (statement.label.name === 'whenStart') {
-                rules.push({
-                    type: 'ObjectExpression',
-                    properties: [{
-                        type: 'Property',
-                        key: { type: 'Identifier', name: 'whenStart' },
-                        value: transformStartStatements(statement.body)
-                    }]
-                });
-            } else if (statement.label.name === 'run') {
-                currentRule.properties.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: 'run' },
-                    value: transformRunStatements(statement.body, cmap)
-                });
-            } else if (statement.label.name === 'runAsync') {
-                currentRule.properties.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: 'run' },
-                    value: transformRunStatements(statement.body, cmap, true)
-                });
-            } else if ((statement.label.name === 'pri') ||
-                      (statement.label.name === 'count') ||
-                      (statement.label.name === 'cap')) {
-                currentRule.properties.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: statement.label.name },
-                    value: statement.body.expression
-                })
-            } else {
-                throw 'syntax error: whenAll, run, whenStart labels expected';
             }
         });
 
@@ -557,68 +557,68 @@ exports = module.exports = durableEngine = function () {
         var currentTrigger = null;
         var cmap;
         block.body.forEach(function (statement, index) {
-            if (statement.type !== 'LabeledStatement') {
-                throw 'syntax error: statement type ' + statement.type + ' unexpected';
-            }
-
-            if (statement.label.name === 'to') {
-                cmap = {};
-                currentTrigger = {
-                    type: 'ObjectExpression',
-                    properties: [{
-                        type: 'Property',
-                        key: { type: 'Identifier', name: 'to' },
-                        value: statement.body.expression
-                    }]
-                };
-
-                triggers.push(currentTrigger);
-            } else if (statement.label.name === 'whenAll') {
-                currentTrigger.properties.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: 'whenAll' },
-                    value: transformExpressions(statement.body, cmap)
-                });
-            } else if (statement.label.name === 'whenAny') {
-                currentTrigger.properties.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: 'whenAny' },
-                    value: transformExpressions(statement.body, cmap)
-                });
-            } else if (statement.label.name === 'run') {
-                currentTrigger.properties.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: 'run' },
-                    value: transformRunStatements(statement.body, cmap)
-                });
-            } else if (statement.label.name === 'runAsync') {
-                currentTrigger.properties.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: 'run' },
-                    value: transformRunStatements(statement.body, cmap, true)
-                });
-            } else if ((statement.label.name === 'pri') ||
-                      (statement.label.name === 'count') ||
-                      (statement.label.name === 'cap')) {
-                currentTrigger.properties.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: statement.label.name },
-                    value: statement.body.expression
-                })
-            } else {
-                if (!states) {
-                    states = [];
-                    triggers.push({
+            if (statement.type === 'LabeledStatement') {
+                if (statement.label.name === 'to') {
+                    cmap = {};
+                    currentTrigger = {
                         type: 'ObjectExpression',
-                        properties: states
+                        properties: [{
+                            type: 'Property',
+                            key: { type: 'Identifier', name: 'to' },
+                            value: statement.body.expression
+                        }]
+                    };
+
+                    triggers.push(currentTrigger);
+                } else if (statement.label.name === 'whenAll') {
+                    currentTrigger.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'whenAll' },
+                        value: transformExpressions(statement.body, cmap)
+                    });
+                } else if (statement.label.name === 'whenAny') {
+                    currentTrigger.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'whenAny' },
+                        value: transformExpressions(statement.body, cmap)
+                    });
+                } else if (statement.label.name === 'run') {
+                    currentTrigger.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'run' },
+                        value: transformRunStatements(statement.body, cmap)
+                    });
+                } else if (statement.label.name === 'runAsync') {
+                    currentTrigger.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'run' },
+                        value: transformRunStatements(statement.body, cmap, true)
+                    });
+                } else if ((statement.label.name === 'pri') ||
+                          (statement.label.name === 'count') ||
+                          (statement.label.name === 'cap')) {
+                    currentTrigger.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: statement.label.name },
+                        value: statement.body.expression
+                    })
+                } else {
+                    if (!states) {
+                        states = [];
+                        triggers.push({
+                            type: 'ObjectExpression',
+                            properties: states
+                        });
+                    }
+
+                    states.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: statement.label.name },
+                        value: transformState(statement.body)
                     });
                 }
-
-                states.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: statement.label.name },
-                    value: transformState(statement.body)
-                });
+            } else if (statement.type !== 'VariableDeclaration') {
+                throw 'syntax error: statement type ' + statement.type + ' unexpected';
             }
         });
 
@@ -699,32 +699,32 @@ exports = module.exports = durableEngine = function () {
             });
         } else {
             block.body.forEach(function (statement, index) {
-                if (statement.type !== 'LabeledStatement') {
+                if (statement.type === 'LabeledStatement') {
+                    if (statement.label.name === 'whenAll') {
+                        currentCondition.properties.push({
+                            type: 'Property',
+                            key: { type: 'Identifier', name: 'whenAll' },
+                            value: transformExpressions(statement.body, cmap)
+                        });
+                    } else if (statement.label.name === 'whenAny') {
+                        currentCondition.properties.push({
+                            type: 'Property',
+                            key: { type: 'Identifier', name: 'whenAny' },
+                            value: transformExpressions(statement.body, cmap)
+                        });
+                    } else if ((statement.label.name === 'pri') ||
+                              (statement.label.name === 'count') ||
+                              (statement.label.name === 'cap')) {
+                        currentCondition.properties.push({
+                            type: 'Property',
+                            key: { type: 'Identifier', name: statement.label.name },
+                            value: statement.body.expression
+                        });
+                    } else {
+                        throw 'syntax error: whenAll, pri, count or cap labels expected';   
+                    }
+                } else if (statement.type !== 'VariableDeclaration') {
                     throw 'syntax error: statement type ' + statement.type + ' unexpected';
-                }
-
-                if (statement.label.name === 'whenAll') {
-                    currentCondition.properties.push({
-                        type: 'Property',
-                        key: { type: 'Identifier', name: 'whenAll' },
-                        value: transformExpressions(statement.body, cmap)
-                    });
-                } else if (statement.label.name === 'whenAny') {
-                    currentCondition.properties.push({
-                        type: 'Property',
-                        key: { type: 'Identifier', name: 'whenAny' },
-                        value: transformExpressions(statement.body, cmap)
-                    });
-                } else if ((statement.label.name === 'pri') ||
-                          (statement.label.name === 'count') ||
-                          (statement.label.name === 'cap')) {
-                    currentCondition.properties.push({
-                        type: 'Property',
-                        key: { type: 'Identifier', name: statement.label.name },
-                        value: statement.body.expression
-                    });
-                } else {
-                    throw 'syntax error: whenAll, pri, count or cap labels expected';   
                 }
             });
         }
@@ -740,34 +740,34 @@ exports = module.exports = durableEngine = function () {
         };
 
         block.body.forEach(function (statement, index) {
-            if (statement.type !== 'LabeledStatement') {
+            if (statement.type === 'LabeledStatement') {
+                if (statement.label.name === 'run') {
+                    currentStage.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'run' },
+                        value: transformRunStatements(statement.body, {})
+                    });
+                } else if (statement.label.name === 'runAsync') {
+                    currentStage.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'run' },
+                        value: transformRunStatements(statement.body, {}, true)
+                    });
+                } else if (statement.label.name === 'self') {
+                    currentStage.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: name },
+                        value: transformCondition(statement.body) 
+                    });
+                } else {
+                    currentStage.properties.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: statement.label.name },
+                        value: transformCondition(statement.body) 
+                    });
+                }
+            } else if (statement.type !== 'VariableDeclaration') {
                 throw 'syntax error: statement type ' + statement.type + ' unexpected';
-            }
-
-            if (statement.label.name === 'run') {
-                currentStage.properties.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: 'run' },
-                    value: transformRunStatements(statement.body, {})
-                });
-            } else if (statement.label.name === 'runAsync') {
-                currentStage.properties.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: 'run' },
-                    value: transformRunStatements(statement.body, {}, true)
-                });
-            } else if (statement.label.name === 'self') {
-                currentStage.properties.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: name },
-                    value: transformCondition(statement.body) 
-                });
-            } else {
-                currentStage.properties.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: statement.label.name },
-                    value: transformCondition(statement.body) 
-                });
             }
         });
 
@@ -777,22 +777,22 @@ exports = module.exports = durableEngine = function () {
     var transformStages = function (block) {
         var stages = [];
         block.body.forEach(function (statement, index) {
-            if (statement.type !== 'LabeledStatement') {
+            if (statement.type === 'LabeledStatement') {
+                if (statement.label.name === 'whenStart') {
+                    stages.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: 'whenStart' },
+                        value: transformStartStatements(statement.body)
+                    });
+                } else {
+                    stages.push({
+                        type: 'Property',
+                        key: { type: 'Identifier', name: statement.label.name },
+                        value: transformStage(statement.body, statement.label.name)
+                    });
+                }
+            } else if (statement.type !== 'VariableDeclaration') {
                 throw 'syntax error: statement type ' + statement.type + ' unexpected';
-            }
-            
-            if (statement.label.name === 'whenStart') {
-                stages.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: 'whenStart' },
-                    value: transformStartStatements(statement.body)
-                });
-            } else {
-                stages.push({
-                    type: 'Property',
-                    key: { type: 'Identifier', name: statement.label.name },
-                    value: transformStage(statement.body, statement.label.name)
-                });
             }
         });
 
