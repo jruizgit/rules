@@ -783,7 +783,7 @@ d.ruleset('a12', function() {
 });
 
 d.ruleset('a13', function() {
-    whenAll: m.amount > c.s.maxAmount + s.refId('global').minAmount
+    whenAll: m.amount > s.maxAmount + s.refId('global').minAmount
     run: console.log('a13 approved ' +  m.amount);
 
     whenStart: {

@@ -68,12 +68,14 @@ static unsigned int handleMessage(ruleset *tree,
                                   unsigned int *commandCount,
                                   void **rulesBinding);
 
-static unsigned int reduceStateIdiom(ruleset *tree, 
-                                     char *sid,
-                                     unsigned int idiomOffset,
-                                     char **state,
-                                     unsigned char *releaseState,
-                                     jsonProperty **targetValue);
+static unsigned int reduceIdiom(ruleset *tree, 
+                                char *sid,
+                                char *message,
+                                jsonObject *messageObject,
+                                unsigned int idiomOffset,
+                                char **state,
+                                unsigned char *releaseState,
+                                jsonProperty **targetValue);
 
 static unsigned char compareBool(unsigned char left, 
                                  unsigned char right, 
@@ -418,6 +420,8 @@ static unsigned int handleBeta(ruleset *tree,
 
 static unsigned int valueToProperty(ruleset *tree,
                                     char *sid,
+                                    char *message,
+                                    jsonObject *messageObject,
                                     jsonValue *sourceValue, 
                                     char **state,
                                     unsigned char *releaseState,
@@ -426,22 +430,39 @@ static unsigned int valueToProperty(ruleset *tree,
     unsigned int result = RULES_OK;
     *releaseState = 0;
     switch(sourceValue->type) {
+        case JSON_EVENT_IDIOM:
         case JSON_STATE_IDIOM:
-            result = reduceStateIdiom(tree, 
-                                    sid, 
-                                    sourceValue->value.idiomOffset,
-                                    state,
-                                    releaseState,
-                                    targetProperty);
+            result = reduceIdiom(tree, 
+                                 sid, 
+                                 message,
+                                 messageObject,
+                                 sourceValue->value.idiomOffset,
+                                 state,
+                                 releaseState,
+                                 targetProperty);
 
             return result;
+        case JSON_EVENT_PROPERTY:
+            if (!sourceValue->value.property.evaluateAsAlpha) {
+                return ERR_IGNORE_PROPERTY;
+            } else {
+                for (unsigned short i = 0; i < messageObject->propertiesLength; ++i) {
+                    if (sourceValue->value.property.nameHash == messageObject->properties[i].hash) {
+                        *targetProperty = &messageObject->properties[i];
+                        rehydrateProperty(*targetProperty, message);
+                        return RULES_OK;
+                    } 
+                }
+
+                return ERR_PROPERTY_NOT_FOUND;
+            }
         case JSON_STATE_PROPERTY:
             if (sourceValue->value.property.idOffset) {
                 sid = &tree->stringPool[sourceValue->value.property.idOffset];
             }
             result = fetchStateProperty(tree, 
                                         sid, 
-                                        sourceValue->value.property.hash, 
+                                        sourceValue->value.property.nameHash, 
                                         MAX_STATE_PROPERTY_TIME, 
                                         0,
                                         state,
@@ -455,7 +476,7 @@ static unsigned int valueToProperty(ruleset *tree,
 
                 result = fetchStateProperty(tree, 
                                             sid, 
-                                            sourceValue->value.property.hash, 
+                                            sourceValue->value.property.nameHash, 
                                             MAX_STATE_PROPERTY_TIME, 
                                             0,
                                             state,
@@ -498,7 +519,7 @@ static unsigned int reduceProperties(unsigned char operator,
     char rightTemp = 0;
     if (leftProperty->type == JSON_STRING || rightProperty->type == JSON_STRING) {
         if (operator != OP_ADD) {
-            *state = (char*)calloc(1, sizeof(char));
+            *state = (char *)calloc(1, sizeof(char));
             if (!*state) {
                 return ERR_OUT_OF_MEMORY;
             }
@@ -629,12 +650,14 @@ static unsigned int reduceProperties(unsigned char operator,
     return RULES_OK;
 }
 
-static unsigned int reduceStateIdiom(ruleset *tree, 
-                                     char *sid,
-                                     unsigned int idiomOffset,
-                                     char **state,
-                                     unsigned char *releaseState,
-                                     jsonProperty **targetValue) {
+static unsigned int reduceIdiom(ruleset *tree, 
+                                char *sid,
+                                char *message,
+                                jsonObject *messageObject,
+                                unsigned int idiomOffset,
+                                char **state,
+                                unsigned char *releaseState,
+                                jsonProperty **targetValue) {
     unsigned int result = RULES_OK;
     *releaseState = 0;
     idiom *currentIdiom = &tree->idiomPool[idiomOffset];
@@ -644,6 +667,8 @@ static unsigned int reduceStateIdiom(ruleset *tree,
     char *leftState = NULL;
     result = valueToProperty(tree,
                              sid,
+                             message,
+                             messageObject,
                              &currentIdiom->left,
                              &leftState,
                              &releaseLeftState,
@@ -658,6 +683,8 @@ static unsigned int reduceStateIdiom(ruleset *tree,
     char *rightState = NULL;
     result = valueToProperty(tree,
                              sid,
+                             message,
+                             messageObject,
                              &currentIdiom->right,
                              &rightState,
                              &releaseRightState,
@@ -696,6 +723,7 @@ static unsigned int reduceStateIdiom(ruleset *tree,
 static unsigned int isMatch(ruleset *tree,
                             char *sid,
                             char *message,
+                            jsonObject *messageObject,
                             jsonProperty *currentProperty, 
                             alpha *currentAlpha,
                             unsigned char *propertyMatch,
@@ -717,6 +745,8 @@ static unsigned int isMatch(ruleset *tree,
     char *rightState = NULL;
     result = valueToProperty(tree,
                              sid,
+                             message,
+                             messageObject,
                              &currentAlpha->right,
                              &rightState,
                              &releaseRightState,
@@ -955,33 +985,25 @@ static unsigned int handleAlpha(ruleset *tree,
                 for (entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
                     node *hashNode = &tree->nodePool[nextHashset[entry]];
                     if (currentProperty->hash == hashNode->value.a.hash) {
-                        if (hashNode->value.a.right.type == JSON_EVENT_PROPERTY || hashNode->value.a.right.type == JSON_EVENT_IDIOM) {
+                        unsigned char match = 0;
+                        unsigned int mresult = isMatch(tree, 
+                                                       sid, 
+                                                       message,
+                                                       jo,
+                                                       currentProperty, 
+                                                       &hashNode->value.a,
+                                                       &match,
+                                                       rulesBinding);
+                        if (mresult != RULES_OK && mresult != ERR_IGNORE_PROPERTY){
+                            return mresult;
+                        }
+                        if (match || mresult == ERR_IGNORE_PROPERTY) {
                             if (top == MAX_STACK_SIZE) {
                                 return ERR_MAX_STACK_SIZE;
                             }
 
                             stack[top] = &hashNode->value.a; 
                             ++top;
-                        } else {
-                            unsigned char match = 0;
-                            unsigned int mresult = isMatch(tree, 
-                                                           sid, 
-                                                           message,
-                                                           currentProperty, 
-                                                           &hashNode->value.a,
-                                                           &match,
-                                                           rulesBinding);
-                            if (mresult != RULES_OK){
-                                return mresult;
-                            }
-                            if (match) {
-                                if (top == MAX_STACK_SIZE) {
-                                    return ERR_MAX_STACK_SIZE;
-                                }
-
-                                stack[top] = &hashNode->value.a; 
-                                ++top;
-                            }
                         }
                     }
                 }

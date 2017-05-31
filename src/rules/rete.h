@@ -29,9 +29,10 @@
 #define NODE_M_OFFSET 0
 
 typedef struct reference {
-    unsigned int hash;
+    unsigned int nameHash;
     unsigned int nameOffset;
     unsigned int idOffset;
+    char evaluateAsAlpha;
 } reference;
 
 typedef struct regexReference {

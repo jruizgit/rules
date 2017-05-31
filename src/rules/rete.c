@@ -26,6 +26,7 @@
 #define HASH_OR 340911698 // $or
 #define HASH_AND 3746487396 // $and
 #define HASH_S 1186729920 // $s
+#define HASH_M 1690058490 // $m
 #define HASH_NAME 2369371622 // name 
 #define HASH_ADD 4081054038 // $add
 #define HASH_SUB 1040718071 // $sub
@@ -305,8 +306,9 @@ static unsigned int copyValue(ruleset *tree,
     switch(type) {
         case JSON_EVENT_PROPERTY:
         case JSON_STATE_PROPERTY:
-            right->value.property.hash = ref->hash;
+            right->value.property.nameHash = ref->nameHash;
             right->value.property.nameOffset = ref->nameOffset;
+            right->value.property.evaluateAsAlpha = ref->evaluateAsAlpha;
             right->value.property.idOffset = ref->idOffset;
             break;
         case JSON_STATE_IDIOM:
@@ -374,8 +376,7 @@ static unsigned char compareValue(ruleset *tree,
     switch(type) {
         case JSON_EVENT_PROPERTY:
         case JSON_STATE_PROPERTY:
-            if (right->value.property.hash == ref->hash &&
-                right->value.property.nameOffset == ref->nameOffset &&
+            if (right->value.property.nameOffset == ref->nameOffset &&
                 right->value.property.idOffset == ref->idOffset)
                 return 1;
 
@@ -850,6 +851,7 @@ static unsigned int readReference(ruleset *tree, char *rule, unsigned char *idio
     *idiomType = JSON_EVENT_PROPERTY;
     
     ref->idOffset = 0;
+    ref->evaluateAsAlpha = 0;
     readNextName(rule, &first, &last, &hash);
     if (hash != HASH_S) {
         result = storeString(tree, first, &ref->idOffset, last - first); 
@@ -857,8 +859,12 @@ static unsigned int readReference(ruleset *tree, char *rule, unsigned char *idio
             return result;
         }  
 
+        if (hash == HASH_M) {
+            ref->evaluateAsAlpha = 1;
+        }
+
         readNextString(last, &first, &last, &hash);
-        ref->hash = hash;
+        ref->nameHash = hash;
         result = storeString(tree, first, &ref->nameOffset, last - first);
         if (result != RULES_OK) {
             return result;
@@ -866,7 +872,7 @@ static unsigned int readReference(ruleset *tree, char *rule, unsigned char *idio
     } else {
         *idiomType = JSON_STATE_PROPERTY;
         if (readNextString(last, &first, &last, &hash) == PARSE_OK) {
-            ref->hash = hash;
+            ref->nameHash = hash;
             result = storeString(tree, first, &ref->nameOffset, last - first);
             if (result != RULES_OK) {
                 return result;
@@ -879,7 +885,7 @@ static unsigned int readReference(ruleset *tree, char *rule, unsigned char *idio
                 switch (hash) {
                     case HASH_NAME:
                         readNextString(last, &first, &last, &hash);
-                        ref->hash = hash;
+                        ref->nameHash = hash;
                         result = storeString(tree, first, &ref->nameOffset, last - first);
                         if (result != RULES_OK) {
                             return result;
@@ -898,7 +904,7 @@ static unsigned int readReference(ruleset *tree, char *rule, unsigned char *idio
                                 return result;
                             } 
                         }
-
+                        
                         break;
                     default:
                         readNextValue(last, &first, &last, &type);

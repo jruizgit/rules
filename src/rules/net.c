@@ -2365,7 +2365,7 @@ unsigned int getBindingIndex(ruleset *tree, unsigned int sidHash, unsigned int *
     redisContext *reContext = firstBinding->reContext;
 
     int result = redisAppendCommand(reContext, 
-                                    "evalsha %s 0 %d %d", 
+                                    "evalsha %s 0 %u %d", 
                                     firstBinding->partitionHash, 
                                     sidHash, 
                                     list->bindingsLength);
@@ -3036,7 +3036,7 @@ unsigned int deleteSession(ruleset *tree, void *rulesBinding, char *sid, unsigne
     redisContext *reContext = currentBinding->reContext; 
 
     int result = redisAppendCommand(reContext, 
-                                    "evalsha %s 0 %s %d", 
+                                    "evalsha %s 0 %s %u", 
                                     currentBinding->deleteSessionHash,
                                     sid,
                                     sidHash); 
@@ -3047,7 +3047,7 @@ unsigned int deleteSession(ruleset *tree, void *rulesBinding, char *sid, unsigne
     if (firstBinding != currentBinding) {
         reContext = firstBinding->reContext;
         result = redisAppendCommand(reContext, 
-                                    "hdel %s %d", 
+                                    "hdel %s %u", 
                                     firstBinding->partitionHashset,
                                     sidHash);
         VERIFY(result, "deleteSession");

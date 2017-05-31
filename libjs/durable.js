@@ -890,6 +890,7 @@ exports = module.exports = durableEngine = function () {
         var right;
         var alias;
         var that;
+        var sid;
 
         var gt = function (rvalue) {
             op = '$gt';
@@ -974,8 +975,49 @@ exports = module.exports = durableEngine = function () {
             return or.apply(this, terms);
         };
 
+        var innerAdd = function () {
+            var idioms = [that];
+            argsToArray(arguments, idioms);
+            return add.apply(this, idioms);
+        }
+
+        var innerSub = function (rvalue) {
+            var idioms = [that];
+            argsToArray(arguments, idioms);
+            return sub.apply(this, idioms);
+        }
+
+        var innerMul = function (rvalue) {
+            var idioms = [that];
+            argsToArray(arguments, idioms);
+            return mul.apply(this, idioms);
+        }
+
+        var innerDiv = function (rvalue) {
+            var idioms = [that];
+            argsToArray(arguments, idioms);
+            return div.apply(this, idioms);
+        }
+
+        var refId = function (refid) {
+            sid = refid;
+            return r.createProxy(
+                function(name) {
+                    left = name;
+                    return that;
+                },
+                function(name, value) {
+                    return;
+                }
+            );
+        }; 
+
         var define = function (proposedAlias) {
             var newDefinition = {};
+            if (sid && typeof(left) !== 'object') {
+                left = {name: left, id: sid};
+            } 
+
             if (!op) {
                 newDefinition[type] = left;
             } else {
@@ -1036,6 +1078,16 @@ exports = module.exports = durableEngine = function () {
                         return innerAnd;
                     case 'or':
                         return innerOr;
+                    case 'add':
+                        return innerAdd;
+                    case 'sub':
+                        return innerSub;
+                    case 'mul':
+                        return innerMul;
+                    case 'div':
+                        return innerDiv;
+                    case 'refId':
+                        return refId;
                     case 'setAlias':
                         return setAlias;
                     case 'define':
@@ -1043,7 +1095,11 @@ exports = module.exports = durableEngine = function () {
                     case 'push':
                         return false;
                     default:
-                        return term(type, left + '.' + name);
+                        if (left) {
+                            return term(type, left + '.' + name);
+                        } else {
+                            return term(type, name);
+                        }
                 }
             },
             function(name, value) {
@@ -1377,10 +1433,10 @@ exports = module.exports = durableEngine = function () {
     var c = r.createProxy(
         function(name) {
             if (name === 's') {
-                return idiom('$s');
+                return term('$s');
             }
 
-            return idiom(name);
+            return term(name);
         },
         function(name, value) {
             value.setAlias(name);
