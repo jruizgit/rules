@@ -104,6 +104,13 @@ static unsigned int createIdiom(ruleset *tree, jsonValue *newValue, char **idiom
                 return ERR_OUT_OF_MEMORY;
             }
             break;
+        case JSON_EVENT_LOCAL_PROPERTY:
+            rightProperty = &tree->stringPool[newValue->value.property.nameOffset];
+            if (asprintf(idiomString, "message[\"%s\"]", rightProperty) == -1) {
+                return ERR_OUT_OF_MEMORY;
+            }
+            break;
+        case JSON_EVENT_LOCAL_IDIOM:
         case JSON_EVENT_IDIOM:
             newIdiom = &tree->idiomPool[newValue->value.idiomOffset];
             char *op = "";
@@ -2138,6 +2145,7 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
                  lua)  == -1) {
         return ERR_OUT_OF_MEMORY;
     }
+    
     free(oldLua);
     unsigned int result = redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
     GET_REPLY(result, "loadEvalMessageCommand", reply);

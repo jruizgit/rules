@@ -286,7 +286,14 @@ exports = module.exports = durableEngine = function () {
                 throw 'syntax error: operator ' + expression.operator + ' not supported'
             } else  {
                 expression.type = 'CallExpression';
-                if (cmap[expression.left]) {
+                var leftExpression = expression.left;
+                var rightExpression = expression.right;
+                if (leftExpression.type == "Literal") {
+                    leftExpression = expression.right;
+                    rightExpression = expression.left;
+                }
+
+                if (cmap[leftExpression]) {
                     expression.callee = {
                         type: 'MemberExpression',
                         object: {
@@ -295,7 +302,7 @@ exports = module.exports = durableEngine = function () {
                         },
                         property: {
                             type: 'MemberExpression',
-                            object: expression.left,
+                            object: leftExpression,
                             property: {
                                 type: 'Identifier',
                                 name: omap[expression.operator]
@@ -305,7 +312,7 @@ exports = module.exports = durableEngine = function () {
                 } else {
                     expression.callee = {
                         type: 'MemberExpression',
-                        object: expression.left,
+                        object: leftExpression,
                         property: {
                             type: 'Identifier',
                             name: omap[expression.operator]
@@ -313,9 +320,9 @@ exports = module.exports = durableEngine = function () {
                     };
                 }
 
-                expression['arguments'] = [expression.right];
-                transformExpression(expression.left, cmap);
-                transformExpression(expression.right, cmap);
+                expression['arguments'] = [rightExpression];
+                transformExpression(leftExpression, cmap);
+                transformExpression(rightExpression, cmap);
                 delete(expression['operator']);
                 delete(expression['left']);
                 delete(expression['right']);
@@ -885,7 +892,7 @@ exports = module.exports = durableEngine = function () {
         return that;
     };
 
-    var term = function (type, left) {
+    var term = function (type, left, sid) {
         var op;
         var right;
         var alias;
@@ -999,27 +1006,23 @@ exports = module.exports = durableEngine = function () {
             return div.apply(this, idioms);
         }
 
-        var refId = function (refid) {
-            sid = refid;
-            return r.createProxy(
-                function(name) {
-                    left = name;
-                    return that;
-                },
-                function(name, value) {
-                    return;
-                }
-            );
-        }; 
-
         var define = function (proposedAlias) {
-            var newDefinition = {};
-            if (sid && typeof(left) !== 'object') {
-                left = {name: left, id: sid};
-            } 
+            if (!op && (type === '$s')) {
+                throw 'syntax error: s cannot be an expression rvalue';
+            }
 
+            var localLeft = left;
+            var localType = type;
+            if (type === '$sref') {
+                localType = '$s';
+                if (sid) {
+                    localLeft = {name: left, id: sid};
+                }
+            }
+
+            var newDefinition = {};
             if (!op) {
-                newDefinition[type] = left;
+                newDefinition[localType] = localLeft;
             } else {
                 var rightDefinition = right;
                 if (typeof(right) === 'object' && right !== null) {
@@ -1027,14 +1030,18 @@ exports = module.exports = durableEngine = function () {
                 }
 
                 if (op === '$eq') {
-                    newDefinition[left] = rightDefinition;
+                    newDefinition[localLeft] = rightDefinition;
                 } else {
                     var innerDefinition = {};
-                    innerDefinition[left] = rightDefinition;
+                    innerDefinition[localLeft] = rightDefinition;
                     newDefinition[op] = innerDefinition;
                 }
 
-                newDefinition = type === '$s' ? {$and: [newDefinition, {$s: 1}]}: newDefinition;
+                if (localType !== '$m' && localType !== '$s') {
+                    throw 'syntax error: ' + localType + ' cannot be an expression lvalue';
+                }
+
+                newDefinition = localType === '$s' ? {$and: [newDefinition, {$s: 1}]}: newDefinition;
             }
 
             var aliasedDefinition = {};
@@ -1086,8 +1093,6 @@ exports = module.exports = durableEngine = function () {
                         return innerMul;
                     case 'div':
                         return innerDiv;
-                    case 'refId':
-                        return refId;
                     case 'setAlias':
                         return setAlias;
                     case 'define':
@@ -1189,103 +1194,6 @@ exports = module.exports = durableEngine = function () {
 
         return that;
     };
-
-    var idiom = function (type, parentName) {
-        var that;
-        var op;
-        var right = [];
-        var left;
-        var sid;
-
-        var innerAdd = function () {
-            var idioms = [that];
-            argsToArray(arguments, idioms);
-            return add.apply(this, idioms);
-        }
-
-        var innerSub = function (rvalue) {
-            var idioms = [that];
-            argsToArray(arguments, idioms);
-            return sub.apply(this, idioms);
-        }
-
-        var innerMul = function (rvalue) {
-            var idioms = [that];
-            argsToArray(arguments, idioms);
-            return mul.apply(this, idioms);
-        }
-
-        var innerDiv = function (rvalue) {
-            var idioms = [that];
-            argsToArray(arguments, idioms);
-            return div.apply(this, idioms);
-        }
-
-        var refId = function (refid) {
-            sid = refid;
-            return r.createProxy(
-                function(name) {
-                    left = name;
-                    return that;
-                },
-                function(name, value) {
-                    return;
-                }
-            );
-        }; 
-
-        var define = function () {
-            var newDefinition;
-            if (sid) {
-                newDefinition = {name: left, id: sid};
-            } else {
-                newDefinition = left;
-            }
-            var leftDefinition = {};
-            leftDefinition[type] = newDefinition;
-            return leftDefinition;
-        }
-
-        that = r.createProxy(
-            function(name) {
-                switch (name) {
-                    case 'add':
-                        return innerAdd;
-                    case 'sub':
-                        return innerSub;
-                    case 'mul':
-                        return innerMul;
-                    case 'div':
-                        return innerDiv;
-                    case 'refId':
-                        return refId;
-                    case 'define':
-                        return define;
-                    default:
-                        left = left + '.' + name;        
-                        return that;
-                }
-            },
-            function(name, value) {
-                return;
-            }
-        );
-
-        return r.createProxy(
-            function(name) {
-                if (name === 'refId') {
-                    return refId;
-                }
-
-
-                left = name;
-                return that;
-            },
-            function(name, value) {
-                return;
-            }
-        );
-    }
 
     var rule = function(op, lexp) {
         var that = {};
@@ -1479,6 +1387,17 @@ exports = module.exports = durableEngine = function () {
 
     var timeout = function(name) {
         return m.$t.eq(name);
+    };
+
+    var sref = function(sid) {
+        return r.createProxy(
+            function(name) {
+                return term('$sref', name, sid);
+            },
+            function(name, value) {
+                return;
+            }
+        )
     };
 
     var extend = function (obj) {        

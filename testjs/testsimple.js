@@ -760,7 +760,7 @@ d.ruleset('a10', function() {
 });
 
 d.ruleset('a11', function() {
-    whenAll: m.amount < s.maxAmount
+    whenAll: m.amount < sref().maxAmount
     run: console.log('a11 approved ' +  m.amount);
 
     whenStart: {
@@ -771,7 +771,7 @@ d.ruleset('a11', function() {
 });
 
 d.ruleset('a12', function() {
-    whenAll: m.amount < s.maxAmount && m.amount > s.refId('global').minAmount
+    whenAll: m.amount < sref().maxAmount && m.amount > sref('global').minAmount
     run: console.log('a12 approved ' +  m.amount);
 
     whenStart: {
@@ -783,7 +783,7 @@ d.ruleset('a12', function() {
 });
 
 d.ruleset('a13', function() {
-    whenAll: m.amount > s.maxAmount + s.refId('global').minAmount
+    whenAll: m.amount > sref().maxAmount + sref('global').minAmount
     run: console.log('a13 approved ' +  m.amount);
 
     whenStart: {

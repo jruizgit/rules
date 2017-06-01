@@ -305,14 +305,15 @@ static unsigned int copyValue(ruleset *tree,
     char temp;
     switch(type) {
         case JSON_EVENT_PROPERTY:
+        case JSON_EVENT_LOCAL_PROPERTY:
         case JSON_STATE_PROPERTY:
             right->value.property.nameHash = ref->nameHash;
             right->value.property.nameOffset = ref->nameOffset;
-            right->value.property.evaluateAsAlpha = ref->evaluateAsAlpha;
             right->value.property.idOffset = ref->idOffset;
             break;
         case JSON_STATE_IDIOM:
         case JSON_EVENT_IDIOM:
+        case JSON_EVENT_LOCAL_IDIOM:
             right->value.idiomOffset = idiomOffset;
             break;
         case JSON_STRING:
@@ -375,14 +376,17 @@ static unsigned char compareValue(ruleset *tree,
     char temp;
     switch(type) {
         case JSON_EVENT_PROPERTY:
+        case JSON_EVENT_LOCAL_PROPERTY:
         case JSON_STATE_PROPERTY:
-            if (right->value.property.nameOffset == ref->nameOffset &&
+            if (right->value.property.nameHash == ref->nameHash &&
+                right->value.property.nameOffset == ref->nameOffset &&
                 right->value.property.idOffset == ref->idOffset)
                 return 1;
 
             return 0;
         case JSON_STATE_IDIOM:
         case JSON_EVENT_IDIOM:
+        case JSON_EVENT_LOCAL_IDIOM:
             return 0;
         case JSON_STRING:
             {
@@ -457,6 +461,11 @@ static unsigned int validateReference(char *rule, unsigned char *referenceType) 
 
     if (hash != HASH_S) {
         *referenceType = JSON_EVENT_PROPERTY;
+
+        if (hash == HASH_M) {
+             *referenceType = JSON_EVENT_LOCAL_PROPERTY;
+        }
+
         result = readNextString(last, &first, &last, &hash);
         if (result != PARSE_OK) {
             return result;
@@ -532,7 +541,8 @@ static unsigned int validateIdiom(char *rule, unsigned char *idiomType) {
             }
 
             if (newIdiomType == JSON_EVENT_PROPERTY || newIdiomType == JSON_EVENT_IDIOM) {
-                if (*idiomType == JSON_STATE_PROPERTY || *idiomType == JSON_STATE_IDIOM) {
+                if (*idiomType == JSON_STATE_PROPERTY || *idiomType == JSON_STATE_IDIOM ||
+                    *idiomType == JSON_EVENT_LOCAL_PROPERTY || *idiomType == JSON_EVENT_LOCAL_PROPERTY) {
                     return ERR_UNEXPECTED_TYPE;
                 }
 
@@ -540,12 +550,22 @@ static unsigned int validateIdiom(char *rule, unsigned char *idiomType) {
             } 
 
             if (newIdiomType == JSON_STATE_PROPERTY || newIdiomType == JSON_STATE_IDIOM) {
-                if (*idiomType == JSON_EVENT_PROPERTY || *idiomType == JSON_EVENT_IDIOM) {
+                if (*idiomType == JSON_EVENT_PROPERTY || *idiomType == JSON_EVENT_IDIOM ||
+                    *idiomType == JSON_EVENT_LOCAL_PROPERTY || *idiomType == JSON_EVENT_LOCAL_IDIOM) {
                     return ERR_UNEXPECTED_TYPE;
                 }
 
                 *idiomType = JSON_STATE_IDIOM;
             }                    
+
+            if (newIdiomType == JSON_EVENT_LOCAL_PROPERTY || newIdiomType == JSON_EVENT_LOCAL_IDIOM) {
+                if (*idiomType == JSON_STATE_PROPERTY || *idiomType == JSON_STATE_IDIOM ||
+                    *idiomType == JSON_EVENT_PROPERTY || *idiomType == JSON_EVENT_PROPERTY) {
+                    return ERR_UNEXPECTED_TYPE;
+                }
+
+                *idiomType = JSON_EVENT_IDIOM;
+            }
 
             if (hash != HASH_L && hash != HASH_R) {
                 return ERR_UNEXPECTED_NAME;
@@ -851,7 +871,6 @@ static unsigned int readReference(ruleset *tree, char *rule, unsigned char *idio
     *idiomType = JSON_EVENT_PROPERTY;
     
     ref->idOffset = 0;
-    ref->evaluateAsAlpha = 0;
     readNextName(rule, &first, &last, &hash);
     if (hash != HASH_S) {
         result = storeString(tree, first, &ref->idOffset, last - first); 
@@ -860,7 +879,7 @@ static unsigned int readReference(ruleset *tree, char *rule, unsigned char *idio
         }  
 
         if (hash == HASH_M) {
-            ref->evaluateAsAlpha = 1;
+            *idiomType = JSON_EVENT_LOCAL_PROPERTY;
         }
 
         readNextString(last, &first, &last, &hash);
@@ -972,6 +991,10 @@ static unsigned int readIdiom(ruleset *tree, char *rule, unsigned char *idiomTyp
             
             if (type == JSON_EVENT_PROPERTY || type == JSON_EVENT_IDIOM) {
                 *idiomType = JSON_EVENT_IDIOM;  
+            }
+
+            if (*idiomType != JSON_EVENT_IDIOM && (type == JSON_EVENT_LOCAL_PROPERTY || type == JSON_EVENT_LOCAL_IDIOM)) {
+                *idiomType = JSON_EVENT_LOCAL_IDIOM;  
             }
 
             // newIdiom address might have changed after readIdiom

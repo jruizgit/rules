@@ -32,7 +32,6 @@ typedef struct reference {
     unsigned int nameHash;
     unsigned int nameOffset;
     unsigned int idOffset;
-    char evaluateAsAlpha;
 } reference;
 
 typedef struct regexReference {

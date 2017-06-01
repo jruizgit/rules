@@ -37,8 +37,8 @@
 #define OP_STRING_DOUBLE 0x0103
 #define OP_STRING_STRING 0x0101
 #define OP_STRING_NIL 0x0107
-#define OP_STRING_REGEX 0x010C
-#define OP_STRING_IREGEX 0x010D
+#define OP_STRING_REGEX 0x010E
+#define OP_STRING_IREGEX 0x010F
 #define OP_NIL_BOOL 0x0704
 #define OP_NIL_INT 0x0702
 #define OP_NIL_DOUBLE 0x0703
@@ -430,7 +430,7 @@ static unsigned int valueToProperty(ruleset *tree,
     unsigned int result = RULES_OK;
     *releaseState = 0;
     switch(sourceValue->type) {
-        case JSON_EVENT_IDIOM:
+        case JSON_EVENT_LOCAL_IDIOM:
         case JSON_STATE_IDIOM:
             result = reduceIdiom(tree, 
                                  sid, 
@@ -442,20 +442,16 @@ static unsigned int valueToProperty(ruleset *tree,
                                  targetProperty);
 
             return result;
-        case JSON_EVENT_PROPERTY:
-            if (!sourceValue->value.property.evaluateAsAlpha) {
-                return ERR_IGNORE_PROPERTY;
-            } else {
-                for (unsigned short i = 0; i < messageObject->propertiesLength; ++i) {
-                    if (sourceValue->value.property.nameHash == messageObject->properties[i].hash) {
-                        *targetProperty = &messageObject->properties[i];
-                        rehydrateProperty(*targetProperty, message);
-                        return RULES_OK;
-                    } 
-                }
-
-                return ERR_PROPERTY_NOT_FOUND;
+        case JSON_EVENT_LOCAL_PROPERTY:
+            for (unsigned short i = 0; i < messageObject->propertiesLength; ++i) {
+                if (sourceValue->value.property.nameHash == messageObject->properties[i].hash) {
+                    *targetProperty = &messageObject->properties[i];
+                    rehydrateProperty(*targetProperty, message);
+                    return RULES_OK;
+                } 
             }
+
+            return ERR_PROPERTY_NOT_FOUND;
         case JSON_STATE_PROPERTY:
             if (sourceValue->value.property.idOffset) {
                 sid = &tree->stringPool[sourceValue->value.property.idOffset];
@@ -969,6 +965,7 @@ static unsigned int handleAlpha(ruleset *tree,
 
                 if (!exists) {
                     if (top == MAX_STACK_SIZE) {
+                        printf("exiting 1\n");
                         return ERR_MAX_STACK_SIZE;
                     }
                     
@@ -985,25 +982,34 @@ static unsigned int handleAlpha(ruleset *tree,
                 for (entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
                     node *hashNode = &tree->nodePool[nextHashset[entry]];
                     if (currentProperty->hash == hashNode->value.a.hash) {
-                        unsigned char match = 0;
-                        unsigned int mresult = isMatch(tree, 
-                                                       sid, 
-                                                       message,
-                                                       jo,
-                                                       currentProperty, 
-                                                       &hashNode->value.a,
-                                                       &match,
-                                                       rulesBinding);
-                        if (mresult != RULES_OK && mresult != ERR_IGNORE_PROPERTY){
-                            return mresult;
-                        }
-                        if (match || mresult == ERR_IGNORE_PROPERTY) {
+                        if (hashNode->value.a.right.type == JSON_EVENT_PROPERTY || hashNode->value.a.right.type == JSON_EVENT_IDIOM) {
                             if (top == MAX_STACK_SIZE) {
                                 return ERR_MAX_STACK_SIZE;
                             }
-
                             stack[top] = &hashNode->value.a; 
                             ++top;
+                        } else {
+                            unsigned char match = 0;
+                            unsigned int mresult = isMatch(tree, 
+                                                           sid, 
+                                                           message,
+                                                           jo,
+                                                           currentProperty, 
+                                                           &hashNode->value.a,
+                                                           &match,
+                                                           rulesBinding);
+                            if (mresult != RULES_OK){
+                                return mresult;
+                            }
+
+                            if (match) {
+                                if (top == MAX_STACK_SIZE) {
+                                    return ERR_MAX_STACK_SIZE;
+                                }
+
+                                stack[top] = &hashNode->value.a; 
+                                ++top;
+                            }
                         }
                     }
                 }
