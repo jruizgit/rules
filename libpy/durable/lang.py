@@ -37,6 +37,30 @@ class avalue(object):
 
         return self
 
+    def __lt__(self, other):
+        raise Exception('Only binary arithmetic operators supported')
+
+    def __le__(self, other):
+        raise Exception('Only binary arithmetic operators supported')
+
+    def __gt__(self, other):
+        raise Exception('Only binary arithmetic operators supported')
+
+    def __ge__(self, other):
+        raise Exception('Only binary arithmetic operators supported')
+
+    def __eq__(self, other):
+        raise Exception('Only binary arithmetic operators supported')
+
+    def __ne__(self, other):
+        raise Exception('Only binary arithmetic operators supported')
+
+    def __neg__(self):
+        raise Exception('Only binary arithmetic operators supported')
+
+    def __pos__(self):
+        raise Exception('Only binary arithmetic operators supported')
+
     def _set_right(self, op, other):
         if self._right:
             self._left = avalue(self._name, self._left, self._sid, self._op, self._right) 
@@ -45,13 +69,15 @@ class avalue(object):
         self._right = other
         return self
 
-    def ref_id(self, id):
-        self._sid = id 
-        return self
-
     def define(self, parent_name = None):
         if not self._left:
             raise Exception('Property name for {0} not defined'.format(self._name))
+
+        if self._name == '$s':
+            raise Exception('s not allowed as rvalue')
+
+        if self._name == '$sref':
+            self._name = '$s'
 
         if not self._op:
             if self._sid:
@@ -75,9 +101,6 @@ class avalue(object):
 class closure(object):
 
     def __getattr__(self, name):
-        if name == 's':
-            return avalue('$s')
-
         return avalue(name)
 
 
@@ -144,6 +167,21 @@ class value(object):
     def __or__(self, other):
         return value(self._type, self, '$or', other, self.alias)    
 
+    def __add__(self, other):
+        return avalue(self._type, self._left, None, '$add', other)
+        
+    def __sub__(self, other):
+        return avalue(self._type, self._left, None, '$sub', other)
+
+    def __mul__(self, other):
+        return avalue(self._type, self._left, None, '$mul', other)
+
+    def __div__(self, other):
+        return avalue(self._type, self._left, None, '$div', other)
+
+    def __truediv__(self, other):
+        return avalue(self._type, self._left, None, '$div', other)
+
     def __getattr__(self, name):
         if self._type:
             if self._left:
@@ -175,6 +213,12 @@ class value(object):
             new_definition = {self._op: {self._left: 1}}
         elif self._op == '$eq':
             new_definition = {self._left: right_definition}
+        elif not self._op:
+            if self._type == '$s':
+                raise Exception('s not allowed as rvalue')
+
+            print('defining {0}, {1}'.format(self._type, self._left))
+            new_definition = {self._type: self._left}
         else:
             new_definition = {self._op: {self._left: right_definition}}
         
@@ -599,6 +643,9 @@ def pri(value):
 def cap(value):
     return {'cap': value}
 
+def sref(sid = None):
+    return avalue('$sref', None, sid, None, None)
+
 def select(name):
     for rset in _rulesets:
         if rset.name == name:
@@ -606,7 +653,7 @@ def select(name):
 
     raise Exception('Ruleset {0} not found'.format(name))
 
-m = value('m')
+m = value('$m')
 s = value('$s')
 c = closure()
 

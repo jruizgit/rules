@@ -590,7 +590,7 @@ with statechart('a6'):
        
 
 with ruleset('a7'):
-    @when_all(m.amount < c.s.max_amount)
+    @when_all(m.amount < sref().max_amount)
     def approved(c):
         print ('a7 approved {0}'.format(c.m.amount))
 
@@ -602,7 +602,7 @@ with ruleset('a7'):
 
 
 with ruleset('a8'):
-    @when_all((m.amount < c.s.max_amount) & (m.amount > c.s.ref_id('global').min_amount))
+    @when_all((m.amount < sref().max_amount) & (m.amount > sref('global').min_amount))
     def approved(c):
         print ('a8 approved {0}'.format(c.m.amount))
 
@@ -615,7 +615,7 @@ with ruleset('a8'):
 
 
 with ruleset('a9'):
-    @when_all(m.amount < c.s.max_amount * 2)
+    @when_all(m.amount < sref().max_amount * 2)
     def approved(c):
         print ('a9 approved {0}'.format(c.m.amount))
 
@@ -627,7 +627,7 @@ with ruleset('a9'):
 
 
 with ruleset('a10'):
-    @when_all(m.amount < c.s.max_amount + c.s.ref_id('global').max_amount)
+    @when_all(m.amount < sref().max_amount + sref('global').max_amount)
     def approved(c):
         print ('a10 approved {0}'.format(c.m.amount))
 
