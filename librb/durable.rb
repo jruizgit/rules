@@ -188,6 +188,7 @@ module Durable
     
     def definition(parent_name=nil)
       new_definition = nil
+
       if @__op == :$or || @__op == :$and
         new_definition = {@__op => @definitions}
       else
@@ -202,7 +203,11 @@ module Durable
         if @__op == :$eq
           new_definition = {@left => righ_definition}
         else
-          new_definition = {@__op => {@left => righ_definition}}
+          if not @right
+            new_definition = {@__type => @left}
+          else
+            new_definition = {@__op => {@left => righ_definition}}
+          end
         end
       end
 
@@ -281,6 +286,22 @@ module Durable
     def &(other)
       merge other, :$and
       self
+    end
+
+    def +(other)
+      return Arithmetic.new(@__type, @left, nil, :$add, other)
+    end
+
+    def -(other)
+      return Arithmetic.new(@__type, @left, nil, :$sub, other)
+    end
+
+    def *(other)
+      return Arithmetic.new(@__type, @left, nil, :$mul, other)
+    end
+
+    def /(other)
+      return Arithmetic.new(@__type, @left, nil, :$div, other)
     end
 
     private 

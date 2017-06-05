@@ -435,6 +435,7 @@ module Engine
         end
       end
 
+      puts(JSON.generate(ruleset_definition))
       @handle = Rules.create_ruleset name, JSON.generate(ruleset_definition), state_cache_size
       @definition = ruleset_definition
     end
