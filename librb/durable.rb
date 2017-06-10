@@ -145,9 +145,6 @@ module Durable
       return Expression.new(@name, @left).imatches(other)
     end
 
-    def ref_id(sid)
-      Arithmetic.new @name, @left, sid
-    end
 
     private 
 
@@ -436,7 +433,7 @@ module Durable
     end
 
     def s
-      Arithmetic.new(:$s)
+      Expression.new(:$s)
     end
     
     def m
@@ -464,6 +461,10 @@ module Durable
       expression == name
     end
     
+    def sref(sid = nil)
+      Arithmetic.new :$s, nil, sid
+    end
+
     protected
 
     def get_options(*args)
