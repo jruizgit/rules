@@ -175,7 +175,9 @@ static void insertSortProperties(jsonObject *jo, jsonProperty **properties) {
 }
 
 static void radixSortProperties(jsonObject *jo, jsonProperty **properties) {
-    unsigned char counts[43] = {};
+    unsigned char counts[43];
+    memset(counts, 0, 43 * sizeof(char));
+
     for (unsigned char i = 0; i < jo->propertiesLength; ++i) {
         unsigned char mostSignificant = jo->properties[i].hash / 100000000;
         ++counts[mostSignificant];
