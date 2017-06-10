@@ -7,6 +7,7 @@ Reference Manual
   * [Facts](reference.md#facts)
   * [Events](reference.md#events)
   * [State](reference.md#state)
+  * [Identity](reference.md#identity)
 * [Antecedents](reference.md#antecedents)
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
@@ -221,6 +222,64 @@ State can also be retrieved and modified using the http API. When the example ab
 <sub>`curl -H "content-type: application/json" -X POST -d '{"status": "next"}' http://localhost:5000/flow/state`</sub>  
 
 [top](reference.md#table-of-contents)  
+### Identity
+Facts with the same property names and values are considered equal when asserted or retracted. Events with the same property names and values are considered different when posted because the posting time matters. 
+
+```python
+with ruleset('bookstore'):
+    # this rule will trigger for events with status
+    @when_all(+m.status)
+    def event(c):
+        print('Reference {0} status {1}'.format(c.m.reference, c.m.status))
+
+    @when_all(+m.name)
+    def fact(c):
+        print('Added {0}'.format(c.m.name))
+        c.retract_fact({
+            'name': 'The new book',
+            'reference': '75323',
+            'price': 500,
+            'seller': 'bookstore'
+        })
+
+    # this rule will be triggered when the fact is retracted
+    @when_all(none(+m.name))
+    def empty(c):
+        print('No books')
+
+    @when_start
+    def start(host):    
+        # will return 0 because the fact assert was successful 
+        print(host.assert_fact('bookstore', {
+            'name': 'The new book',
+            'seller': 'bookstore',
+            'reference': '75323',
+            'price': 500
+        }))
+
+        # will return 212 because the fact has already been asserted
+        print(host.assert_fact('bookstore', {
+            'reference': '75323',
+            'name': 'The new book',
+            'price': 500,
+            'seller': 'bookstore'
+        }))
+
+        # will return 0 because a new event is being posted
+        print(host.post('bookstore', {
+            'reference': '75323',
+            'status': 'Active'
+        }))
+
+        # will return 0 because a new event is being posted
+        print(host.post('bookstore', {
+            'reference': '75323',
+            'status': 'Active'
+        }))
+```
+
+[top](reference.md#table-of-contents)  
+
 ## Antecendents
 ### Simple Filter
 A rule antecedent is an expression. The left side of the expression represents an event or fact property. The right side defines a pattern to be matched. By convention events or facts are represented with the `m` name. Context state are represented with the `s` name.  
