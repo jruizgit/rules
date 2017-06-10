@@ -7,6 +7,7 @@ Reference Manual
   * [Facts](reference.md#facts)
   * [Events](reference.md#events)
   * [State](reference.md#state)
+  * [Identity](reference.md#identity)
 * [Antecedents](reference.md#antecedents)
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
@@ -225,6 +226,59 @@ State can also be retrieved and modified using the http API. When the example ab
 <sub>`curl -H "content-type: application/json" -X POST -d '{"status": "next"}' http://localhost:4567/flow/state`</sub>  
 
 [top](reference.md#table-of-contents)  
+
+### Identity
+Facts with the same property names and values are considered equal when asserted or retracted. Events with the same property names and values are considered different when posted because the posting time matters. 
+
+```ruby
+Durable.ruleset :bookstore do
+  # this rule will trigger for events with status
+  when_all +m.status do
+    puts "Reference #{m.reference} status #{m.status}"
+  end
+
+  when_all +m.name do
+    puts "Added: #{m.name}"
+    retract(:name => 'The new book',
+            :reference => '75323',
+            :price => 500,
+            :seller => 'bookstore')
+  end
+
+  when_all none(+m.name) do
+    puts "No books"
+  end  
+
+  when_start do
+    # will return 0 because the fact assert was successful 
+    puts assert :bookstore, {
+                :name => 'The new book',
+                :seller => 'bookstore',
+                :reference => '75323',
+                :price => 500}
+
+    # will return 212 because the fact has already been asserted 
+    puts assert :bookstore, {
+                :reference => '75323',
+                :name => 'The new book',
+                :price => 500,
+                :seller => 'bookstore'}
+
+    # will return 0 because a new event is being posted
+    puts post :bookstore, {
+              :reference => '75323',
+              :status => 'Active'}
+
+    # will return 0 because a new event is being posted
+    puts post :bookstore, {
+              :reference => '75323',
+              :status => 'Active'}
+  end
+end
+```
+
+[top](reference.md#table-of-contents)  
+
 ## Antecendents
 ### Simple Filter
 A rule antecedent is an expression. The left side of the expression represents an event or fact property. The right side defines a pattern to be matched. By convention events or facts are represented with the `m` name. Context state are represented with the `s` name.  
