@@ -7,6 +7,7 @@ Reference Manual
   * [Facts](reference.md#facts)
   * [Events](reference.md#events)
   * [State](reference.md#state)
+  * [Identity](reference.md#identity)
 * [Antecedents](reference.md#antecedents)
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
@@ -225,6 +226,65 @@ d.runAll();
 ```
 State can also be retrieved and modified using the http API. When the example above is running, try the following commands:  
 <sub>`curl -H "content-type: application/json" -X POST -d '{"status": "next"}' http://localhost:5000/flow/state`</sub>  
+
+[top](reference.md#table-of-contents)  
+
+### Identity
+Facts with the same property names and values are considered equal when asserted or retracted. Events with the same property names and values are considered different when posted because the posting time matters. 
+
+```javascript
+d.ruleset('bookstore', function() {
+    // this rule will trigger for events with status
+    whenAll: +m.status
+    run: console.log('reference ' + m.reference + ' status ' + m.status)
+
+    whenAll: +m.name
+    run: { 
+        console.log('Added: ' + m.name);
+        retract({
+            name: 'The new book',
+            reference: '75323',
+            price: 500,
+            seller: 'bookstore'
+        });
+    }
+
+    // this rule will be triggered when the fact is retracted
+    whenAll: none(+m.name)
+    run: console.log('no books');
+
+
+    whenStart: {
+        // will return 0 because the fact assert was successful 
+        console.log(assert('bookstore', {
+            name: 'The new book',
+            seller: 'bookstore',
+            reference: '75323',
+            price: 500
+        }));
+
+        // will return 212 because the fact has already been asserted 
+        console.log(assert('bookstore', {
+            reference: '75323',
+            name: 'The new book',
+            price: 500,
+            seller: 'bookstore'
+        }));
+
+        // will return 0 because a new event is being posted
+        console.log(post('bookstore', {
+            reference: '75323',
+            status: 'Active'
+        }));
+
+        // will return 0 because a new event is being posted
+        console.log(post('bookstore', {
+            reference: '75323',
+            status: 'Active'
+        }));
+    }
+});
+```
 
 [top](reference.md#table-of-contents)  
 
