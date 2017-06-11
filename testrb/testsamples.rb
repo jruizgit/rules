@@ -574,6 +574,51 @@ Durable.ruleset :flow3 do
 end
 
 
+Durable.ruleset :bookstore do
+  # this rule will trigger for events with status
+  when_all +m.status do
+    puts "Reference #{m.reference} status #{m.status}"
+  end
+
+  when_all +m.name do
+    puts "Added: #{m.name}"
+    retract(:name => 'The new book',
+            :reference => '75323',
+            :price => 500,
+            :seller => 'bookstore')
+  end
+
+  when_all none(+m.name) do
+    puts "No books"
+  end  
+
+  when_start do
+    # will return 0 because the fact assert was successful 
+    puts assert :bookstore, {
+                :name => 'The new book',
+                :seller => 'bookstore',
+                :reference => '75323',
+                :price => 500}
+
+    # will return 212 because the fact has already been asserted 
+    puts assert :bookstore, {
+                :reference => '75323',
+                :name => 'The new book',
+                :price => 500,
+                :seller => 'bookstore'}
+
+    # will return 0 because a new event is being posted
+    puts post :bookstore, {
+              :reference => '75323',
+              :status => 'Active'}
+
+    # will return 0 because a new event is being posted
+    puts post :bookstore, {
+              :reference => '75323',
+              :status => 'Active'}
+  end
+end
+
 # Durable.ruleset :flow do
 
 #   when_all m.status == "start" do

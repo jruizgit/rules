@@ -495,51 +495,53 @@ d.ruleset('expense4', function() {
 });
 
 d.ruleset('bookstore', function() {
+    // this rule will trigger for events with status
+    whenAll: +m.status
+    run: console.log('reference ' + m.reference + ' status ' + m.status)
+
     whenAll: +m.name
     run: { 
-        console.log('reviewing ' + m.name);
+        console.log('Added: ' + m.name);
         retract({
-            name: 'John',
-            address: '1111 NE 22, Sea, Wa',
-            phone: '299678787',
-            country: 'US',
-            seller: 'bookstore',
+            name: 'The new book',
             reference: '75323',
-            amount: 500,
-            currency: 'US',
-            item: 'book'
+            price: 500,
+            seller: 'bookstore'
         });
     }
 
     // this rule will be triggered when the fact is retracted
     whenAll: none(+m.name)
-    run: console.log('test complete')
+    run: console.log('no books');
+
 
     whenStart: {
         // will return 0 because the fact assert was successful 
         console.log(assert('bookstore', {
-            name: 'John',
-            address: '1111 NE 22, Sea, Wa',
-            phone: '299678787',
-            country: 'US',
-            currency: 'US',
+            name: 'The new book',
             seller: 'bookstore',
-            item: 'book',
             reference: '75323',
-            amount: 500
+            price: 500
         }));
 
         // will return 212 because the fact has already been asserted 
         console.log(assert('bookstore', {
-            currency: 'US',
-            address: '1111 NE 22, Sea, Wa',
-            phone: '299678787',
-            amount: 500,
-            seller: 'bookstore',
-            item: 'book',
-            country: 'US',
             reference: '75323',
-            name: 'John'
+            name: 'The new book',
+            price: 500,
+            seller: 'bookstore'
+        }));
+
+        // will return 0 because a new event is being posted
+        console.log(post('bookstore', {
+            reference: '75323',
+            status: 'Active'
+        }));
+
+        // will return 0 because a new event is being posted
+        console.log(post('bookstore', {
+            reference: '75323',
+            status: 'Active'
         }));
     }
 });
