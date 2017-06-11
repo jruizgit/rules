@@ -430,13 +430,13 @@ var d = require('durable');
 
 d.ruleset('risk', function() {
     
-    // compares properties in the same event, evaluated in alpha tree (client)
+    // compares properties in the same event, this expression is evaluated in the client
     whenAll: {
         m.debit > 2 * m.credit
     }
     run: console.log('debit ' + m.debit + ' more than twice the credit ' + m.credit)
    
-    // correlates two events, evaluated in the beta tree (redis)
+    // compares two correlated events, this expression is evaluated in the backend
     whenAll: {
         first = m.amount > 100
         second = m.amount > first.amount + m.amount / 2
