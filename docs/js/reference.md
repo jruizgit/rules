@@ -13,6 +13,7 @@ Reference Manual
   * [Pattern Matching](reference.md#pattern-matching)
   * [String Operations](reference.md#string-operations)
   * [Correlated Sequence](reference.md#correlated-sequence)
+  * [Facts and events as rvalues](reference.md#facts-and-events-as-rvalues)
   * [Nested Objects](reference.md#nested-objects)
   * [Lack of Information](reference.md#lack-of-information)
   * [Choice of Sequences](reference.md#choice-of-sequences)
@@ -233,6 +234,8 @@ State can also be retrieved and modified using the http API. When the example ab
 Facts with the same property names and values are considered equal when asserted or retracted. Events with the same property names and values are considered different when posted because the posting time matters. 
 
 ```javascript
+var d = require('durable');
+
 d.ruleset('bookstore', function() {
     // this rule will trigger for events with status
     whenAll: +m.status
@@ -284,6 +287,8 @@ d.ruleset('bookstore', function() {
         }));
     }
 });
+
+d.runAll();
 ```
 
 [top](reference.md#table-of-contents)  
@@ -416,6 +421,43 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 
+### Facts and events as rvalues
+
+Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
+
+```javascript
+var d = require('durable');
+
+d.ruleset('risk', function() {
+    
+    // compares properties in the same event, evaluated in alpha tree (client)
+    whenAll: {
+        m.debit > 2 * m.credit
+    }
+    run: console.log('debit ' + m.debit + ' more than twice the credit ' + m.credit)
+   
+    // correlates two events, evaluated in the beta tree (redis)
+    whenAll: {
+        first = m.amount > 100
+        second = m.amount > first.amount + m.amount / 2
+    }
+    run: {
+        console.log('fraud detected -> ' + first.amount);
+        console.log('fraud detected -> ' + second.amount);
+    }
+
+    whenStart: {
+        post('risk', { debit: 220, credit: 100 });
+        post('risk', { debit: 150, credit: 100 });
+        post('risk', {amount: 200});
+        post('risk', {amount: 500});
+    }
+});
+
+d.runAll();
+```
+
+[top](reference.md#table-of-contents) 
 ### Nested Objects
 Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.  
 
