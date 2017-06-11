@@ -13,7 +13,7 @@ Reference Manual
   * [Pattern Matching](reference.md#pattern-matching)
   * [String Operations](reference.md#string-operations)
   * [Correlated Sequence](reference.md#correlated-sequence)
-  * [Facts and events as rvalues](reference.md#facts-and-events-as-rvalues)
+  * [Facts and Events as rvalues](reference.md#facts-and-events-as-rvalues)
   * [Nested Objects](reference.md#nested-objects)
   * [Lack of Information](reference.md#lack-of-information)
   * [Choice of Sequences](reference.md#choice-of-sequences)
@@ -421,7 +421,7 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 
-### Facts and events as rvalues
+### Facts and Events as rvalues
 
 Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
 
