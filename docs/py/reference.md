@@ -13,9 +13,10 @@ Reference Manual
   * [Pattern Matching](reference.md#pattern-matching)
   * [String Operations](reference.md#string-operations)
   * [Correlated Sequence](reference.md#correlated-sequence)
-  * [Nested Objects](reference.md#nested-objects)
-  * [Lack of Information](reference.md#lack-of-information)
   * [Choice of Sequences](reference.md#choice-of-sequences)
+  * [Lack of Information](reference.md#lack-of-information)
+  * [Nested Objects](reference.md#nested-objects)
+  * [Facts and Events as rvalues](reference.md#facts-and-events-as-rvalues)
 * [Consequents](reference.md#consequents)  
   * [Conflict Resolution](reference.md#conflict-resolution)
   * [Action Batches](reference.md#action-batches)
@@ -226,6 +227,8 @@ State can also be retrieved and modified using the http API. When the example ab
 Facts with the same property names and values are considered equal when asserted or retracted. Events with the same property names and values are considered different when posted because the posting time matters. 
 
 ```python
+from durable.lang import *
+
 with ruleset('bookstore'):
     # this rule will trigger for events with status
     @when_all(+m.status)
@@ -276,6 +279,8 @@ with ruleset('bookstore'):
             'reference': '75323',
             'status': 'Active'
         }))
+        
+run_all()
 ```
 
 [top](reference.md#table-of-contents)  
@@ -413,54 +418,6 @@ run_all()
 
 [top](reference.md#table-of-contents)  
 
-### Nested Objects
-Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.  
-
-```python
-
-with ruleset('expense'):
-    # use the '.' notation to match properties in nested objects
-    @when_all(c.bill << (m.t == 'bill') & (m.invoice.amount > 50),
-              c.account << (m.t == 'account') & (m.payment.invoice.amount == c.bill.invoice.amount))
-    def approved(c):
-        print ('bill amount  ->{0}'.format(c.bill.invoice.amount))
-        print ('account payment amount ->{0}'.format(c.account.payment.invoice.amount))
-        
-    @when_start
-    def start(host):
-        # one level of nesting
-        host.post('expense', {'t': 'bill', 'invoice': {'amount': 100}})
-        
-        #two levels of nesting
-        host.post('expense', {'t': 'account', 'payment': {'invoice': {'amount': 100}}})
-
-run_all()
-```  
-[top](reference.md#table-of-contents)  
-
-### Lack of Information
-In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.
-```python
-from durable.lang import *
-
-with ruleset('risk'):
-    @when_all(c.first << m.t == 'deposit',
-              none(m.t == 'balance'),
-              c.third << m.t == 'withrawal',
-              c.fourth << m.t == 'chargeback')
-    def detected(c):
-        print('fraud detected {0} {1} {2}'.format(c.first.t, c.third.t, c.fourth.t))
-        
-    @when_start
-    def start(host):
-        host.post('risk', { 't': 'deposit' })
-        host.post('risk', { 't': 'withrawal' })
-        host.post('risk', { 't': 'chargeback' })
-        
-run_all()
-```
-
-[top](reference.md#table-of-contents)  
 ### Choice of Sequences
 durable_rules allows expressing and efficiently evaluating richer events sequences In the example below any of the two event\fact sequences will trigger an action. 
 
@@ -492,6 +449,89 @@ with ruleset('expense'):
 run_all()
 ```
 [top](reference.md#table-of-contents) 
+
+### Lack of Information
+In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.
+```python
+from durable.lang import *
+
+with ruleset('risk'):
+    @when_all(c.first << m.t == 'deposit',
+              none(m.t == 'balance'),
+              c.third << m.t == 'withrawal',
+              c.fourth << m.t == 'chargeback')
+    def detected(c):
+        print('fraud detected {0} {1} {2}'.format(c.first.t, c.third.t, c.fourth.t))
+        
+    @when_start
+    def start(host):
+        host.post('risk', { 't': 'deposit' })
+        host.post('risk', { 't': 'withrawal' })
+        host.post('risk', { 't': 'chargeback' })
+        
+run_all()
+```
+
+[top](reference.md#table-of-contents)  
+
+### Nested Objects
+Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.  
+
+```python
+from durable.lang import *
+
+with ruleset('expense'):
+    # use the '.' notation to match properties in nested objects
+    @when_all(c.bill << (m.t == 'bill') & (m.invoice.amount > 50),
+              c.account << (m.t == 'account') & (m.payment.invoice.amount == c.bill.invoice.amount))
+    def approved(c):
+        print ('bill amount  ->{0}'.format(c.bill.invoice.amount))
+        print ('account payment amount ->{0}'.format(c.account.payment.invoice.amount))
+        
+    @when_start
+    def start(host):
+        # one level of nesting
+        host.post('expense', {'t': 'bill', 'invoice': {'amount': 100}})
+        
+        #two levels of nesting
+        host.post('expense', {'t': 'account', 'payment': {'invoice': {'amount': 100}}})
+
+run_all()
+```  
+[top](reference.md#table-of-contents)  
+
+### Facts and Events as rvalues
+
+Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
+
+```python
+from durable.lang import *
+
+with ruleset('risk'):
+    # compares properties in the same event, this expression is evaluated in the client 
+    @when_all(m.debit > m.credit * 2)
+    def fraud_1(c):
+        print('debit {0} more than twice the credit {1}'.format(c.m.debit, c.m.credit))
+
+    # compares two correlated events, this expression is evaluated in the backend
+    @when_all(c.first << m.amount > 100,
+              c.second << m.amount > c.first.amount + m.amount / 2)
+    def fraud_2(c):
+        print('fraud detected ->{0}'.format(c.first.amount))
+        print('fraud detected ->{0}'.format(c.second.amount))
+        
+    @when_start
+    def start(host):    
+        host.post('risk', { 'debit': 220, 'credit': 100 })
+        host.post('risk', { 'debit': 150, 'credit': 100 })
+        host.post('risk', { 'amount': 200 })
+        host.post('risk', { 'amount': 500 })
+        
+run_all()
+```
+
+[top](reference.md#table-of-contents) 
+ 
 ## Consequents
 ### Conflict Resolution
 Event and fact evaluation can lead to multiple consequents. The triggering order can be controlled by using the `pri` (salience) function. Actions with lower value are executed first. The default value for all actions is 0.
