@@ -900,7 +900,7 @@ static unsigned int ensureState(unsigned short *id,
                                 unsigned short stateListLength, 
                                 state **newState) {
     CREATE_STATE(id, newState);
-    unsigned short dotTransitions = 0;
+    unsigned short cancelSpecificTransitions = 0;
     for (unsigned short i = 0; i < stateListLength; ++i) {
         state *targetState = list[i];
         for (unsigned short ii = 0; ii < targetState->transitionsLength; ++ii) {
@@ -910,8 +910,8 @@ static unsigned int ensureState(unsigned short *id,
                 return result;
             }
 
-            if (targetTransition->symbol == REGEX_DOT) {
-                ++dotTransitions;
+            if (targetTransition->symbol == REGEX_DOT && targetState->isAccept) {
+                cancelSpecificTransitions = 1;
             }
         }
 
@@ -928,10 +928,9 @@ static unsigned int ensureState(unsigned short *id,
         }        
     }
 
-    // when merging two states results in two or more dot transitions
-    // all specific transitions are cancelled, this allows for the
-    // first match to succeed.
-    if (dotTransitions > 1) {
+    // if the current state has any dot transitions to accept states
+    // then all specific transitions are cancelled, this allows for the first match to succeed.
+    if (cancelSpecificTransitions) {
         for (unsigned short i = 0; i < (*newState)->transitionsLength; ++i) {
             transition *currentTransition = &(*newState)->transitions[i];
             if (currentTransition->symbol != REGEX_DOT) {
