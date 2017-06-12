@@ -13,10 +13,10 @@ Reference Manual
   * [Pattern Matching](reference.md#pattern-matching)
   * [String Operations](reference.md#string-operations)
   * [Correlated Sequence](reference.md#correlated-sequence)
-  * [Facts and Events as rvalues](reference.md#facts-and-events-as-rvalues)
-  * [Nested Objects](reference.md#nested-objects)
-  * [Lack of Information](reference.md#lack-of-information)
   * [Choice of Sequences](reference.md#choice-of-sequences)
+  * [Lack of Information](reference.md#lack-of-information)
+  * [Nested Objects](reference.md#nested-objects)
+  * [Facts and Events as rvalues](reference.md#facts-and-events-as-rvalues)
 * [Consequents](reference.md#consequents)  
   * [Conflict Resolution](reference.md#conflict-resolution)
   * [Action Batches](reference.md#action-batches)
@@ -421,98 +421,6 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 
-### Facts and Events as rvalues
-
-Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
-
-```javascript
-var d = require('durable');
-
-d.ruleset('risk', function() {
-    
-    // compares properties in the same event, this expression is evaluated in the client
-    whenAll: {
-        m.debit > 2 * m.credit
-    }
-    run: console.log('debit ' + m.debit + ' more than twice the credit ' + m.credit)
-   
-    // compares two correlated events, this expression is evaluated in the backend
-    whenAll: {
-        first = m.amount > 100
-        second = m.amount > first.amount + m.amount / 2
-    }
-    run: {
-        console.log('fraud detected -> ' + first.amount);
-        console.log('fraud detected -> ' + second.amount);
-    }
-
-    whenStart: {
-        post('risk', { debit: 220, credit: 100 });
-        post('risk', { debit: 150, credit: 100 });
-        post('risk', {amount: 200});
-        post('risk', {amount: 500});
-    }
-});
-
-d.runAll();
-```
-
-[top](reference.md#table-of-contents) 
-### Nested Objects
-Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.  
-
-```javascript
-var d = require('durable');
-
-d.ruleset('expense4', function() {
-    // use the '.' notation to match properties in nested objects
-    whenAll: {
-        bill = m.t == 'bill' && m.invoice.amount > 50
-        account = m.t == 'account' && m.payment.invoice.amount == bill.invoice.amount
-    }
-    run: {
-        console.log('bill amount ->' + bill.invoice.amount);
-        console.log('account payment amount ->' + account.payment.invoice.amount);
-    }
-
-    whenStart: {
-        // one level of nesting
-        post('expense4', {t: 'bill', invoice: {amount: 100}});  
-
-        // two levels of nesting
-        post('expense4', {t: 'account', payment: {invoice: {amount: 100}}}); 
-    }
-});
-
-d.runAll();
-```
-[top](reference.md#table-of-contents)  
-
-### Lack of Information
-In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.
-```javascript
-var d = require('durable');
-
-d.ruleset('risk', function() {
-    whenAll: {
-        first = m.t == 'deposit'
-        none(m.t == 'balance')
-        third = m.t == 'withrawal'
-        fourth = m.t == 'chargeback'
-    }
-    run: console.log('fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
-
-    whenStart: {
-        post('risk', { t: 'deposit' });
-        post('risk', { t: 'withrawal' });
-        post('risk', { t: 'chargeback' });
-    }
-});
-
-d.runAll();
-```
-
-[top](reference.md#table-of-contents)  
 ### Choice of Sequences
 durable_rules allows expressing and efficiently evaluating richer events sequences In the example below any of the two event\fact sequences will trigger an action. 
 
@@ -552,6 +460,100 @@ d.ruleset('expense', function() {
 
 d.runAll();
 ```
+[top](reference.md#table-of-contents) 
+
+### Lack of Information
+In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.
+```javascript
+var d = require('durable');
+
+d.ruleset('risk', function() {
+    whenAll: {
+        first = m.t == 'deposit'
+        none(m.t == 'balance')
+        third = m.t == 'withrawal'
+        fourth = m.t == 'chargeback'
+    }
+    run: console.log('fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
+
+    whenStart: {
+        post('risk', { t: 'deposit' });
+        post('risk', { t: 'withrawal' });
+        post('risk', { t: 'chargeback' });
+    }
+});
+
+d.runAll();
+```
+
+[top](reference.md#table-of-contents)  
+
+### Nested Objects
+Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.  
+
+```javascript
+var d = require('durable');
+
+d.ruleset('expense4', function() {
+    // use the '.' notation to match properties in nested objects
+    whenAll: {
+        bill = m.t == 'bill' && m.invoice.amount > 50
+        account = m.t == 'account' && m.payment.invoice.amount == bill.invoice.amount
+    }
+    run: {
+        console.log('bill amount ->' + bill.invoice.amount);
+        console.log('account payment amount ->' + account.payment.invoice.amount);
+    }
+
+    whenStart: {
+        // one level of nesting
+        post('expense4', {t: 'bill', invoice: {amount: 100}});  
+
+        // two levels of nesting
+        post('expense4', {t: 'account', payment: {invoice: {amount: 100}}}); 
+    }
+});
+
+d.runAll();
+```
+[top](reference.md#table-of-contents)  
+
+### Facts and Events as rvalues
+
+Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
+
+```javascript
+var d = require('durable');
+
+d.ruleset('risk', function() {
+    
+    // compares properties in the same event, this expression is evaluated in the client
+    whenAll: {
+        m.debit > 2 * m.credit
+    }
+    run: console.log('debit ' + m.debit + ' more than twice the credit ' + m.credit)
+   
+    // compares two correlated events, this expression is evaluated in the backend
+    whenAll: {
+        first = m.amount > 100
+        second = m.amount > first.amount + m.amount / 2
+    }
+    run: {
+        console.log('fraud detected -> ' + first.amount);
+        console.log('fraud detected -> ' + second.amount);
+    }
+
+    whenStart: {
+        post('risk', { debit: 220, credit: 100 });
+        post('risk', { debit: 150, credit: 100 });
+        post('risk', {amount: 200});
+        post('risk', {amount: 500});
+    }
+});
+
+d.runAll();
+```
+
 [top](reference.md#table-of-contents) 
 
 ## Consequents
