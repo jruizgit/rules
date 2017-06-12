@@ -517,7 +517,8 @@ Durable.ruleset :risk do
   # compares two correlated events, this expression is evaluated in the backend
   when_all c.first = m.amount > 100,
            c.second = m.amount > first.amount + m.amount / 2  do
-    puts "debit #{m.debit} more than twice the credit #{m.credit}"
+    puts "fraud detected -> #{first.amount}"
+    puts "fraud detected -> #{second.amount}"
   end
 
   when_start do
