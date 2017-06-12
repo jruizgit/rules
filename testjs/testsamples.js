@@ -546,6 +546,32 @@ d.ruleset('bookstore', function() {
     }
 });
 
+d.ruleset('risk5', function() {
+    
+    // compares properties in the same event, evaluated in alpha tree (node.js)
+    whenAll: {
+        m.debit > 2 * m.credit
+    }
+    run: console.log('debit ' + m.debit + ' more than twice the credit ' + m.credit)
+   
+    // correlates two events, evaluated in the beta tree (redis)
+    whenAll: {
+        first = m.amount > 100
+        second = m.amount > first.amount + m.amount / 2
+    }
+    run: {
+        console.log('fraud detected -> ' + first.amount);
+        console.log('fraud detected -> ' + second.amount);
+    }
+
+    whenStart: {
+        post('risk5', { debit: 220, credit: 100 });
+        post('risk5', { debit: 150, credit: 100 });
+        post('risk5', {amount: 200});
+        post('risk5', {amount: 500});
+    }
+});
+
 // d.ruleset('flow', function() {
 //     whenAll: m.state == 'start'
 //     run: {

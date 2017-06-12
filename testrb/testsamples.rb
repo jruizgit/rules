@@ -619,6 +619,27 @@ Durable.ruleset :bookstore do
   end
 end
 
+Durable.ruleset :risk5 do
+  # compares properties in the same event, this expression is evaluated in the client 
+  when_all m.debit > m.credit * 2 do
+    puts "debit #{m.debit} more than twice the credit #{m.credit}"
+  end
+  # compares two correlated events, this expression is evaluated in the backend
+  when_all c.first = m.amount > 100,
+           c.second = m.amount > first.amount + m.amount / 2  do
+    puts "fraud detected -> #{first.amount}"
+    puts "fraud detected -> #{second.amount}"
+  end
+
+  when_start do
+    post :risk5, { :debit => 220, :credit => 100 }
+    post :risk5, { :debit => 150, :credit => 100 }
+    post :risk5, { :amount => 200 }
+    post :risk5, { :amount => 500 }
+  end
+end
+
+
 # Durable.ruleset :flow do
 
 #   when_all m.status == "start" do

@@ -592,7 +592,6 @@ with ruleset('bookstore'):
             'price': 500,
             'seller': 'bookstore'
         })
-
     # this rule will be triggered when the fact is retracted
     @when_all(none(+m.name))
     def empty(c):
@@ -628,6 +627,25 @@ with ruleset('bookstore'):
             'status': 'Active'
         }))
 
+with ruleset('risk5'):
+    # compares properties in the same event, this expression is evaluated in the client 
+    @when_all(m.debit > m.credit * 2)
+    def fraud_1(c):
+        print('debit {0} more than twice the credit {1}'.format(c.m.debit, c.m.credit))
+
+    # compares two correlated events, this expression is evaluated in the backend
+    @when_all(c.first << m.amount > 100,
+              c.second << m.amount > c.first.amount + m.amount / 2)
+    def fraud_2(c):
+        print('fraud detected ->{0}'.format(c.first.amount))
+        print('fraud detected ->{0}'.format(c.second.amount))
+        
+    @when_start
+    def start(host):    
+        host.post('risk5', { 'debit': 220, 'credit': 100 })
+        host.post('risk5', { 'debit': 150, 'credit': 100 })
+        host.post('risk5', { 'amount': 200 })
+        host.post('risk5', { 'amount': 500 })
 
 # with ruleset('flow'):
 #     @when_all(m.status == 'start')
