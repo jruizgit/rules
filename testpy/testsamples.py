@@ -627,6 +627,7 @@ with ruleset('bookstore'):
             'status': 'Active'
         }))
 
+
 with ruleset('risk5'):
     # compares properties in the same event, this expression is evaluated in the client 
     @when_all(m.debit > m.credit * 2)
@@ -646,6 +647,35 @@ with ruleset('risk5'):
         host.post('risk5', { 'debit': 150, 'credit': 100 })
         host.post('risk5', { 'amount': 200 })
         host.post('risk5', { 'amount': 500 })
+
+
+with ruleset('risk6'):
+    # matching primitive array
+    @when_all(m.payments.allItems((item > 100) & (item < 500)))
+    def rule1(c):
+        print('fraud 1 detected {0}'.format(c.m.payments))
+
+    # matching object array
+    @when_all(m.payments.allItems((item.amount < 250) | (item.amount >= 300)))
+    def rule2(c):
+        print('fraud 2 detected {0}'.format(c.m.payments))
+
+    # pattern matching string array
+    @when_all(m.cards.anyItem(item.matches('three.*')))
+    def rule3(c):
+        print('fraud 3 detected {0}'.format(c.m.cards))
+
+    # matching nested arrays
+    @when_all(m.payments.anyItem(item.allItems(item < 100)))
+    def rule4(c):
+        print('fraud 4 detected {0}'.format(c.m.payments))
+
+    @when_start
+    def start(host):
+        host.post('risk6', {'payments': [ 150, 300, 450 ]})
+        host.post('risk6', {'payments': [ { 'amount' : 200 }, { 'amount' : 300 }, { 'amount' : 450 } ]})
+        host.post('risk6', {'cards': [ 'one card', 'two cards', 'three cards' ]})
+        host.post('risk6', {'payments': [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]})  
 
 # with ruleset('flow'):
 #     @when_all(m.status == 'start')

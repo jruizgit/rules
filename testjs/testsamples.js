@@ -567,10 +567,45 @@ d.ruleset('risk5', function() {
     whenStart: {
         post('risk5', { debit: 220, credit: 100 });
         post('risk5', { debit: 150, credit: 100 });
-        post('risk5', {amount: 200});
-        post('risk5', {amount: 500});
+        post('risk5', { amount: 200 });
+        post('risk5', { amount: 500 });
     }
 });
+
+d.ruleset('risk6', function() {
+    
+    // matching primitive array
+    whenAll: {
+        m.payments.allItems(item > 100)
+    }
+    run: console.log('fraud 1 detected ' + m.payments)
+
+    // matching object array
+    whenAll: {
+        m.payments.allItems(item.amount < 250 || item.amount >= 300)
+    }
+    run: console.log('fraud 2 detected ' + JSON.stringify(m.payments))
+   
+    // pattern matching string array
+    whenAll: {
+        m.cards.anyItem(item.matches('three.*'))
+    }
+    run: console.log('fraud 3 detected ' + m.cards)
+
+    // matching nested arrays
+    whenAll: {
+        m.payments.anyItem(item.allItems(item < 100))
+    }
+    run: console.log('fraud 4 detected ' + JSON.stringify(m.payments))
+
+    whenStart: {
+        post('risk6', { payments: [ 150, 350, 450 ] });
+        post('risk6', { payments: [ { amount: 200 }, { amount: 300 }, { amount: 400 } ] });
+        post('risk6', { cards: [ 'one card', 'two cards', 'three cards' ] });
+        post('risk6', { payments: [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]});    
+    }
+});
+
 
 // d.ruleset('flow', function() {
 //     whenAll: m.state == 'start'
