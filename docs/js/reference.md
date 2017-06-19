@@ -16,6 +16,7 @@ Reference Manual
   * [Choice of Sequences](reference.md#choice-of-sequences)
   * [Lack of Information](reference.md#lack-of-information)
   * [Nested Objects](reference.md#nested-objects)
+  * [Arrays](reference.md#arrays)
   * [Facts and Events as rvalues](reference.md#facts-and-events-as-rvalues)
 * [Consequents](reference.md#consequents)  
   * [Conflict Resolution](reference.md#conflict-resolution)
@@ -518,6 +519,47 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 
+### Arrays
+```javascript
+var d = require('durable');
+
+d.ruleset('risk', function() {
+    
+    // matching primitive array
+    whenAll: {
+        m.payments.allItems(item > 100)
+    }
+    run: console.log('fraud 1 detected ' + m.payments)
+
+    // matching object array
+    whenAll: {
+        m.payments.allItems(item.amount < 250 || item.amount >= 300)
+    }
+    run: console.log('fraud 2 detected ' + JSON.stringify(m.payments))
+   
+    // pattern matching string array
+    whenAll: {
+        m.cards.anyItem(item.matches('three.*'))
+    }
+    run: console.log('fraud 3 detected ' + m.cards)
+
+    // matching nested arrays
+    whenAll: {
+        m.payments.anyItem(item.allItems(item < 100))
+    }
+    run: console.log('fraud 4 detected ' + JSON.stringify(m.payments))
+
+    whenStart: {
+        post('risk', { payments: [ 150, 350, 450 ] });
+        post('risk', { payments: [ { amount: 200 }, { amount: 300 }, { amount: 400 } ] });
+        post('risk', { cards: [ 'one card', 'two cards', 'three cards' ] });
+        post('risk', { payments: [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]});    
+    }
+});
+
+d.runAll();
+```
+[top](reference.md#table-of-contents) 
 ### Facts and Events as rvalues
 
 Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
