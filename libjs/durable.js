@@ -935,12 +935,6 @@ exports = module.exports = durableEngine = function () {
             return that;
         };
 
-        var mt = function (rvalue) {
-            op = '$mt';
-            right = rvalue;
-            return that;
-        };
-
         var matches = function (rvalue) {
             op = '$mt';
             right = rvalue;
@@ -949,6 +943,18 @@ exports = module.exports = durableEngine = function () {
 
         var imatches = function (rvalue) {
             op = '$imt';
+            right = rvalue;
+            return that;
+        };
+
+        var allItems = function (rvalue) {
+            op = '$iall';
+            right = rvalue;
+            return that;
+        };
+
+        var anyItem = function (rvalue) {
+            op = '$iany';
             right = rvalue;
             return that;
         };
@@ -1037,7 +1043,7 @@ exports = module.exports = durableEngine = function () {
                     newDefinition[op] = innerDefinition;
                 }
 
-                if (localType !== '$m' && localType !== '$s') {
+                if (localType !== '$m' && localType !== '$s' && localType !== '$i') {
                     throw 'syntax error: ' + localType + ' cannot be an expression lvalue';
                 }
 
@@ -1071,12 +1077,14 @@ exports = module.exports = durableEngine = function () {
                         return eq;
                     case 'neq':
                         return neq;
-                    case 'mt':
-                        return mt;
                     case 'matches':
                         return matches;
                     case 'imatches':
                         return imatches;
+                    case 'allItems':
+                        return allItems;
+                    case 'anyItem':
+                        return anyItem;
                     case 'ex':
                         return ex;
                     case 'nex':
@@ -1361,6 +1369,15 @@ exports = module.exports = durableEngine = function () {
         }
     );
 
+    var item = r.createProxy(
+        function(name) {
+            return term('$i', '$i')[name];
+        },
+        function(name, value) {
+            return;
+        }
+    );
+
     var s = r.createProxy(
         function(name) {
             return term('$s', name);
@@ -1410,6 +1427,7 @@ exports = module.exports = durableEngine = function () {
         obj.c = c;
         obj.m = m;
         obj.s = s;
+        obj.item = item;
         obj.all = all;
         obj.any = any;
         obj.none = none;

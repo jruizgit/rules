@@ -114,52 +114,40 @@ class value(object):
         self._right = right
         
     def __lt__(self, other):
-        self._op = '$lt'
-        self._right = other
-        return self
-
+        return value(self._type, self._left, '$lt', other, self.alias)
+        
     def __le__(self, other):
-        self._op = '$lte'
-        self._right = other
-        return self
-
+        return value(self._type, self._left, '$lte', other, self.alias)
+        
     def __gt__(self, other):
-        self._op = '$gt'
-        self._right = other
-        return self
-
+        return value(self._type, self._left, '$gt', other, self.alias)
+    
     def __ge__(self, other):
-        self._op = '$gte'
-        self._right = other
-        return self
+        return value(self._type, self._left, '$gte', other, self.alias)
 
     def __eq__(self, other):
-        self._op = '$eq'
-        self._right = other
-        return self
+        return value(self._type, self._left, '$eq', other, self.alias)
 
     def __ne__(self, other):
-        self._op = '$neq'
-        self._right = other
-        return self
+        return value(self._type, self._left, '$neq', other, self.alias)
 
     def __neg__(self):
-        self._op = '$nex'
-        return self
+        return value(self._type, self._left, '$nex', None, self.alias)
 
     def __pos__(self):
-        self._op = '$ex'
-        return self
+        return value(self._type, self._left, '$ex', None, self.alias)
+
+    def allItems(self, other):
+        return value(self._type, self._left, '$iall', other, self.alias)
+
+    def anyItem(self, other):
+        return value(self._type, self._left, '$iany', other, self.alias)
 
     def matches(self, other):
-        self._op = '$mt'
-        self._right = other
-        return self
+        return value(self._type, self._left, '$mt', other, self.alias)
 
     def imatches(self, other):
-        self._op = '$imt'
-        self._right = other
-        return self
+        return value(self._type, self._left, '$mt', other, self.alias)
 
     def __and__(self, other):
         return value(self._type, self, '$and', other, self.alias)
@@ -655,6 +643,7 @@ def select(name):
 
 m = value('$m')
 s = value('$s')
+item = value('$i', '$i')
 c = closure()
 
 _rule_stack = []

@@ -175,12 +175,13 @@ module Durable
     attr_reader :__type, :__op
     attr_accessor :__name
 
-    def initialize(type, left = nil)
+    def initialize(type, left = nil, op = nil, right = nil, definitions = nil, name = nil)
       @__type = type
       @left = left
-      @right = nil
-      @definitions = nil
-      @__name = nil
+      @__op = op
+      @right = right
+      @definitions = definitions
+      @__name = name
     end
     
     def definition(parent_name=nil)
@@ -190,7 +191,7 @@ module Durable
         new_definition = {@__op => @definitions}
       else
         if not @left
-          raise ArgumentError, "Property for #{@__op} not defined"
+          raise ArgumentError, "Property for #{@__type} and #{@__op} not defined"
         end 
         righ_definition = @right
         if (@right.kind_of? Expression) || (@right.kind_of? Arithmetic)
@@ -216,63 +217,51 @@ module Durable
     end
 
     def ==(other)
-      @__op = :$eq
-      @right = other
-      self
+      Expression.new(@__type, @left, :$eq, other, @definitions, @__name)
     end
 
     def !=(other)
-      @__op = :$neq
-      @right = other
-      self
+      Expression.new(@__type, @left, :$neq, other, @definitions, @__name)
     end
 
     def <(other)
-      @__op = :$lt
-      @right = other
-      self
+      Expression.new(@__type, @left, :$lt, other, @definitions, @__name)
     end
 
     def <=(other)
-      @__op = :$lte
-      @right = other
-      self
+      Expression.new(@__type, @left, :$lte, other, @definitions, @__name)
     end
 
     def >(other)
-      @__op = :$gt
-      @right = other
-      self
+      Expression.new(@__type, @left, :$gt, other, @definitions, @__name)
     end
 
     def >=(other)
-      @__op = :$gte
-      @right = other
-      self
+      Expression.new(@__type, @left, :$gte, other, @definitions, @__name)
     end
 
     def matches(other)
-      @__op = :$mt
-      @right = other
-      self
+      Expression.new(@__type, @left, :$mt, other, @definitions, @__name)
     end
 
     def imatches(other)
-      @__op = :$imt
-      @right = other
-      self
+      Expression.new(@__type, @left, :$imt, other, @definitions, @__name)
+    end
+
+    def allItems(other)
+      Expression.new(@__type, @left, :$iall, other, @definitions, @__name)
+    end
+
+    def anyItem(other)
+      Expression.new(@__type, @left, :$iany, other, @definitions, @__name)
     end
 
     def -@
-      @__op = :$nex
-      @right = 1
-      self
+      Expression.new(@__type, @left, :$nex, 1, @definitions, @__name)
     end
 
     def +@
-      @__op = :$ex
-      @right = 1
-      self
+      Expression.new(@__type, @left, :$ex, 1, @definitions, @__name)
     end
 
     def |(other)
@@ -440,6 +429,10 @@ module Durable
       Expression.new(:$m)
     end
     
+    def item
+      Expression.new(:$i, :$i)
+    end
+
     def c
       Closure.new()
     end

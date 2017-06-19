@@ -21,6 +21,8 @@
 #define HASH_NEQ 2488026869 // $neq
 #define HASH_MT 576092554 // $mt
 #define HASH_IMT 1472564215 // $imt
+#define HASH_IALL 3261766877 // $iall
+#define HASH_IANY 3379504400 // $iany
 #define HASH_EX 373481198 // $ex
 #define HASH_NEX 2605470202 // $nex
 #define HASH_OR 340911698 // $or
@@ -615,6 +617,12 @@ static unsigned int validateExpression(char *rule) {
         case HASH_IMT:
             operator = OP_IMT;
             break;
+        case HASH_IALL:
+            operator = OP_IALL;
+            break;
+        case HASH_IANY:
+            operator = OP_IANY;
+            break;
         case HASH_LT:
             operator = OP_LT;
             break;
@@ -662,6 +670,11 @@ static unsigned int validateExpression(char *rule) {
     // Validating expression rValue
     result = readNextValue(last, &first, &last, &type);
     if (result != PARSE_OK) {
+        return result;
+    }
+
+    if (operator == OP_IALL || operator == OP_IANY) {
+        result = validateExpression(first);
         return result;
     }
 
@@ -825,8 +838,7 @@ static unsigned int linkAlpha(ruleset *tree,
         }
 
         parentBetaList[entry] = nextOffset;
-    }
-    else if (nextNode->value.a.operator == OP_NEX) {
+    } else if (nextNode->value.a.operator == OP_NEX) {
         result = ensureNextList(tree, parentAlpha);
         if (result != RULES_OK) {
             return result;
@@ -841,8 +853,7 @@ static unsigned int linkAlpha(ruleset *tree,
         }
 
         parentNextList[entry] = nextOffset;
-    }
-    else {
+    } else {
         result = ensureNextHashset(tree, parentAlpha);
         if (result != RULES_OK) {
             return result;
@@ -896,8 +907,7 @@ static unsigned int readReference(ruleset *tree, char *rule, unsigned char *idio
             if (result != RULES_OK) {
                 return result;
             } 
-        }
-        else {
+        } else {
             readNextValue(last, &first, &last, &type);
             result = readNextName(first, &first, &last, &hash);
             while (result == PARSE_OK) {
@@ -1034,7 +1044,7 @@ static unsigned int findAlpha(ruleset *tree,
     
     readNextName(rule, &firstName, &lastName, &hash);
     readNextValue(lastName, &first, &last, &type);
-    if (type == JSON_OBJECT) {
+    if (type == JSON_OBJECT && operator != OP_IALL && operator != OP_IANY) {
         result = readIdiom(tree, first, &type, &idiomOffset, &ref);
         if (result != RULES_OK) {
             return result;
@@ -1049,9 +1059,11 @@ static unsigned int findAlpha(ruleset *tree,
             node *currentNode = &tree->nodePool[parentNext[entry]];
             if (currentNode->value.a.hash == hash && 
                 currentNode->value.a.operator == operator) {
-                if (compareValue(tree, &currentNode->value.a.right, first, last, &ref, type)) {
-                    *resultOffset = parentNext[entry];
-                    return RULES_OK;
+                if (operator != OP_IALL && operator != OP_IANY) {
+                    if (compareValue(tree, &currentNode->value.a.right, first, last, &ref, type)) {
+                        *resultOffset = parentNext[entry];
+                        return RULES_OK;
+                    }
                 }
             }
         }
@@ -1061,11 +1073,13 @@ static unsigned int findAlpha(ruleset *tree,
         parentNext = &tree->nextPool[parent->value.a.nextListOffset];
         for (entry = 0; parentNext[entry] != 0; ++entry) {
             node *currentNode = &tree->nodePool[parentNext[entry]];
-            if (currentNode->value.a.hash == hash&& 
+            if (currentNode->value.a.hash == hash && 
                 currentNode->value.a.operator == operator) {
-                if (compareValue(tree, &currentNode->value.a.right, first, last, &ref, type)) {
-                    *resultOffset = parentNext[entry];
-                    return RULES_OK;
+                if (operator != OP_IALL && operator != OP_IANY) {
+                    if (compareValue(tree, &currentNode->value.a.right, first, last, &ref, type)) {
+                        *resultOffset = parentNext[entry];
+                        return RULES_OK;
+                    }
                 }
             }
         }
@@ -1095,17 +1109,21 @@ static unsigned int findAlpha(ruleset *tree,
         type = JSON_IREGEX;
     }
 
-    result = copyValue(tree, &newAlpha->value.a.right, first, last, idiomOffset, &ref, type);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    if (type == JSON_EVENT_PROPERTY || type == JSON_EVENT_IDIOM) {
-        result = appendTerm(expr, *resultOffset);
+    if (operator == OP_IANY || operator == OP_IALL) {
+        type = JSON_NIL;
+    } else {
+        result = copyValue(tree, &newAlpha->value.a.right, first, last, idiomOffset, &ref, type);
         if (result != RULES_OK) {
             return result;
         }
-    } 
+
+        if (type == JSON_EVENT_PROPERTY || type == JSON_EVENT_IDIOM) {
+            result = appendTerm(expr, *resultOffset);
+            if (result != RULES_OK) {
+                return result;
+            }
+        } 
+    }
 
     return linkAlpha(tree, parentOffset, *resultOffset);
 }
@@ -1183,6 +1201,12 @@ static unsigned int createAlpha(ruleset *tree,
             break;
         case HASH_IMT:
             operator = OP_IMT;
+            break;
+        case HASH_IALL:
+            operator = OP_IALL;
+            break;
+        case HASH_IANY:
+            operator = OP_IANY;
             break;
         case HASH_LT:
             operator = OP_LT;
@@ -1268,6 +1292,23 @@ static unsigned int createAlpha(ruleset *tree,
         readNextValue(last, &first, &last, &type);
     }
     
+    if (operator == OP_IANY || operator == OP_IALL) {
+        unsigned int result = findAlpha(tree, parentOffset, operator, first, expr, newOffset);
+        if (result != RULES_OK) {
+            return result;
+        }   
+
+        unsigned int inner_offset = *newOffset;
+        readNextName(first, &first, &last, &hash);
+        readNextValue(last, &first, &last, &type);
+        result = createAlpha(tree, first, expr, nextOffset, &inner_offset);
+        if (result != RULES_OK) {
+            return result;
+        }
+
+        return linkAlpha(tree, *newOffset, nextOffset);
+    }
+
     if (nextOffset == 0) {
         return findAlpha(tree, parentOffset, operator, first, expr, newOffset);
     } else {
@@ -1662,6 +1703,66 @@ static unsigned int fixupQueries(ruleset *tree, unsigned int actionOffset, char*
     return RULES_OK;
 }
 
+#ifdef _PRINT
+
+static void printActionNode(ruleset *tree, node *actionNode, int level) {
+    for (int i = 0; i < level; ++ i) {
+        printf("    ");
+    }
+
+    printf("-> action: name %s, count %d, cap %d, priority %d\n", 
+          &tree->stringPool[actionNode->nameOffset],
+          actionNode->value.c.count,
+          actionNode->value.c.cap,
+          actionNode->value.c.priority);
+}
+
+static void printBetaNode(ruleset *tree, node *betaNode, int level) {
+    for (int i = 0; i < level; ++ i) {
+        printf("    ");
+    }
+
+    printf("-> beta: name %s, not %d\n", &tree->stringPool[betaNode->nameOffset], betaNode->value.b.not);
+    node *currentNode = &tree->nodePool[betaNode->value.b.nextOffset];
+    if (currentNode->type == NODE_ACTION) {
+        printActionNode(tree, currentNode, level + 1);
+    } else {
+        printBetaNode(tree, currentNode, level + 1);
+    }
+}
+
+static void printAlphaNode(ruleset *tree, node *alphaNode, int level) {
+    for (int i = 0; i < level; ++ i) {
+        printf("    ");
+    }
+
+    printf("-> alpha: name %s, operator %x\n", &tree->stringPool[alphaNode->nameOffset], alphaNode->value.a.operator);
+    if (alphaNode->value.a.nextOffset) {
+        unsigned int *nextHashset = &tree->nextPool[alphaNode->value.a.nextOffset];
+        for (unsigned int entry = 0; entry < NEXT_BUCKET_LENGTH; ++entry) { 
+            if (nextHashset[entry]) {
+                printAlphaNode(tree, &tree->nodePool[nextHashset[entry]], level + 1);  
+            }
+        }  
+    }
+
+    if (alphaNode->value.a.nextListOffset) {
+        unsigned int *nextList = &tree->nextPool[alphaNode->value.a.nextListOffset];
+        for (unsigned int entry = 0; nextList[entry] != 0; ++entry) {
+            printAlphaNode(tree, &tree->nodePool[nextList[entry]], level + 1);
+        }
+    }
+
+    if (alphaNode->value.a.betaListOffset) {
+        unsigned int *betaList = &tree->nextPool[alphaNode->value.a.betaListOffset];
+        for (unsigned int entry = 0; betaList[entry] != 0; ++entry) {
+            printBetaNode(tree, &tree->nodePool[betaList[entry]], level + 1);
+        }
+    }
+}
+
+#endif
+
 static unsigned int createTree(ruleset *tree, char *rules) {
     char *first;
     char *last;
@@ -1706,12 +1807,11 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         readNextValue(lastName, &first, &lastRuleValue, &type);
         ruleAction->value.c.priority = 0;
         ruleAction->value.c.count = 0;
-        ruleAction->value.c.span = 0;
         ruleAction->value.c.cap = 0;
         getSetting(HASH_PRI, first, &ruleAction->value.c.priority);
         getSetting(HASH_COUNT, first, &ruleAction->value.c.count);
         getSetting(HASH_CAP, first, &ruleAction->value.c.cap);
-        if (!ruleAction->value.c.count && !ruleAction->value.c.span && !ruleAction->value.c.cap) {
+        if (!ruleAction->value.c.count && !ruleAction->value.c.cap) {
             ruleAction->value.c.count = 1;
         }
 
@@ -1740,6 +1840,10 @@ static unsigned int createTree(ruleset *tree, char *rules) {
 
         result = readNextName(lastRuleValue, &firstName, &lastName, &hash);
     }
+
+#ifdef _PRINT
+    printAlphaNode(tree, &tree->nodePool[NODE_M_OFFSET], 0);
+#endif
 
     return RULES_OK;
 }
