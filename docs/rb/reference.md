@@ -500,7 +500,10 @@ Durable.run_all
 [top](reference.md#table-of-contents)  
 
 ### Lack of Information
-In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.
+In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.  
+
+*Note: the `none` function requires information to reason about lack of information. That is, it will not trigger any actions if no events or facts have been registered in the corresponding rule.*
+
 ```ruby
 require "durable"
 
