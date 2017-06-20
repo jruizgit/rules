@@ -319,7 +319,7 @@ When the runAll command fails, it can return the following error codes:
 * 506 - Regex DFA transform set full (uncommon)
 * 507 - Conflict in regex transform (uncommon)
 
-When asserting a fact via the whenStart function or the web API, these are the error codes (outcomes):
+When asserting a fact or posting an event via the whenStart function or the web API, these error codes can be returned:
 
 * 0 - OK
 * 101 - Error parsing JSON value (uncommon)
