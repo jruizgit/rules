@@ -286,7 +286,7 @@ run_all()
 ```
 
 [top](reference.md#table-of-contents)  
-## Error Codes
+### Error Codes
 
 When the run_all command fails, it can return the following error codes:
 
