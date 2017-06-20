@@ -293,7 +293,7 @@ d.ruleset('bookstore', function() {
 d.runAll();
 ```
 
-## Error Codes
+### Error Codes
 
 When the runAll command fails, it can return the following error codes:
 
