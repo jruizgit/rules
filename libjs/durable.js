@@ -286,7 +286,14 @@ exports = module.exports = durableEngine = function () {
                 throw 'syntax error: operator ' + expression.operator + ' not supported'
             } else  {
                 expression.type = 'CallExpression';
-                if (cmap[expression.left]) {
+                var leftExpression = expression.left;
+                var rightExpression = expression.right;
+                if (leftExpression.type == "Literal") {
+                    leftExpression = expression.right;
+                    rightExpression = expression.left;
+                }
+
+                if (cmap[leftExpression]) {
                     expression.callee = {
                         type: 'MemberExpression',
                         object: {
@@ -295,7 +302,7 @@ exports = module.exports = durableEngine = function () {
                         },
                         property: {
                             type: 'MemberExpression',
-                            object: expression.left,
+                            object: leftExpression,
                             property: {
                                 type: 'Identifier',
                                 name: omap[expression.operator]
@@ -305,7 +312,7 @@ exports = module.exports = durableEngine = function () {
                 } else {
                     expression.callee = {
                         type: 'MemberExpression',
-                        object: expression.left,
+                        object: leftExpression,
                         property: {
                             type: 'Identifier',
                             name: omap[expression.operator]
@@ -313,9 +320,9 @@ exports = module.exports = durableEngine = function () {
                     };
                 }
 
-                expression['arguments'] = [expression.right];
-                transformExpression(expression.left, cmap);
-                transformExpression(expression.right, cmap);
+                expression['arguments'] = [rightExpression];
+                transformExpression(leftExpression, cmap);
+                transformExpression(rightExpression, cmap);
                 delete(expression['operator']);
                 delete(expression['left']);
                 delete(expression['right']);
@@ -513,9 +520,7 @@ exports = module.exports = durableEngine = function () {
                     })
                 } else {
                     throw 'syntax error: whenAll, run, whenStart labels expected';
-                    }
-            } else if (statement.type !== 'VariableDeclaration') {
-                throw 'syntax error: statement type ' + statement.type + ' unexpected';
+                }
             }
         });
 
@@ -617,8 +622,6 @@ exports = module.exports = durableEngine = function () {
                         value: transformState(statement.body)
                     });
                 }
-            } else if (statement.type !== 'VariableDeclaration') {
-                throw 'syntax error: statement type ' + statement.type + ' unexpected';
             }
         });
 
@@ -723,8 +726,6 @@ exports = module.exports = durableEngine = function () {
                     } else {
                         throw 'syntax error: whenAll, pri, count or cap labels expected';   
                     }
-                } else if (statement.type !== 'VariableDeclaration') {
-                    throw 'syntax error: statement type ' + statement.type + ' unexpected';
                 }
             });
         }
@@ -766,8 +767,6 @@ exports = module.exports = durableEngine = function () {
                         value: transformCondition(statement.body) 
                     });
                 }
-            } else if (statement.type !== 'VariableDeclaration') {
-                throw 'syntax error: statement type ' + statement.type + ' unexpected';
             }
         });
 
@@ -791,8 +790,6 @@ exports = module.exports = durableEngine = function () {
                         value: transformStage(statement.body, statement.label.name)
                     });
                 }
-            } else if (statement.type !== 'VariableDeclaration') {
-                throw 'syntax error: statement type ' + statement.type + ' unexpected';
             }
         });
 
@@ -895,11 +892,12 @@ exports = module.exports = durableEngine = function () {
         return that;
     };
 
-    var term = function (type, left) {
+    var term = function (type, left, sid) {
         var op;
         var right;
         var alias;
         var that;
+        var sid;
 
         var gt = function (rvalue) {
             op = '$gt';
@@ -937,12 +935,6 @@ exports = module.exports = durableEngine = function () {
             return that;
         };
 
-        var mt = function (rvalue) {
-            op = '$mt';
-            right = rvalue;
-            return that;
-        };
-
         var matches = function (rvalue) {
             op = '$mt';
             right = rvalue;
@@ -951,6 +943,18 @@ exports = module.exports = durableEngine = function () {
 
         var imatches = function (rvalue) {
             op = '$imt';
+            right = rvalue;
+            return that;
+        };
+
+        var allItems = function (rvalue) {
+            op = '$iall';
+            right = rvalue;
+            return that;
+        };
+
+        var anyItem = function (rvalue) {
+            op = '$iany';
             right = rvalue;
             return that;
         };
@@ -984,10 +988,47 @@ exports = module.exports = durableEngine = function () {
             return or.apply(this, terms);
         };
 
+        var innerAdd = function () {
+            var idioms = [that];
+            argsToArray(arguments, idioms);
+            return add.apply(this, idioms);
+        }
+
+        var innerSub = function (rvalue) {
+            var idioms = [that];
+            argsToArray(arguments, idioms);
+            return sub.apply(this, idioms);
+        }
+
+        var innerMul = function (rvalue) {
+            var idioms = [that];
+            argsToArray(arguments, idioms);
+            return mul.apply(this, idioms);
+        }
+
+        var innerDiv = function (rvalue) {
+            var idioms = [that];
+            argsToArray(arguments, idioms);
+            return div.apply(this, idioms);
+        }
+
         var define = function (proposedAlias) {
+            if (!op && (type === '$s')) {
+                throw 'syntax error: s cannot be an expression rvalue';
+            }
+
+            var localLeft = left;
+            var localType = type;
+            if (type === '$sref') {
+                localType = '$s';
+                if (sid) {
+                    localLeft = {name: left, id: sid};
+                }
+            }
+
             var newDefinition = {};
             if (!op) {
-                newDefinition[type] = left;
+                newDefinition[localType] = localLeft;
             } else {
                 var rightDefinition = right;
                 if (typeof(right) === 'object' && right !== null) {
@@ -995,14 +1036,18 @@ exports = module.exports = durableEngine = function () {
                 }
 
                 if (op === '$eq') {
-                    newDefinition[left] = rightDefinition;
+                    newDefinition[localLeft] = rightDefinition;
                 } else {
                     var innerDefinition = {};
-                    innerDefinition[left] = rightDefinition;
+                    innerDefinition[localLeft] = rightDefinition;
                     newDefinition[op] = innerDefinition;
                 }
 
-                newDefinition = type === '$s' ? {$and: [newDefinition, {$s: 1}]}: newDefinition;
+                if (localType !== '$m' && localType !== '$s' && localType !== '$i') {
+                    throw 'syntax error: ' + localType + ' cannot be an expression lvalue';
+                }
+
+                newDefinition = localType === '$s' ? {$and: [newDefinition, {$s: 1}]}: newDefinition;
             }
 
             var aliasedDefinition = {};
@@ -1032,12 +1077,14 @@ exports = module.exports = durableEngine = function () {
                         return eq;
                     case 'neq':
                         return neq;
-                    case 'mt':
-                        return mt;
                     case 'matches':
                         return matches;
                     case 'imatches':
                         return imatches;
+                    case 'allItems':
+                        return allItems;
+                    case 'anyItem':
+                        return anyItem;
                     case 'ex':
                         return ex;
                     case 'nex':
@@ -1046,6 +1093,14 @@ exports = module.exports = durableEngine = function () {
                         return innerAnd;
                     case 'or':
                         return innerOr;
+                    case 'add':
+                        return innerAdd;
+                    case 'sub':
+                        return innerSub;
+                    case 'mul':
+                        return innerMul;
+                    case 'div':
+                        return innerDiv;
                     case 'setAlias':
                         return setAlias;
                     case 'define':
@@ -1053,7 +1108,11 @@ exports = module.exports = durableEngine = function () {
                     case 'push':
                         return false;
                     default:
-                        return term(type, left + '.' + name);
+                        if (left) {
+                            return term(type, left + '.' + name);
+                        } else {
+                            return term(type, name);
+                        }
                 }
             },
             function(name, value) {
@@ -1143,103 +1202,6 @@ exports = module.exports = durableEngine = function () {
 
         return that;
     };
-
-    var idiom = function (type, parentName) {
-        var that;
-        var op;
-        var right = [];
-        var left;
-        var sid;
-
-        var innerAdd = function () {
-            var idioms = [that];
-            argsToArray(arguments, idioms);
-            return add.apply(this, idioms);
-        }
-
-        var innerSub = function (rvalue) {
-            var idioms = [that];
-            argsToArray(arguments, idioms);
-            return sub.apply(this, idioms);
-        }
-
-        var innerMul = function (rvalue) {
-            var idioms = [that];
-            argsToArray(arguments, idioms);
-            return mul.apply(this, idioms);
-        }
-
-        var innerDiv = function (rvalue) {
-            var idioms = [that];
-            argsToArray(arguments, idioms);
-            return div.apply(this, idioms);
-        }
-
-        var refId = function (refid) {
-            sid = refid;
-            return r.createProxy(
-                function(name) {
-                    left = name;
-                    return that;
-                },
-                function(name, value) {
-                    return;
-                }
-            );
-        }; 
-
-        var define = function () {
-            var newDefinition;
-            if (sid) {
-                newDefinition = {name: left, id: sid};
-            } else {
-                newDefinition = left;
-            }
-            var leftDefinition = {};
-            leftDefinition[type] = newDefinition;
-            return leftDefinition;
-        }
-
-        that = r.createProxy(
-            function(name) {
-                switch (name) {
-                    case 'add':
-                        return innerAdd;
-                    case 'sub':
-                        return innerSub;
-                    case 'mul':
-                        return innerMul;
-                    case 'div':
-                        return innerDiv;
-                    case 'refId':
-                        return refId;
-                    case 'define':
-                        return define;
-                    default:
-                        left = left + '.' + name;        
-                        return that;
-                }
-            },
-            function(name, value) {
-                return;
-            }
-        );
-
-        return r.createProxy(
-            function(name) {
-                if (name === 'refId') {
-                    return refId;
-                }
-
-
-                left = name;
-                return that;
-            },
-            function(name, value) {
-                return;
-            }
-        );
-    }
 
     var rule = function(op, lexp) {
         var that = {};
@@ -1387,10 +1349,10 @@ exports = module.exports = durableEngine = function () {
     var c = r.createProxy(
         function(name) {
             if (name === 's') {
-                return idiom('$s');
+                return term('$s');
             }
 
-            return idiom(name);
+            return term(name);
         },
         function(name, value) {
             value.setAlias(name);
@@ -1401,6 +1363,15 @@ exports = module.exports = durableEngine = function () {
     var m = r.createProxy(
         function(name) {
             return term('$m', name);
+        },
+        function(name, value) {
+            return;
+        }
+    );
+
+    var item = r.createProxy(
+        function(name) {
+            return term('$i', '$i')[name];
         },
         function(name, value) {
             return;
@@ -1435,6 +1406,17 @@ exports = module.exports = durableEngine = function () {
         return m.$t.eq(name);
     };
 
+    var sref = function(sid) {
+        return r.createProxy(
+            function(name) {
+                return term('$sref', name, sid);
+            },
+            function(name, value) {
+                return;
+            }
+        )
+    };
+
     var extend = function (obj) {        
         obj.add = add;
         obj.sub = sub;
@@ -1445,6 +1427,7 @@ exports = module.exports = durableEngine = function () {
         obj.c = c;
         obj.m = m;
         obj.s = s;
+        obj.item = item;
         obj.all = all;
         obj.any = any;
         obj.none = none;

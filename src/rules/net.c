@@ -104,6 +104,13 @@ static unsigned int createIdiom(ruleset *tree, jsonValue *newValue, char **idiom
                 return ERR_OUT_OF_MEMORY;
             }
             break;
+        case JSON_EVENT_LOCAL_PROPERTY:
+            rightProperty = &tree->stringPool[newValue->value.property.nameOffset];
+            if (asprintf(idiomString, "message[\"%s\"]", rightProperty) == -1) {
+                return ERR_OUT_OF_MEMORY;
+            }
+            break;
+        case JSON_EVENT_LOCAL_IDIOM:
         case JSON_EVENT_IDIOM:
             newIdiom = &tree->idiomPool[newValue->value.idiomOffset];
             char *op = "";
@@ -577,6 +584,7 @@ static unsigned int loadDeleteSessionCommand(ruleset *tree, binding *rulesBindin
 "        redis.call(\"del\", all_keys[i])\n"
 "    end\n"
 "end\n"
+"redis.call(\"hdel\", \"%s!p\", ARGV[2])\n"
 "redis.call(\"hdel\", \"%s!c\", sid)\n"
 "redis.call(\"hdel\", \"%s!s\", sid)\n"
 "redis.call(\"hdel\", \"%s!s!v\", sid)\n"
@@ -585,6 +593,7 @@ static unsigned int loadDeleteSessionCommand(ruleset *tree, binding *rulesBindin
 "redis.call(\"del\", \"%s!e!\" .. sid)\n"
 "redis.call(\"del\", \"%s!f!\" .. sid)\n"
 "redis.call(\"del\", \"%s!v!\" .. sid)\n%s",
+                name,
                 name,
                 name,
                 name,
@@ -2136,6 +2145,7 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
                  lua)  == -1) {
         return ERR_OUT_OF_MEMORY;
     }
+    
     free(oldLua);
     unsigned int result = redisAppendCommand(reContext, "SCRIPT LOAD %s", lua);
     GET_REPLY(result, "loadEvalMessageCommand", reply);
@@ -2182,6 +2192,17 @@ static unsigned int setNames(ruleset *tree, binding *rulesBinding) {
     eventsHashset[nameLength + 1] = 'e';
     eventsHashset[nameLength + 2] = '\0';
     rulesBinding->eventsHashset = eventsHashset;
+
+    char *partitionHashset = malloc((nameLength + 3) * sizeof(char));
+    if (!partitionHashset) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    strncpy(partitionHashset, name, nameLength);
+    partitionHashset[nameLength] = '!';
+    partitionHashset[nameLength + 1] = 'p';
+    partitionHashset[nameLength + 2] = '\0';
+    rulesBinding->partitionHashset = partitionHashset;
 
     char *timersSortedset = malloc((nameLength + 3) * sizeof(char));
     if (!timersSortedset) {
@@ -2352,7 +2373,7 @@ unsigned int getBindingIndex(ruleset *tree, unsigned int sidHash, unsigned int *
     redisContext *reContext = firstBinding->reContext;
 
     int result = redisAppendCommand(reContext, 
-                                    "evalsha %s 0 %d %d", 
+                                    "evalsha %s 0 %u %d", 
                                     firstBinding->partitionHash, 
                                     sidHash, 
                                     list->bindingsLength);
@@ -3018,15 +3039,28 @@ unsigned int getSessionVersion(void *rulesBinding, char *sid, unsigned long *sta
     return REDIS_OK;
 }
 
-unsigned int deleteSession(void *rulesBinding, char *sid) {
+unsigned int deleteSession(ruleset *tree, void *rulesBinding, char *sid, unsigned int sidHash) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext; 
 
     int result = redisAppendCommand(reContext, 
-                                    "evalsha %s 0 %s", 
+                                    "evalsha %s 0 %s %u", 
                                     currentBinding->deleteSessionHash,
-                                    sid); 
+                                    sid,
+                                    sidHash); 
     VERIFY(result, "deleteSession");  
+
+    bindingsList *list = tree->bindingsList;
+    binding *firstBinding = &list->bindings[0];
+    if (firstBinding != currentBinding) {
+        reContext = firstBinding->reContext;
+        result = redisAppendCommand(reContext, 
+                                    "hdel %s %u", 
+                                    firstBinding->partitionHashset,
+                                    sidHash);
+        VERIFY(result, "deleteSession");
+    }
+
     return REDIS_OK;
 }
 

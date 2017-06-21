@@ -260,12 +260,20 @@ d.ruleset('match21', function() {
     whenAll: m.subject.matches('.*hello.*')
     run: console.log('match 21 contains hello: ' + m.subject)
 
+    whenAll: m.subject.matches('.*(error while abc).*')
+    run: console.log('match 21 error while: ' + m.subject)
+
+    whenAll: m.subject.matches('.*error error.*')
+    run: console.log('match 21 error: ' + m.subject)
+
     whenStart: {
-        assert('match21', {id: 1, sid: 1, subject: 'hello world'});
-        assert('match21', {id: 2, sid: 1, subject: 'world hello'});
-        assert('match21', {id: 3, sid: 1, subject: 'world hello hello'});
-        assert('match21', {id: 4, sid: 1, subject: 'has hello string'});
-        assert('match21', {id: 5, sid: 1, subject: 'does not match'});
+        assert('match21', {subject: 'hello world'});
+        assert('match21', {subject: 'world hello'});
+        assert('match21', {subject: 'world hello hello'});
+        assert('match21', {subject: 'has hello string'});
+        assert('match21', {subject: 'error while abc'});
+        assert('match21', {subject: 'error error error'});
+        assert('match21', {subject: 'does not match'});
     }
 });
 
@@ -760,7 +768,7 @@ d.ruleset('a10', function() {
 });
 
 d.ruleset('a11', function() {
-    whenAll: m.amount < s.maxAmount
+    whenAll: m.amount < sref().maxAmount
     run: console.log('a11 approved ' +  m.amount);
 
     whenStart: {
@@ -771,7 +779,7 @@ d.ruleset('a11', function() {
 });
 
 d.ruleset('a12', function() {
-    whenAll: m.amount < s.maxAmount && m.amount > s.refId('global').minAmount
+    whenAll: m.amount < sref().maxAmount && m.amount > sref('global').minAmount
     run: console.log('a12 approved ' +  m.amount);
 
     whenStart: {
@@ -783,7 +791,7 @@ d.ruleset('a12', function() {
 });
 
 d.ruleset('a13', function() {
-    whenAll: m.amount > c.s.maxAmount + s.refId('global').minAmount
+    whenAll: m.amount > sref().maxAmount + sref('global').minAmount
     run: console.log('a13 approved ' +  m.amount);
 
     whenStart: {

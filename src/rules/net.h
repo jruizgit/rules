@@ -33,6 +33,7 @@ typedef struct binding {
     functionHash removeTimerHash;
     functionHash updateActionHash;
     functionHash deleteSessionHash;
+    char *partitionHashset;
     char *sessionHashset;
     char *factsHashset;
     char *eventsHashset;
@@ -153,8 +154,10 @@ unsigned int getSessionVersion(void *rulesBinding,
                                char *sid, 
                                unsigned long *stateVersion);
 
-unsigned int deleteSession(void *rulesBinding, 
-                           char *sid);
+unsigned int deleteSession(ruleset *tree,
+                           void *rulesBinding, 
+                           char *sid,
+                           unsigned int sidHash);
 
 unsigned int updateAction(void *rulesBinding, 
                           char *sid);

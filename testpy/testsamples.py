@@ -577,6 +577,106 @@ with ruleset('expense5'):
         host.post('expense5', {'t': 'account', 'payment': {'invoice': {'amount': 100}}})
 
 
+with ruleset('bookstore'):
+    # this rule will trigger for events with status
+    @when_all(+m.status)
+    def event(c):
+        print('Reference {0} status {1}'.format(c.m.reference, c.m.status))
+
+    @when_all(+m.name)
+    def fact(c):
+        print('Added {0}'.format(c.m.name))
+        c.retract_fact({
+            'name': 'The new book',
+            'reference': '75323',
+            'price': 500,
+            'seller': 'bookstore'
+        })
+    # this rule will be triggered when the fact is retracted
+    @when_all(none(+m.name))
+    def empty(c):
+        print('No books')
+
+    @when_start
+    def start(host):    
+        # will return 0 because the fact assert was successful 
+        print(host.assert_fact('bookstore', {
+            'name': 'The new book',
+            'seller': 'bookstore',
+            'reference': '75323',
+            'price': 500
+        }))
+
+        # will return 212 because the fact has already been asserted
+        print(host.assert_fact('bookstore', {
+            'reference': '75323',
+            'name': 'The new book',
+            'price': 500,
+            'seller': 'bookstore'
+        }))
+
+        # will return 0 because a new event is being posted
+        print(host.post('bookstore', {
+            'reference': '75323',
+            'status': 'Active'
+        }))
+
+        # will return 0 because a new event is being posted
+        print(host.post('bookstore', {
+            'reference': '75323',
+            'status': 'Active'
+        }))
+
+
+with ruleset('risk5'):
+    # compares properties in the same event, this expression is evaluated in the client 
+    @when_all(m.debit > m.credit * 2)
+    def fraud_1(c):
+        print('debit {0} more than twice the credit {1}'.format(c.m.debit, c.m.credit))
+
+    # compares two correlated events, this expression is evaluated in the backend
+    @when_all(c.first << m.amount > 100,
+              c.second << m.amount > c.first.amount + m.amount / 2)
+    def fraud_2(c):
+        print('fraud detected ->{0}'.format(c.first.amount))
+        print('fraud detected ->{0}'.format(c.second.amount))
+        
+    @when_start
+    def start(host):    
+        host.post('risk5', { 'debit': 220, 'credit': 100 })
+        host.post('risk5', { 'debit': 150, 'credit': 100 })
+        host.post('risk5', { 'amount': 200 })
+        host.post('risk5', { 'amount': 500 })
+
+
+with ruleset('risk6'):
+    # matching primitive array
+    @when_all(m.payments.allItems((item > 100) & (item < 500)))
+    def rule1(c):
+        print('fraud 1 detected {0}'.format(c.m.payments))
+
+    # matching object array
+    @when_all(m.payments.allItems((item.amount < 250) | (item.amount >= 300)))
+    def rule2(c):
+        print('fraud 2 detected {0}'.format(c.m.payments))
+
+    # pattern matching string array
+    @when_all(m.cards.anyItem(item.matches('three.*')))
+    def rule3(c):
+        print('fraud 3 detected {0}'.format(c.m.cards))
+
+    # matching nested arrays
+    @when_all(m.payments.anyItem(item.allItems(item < 100)))
+    def rule4(c):
+        print('fraud 4 detected {0}'.format(c.m.payments))
+
+    @when_start
+    def start(host):
+        host.post('risk6', {'payments': [ 150, 300, 450 ]})
+        host.post('risk6', {'payments': [ { 'amount' : 200 }, { 'amount' : 300 }, { 'amount' : 450 } ]})
+        host.post('risk6', {'cards': [ 'one card', 'two cards', 'three cards' ]})
+        host.post('risk6', {'payments': [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]})  
+
 # with ruleset('flow'):
 #     @when_all(m.status == 'start')
 #     def start(c):

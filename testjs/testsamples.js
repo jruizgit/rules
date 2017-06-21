@@ -495,54 +495,117 @@ d.ruleset('expense4', function() {
 });
 
 d.ruleset('bookstore', function() {
+    // this rule will trigger for events with status
+    whenAll: +m.status
+    run: console.log('reference ' + m.reference + ' status ' + m.status)
+
     whenAll: +m.name
     run: { 
-        console.log('reviewing ' + m.name);
+        console.log('Added: ' + m.name);
         retract({
-            name: 'John',
-            address: '1111 NE 22, Sea, Wa',
-            phone: '299678787',
-            country: 'US',
-            seller: 'bookstore',
+            name: 'The new book',
             reference: '75323',
-            amount: 500,
-            currency: 'US',
-            item: 'book'
+            price: 500,
+            seller: 'bookstore'
         });
     }
 
     // this rule will be triggered when the fact is retracted
     whenAll: none(+m.name)
-    run: console.log('test complete')
+    run: console.log('no books');
+
 
     whenStart: {
         // will return 0 because the fact assert was successful 
         console.log(assert('bookstore', {
-            name: 'John',
-            address: '1111 NE 22, Sea, Wa',
-            phone: '299678787',
-            country: 'US',
-            currency: 'US',
+            name: 'The new book',
             seller: 'bookstore',
-            item: 'book',
             reference: '75323',
-            amount: 500
+            price: 500
         }));
 
         // will return 212 because the fact has already been asserted 
         console.log(assert('bookstore', {
-            currency: 'US',
-            address: '1111 NE 22, Sea, Wa',
-            phone: '299678787',
-            amount: 500,
-            seller: 'bookstore',
-            item: 'book',
-            country: 'US',
             reference: '75323',
-            name: 'John'
+            name: 'The new book',
+            price: 500,
+            seller: 'bookstore'
+        }));
+
+        // will return 0 because a new event is being posted
+        console.log(post('bookstore', {
+            reference: '75323',
+            status: 'Active'
+        }));
+
+        // will return 0 because a new event is being posted
+        console.log(post('bookstore', {
+            reference: '75323',
+            status: 'Active'
         }));
     }
 });
+
+d.ruleset('risk5', function() {
+    
+    // compares properties in the same event, evaluated in alpha tree (node.js)
+    whenAll: {
+        m.debit > 2 * m.credit
+    }
+    run: console.log('debit ' + m.debit + ' more than twice the credit ' + m.credit)
+   
+    // correlates two events, evaluated in the beta tree (redis)
+    whenAll: {
+        first = m.amount > 100
+        second = m.amount > first.amount + m.amount / 2
+    }
+    run: {
+        console.log('fraud detected -> ' + first.amount);
+        console.log('fraud detected -> ' + second.amount);
+    }
+
+    whenStart: {
+        post('risk5', { debit: 220, credit: 100 });
+        post('risk5', { debit: 150, credit: 100 });
+        post('risk5', { amount: 200 });
+        post('risk5', { amount: 500 });
+    }
+});
+
+d.ruleset('risk6', function() {
+    
+    // matching primitive array
+    whenAll: {
+        m.payments.allItems(item > 100)
+    }
+    run: console.log('fraud 1 detected ' + m.payments)
+
+    // matching object array
+    whenAll: {
+        m.payments.allItems(item.amount < 250 || item.amount >= 300)
+    }
+    run: console.log('fraud 2 detected ' + JSON.stringify(m.payments))
+   
+    // pattern matching string array
+    whenAll: {
+        m.cards.anyItem(item.matches('three.*'))
+    }
+    run: console.log('fraud 3 detected ' + m.cards)
+
+    // matching nested arrays
+    whenAll: {
+        m.payments.anyItem(item.allItems(item < 100))
+    }
+    run: console.log('fraud 4 detected ' + JSON.stringify(m.payments))
+
+    whenStart: {
+        post('risk6', { payments: [ 150, 350, 450 ] });
+        post('risk6', { payments: [ { amount: 200 }, { amount: 300 }, { amount: 400 } ] });
+        post('risk6', { cards: [ 'one card', 'two cards', 'three cards' ] });
+        post('risk6', { payments: [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]});    
+    }
+});
+
 
 // d.ruleset('flow', function() {
 //     whenAll: m.state == 'start'

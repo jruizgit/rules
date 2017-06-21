@@ -574,6 +574,72 @@ Durable.ruleset :flow3 do
 end
 
 
+Durable.ruleset :bookstore do
+  # this rule will trigger for events with status
+  when_all +m.status do
+    puts "Reference #{m.reference} status #{m.status}"
+  end
+
+  when_all +m.name do
+    puts "Added: #{m.name}"
+    retract(:name => 'The new book',
+            :reference => '75323',
+            :price => 500,
+            :seller => 'bookstore')
+  end
+
+  when_all none(+m.name) do
+    puts "No books"
+  end  
+
+  when_start do
+    # will return 0 because the fact assert was successful 
+    puts assert :bookstore, {
+                :name => 'The new book',
+                :seller => 'bookstore',
+                :reference => '75323',
+                :price => 500}
+
+    # will return 212 because the fact has already been asserted 
+    puts assert :bookstore, {
+                :reference => '75323',
+                :name => 'The new book',
+                :price => 500,
+                :seller => 'bookstore'}
+
+    # will return 0 because a new event is being posted
+    puts post :bookstore, {
+              :reference => '75323',
+              :status => 'Active'}
+
+    # will return 0 because a new event is being posted
+    puts post :bookstore, {
+              :reference => '75323',
+              :status => 'Active'}
+  end
+end
+
+Durable.ruleset :risk5 do
+  # compares properties in the same event, this expression is evaluated in the client 
+  when_all m.debit > m.credit * 2 do
+    puts "debit #{m.debit} more than twice the credit #{m.credit}"
+  end
+  # compares two correlated events, this expression is evaluated in the backend
+  when_all c.first = m.amount > 100,
+           c.second = m.amount > first.amount + m.amount / 2  do
+    puts "fraud detected -> #{first.amount}"
+    puts "fraud detected -> #{second.amount}"
+  end
+
+  when_start do
+    post :risk5, { :debit => 220, :credit => 100 }
+    post :risk5, { :debit => 150, :credit => 100 }
+    post :risk5, { :amount => 200 }
+    post :risk5, { :amount => 500 }
+  end
+end
+
+
 # Durable.ruleset :flow do
 
 #   when_all m.status == "start" do

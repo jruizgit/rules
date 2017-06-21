@@ -7,14 +7,18 @@ Reference Manual
   * [Facts](reference.md#facts)
   * [Events](reference.md#events)
   * [State](reference.md#state)
+  * [Identity](reference.md#identity)
+  * [Error Codes](reference.md#error-codes)
 * [Antecedents](reference.md#antecedents)
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
   * [String Operations](reference.md#string-operations)
   * [Correlated Sequence](reference.md#correlated-sequence)
-  * [Nested Objects](reference.md#nested-objects)
-  * [Lack of Information](reference.md#lack-of-information)
   * [Choice of Sequences](reference.md#choice-of-sequences)
+  * [Lack of Information](reference.md#lack-of-information)
+  * [Nested Objects](reference.md#nested-objects)
+  * [Arrays](reference.md#arrays)
+  * [Facts and Events as rvalues](reference.md#facts-and-events-as-rvalues)
 * [Consequents](reference.md#consequents)  
   * [Conflict Resolution](reference.md#conflict-resolution)
   * [Action Batches](reference.md#action-batches)
@@ -221,6 +225,111 @@ State can also be retrieved and modified using the http API. When the example ab
 <sub>`curl -H "content-type: application/json" -X POST -d '{"status": "next"}' http://localhost:5000/flow/state`</sub>  
 
 [top](reference.md#table-of-contents)  
+### Identity
+Facts with the same property names and values are considered equal when asserted or retracted. Events with the same property names and values are considered different when posted because the posting time matters. 
+
+```python
+from durable.lang import *
+
+with ruleset('bookstore'):
+    # this rule will trigger for events with status
+    @when_all(+m.status)
+    def event(c):
+        print('Reference {0} status {1}'.format(c.m.reference, c.m.status))
+
+    @when_all(+m.name)
+    def fact(c):
+        print('Added {0}'.format(c.m.name))
+        c.retract_fact({
+            'name': 'The new book',
+            'reference': '75323',
+            'price': 500,
+            'seller': 'bookstore'
+        })
+
+    # this rule will be triggered when the fact is retracted
+    @when_all(none(+m.name))
+    def empty(c):
+        print('No books')
+
+    @when_start
+    def start(host):    
+        # will return 0 because the fact assert was successful 
+        print(host.assert_fact('bookstore', {
+            'name': 'The new book',
+            'seller': 'bookstore',
+            'reference': '75323',
+            'price': 500
+        }))
+
+        # will return 212 because the fact has already been asserted
+        print(host.assert_fact('bookstore', {
+            'reference': '75323',
+            'name': 'The new book',
+            'price': 500,
+            'seller': 'bookstore'
+        }))
+
+        # will return 0 because a new event is being posted
+        print(host.post('bookstore', {
+            'reference': '75323',
+            'status': 'Active'
+        }))
+
+        # will return 0 because a new event is being posted
+        print(host.post('bookstore', {
+            'reference': '75323',
+            'status': 'Active'
+        }))
+        
+run_all()
+```
+
+[top](reference.md#table-of-contents)  
+### Error Codes
+
+When the run_all command fails, it can return the following error codes:
+
+* 0 - OK
+* 1 - Out of memory (uncommon)
+* 2 - Unexpected type (uncommon)
+* 5 - Unexpected name (uncommon)
+* 6 - Rule limit exceeded (uncommon)
+* 8 - Rule beta limit exceeded (uncommon)
+* 9 - Rule without qualifier (uncommon)
+* 10 - Invalid rule attribute (uncommon)
+* 101 - Error parsing JSON value (uncommon)
+* 102 - Error parsing JSON string (uncommon)
+* 103 - Error parsing JSON number (uncommon)
+* 104 - Error parsing JSON object (uncommon)
+* 301 - Could not establish Redis connection
+* 302 - Redis returned an error
+* 501 - Could not parse regex
+* 502 - Max regex state transitions reached (uncommon)
+* 503 - Max regex states reached (uncommon)
+* 504 - Regex DFA transform queue full (uncommon)
+* 505 - Regex DFA transform list full (uncommon)
+* 506 - Regex DFA transform set full (uncommon)
+* 507 - Conflict in regex transform (uncommon)
+
+When asserting a fact or posting an event via the when_start function or the web API, these error codes can be returned:
+
+* 0 - OK
+* 101 - Error parsing JSON value (uncommon)
+* 102 - Error parsing JSON string (uncommon)
+* 103 - Error parsing JSON number (uncommon)
+* 104 - Error parsing JSON object (uncommon)
+* 201 - The event or fact was not captured because it did not match any rule
+* 202 - Too many properties in the event or fact
+* 203 - Max rule stack size reached due to complex ruleset (uncommon) 
+* 209 - Max number of command actions reached (uncommon)
+* 210 - Max number of add actions reached (uncommon)
+* 211 - Max number of eval actions reached (uncommon)
+* 212 - The event or fact has already been observed
+* 302 - Redis returned an error
+
+[top](reference.md#table-of-contents) 
+
 ## Antecendents
 ### Simple Filter
 A rule antecedent is an expression. The left side of the expression represents an event or fact property. The right side defines a pattern to be matched. By convention events or facts are represented with the `m` name. Context state are represented with the `s` name.  
@@ -354,54 +463,6 @@ run_all()
 
 [top](reference.md#table-of-contents)  
 
-### Nested Objects
-Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.  
-
-```python
-
-with ruleset('expense'):
-    # use the '.' notation to match properties in nested objects
-    @when_all(c.bill << (m.t == 'bill') & (m.invoice.amount > 50),
-              c.account << (m.t == 'account') & (m.payment.invoice.amount == c.bill.invoice.amount))
-    def approved(c):
-        print ('bill amount  ->{0}'.format(c.bill.invoice.amount))
-        print ('account payment amount ->{0}'.format(c.account.payment.invoice.amount))
-        
-    @when_start
-    def start(host):
-        # one level of nesting
-        host.post('expense', {'t': 'bill', 'invoice': {'amount': 100}})
-        
-        #two levels of nesting
-        host.post('expense', {'t': 'account', 'payment': {'invoice': {'amount': 100}}})
-
-run_all()
-```  
-[top](reference.md#table-of-contents)  
-
-### Lack of Information
-In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.
-```python
-from durable.lang import *
-
-with ruleset('risk'):
-    @when_all(c.first << m.t == 'deposit',
-              none(m.t == 'balance'),
-              c.third << m.t == 'withrawal',
-              c.fourth << m.t == 'chargeback')
-    def detected(c):
-        print('fraud detected {0} {1} {2}'.format(c.first.t, c.third.t, c.fourth.t))
-        
-    @when_start
-    def start(host):
-        host.post('risk', { 't': 'deposit' })
-        host.post('risk', { 't': 'withrawal' })
-        host.post('risk', { 't': 'chargeback' })
-        
-run_all()
-```
-
-[top](reference.md#table-of-contents)  
 ### Choice of Sequences
 durable_rules allows expressing and efficiently evaluating richer events sequences In the example below any of the two event\fact sequences will trigger an action. 
 
@@ -433,6 +494,129 @@ with ruleset('expense'):
 run_all()
 ```
 [top](reference.md#table-of-contents) 
+
+### Lack of Information
+In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.  
+
+*Note: the `none` function requires information to reason about lack of information. That is, it will not trigger any actions if no events or facts have been registered in the corresponding rule.*
+
+```python
+from durable.lang import *
+
+with ruleset('risk'):
+    @when_all(c.first << m.t == 'deposit',
+              none(m.t == 'balance'),
+              c.third << m.t == 'withrawal',
+              c.fourth << m.t == 'chargeback')
+    def detected(c):
+        print('fraud detected {0} {1} {2}'.format(c.first.t, c.third.t, c.fourth.t))
+        
+    @when_start
+    def start(host):
+        host.post('risk', { 't': 'deposit' })
+        host.post('risk', { 't': 'withrawal' })
+        host.post('risk', { 't': 'chargeback' })
+        
+run_all()
+```
+
+[top](reference.md#table-of-contents)  
+
+### Nested Objects
+Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.  
+
+```python
+from durable.lang import *
+
+with ruleset('expense'):
+    # use the '.' notation to match properties in nested objects
+    @when_all(c.bill << (m.t == 'bill') & (m.invoice.amount > 50),
+              c.account << (m.t == 'account') & (m.payment.invoice.amount == c.bill.invoice.amount))
+    def approved(c):
+        print ('bill amount  ->{0}'.format(c.bill.invoice.amount))
+        print ('account payment amount ->{0}'.format(c.account.payment.invoice.amount))
+        
+    @when_start
+    def start(host):
+        # one level of nesting
+        host.post('expense', {'t': 'bill', 'invoice': {'amount': 100}})
+        
+        #two levels of nesting
+        host.post('expense', {'t': 'account', 'payment': {'invoice': {'amount': 100}}})
+
+run_all()
+```  
+[top](reference.md#table-of-contents)  
+
+### Arrays
+
+```python
+from durable.lang import *
+
+with ruleset('risk'):
+    # matching primitive array
+    @when_all(m.payments.allItems((item > 100) & (item < 500)))
+    def rule1(c):
+        print('fraud 1 detected {0}'.format(c.m.payments))
+
+    # matching object array
+    @when_all(m.payments.allItems((item.amount < 250) | (item.amount >= 300)))
+    def rule2(c):
+        print('fraud 2 detected {0}'.format(c.m.payments))
+
+    # pattern matching string array
+    @when_all(m.cards.anyItem(item.matches('three.*')))
+    def rule3(c):
+        print('fraud 3 detected {0}'.format(c.m.cards))
+
+    # matching nested arrays
+    @when_all(m.payments.anyItem(item.allItems(item < 100)))
+    def rule4(c):
+        print('fraud 4 detected {0}'.format(c.m.payments))
+
+    @when_start
+    def start(host):
+        host.post('risk', {'payments': [ 150, 300, 450 ]})
+        host.post('risk', {'payments': [ { 'amount' : 200 }, { 'amount' : 300 }, { 'amount' : 450 } ]})
+        host.post('risk', {'cards': [ 'one card', 'two cards', 'three cards' ]})
+        host.post('risk', {'payments': [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]})  
+        
+run_all()
+```  
+[top](reference.md#table-of-contents)  
+
+### Facts and Events as rvalues
+
+Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
+
+```python
+from durable.lang import *
+
+with ruleset('risk'):
+    # compares properties in the same event, this expression is evaluated in the client 
+    @when_all(m.debit > m.credit * 2)
+    def fraud_1(c):
+        print('debit {0} more than twice the credit {1}'.format(c.m.debit, c.m.credit))
+
+    # compares two correlated events, this expression is evaluated in the backend
+    @when_all(c.first << m.amount > 100,
+              c.second << m.amount > c.first.amount + m.amount / 2)
+    def fraud_2(c):
+        print('fraud detected ->{0}'.format(c.first.amount))
+        print('fraud detected ->{0}'.format(c.second.amount))
+        
+    @when_start
+    def start(host):    
+        host.post('risk', { 'debit': 220, 'credit': 100 })
+        host.post('risk', { 'debit': 150, 'credit': 100 })
+        host.post('risk', { 'amount': 200 })
+        host.post('risk', { 'amount': 500 })
+        
+run_all()
+```
+
+[top](reference.md#table-of-contents) 
+ 
 ## Consequents
 ### Conflict Resolution
 Event and fact evaluation can lead to multiple consequents. The triggering order can be controlled by using the `pri` (salience) function. Actions with lower value are executed first. The default value for all actions is 0.

@@ -278,7 +278,7 @@ Durable.statechart :a6 do
 end
 
 Durable.ruleset :a7 do
-  when_all m.amount < s.max_amount do
+  when_all m.amount < sref().max_amount do
     puts "a7 approved " + m.amount.to_s
   end
   when_start do
@@ -289,7 +289,7 @@ Durable.ruleset :a7 do
 end
 
 Durable.ruleset :a8 do
-  when_all (m.amount < s.max_amount) & (m.amount > s.ref_id(:global).min_amount) do
+  when_all (m.amount < sref().max_amount) & (m.amount > sref(:global).min_amount) do
     puts "a8 approved " + m.amount.to_s
   end
   when_start do
@@ -331,7 +331,7 @@ Durable.ruleset :a10 do
 end
 
 Durable.ruleset :a11 do
-  when_all m.amount < s.max_amount + s.id(:global).min_amount do
+  when_all m.amount < sref().max_amount + sref(:global).min_amount do
     puts "a11 approved " + m.amount.to_s
   end
   when_start do

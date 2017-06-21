@@ -175,7 +175,9 @@ static void insertSortProperties(jsonObject *jo, jsonProperty **properties) {
 }
 
 static void radixSortProperties(jsonObject *jo, jsonProperty **properties) {
-    unsigned char counts[43] = {};
+    unsigned char counts[43];
+    memset(counts, 0, 43 * sizeof(char));
+
     for (unsigned char i = 0; i < jo->propertiesLength; ++i) {
         unsigned char mostSignificant = jo->properties[i].hash / 100000000;
         ++counts[mostSignificant];
@@ -615,5 +617,6 @@ unsigned int deleteState(void *handle, char *sid) {
       return result;
     }
 
-    return deleteSession(rulesBinding, sid);
+    unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
+    return deleteSession(handle, rulesBinding, sid, sidHash);
 }

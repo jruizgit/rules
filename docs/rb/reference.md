@@ -7,14 +7,17 @@ Reference Manual
   * [Facts](reference.md#facts)
   * [Events](reference.md#events)
   * [State](reference.md#state)
+  * [Identity](reference.md#identity)
+  * [Error Codes](reference.md#error-codes)
 * [Antecedents](reference.md#antecedents)
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
   * [String Operations](reference.md#string-operations)
   * [Correlated Sequence](reference.md#correlated-sequence)
-  * [Nested Objects](reference.md#nested-objects)
-  * [Lack of Information](reference.md#lack-of-information)
   * [Choice of Sequences](reference.md#choice-of-sequences)
+  * [Lack of Information](reference.md#lack-of-information)
+  * [Nested Objects](reference.md#nested-objects)
+  * [Facts and Events as rvalues](reference.md#facts-and-events-as-rvalues)
 * [Consequents](reference.md#consequents)  
   * [Conflict Resolution](reference.md#conflict-resolution)
   * [Action Batches](reference.md#action-batches)
@@ -225,6 +228,107 @@ State can also be retrieved and modified using the http API. When the example ab
 <sub>`curl -H "content-type: application/json" -X POST -d '{"status": "next"}' http://localhost:4567/flow/state`</sub>  
 
 [top](reference.md#table-of-contents)  
+
+### Identity
+Facts with the same property names and values are considered equal when asserted or retracted. Events with the same property names and values are considered different when posted because the posting time matters. 
+
+```ruby
+require "durable"
+
+Durable.ruleset :bookstore do
+  # this rule will trigger for events with status
+  when_all +m.status do
+    puts "Reference #{m.reference} status #{m.status}"
+  end
+
+  when_all +m.name do
+    puts "Added: #{m.name}"
+    retract(:name => 'The new book',
+            :reference => '75323',
+            :price => 500,
+            :seller => 'bookstore')
+  end
+
+  when_all none(+m.name) do
+    puts "No books"
+  end  
+
+  when_start do
+    # will return 0 because the fact assert was successful 
+    puts assert :bookstore, {
+                :name => 'The new book',
+                :seller => 'bookstore',
+                :reference => '75323',
+                :price => 500}
+
+    # will return 212 because the fact has already been asserted 
+    puts assert :bookstore, {
+                :reference => '75323',
+                :name => 'The new book',
+                :price => 500,
+                :seller => 'bookstore'}
+
+    # will return 0 because a new event is being posted
+    puts post :bookstore, {
+              :reference => '75323',
+              :status => 'Active'}
+
+    # will return 0 because a new event is being posted
+    puts post :bookstore, {
+              :reference => '75323',
+              :status => 'Active'}
+  end
+end
+
+Durable.run_all
+```
+
+[top](reference.md#table-of-contents)  
+
+### Error Codes
+
+When the run_all command fails, it can return the following error codes:
+
+* 0 - OK
+* 1 - Out of memory (uncommon)
+* 2 - Unexpected type (uncommon)
+* 5 - Unexpected name (uncommon)
+* 6 - Rule limit exceeded (uncommon)
+* 8 - Rule beta limit exceeded (uncommon)
+* 9 - Rule without qualifier (uncommon)
+* 10 - Invalid rule attribute (uncommon)
+* 101 - Error parsing JSON value (uncommon)
+* 102 - Error parsing JSON string (uncommon)
+* 103 - Error parsing JSON number (uncommon)
+* 104 - Error parsing JSON object (uncommon)
+* 301 - Could not establish Redis connection
+* 302 - Redis returned an error
+* 501 - Could not parse regex
+* 502 - Max regex state transitions reached (uncommon)
+* 503 - Max regex states reached (uncommon)
+* 504 - Regex DFA transform queue full (uncommon)
+* 505 - Regex DFA transform list full (uncommon)
+* 506 - Regex DFA transform set full (uncommon)
+* 507 - Conflict in regex transform (uncommon)
+
+When asserting a fact or posting an event via the when_start function or the web API, these error codes can be returned:
+
+* 0 - OK
+* 101 - Error parsing JSON value (uncommon)
+* 102 - Error parsing JSON string (uncommon)
+* 103 - Error parsing JSON number (uncommon)
+* 104 - Error parsing JSON object (uncommon)
+* 201 - The event or fact was not captured because it did not match any rule
+* 202 - Too many properties in the event or fact
+* 203 - Max rule stack size reached due to complex ruleset (uncommon) 
+* 209 - Max number of command actions reached (uncommon)
+* 210 - Max number of add actions reached (uncommon)
+* 211 - Max number of eval actions reached (uncommon)
+* 212 - The event or fact has already been observed
+* 302 - Redis returned an error
+
+[top](reference.md#table-of-contents) 
+
 ## Antecendents
 ### Simple Filter
 A rule antecedent is an expression. The left side of the expression represents an event or fact property. The right side defines a pattern to be matched. By convention events or facts are represented with the `m` name. Context state are represented with the `s` name.  
@@ -361,53 +465,6 @@ Durable.run_all
 
 [top](reference.md#table-of-contents)  
 
-### Nested Objects
-Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.  
-
-```ruby
-require "durable"
-
-Durable.ruleset :expense do
-  when_all c.bill = (m.t == "bill") & (m.invoice.amount > 50),
-           c.account = (m.t == "account") & (m.payment.invoice.amount == bill.invoice.amount) do
-    puts "bill amount -> #{bill.invoice.amount}" 
-    puts "account payment amount -> #{account.payment.invoice.amount}" 
-  end
-  
-  when_start do
-    post :expense, { t:"bill", :invoice => { :amount => 1000 }}
-    post :expense, { t:"account", :payment => { :invoice => { :amount => 1000 }}}
-  end
-end
-
-Durable.run_all
-```  
-[top](reference.md#table-of-contents)  
-
-### Lack of Information
-In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.
-```ruby
-require "durable"
-
-Durable.ruleset :risk do
-  when_all c.first = m.t == "deposit",
-           none(m.t == "balance"),
-           c.third = m.t == "withrawal",
-           c.fourth = m.t == "chargeback" do
-    puts "fraud detected #{first.t} #{third.t} #{fourth.t}"
-  end
-  
-  when_start do
-    post :risk, { :t => "deposit" }
-    post :risk, { :t => "withrawal" }
-    post :risk, { :t => "chargeback" }
-  end
-end
-
-Durable.run_all
-```  
-
-[top](reference.md#table-of-contents)  
 ### Choice of Sequences
 durable_rules allows expressing and efficiently evaluating richer events sequences In the example below any of the two event\fact sequences will trigger an action. 
 
@@ -440,7 +497,91 @@ end
 
 Durable.run_all
 ```  
+[top](reference.md#table-of-contents)  
+
+### Lack of Information
+In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.  
+
+*Note: the `none` function requires information to reason about lack of information. That is, it will not trigger any actions if no events or facts have been registered in the corresponding rule.*
+
+```ruby
+require "durable"
+
+Durable.ruleset :risk do
+  when_all c.first = m.t == "deposit",
+           none(m.t == "balance"),
+           c.third = m.t == "withrawal",
+           c.fourth = m.t == "chargeback" do
+    puts "fraud detected #{first.t} #{third.t} #{fourth.t}"
+  end
+  
+  when_start do
+    post :risk, { :t => "deposit" }
+    post :risk, { :t => "withrawal" }
+    post :risk, { :t => "chargeback" }
+  end
+end
+
+Durable.run_all
+```  
+
+[top](reference.md#table-of-contents)  
+
+### Nested Objects
+Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.  
+
+```ruby
+require "durable"
+
+Durable.ruleset :expense do
+  when_all c.bill = (m.t == "bill") & (m.invoice.amount > 50),
+           c.account = (m.t == "account") & (m.payment.invoice.amount == bill.invoice.amount) do
+    puts "bill amount -> #{bill.invoice.amount}" 
+    puts "account payment amount -> #{account.payment.invoice.amount}" 
+  end
+  
+  when_start do
+    post :expense, { t:"bill", :invoice => { :amount => 1000 }}
+    post :expense, { t:"account", :payment => { :invoice => { :amount => 1000 }}}
+  end
+end
+
+Durable.run_all
+```  
+[top](reference.md#table-of-contents)  
+
+### Facts and Events as rvalues
+
+Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
+
+```ruby
+require "durable"
+
+Durable.ruleset :risk do
+  # compares properties in the same event, this expression is evaluated in the client 
+  when_all m.debit > m.credit * 2 do
+    puts "debit #{m.debit} more than twice the credit #{m.credit}"
+  end
+  # compares two correlated events, this expression is evaluated in the backend
+  when_all c.first = m.amount > 100,
+           c.second = m.amount > first.amount + m.amount / 2  do
+    puts "fraud detected -> #{first.amount}"
+    puts "fraud detected -> #{second.amount}"
+  end
+
+  when_start do
+    post :risk, { :debit => 220, :credit => 100 }
+    post :risk, { :debit => 150, :credit => 100 }
+    post :risk, { :amount => 200 }
+    post :risk, { :amount => 500 }
+  end
+end
+
+Durable.run_all
+```
+
 [top](reference.md#table-of-contents) 
+
 ## Consequents
 ### Conflict Resolution
 Event and fact evaluation can lead to multiple consequents. The triggering order can be controlled by using the `pri` (salience) function. Actions with lower value are executed first. The default value for all actions is 0.
