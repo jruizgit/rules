@@ -1049,7 +1049,7 @@ static unsigned int isArrayMatch(ruleset *tree,
                 }
             }
 
-            if(currentAlpha->betaListOffset && currentAlpha != arrayAlpha) {
+            if ((currentAlpha->betaListOffset || !currentAlpha->nextOffset) && currentAlpha != arrayAlpha) {
                 *propertyMatch = 1;
                 break;
             }

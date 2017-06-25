@@ -22,7 +22,7 @@ exports = module.exports = durableEngine = function () {
         '*': 'mul',
         '/': 'div',
         'u+': 'ex',
-        '~': 'nex',
+        'u~': 'nex',
     };
 
     var transformStartStatement = function (statement) {

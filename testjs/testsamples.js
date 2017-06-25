@@ -576,7 +576,7 @@ d.ruleset('risk6', function() {
     
     // matching primitive array
     whenAll: {
-        m.payments.allItems(item > 100)
+        m.payments.allItems(item > 1000)
     }
     run: console.log('fraud 1 detected ' + m.payments)
 
@@ -598,11 +598,18 @@ d.ruleset('risk6', function() {
     }
     run: console.log('fraud 4 detected ' + JSON.stringify(m.payments))
 
+    // matching array and value
+    whenAll: {
+        m.payments.allItems(item > 100) && m.cash == true
+    }
+    run: console.log('fraud 5 detected ' + JSON.stringify(m))
+
     whenStart: {
-        post('risk6', { payments: [ 150, 350, 450 ] });
+        post('risk6', { payments: [ 1500, 3500, 4500 ] });
         post('risk6', { payments: [ { amount: 200 }, { amount: 300 }, { amount: 400 } ] });
         post('risk6', { cards: [ 'one card', 'two cards', 'three cards' ] });
-        post('risk6', { payments: [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]});    
+        post('risk6', { payments: [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]});
+        post('risk6', { payments: [ 150, 350, 450 ], cash : true});    
     }
 });
 
