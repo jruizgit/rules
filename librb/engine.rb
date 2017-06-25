@@ -435,7 +435,6 @@ module Engine
         end
       end
 
-      puts JSON.generate(ruleset_definition)
       @handle = Rules.create_ruleset name, JSON.generate(ruleset_definition), state_cache_size
       @definition = ruleset_definition
     end
@@ -1321,7 +1320,7 @@ module Engine
 
   class Queue
 
-    def initialize(ruleset_name, database = {:host => 'localhost', :port => 6379, :password => nil, :db => 0}, state_cache_size = 1024)
+    def initialize(ruleset_name, database = {:host => "localhost", :port => 6379, :password => nil, :db => 0}, state_cache_size = 1024)
       @_ruleset_name = ruleset_name.to_s
       @handle = Rules.create_client @_ruleset_name, state_cache_size
       if database.kind_of? String
@@ -1331,23 +1330,42 @@ module Engine
       end
     end
 
+    def isClosed()
+      @handle == 0
+    end
+
     def post(message)
+      if @handle == 0
+        raise "Queue has already been closed"
+      end
+
       sid = (message.key? :sid) ? message[:sid]: message['sid']
       Rules.queue_assert_event @handle, sid.to_s, @_ruleset_name, JSON.generate(message)
     end
 
     def assert(message)
+      if @handle == 0
+        raise "Queue has already been closed"
+      end
+
       sid = (message.key? :sid) ? message[:sid]: message['sid']
       Rules.queue_assert_fact @handle, sid.to_s, @_ruleset_name, JSON.generate(message)
     end
 
     def retract(message)
+      if @handle == 0
+        raise "Queue has already been closed"
+      end
+
       sid = (message.key? :sid) ? message[:sid]: message['sid']
       Rules.queue_retract_fact @handle, sid.to_s, @_ruleset_name, JSON.generate(message)
     end
 
     def close()
-      Rules.delete_client @handle
+      if @handle != 0
+        Rules.delete_client @handle
+        @handle = 0
+      end
     end
   end
 

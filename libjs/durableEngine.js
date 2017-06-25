@@ -1326,20 +1326,39 @@ exports = module.exports = durableEngine = function () {
         database = database || {host: 'localhost', port: 6379, password: null, db: 0};
         stateCacheSize = stateCacheSize || 5000;
 
+        that.isClosed = function() {
+            return (handle == 0);
+        }
+
         that.post = function (message) {
+            if (handle == 0) {
+                throw 'Queue has already been closed';
+            }
+
             return r.queueAssertEvent(handle, message.sid, rulesetName, JSON.stringify(message));
         };
 
         that.assert = function (message) {
+            if (handle == 0) {
+                throw 'Queue has already been closed';
+            }
+
             return r.queueAssertFact(handle, message.sid, rulesetName, JSON.stringify(message));
         };
 
         that.retract = function (message) {
+            if (handle == 0) {
+                throw 'Queue has already been closed';
+            }
+
             return r.queueRetractFact(handle, message.sid, rulesetName, JSON.stringify(message));
         };
 
         that.close = function() {
-            return r.deleteClient(handle);
+            if (handle != 0) {
+                r.deleteClient(handle);
+                handle = 0;
+            }
         };
 
         handle = r.createClient(rulesetName, stateCacheSize)

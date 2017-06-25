@@ -1113,25 +1113,38 @@ class Queue(object):
 
             rules.bind_ruleset(database['port'], database['db'], database['host'], database['password'], self._handle)
         
+    def isClosed(self):
+        return self._handle == 0
 
     def post(self, message):
+        if self._handle == 0:
+            raise Exception('Queue has already been closed')
+
         if 'sid' in message:
             rules.queue_assert_event(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
         else:
             rules.queue_assert_event(self._handle, None, self._ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def assert_fact(self, message):
+        if self._handle == 0:
+            raise Exception('Queue has already been closed')
+
         if 'sid' in message:
             rules.queue_assert_fact(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
         else: 
             rules.queue_assert_fact(self._handle, None, self._ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def retract_fact(self, message):
+        if self._handle == 0:
+            raise Exception('Queue has already been closed')
+
         if 'sid' in message:
             rules.queue_retract_fact(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
         else:
             rules.queue_retract_fact(self._handle, None, self._ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def close(self):
-        rules.delete_client(self._handle)
+        if self._handle != 0:
+            rules.delete_client(self._handle)
+            self._handle = 0
 
