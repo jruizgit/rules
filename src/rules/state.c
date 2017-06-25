@@ -228,9 +228,9 @@ static void calculateId(jsonObject *jo) {
     }
 
 #ifdef _WIN32
-    sprintf_s(jo->idBuffer, sizeof(char) * 21, "%020llu", hash); 
+    sprintf_s(jo->idBuffer, sizeof(char) * ID_BUFFER_LENGTH, "$%020llu", hash); 
 #else
-    snprintf(jo->idBuffer, sizeof(char) * 21, "%020llu", hash);
+    snprintf(jo->idBuffer, sizeof(char) * ID_BUFFER_LENGTH, "$%020llu", hash);
 #endif
     jo->properties[jo->idIndex].valueLength = 20;
 }

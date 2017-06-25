@@ -1768,13 +1768,13 @@ exports = module.exports = durableEngine = function () {
 
             var switchesDefinition = {};
             for (var i = 0; i < switches.length; ++i) {
-                var switchDefinition = switches[i].define('');
+                var switchDefinition = switches[i].define();
                 if (typeof(switchDefinition) === 'string') {
                     switchesDefinition = switchDefinition;
                     break;
                 }
 
-                switchesDefinition[switches[i].getName()] = switches[i].define('');
+                switchesDefinition[switches[i].getName()] = switches[i].define();
             }
 
             newDefinition['to'] = switchesDefinition;
@@ -1858,7 +1858,7 @@ exports = module.exports = durableEngine = function () {
         var definitions = {};
         for (var i = 0; i < rulesets.length; ++ i) {
             definitions[rulesets[i].getName()] = rulesets[i].define(); 
-            //console.log(rulesets[i].getName() + ' ***** ' + JSON.stringify(definitions[rulesets[i].getName()]))
+            //console.log(rulesets[i].getName() + ' ***** ' + JSON.stringify(definitions[rulesets[i].getName()], 2, 2))
         }
 
         var rulesHost = d.host(databases, stateCacheSize);

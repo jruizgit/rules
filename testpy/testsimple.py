@@ -200,6 +200,25 @@ with statechart('fraud8'):
         host.post('fraud8', {'id': 1, 'sid': 1, 'amount': 200})
 
 
+with ruleset('fraud9'):
+
+    @when_all(c.item << (m.item == 'txn') & (-m.fraud_status))
+    def flaggedFraud(c):
+        c.retract_fact(c.item)
+        c.item.fraud_status = 'flagged'
+        c.assert_fact(c.item)
+        
+    @when_all(c.item << +m.fraud_status)
+    def listFraud(c):
+        print("fraud9 {0} {1} is {2}".format(c.item.item,c.item.nmid,c.item.fraud_status))
+
+    @when_start
+    def start(host):
+        host.assert_fact("fraud9",{"item":"txn","nmid":"1"})
+        host.assert_fact("fraud9",{"item":"txn","nmid":"2"})
+        host.assert_fact("fraud9",{"item":"txn","nmid":"3","fraud_status":"under investigation"})
+
+
 with ruleset('test'):
     @when_all(c.first << +s.last,
               c.second << (m.id == c.first.last + 1) & (m.action == 'open'))
