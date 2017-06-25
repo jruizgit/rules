@@ -8,6 +8,7 @@ Reference Manual
   * [Events](reference.md#events)
   * [State](reference.md#state)
   * [Identity](reference.md#identity)
+  * [Error Codes](reference.md#error-codes)
 * [Antecedents](reference.md#antecedents)
   * [Simple Filter](reference.md#simple-filter)
   * [Pattern Matching](reference.md#pattern-matching)
@@ -16,6 +17,7 @@ Reference Manual
   * [Choice of Sequences](reference.md#choice-of-sequences)
   * [Lack of Information](reference.md#lack-of-information)
   * [Nested Objects](reference.md#nested-objects)
+  * [Arrays](reference.md#arrays)
   * [Facts and Events as rvalues](reference.md#facts-and-events-as-rvalues)
 * [Consequents](reference.md#consequents)  
   * [Conflict Resolution](reference.md#conflict-resolution)
@@ -291,7 +293,49 @@ d.ruleset('bookstore', function() {
 d.runAll();
 ```
 
-[top](reference.md#table-of-contents)  
+### Error Codes
+
+When the runAll command fails, it can return the following error codes:
+
+* 0 - OK
+* 1 - Out of memory (uncommon)
+* 2 - Unexpected type (uncommon)
+* 5 - Unexpected name (uncommon)
+* 6 - Rule limit exceeded (uncommon)
+* 8 - Rule beta limit exceeded (uncommon)
+* 9 - Rule without qualifier (uncommon)
+* 10 - Invalid rule attribute (uncommon)
+* 101 - Error parsing JSON value (uncommon)
+* 102 - Error parsing JSON string (uncommon)
+* 103 - Error parsing JSON number (uncommon)
+* 104 - Error parsing JSON object (uncommon)
+* 301 - Could not establish Redis connection
+* 302 - Redis returned an error
+* 501 - Could not parse regex
+* 502 - Max regex state transitions reached (uncommon)
+* 503 - Max regex states reached (uncommon)
+* 504 - Regex DFA transform queue full (uncommon)
+* 505 - Regex DFA transform list full (uncommon)
+* 506 - Regex DFA transform set full (uncommon)
+* 507 - Conflict in regex transform (uncommon)
+
+When asserting a fact or posting an event via the whenStart function or the web API, these error codes can be returned:
+
+* 0 - OK
+* 101 - Error parsing JSON value (uncommon)
+* 102 - Error parsing JSON string (uncommon)
+* 103 - Error parsing JSON number (uncommon)
+* 104 - Error parsing JSON object (uncommon)
+* 201 - The event or fact was not captured because it did not match any rule
+* 202 - Too many properties in the event or fact
+* 203 - Max rule stack size reached due to complex ruleset (uncommon) 
+* 209 - Max number of command actions reached (uncommon)
+* 210 - Max number of add actions reached (uncommon)
+* 211 - Max number of eval actions reached (uncommon)
+* 212 - The event or fact has already been observed
+* 302 - Redis returned an error
+
+[top](reference.md#table-of-contents) 
 
 ## Antecendents
 ### Simple Filter
@@ -464,6 +508,9 @@ d.runAll();
 
 ### Lack of Information
 In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.
+
+*Note: the `none` function requires information to reason about lack of information. That is, it will not trigger any actions if no events or facts have been registered in the corresponding rule.*
+
 ```javascript
 var d = require('durable');
 
@@ -518,6 +565,47 @@ d.runAll();
 ```
 [top](reference.md#table-of-contents)  
 
+### Arrays
+```javascript
+var d = require('durable');
+
+d.ruleset('risk', function() {
+    
+    // matching primitive array
+    whenAll: {
+        m.payments.allItems(item > 100)
+    }
+    run: console.log('fraud 1 detected ' + m.payments)
+
+    // matching object array
+    whenAll: {
+        m.payments.allItems(item.amount < 250 || item.amount >= 300)
+    }
+    run: console.log('fraud 2 detected ' + JSON.stringify(m.payments))
+   
+    // pattern matching string array
+    whenAll: {
+        m.cards.anyItem(item.matches('three.*'))
+    }
+    run: console.log('fraud 3 detected ' + m.cards)
+
+    // matching nested arrays
+    whenAll: {
+        m.payments.anyItem(item.allItems(item < 100))
+    }
+    run: console.log('fraud 4 detected ' + JSON.stringify(m.payments))
+
+    whenStart: {
+        post('risk', { payments: [ 150, 350, 450 ] });
+        post('risk', { payments: [ { amount: 200 }, { amount: 300 }, { amount: 400 } ] });
+        post('risk', { cards: [ 'one card', 'two cards', 'three cards' ] });
+        post('risk', { payments: [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]});    
+    }
+});
+
+d.runAll();
+```
+[top](reference.md#table-of-contents) 
 ### Facts and Events as rvalues
 
 Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
