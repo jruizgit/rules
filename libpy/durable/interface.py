@@ -11,11 +11,14 @@ from werkzeug.serving import make_ssl_devcert
 
 class Application(object):
 
-    def __init__(self, host, host_name, port, routing_rules = [], run = None):
+    def __init__(self, host, host_name, port, routing_rules = None, run = None):
         self._host = host
         self._host_name = host_name
         self._port = port
         self._run = run
+        if not routing_rules:
+            routing_rules = []
+
         routing_rules.append(Rule('/<ruleset_name>/definition', endpoint=self._ruleset_definition_request))
         routing_rules.append(Rule('/<ruleset_name>/state', endpoint=self._default_state_request))
         routing_rules.append(Rule('/<ruleset_name>/state/<sid>', endpoint=self._state_request))
@@ -114,8 +117,8 @@ class Application(object):
         if self._run:
             self._run(self._host, self)
         elif self._port != 443:
-            run_simple(self._host_name, self._port, self, threaded=True)
+            run_simple(self._host_name, self._port, self, threaded = True)
         else:
-            make_ssl_devcert('key', host=self._host_name)
-            run_simple(self._host_name, self._port, self, threaded=True, ssl_context=('key.crt', 'key.key'))
+            make_ssl_devcert('key', host = self._host_name)
+            run_simple(self._host_name, self._port, self, threaded = True, ssl_context = ('key.crt', 'key.key'))
 

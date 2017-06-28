@@ -935,7 +935,10 @@ class Flowchart(Ruleset):
 
 class Host(object):
 
-    def __init__(self, ruleset_definitions = None, databases = [{'host': 'localhost', 'port': 6379, 'password': None, 'db': 0}], state_cache_size = 1024):
+    def __init__(self, ruleset_definitions = None, databases = None, state_cache_size = 1024):
+        if not databases:
+            databases = [{'host': 'localhost', 'port': 6379, 'password': None, 'db': 0}]
+            
         self._ruleset_directory = {}
         self._ruleset_list = []
         self._databases = databases
@@ -1099,7 +1102,10 @@ class Host(object):
 
 class Queue(object):
 
-    def __init__(self, ruleset_name, database = {'host': 'localhost', 'port': 6379, 'password':None, 'db': 0}, state_cache_size = 1024):
+    def __init__(self, ruleset_name, database = None, state_cache_size = 1024):
+        if not database:
+            database = {'host': 'localhost', 'port': 6379, 'password':None, 'db': 0}
+
         self._ruleset_name = ruleset_name
         self._handle = rules.create_client(state_cache_size, ruleset_name)
         if isinstance(database, str):
