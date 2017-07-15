@@ -39,7 +39,7 @@ class Application(object):
             result = self._host.get_ruleset(ruleset_name)
             return Response(json.dumps(result.get_definition(), default=encode_promise))(environ, start_response)
         elif request.method == 'POST':
-            ruleset_definition = json.loads(request.stream.read())
+            ruleset_definition = json.loads(request.stream.read().decode('utf-8'))
             self._host.set_ruleset(ruleset_name, ruleset_definition)
 
         return Response()(environ, start_response)
@@ -51,7 +51,7 @@ class Application(object):
             result = self._host.get_state(ruleset_name, sid)
             return Response(json.dumps(result))(environ, start_response)
         elif request.method == 'POST':
-            message = json.loads(request.stream.read())
+            message = json.loads(request.stream.read().decode('utf-8'))
             message['sid'] = sid
             result = self._host.patch_state(ruleset_name, message)
             return Response(json.dumps({'outcome': result}))(environ, start_response)
@@ -63,7 +63,7 @@ class Application(object):
             result = self._host.get_state(ruleset_name, None)
             return Response(json.dumps(result))(environ, start_response)
         elif request.method == 'POST':
-            message = json.loads(request.stream.read())
+            message = json.loads(request.stream.read().decode('utf-8'))
             result = self._host.patch_state(ruleset_name, message)
             return Response(json.dumps({'outcome': result}))(environ, start_response)
         
@@ -71,7 +71,7 @@ class Application(object):
         request = Request(environ)
         result = None
         if request.method == 'POST':
-            message = json.loads(request.stream.read())
+            message = json.loads(request.stream.read().decode('utf-8'))
             message['sid'] = sid
             result = self._host.post(ruleset_name, message)
             return Response(json.dumps({'outcome': result}))(environ, start_response)
@@ -80,7 +80,7 @@ class Application(object):
         request = Request(environ)
         result = None
         if request.method == 'POST':
-            message = json.loads(request.stream.read())
+            message = json.loads(request.stream.read().decode('utf-8'))
             result = self._host.post(ruleset_name, message)
             return Response(json.dumps({'outcome': result}))(environ, start_response)
 
@@ -88,7 +88,7 @@ class Application(object):
         request = Request(environ)
         result = None
         if request.method == 'POST':
-            message = json.loads(request.stream.read())
+            message = json.loads(request.stream.read().decode('utf-8'))
             message['sid'] = sid
             result = self._host.assert_fact(ruleset_name, message)
             return Response(json.dumps({'outcome': result}))(environ, start_response)
@@ -97,7 +97,7 @@ class Application(object):
         request = Request(environ)
         result = None
         if request.method == 'POST':
-            message = json.loads(request.stream.read())
+            message = json.loads(request.stream.read().decode('utf-8'))
             result = self._host.assert_fact(ruleset_name, message)
             return Response(json.dumps({'outcome': result}))(environ, start_response)
 
