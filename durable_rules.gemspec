@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'durable_rules'
-  s.version     = '0.34.38'
+  s.version     = '0.34.39'
   s.summary     = "for real time analytics (a Ruby Rules Engine)"
   s.description = "A lightweight library for real-time, consistent and scalable coordination of events."
   s.authors     = ["Jesus Ruiz"]

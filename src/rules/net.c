@@ -290,7 +290,7 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
 "    if not message[\"%s\"] then\n"
 "        return \"\"\n"
 "    else\n"
-"        result = result .. message[\"%s\"]\n"
+"        result = result .. tostring(message[\"%s\"])\n"
 "    end\n", 
                                  leftProperty, 
                                  leftProperty)  == -1) {
@@ -301,7 +301,7 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
 "    if not %s then\n"
 "        return \"\"\n"
 "    else\n"
-"        result = result .. %s\n"
+"        result = result .. tostring(%s)\n"
 "    end\n",
                                 idiomString,
                                 idiomString)  == -1) {
@@ -314,7 +314,7 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
 "%s    if not message[\"%s\"] then\n"
 "        return \"\"\n"
 "    else\n"
-"        result = result .. message[\"%s\"]\n"
+"        result = result .. tostring(message[\"%s\"])\n"
 "    end\n",    
                                  *primaryKey, 
                                  leftProperty,
@@ -327,7 +327,7 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
 "%s    if not %s then\n"
 "        return \"\"\n"
 "    else\n"
-"        result = result .. %s\n"
+"        result = result .. tostring(%s)\n"
 "    end\n", 
                                  *primaryFrameKey, 
                                  idiomString,
