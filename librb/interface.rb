@@ -3,9 +3,11 @@ require "json"
 
 module Interface
   class Application < Sinatra::Base
+    set :bind, "0.0.0.0"
+
     @@host = nil
 
-    def self.set_host(value) 
+    def self.set_host(value)
       @@host = value
     end
 
