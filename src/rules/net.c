@@ -584,7 +584,11 @@ static unsigned int loadDeleteSessionCommand(ruleset *tree, binding *rulesBindin
 "        redis.call(\"del\", all_keys[i])\n"
 "    end\n"
 "end\n"
-"redis.call(\"hdel\", \"%s!p\", ARGV[2])\n"
+"local partition_key = \"%s!p\"\n"
+"redis.call(\"hdel\", partition_key, ARGV[2])\n"
+"if redis.call(\"hlen\", partition_key) == 1 then\n"
+"    redis.call(\"hdel\", partition_key, \"index\")\n"
+"end\n"
 "redis.call(\"hdel\", \"%s!c\", sid)\n"
 "redis.call(\"hdel\", \"%s!s\", sid)\n"
 "redis.call(\"hdel\", \"%s!s!v\", sid)\n"
@@ -2375,7 +2379,7 @@ unsigned int getBindingIndex(ruleset *tree, unsigned int sidHash, unsigned int *
                                     sidHash, 
                                     list->bindingsLength);
     redisReply *reply;
-    GET_REPLY(result, "loadEvalMessageCommand", reply);
+    GET_REPLY(result, "getBindingIndex", reply);
 
     *bindingIndex = reply->integer;
     freeReplyObject(reply);
