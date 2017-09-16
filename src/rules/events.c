@@ -815,10 +815,10 @@ static unsigned int isMatch(ruleset *tree,
             }
             break;
         case OP_DOUBLE_BOOL:
-            *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.b, alphaOp);
+            *propertyMatch = compareDouble(currentProperty->value.d, rightProperty->value.b, alphaOp);
             break;
         case OP_DOUBLE_INT: 
-            *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.i, alphaOp);
+            *propertyMatch = compareDouble(currentProperty->value.d, rightProperty->value.i, alphaOp);
             break;
         case OP_DOUBLE_DOUBLE: 
             *propertyMatch = compareDouble(currentProperty->value.d, rightProperty->value.d, alphaOp);
