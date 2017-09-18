@@ -1110,7 +1110,7 @@ static unsigned int findAlpha(ruleset *tree,
     }
 
     if (operator == OP_IANY || operator == OP_IALL) {
-        type = JSON_NIL;
+        newAlpha->value.a.right.type = JSON_NIL;
     } else {
         result = copyValue(tree, &newAlpha->value.a.right, first, last, idiomOffset, &ref, type);
         if (result != RULES_OK) {
@@ -1306,7 +1306,39 @@ static unsigned int createAlpha(ruleset *tree,
             return result;
         }
 
-        return linkAlpha(tree, *newOffset, nextOffset);
+        node *newAlpha = &tree->nodePool[inner_offset];
+        if (newAlpha->value.a.right.type != JSON_EVENT_PROPERTY && newAlpha->value.a.right.type != JSON_EVENT_IDIOM) {
+            return linkAlpha(tree, *newOffset, nextOffset);
+        } else {
+            // Functions that can execute in client or backend should follow this pattern
+            node *oldAlpha = &tree->nodePool[*newOffset];
+            idiom *newIdiom = NULL;
+            unsigned int idiomOffset = 0;
+            result = storeIdiom(tree, &newIdiom, &idiomOffset);
+            if (result != RULES_OK) {
+                return result;
+            }
+
+            oldAlpha->value.a.right.type = JSON_EVENT_IDIOM;
+            oldAlpha->value.a.right.value.idiomOffset = idiomOffset;
+
+            newIdiom->operator = newAlpha->value.a.operator;
+            newIdiom->right.type = newAlpha->value.a.right.type;
+            if (newAlpha->value.a.right.type == JSON_EVENT_IDIOM) {
+                newIdiom->right.value.idiomOffset = newAlpha->value.a.right.value.idiomOffset;
+            } else {
+                newIdiom->right.value.property.nameHash = newAlpha->value.a.right.value.property.nameHash;
+                newIdiom->right.value.property.nameOffset = newAlpha->value.a.right.value.property.nameOffset;
+                newIdiom->right.value.property.idOffset = newAlpha->value.a.right.value.property.idOffset;
+            }
+            newIdiom->left.type = JSON_EVENT_PROPERTY;
+            newIdiom->left.value.property.nameHash = newAlpha->value.a.hash;
+            newIdiom->left.value.property.nameOffset = newAlpha->nameOffset;
+            newIdiom->left.value.property.idOffset = 0;
+
+            expr->t.termsPointer[expr->termsLength - 1] = *newOffset;
+            return linkAlpha(tree, *newOffset, nextOffset);
+        }
     }
 
     if (nextOffset == 0) {
@@ -1849,6 +1881,11 @@ static unsigned int createTree(ruleset *tree, char *rules) {
 }
 
 unsigned int createRuleset(void **handle, char *name, char *rules, unsigned int stateCaheSize) {
+
+#ifdef _PRINT
+    printf("%s\n", rules);
+#endif
+
     node *newNode;
     unsigned int stringOffset;
     unsigned int nodeOffset;

@@ -242,6 +242,62 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
                 return ERR_OUT_OF_MEMORY;
             }
             free(oldTest);            
+        } else if (currentNode->value.a.operator == OP_IALL || currentNode->value.a.operator == OP_IANY) {
+            char *oldTest = *test;
+            char *leftProperty = &tree->stringPool[currentNode->nameOffset];
+            idiom *newIdiom = &tree->idiomPool[currentNode->value.a.right.value.idiomOffset];
+            char *op = "";
+            switch (newIdiom->operator) {
+                case OP_LT:
+                    op = "0";
+                    break;
+                case OP_LTE:
+                    op = "1";
+                    break;
+                case OP_GT:
+                    op = "2";
+                    break;
+                case OP_GTE:
+                    op = "3";
+                    break;
+                case OP_EQ:
+                    op = "4";
+                    break;
+                case OP_NEQ:
+                    op = "5";
+                    break;
+            }
+
+            char *par = "";
+            if (currentNode->value.a.operator == OP_IALL) {
+                par = "true";
+            } else {
+                par = "false";
+            }
+
+            char *idiomString = NULL;
+            unsigned int result = createIdiom(tree, &newIdiom->right, &idiomString);
+            if (result != RULES_OK) {
+                return result;
+            }
+            
+            if (first) {
+                if (asprintf(test, "%scompare_array(message[\"%s\"], %s, %s, %s)", *test, leftProperty, idiomString, op, par)  == -1) {
+                    return ERR_OUT_OF_MEMORY;
+                }
+                
+                first = 0;
+            } else {
+                if (asprintf(test, "%s %s compare_array(message[\"%s\"], %s, %s, %s)", *test, comp, leftProperty, idiomString, op, par)  == -1) {
+                    return ERR_OUT_OF_MEMORY;
+                }
+                
+                first = 0;   
+            }
+
+            free(idiomString);
+            free(oldTest);
+
         } else {
             char *leftProperty = &tree->stringPool[currentNode->nameOffset];
             char *op = "";
@@ -989,6 +1045,37 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
 "local facts_mids_cache = {}\n"
 "local events_mids_cache = {}\n"
 "local get_context\n"
+"local compare_array = function(left_array, right_value, op, compare_all)\n"
+"   if not left_array or type(left_array) ~= \"table\" then\n"
+"        return false\n"
+"   end\n"
+"   for i = 1, #left_array, 1 do\n"
+"       local comparison = false\n"
+"       if op == 0 then\n"
+"           comparison = (left_array[i] < right_value)\n"
+"       elseif op == 1 then\n"
+"           comparison = (left_array[i] <= right_value)\n"
+"       elseif op == 2 then\n"
+"           comparison = (left_array[i] > right_value)\n"
+"       elseif op == 3 then\n"
+"           comparison = (left_array[i] >= right_value)\n"
+"       elseif op == 4 then\n"
+"           comparison = (left_array[i] == right_value)\n"
+"       elseif op == 5 then\n"
+"           comparison = (left_array[i] ~= right_value)\n"
+"       end\n"
+"       if not compare_all and comparison then\n"
+"           return true\n"
+"       end\n"
+"       if compare_all and not comparison then\n"
+"           return false\n"
+"       end\n"
+"   end"
+"   if compare_all then\n"
+"       return true\n"
+"   end\n"
+"   return false\n"
+"end\n"
 "local get_mids = function(index, frame, events_key, messages_key, mids_cache, message_cache)\n"
 "    local event_mids = mids_cache[events_key]\n"
 "    local primary_key = primary_frame_keys[index](frame)\n"
@@ -1750,6 +1837,37 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "local results_key\n"
 "local inverse_directory\n"
 "local key\n"
+"local compare_array = function(left_array, right_value, op, compare_all)\n"
+"   if not left_array or type(left_array) ~= \"table\" then\n"
+"        return false\n"
+"   end\n"
+"   for i = 1, #left_array, 1 do\n"
+"       local comparison = false\n"
+"       if op == 0 then\n"
+"           comparison = (left_array[i] < right_value)\n"
+"       elseif op == 1 then\n"
+"           comparison = (left_array[i] <= right_value)\n"
+"       elseif op == 2 then\n"
+"           comparison = (left_array[i] > right_value)\n"
+"       elseif op == 3 then\n"
+"           comparison = (left_array[i] >= right_value)\n"
+"       elseif op == 4 then\n"
+"           comparison = (left_array[i] == right_value)\n"
+"       elseif op == 5 then\n"
+"           comparison = (left_array[i] ~= right_value)\n"
+"       end\n"
+"       if not compare_all and comparison then\n"
+"           return true\n"
+"       end\n"
+"       if compare_all and not comparison then\n"
+"           return false\n"
+"       end\n"
+"   end"
+"   if compare_all then\n"
+"       return true\n"
+"   end\n"
+"   return false\n"
+"end\n"
 "local cleanup_mids = function(index, frame, events_key, messages_key, mids_cache, message_cache)\n"
 "    local event_mids = mids_cache[events_key]\n"
 "    local primary_key = primary_frame_keys[index](frame)\n"
