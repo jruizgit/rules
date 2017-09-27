@@ -1554,7 +1554,7 @@ exports = module.exports = durableEngine = function () {
                 });
             });
 
-            that.listen(port, function () {
+            return that.listen(port, function () {
                 console.log('Listening on ' + port);
             });    
         };
