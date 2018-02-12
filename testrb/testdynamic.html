@@ -1,0 +1,176 @@
+<html>
+<head>
+    <title>Ruleset registration page</title>
+</head>
+<body>
+<script type="text/javascript" src="http://d3js.org/d3.v3.min.js?3.1.9"></script>
+<script type="text/javascript">
+
+    function save() {
+        try {
+            var rulesetText = document.getElementById('rulesetpad').value;
+            var ruleset = JSON.parse(rulesetText);
+            var rulesetName = document.getElementById('name').value;
+            var rulesetType = document.getElementById('type').value;
+            var rulesetDefinition = {};
+            if (rulesetType && rulesetType != '') {
+                rulesetDefinition[rulesetName + '$' + rulesetType] = ruleset;
+            } else {
+                rulesetDefinition[rulesetName] = ruleset;
+            } 
+
+            server = d3.xhr('http://localhost:4567/' + rulesetName + '/definition')
+                       .header('content-type', 'application/json; charset=utf-8');
+
+            server.post(JSON.stringify(rulesetDefinition), function(err) {
+                if (err) {
+                    alert('Server error ' + err.responseText);
+                } else {
+                    d3.select('iframe')
+                      .attr('src', '/' + rulesetName + '/admin.html?disableScratchpad=true&size=330');
+                }
+            });
+        } catch (err) {
+            alert('Could not parse ruleset ' + err);
+        }
+    }
+
+    function load() {
+        var rulesetName = document.getElementById('name').value;    
+        d3.json('http://localhost:4567/' + rulesetName + '/definition', function(err, result) {
+            if (err) {
+                alert('Server error ' + err.responseText);
+            }
+            else {
+                d3.select('iframe')
+                  .attr('src', '/' + rulesetName + '/admin.html?disableScratchpad=true&size=330');
+
+                d3.select('textarea[id="rulesetpad"]')
+                  .text(JSON.stringify(result, null, 4));
+            }
+        });
+    }
+
+    function post() {
+        try {
+            var messageText = document.getElementById('messagepad').value;
+            var message = JSON.parse(messageText);
+            var rulesetName = document.getElementById('name').value;
+            server = d3.xhr('http://localhost:4567/' + rulesetName + '/events')
+                       .header('content-type', 'application/json; charset=utf-8');
+
+            server.post(messageText, function(err, result) {
+                if (err) {
+                    alert('Server error ' + err.responseText);
+                } else {
+                    result = JSON.parse(result.responseText);
+                    if (result.outcome != 0) {
+                        alert('Server response ' + result.outcome);
+                    }
+                }
+            });
+        } catch (err) {
+            alert('Could not parse message ' + err);
+        }
+    }
+
+    var body = d3.select('body');
+
+    body.append('span')
+        .append('b')
+        .text('Enter dynamic ruleset: ');
+
+    body.append('br');
+    body.append('br');
+
+    body.append('small')
+        .append('span')
+        .text('Name: ');
+
+    body.append('input')
+        .attr('type', 'text')
+        .attr('value', 'first')
+        .attr('id', 'name')
+        .attr('style', "border:1px solid grey");
+
+    body.append('small')
+        .append('span')
+        .text(' Type: ');
+
+    body.append('input')
+        .attr('type', 'text')
+        .attr('value', 'state')
+        .attr('id', 'type')
+        .attr('style', "border:1px solid grey");
+
+    body.append('br');
+    body.append('br');
+        
+    body.append('textarea')
+        .attr('rows', '25')
+        .attr('cols', '44')
+        .attr('id', 'rulesetpad')
+        .text('{\r\n' + 
+              '    "start": {\r\n' + 
+              '        "trigger": {\r\n' + 
+              '            "all":[{\r\n' + 
+              '                "m": {"$gt":{"amount":100}}\r\n' + 
+              '            }],\r\n' +
+              '            "to": "suspect",\r\n' + 
+              '            "run": "suspect"\r\n' + 
+              '         }\r\n' + 
+              '    },\r\n' +
+              '    "suspect": {\r\n' + 
+              '        "trigger": {\r\n' + 
+              '            "all":[{\r\n' + 
+              '                "m": {"$gt":{"amount":1000}}\r\n' + 
+              '            }],\r\n' +
+              '            "to": "fraud",\r\n' + 
+              '            "run": "fraud"\r\n' + 
+              '        }\r\n' + 
+              '    },\r\n' + 
+              '    "fraud":{}\r\n' + 
+              '}\r\n');
+
+    body.append('iframe')
+        .attr('width', 330)
+        .attr('height', 329)
+        .attr('scrolling', 'no')
+        .attr('style', "border:1px solid grey");
+
+    body.append('br');
+    body.append('br');
+
+    body.append('input')
+        .attr('type', 'button')
+        .attr('id', 'approve')
+        .attr('value', 'Save')
+        .on('click', save);
+
+    body.append('input')
+        .attr('type', 'button')
+        .attr('id', 'approve')
+        .attr('value', 'Load')
+        .on('click', load);
+
+    body.append('br');
+    body.append('br');
+
+    body.append('textarea')
+        .attr('rows', '5')
+        .attr('cols', '44')
+        .attr('id', 'messagepad')
+        .text('{"amount": 2000}');
+
+    body.append('br');
+    body.append('br');
+
+    body.append('input')
+        .attr('type', 'button')
+        .attr('id', 'approve')
+        .attr('value', 'Post')
+        .on('click', post);
+    
+</script>
+</body>
+</html>

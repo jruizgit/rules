@@ -768,6 +768,8 @@ module Engine
       reflexive_states = {}
 
       for state_name, state in chart_definition do
+        next if state_name == "$type"
+
         qualified_name = state_name.to_s
         qualified_name = "#{parent_name}.#{state_name}" if parent_name
         start_state[qualified_name] = true
@@ -783,6 +785,8 @@ module Engine
       end
 
       for state_name, state in chart_definition do
+        next if state_name == "$type"
+        
         qualified_name = state_name.to_s
         qualified_name = "#{parent_name}.#{state_name}" if parent_name
 
@@ -962,6 +966,8 @@ module Engine
       end
 
       for stage_name, stage in chart_definition do
+        next if stage_name == "$type"
+
         from_stage = nil
         if reflexive_stages.key? stage_name
           from_stage = stage_name
