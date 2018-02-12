@@ -333,10 +333,12 @@ unsigned int constructObject(char *root,
             switch (layout) {
                 case JSON_OBJECT_SEQUENCED:
                     property = &jo->properties[jo->propertiesLength];
-                    if (hash == HASH_ID) {
-                        jo->idIndex = jo->propertiesLength;
-                    } else if (hash == HASH_SID) {
-                        jo->sidIndex = jo->propertiesLength;
+                    if (!parentName) {
+                        if (hash == HASH_ID) {
+                            jo->idIndex = jo->propertiesLength;
+                        } else if (hash == HASH_SID) {
+                            jo->sidIndex = jo->propertiesLength;
+                        }
                     }
                     break;
                 case JSON_OBJECT_HASHED: 
@@ -346,10 +348,12 @@ unsigned int constructObject(char *root,
                         candidate = (candidate + 1) % MAX_OBJECT_PROPERTIES;
                     }
 
-                    if (hash == HASH_ID) {
-                        jo->idIndex = candidate;
-                    } else if (hash == HASH_SID) {
-                        jo->sidIndex = candidate;
+                    if (!parentName) {
+                        if (hash == HASH_ID) {
+                            jo->idIndex = candidate;
+                        } else if (hash == HASH_SID) {
+                            jo->sidIndex = candidate;
+                        }
                     }
 
                     property = &jo->properties[candidate];
