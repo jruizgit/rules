@@ -1858,7 +1858,7 @@ exports = module.exports = durableEngine = function () {
         var definitions = {};
         for (var i = 0; i < rulesets.length; ++ i) {
             definitions[rulesets[i].getName()] = rulesets[i].define(); 
-            console.log(rulesets[i].getName() + ' ***** ' + JSON.stringify(definitions[rulesets[i].getName()], 2, 2))
+            //console.log(rulesets[i].getName() + ' ***** ' + JSON.stringify(definitions[rulesets[i].getName()], 2, 2))
         }
 
         var rulesHost = d.host(databases, stateCacheSize);

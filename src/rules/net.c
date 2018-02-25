@@ -2395,12 +2395,14 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     return RULES_OK;
 }
 
-unsigned int bindRuleset(void *handle, 
+unsigned int bindRuleset(unsigned int handle, 
                          char *host, 
                          unsigned int port, 
                          char *password,
                          unsigned char db) {
-    ruleset *tree = (ruleset*)handle;
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+    
     bindingsList *list;
     if (tree->bindingsList) {
         list = tree->bindingsList;

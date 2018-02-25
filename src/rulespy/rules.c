@@ -13,12 +13,12 @@ static PyObject *pyCreateRuleset(PyObject *self, PyObject *args) {
     char *name;
     char *rules;
     unsigned int stateCacheSize;
-    if (!PyArg_ParseTuple(args, "iss", &stateCacheSize, &name, &rules)) {
+    if (!PyArg_ParseTuple(args, "Iss", &stateCacheSize, &name, &rules)) {
         PyErr_SetString(RulesError, "pyCreateRuleset Invalid argument");
         return NULL;
     }
 
-    void *output = NULL;
+    unsigned int output = 0;
     unsigned int result = createRuleset(&output, name, rules, stateCacheSize);
     if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
@@ -35,12 +35,12 @@ static PyObject *pyCreateRuleset(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    return Py_BuildValue("K", output);
+    return Py_BuildValue("I", output);
 }
 
 static PyObject *pyDeleteRuleset(PyObject *self, PyObject *args) {
-    void *handle;
-    if (!PyArg_ParseTuple(args, "K", &handle)) {
+    unsigned int handle;
+    if (!PyArg_ParseTuple(args, "I", &handle)) {
         PyErr_SetString(RulesError, "pyDeleteRuleset Invalid argument");
         return NULL;
     }
@@ -67,12 +67,12 @@ static PyObject *pyDeleteRuleset(PyObject *self, PyObject *args) {
 static PyObject *pyCreateClient(PyObject *self, PyObject *args) {
     char *name;
     unsigned int stateCacheSize;
-    if (!PyArg_ParseTuple(args, "is", &stateCacheSize, &name)) {
+    if (!PyArg_ParseTuple(args, "Is", &stateCacheSize, &name)) {
         PyErr_SetString(RulesError, "pyCreateRuleset Invalid argument");
         return NULL;
     }
 
-    void *output = NULL;
+    unsigned int output = 0;
     unsigned int result = createClient(&output, name, stateCacheSize);
     if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
@@ -89,12 +89,12 @@ static PyObject *pyCreateClient(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    return Py_BuildValue("K", output);
+    return Py_BuildValue("I", output);
 }
 
 static PyObject *pyDeleteClient(PyObject *self, PyObject *args) {
-    void *handle;
-    if (!PyArg_ParseTuple(args, "K", &handle)) {
+    unsigned int handle;
+    if (!PyArg_ParseTuple(args, "I", &handle)) {
         PyErr_SetString(RulesError, "pyDeleteClient Invalid argument");
         return NULL;
     }
@@ -119,13 +119,13 @@ static PyObject *pyDeleteClient(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyBindRuleset(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *host;
     unsigned int port;
     char *password = NULL;
     unsigned int db;
     unsigned int result;
-    if (PyArg_ParseTuple(args, "iiszK", &port, &db, &host, &password, &handle)) {
+    if (PyArg_ParseTuple(args, "IIszI", &port, &db, &host, &password, &handle)) {
         result = bindRuleset(handle, host, port, password, db);
     } else {
         PyErr_SetString(RulesError, "pyBindRuleset Invalid argument");
@@ -153,7 +153,7 @@ static PyObject *pyComplete(PyObject *self, PyObject *args) {
     void *rulesBinding = NULL;
     unsigned int replyCount = 0;
     unsigned int result;
-    if (PyArg_ParseTuple(args, "Ki", &rulesBinding, &replyCount)) {
+    if (PyArg_ParseTuple(args, "KI", &rulesBinding, &replyCount)) {
         result = complete(rulesBinding, replyCount);
     } else {
         PyErr_SetString(RulesError, "pyComplete Invalid argument");
@@ -179,16 +179,16 @@ static PyObject *pyComplete(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyAssertEvent(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *event;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &event)) {
+    if (!PyArg_ParseTuple(args, "Is", &handle, &event)) {
         PyErr_SetString(RulesError, "pyAssertEvent Invalid argument");
         return NULL;
     }
     
     unsigned int result = assertEvent(handle, event);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return Py_BuildValue("i", result);
+        return Py_BuildValue("I", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -206,11 +206,11 @@ static PyObject *pyAssertEvent(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyQueueAssertEvent(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *sid = NULL;
     char *destination = NULL;
     char *event = NULL;
-    if (!PyArg_ParseTuple(args, "Kzss", &handle, &sid, &destination, &event)) {
+    if (!PyArg_ParseTuple(args, "Izss", &handle, &sid, &destination, &event)) {
         PyErr_SetString(RulesError, "pyQueueAssertEvent Invalid argument");
         return NULL;
     }
@@ -235,9 +235,9 @@ static PyObject *pyQueueAssertEvent(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyStartAssertEvent(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *event;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &event)) {
+    if (!PyArg_ParseTuple(args, "Is", &handle, &event)) {
         PyErr_SetString(RulesError, "pyStartAssertEvent Invalid argument");
         return NULL;
     }
@@ -246,7 +246,7 @@ static PyObject *pyStartAssertEvent(PyObject *self, PyObject *args) {
     void *rulesBinding = NULL;
     unsigned int result = startAssertEvent(handle, event, &rulesBinding, &replyCount);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("Ki", rulesBinding, replyCount);    
+        return Py_BuildValue("KI", rulesBinding, replyCount);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -264,16 +264,16 @@ static PyObject *pyStartAssertEvent(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyAssertEvents(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *events;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &events)) {
+    if (!PyArg_ParseTuple(args, "Is", &handle, &events)) {
         PyErr_SetString(RulesError, "pyAssertEvents Invalid argument");
         return NULL;
     }
 
     unsigned int result = assertEvents(handle, events);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return Py_BuildValue("i", result);
+        return Py_BuildValue("I", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -291,9 +291,9 @@ static PyObject *pyAssertEvents(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyStartAssertEvents(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *events;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &events)) {
+    if (!PyArg_ParseTuple(args, "Is", &handle, &events)) {
         PyErr_SetString(RulesError, "pyStartAssertEvents Invalid argument");
         return NULL;
     }
@@ -320,16 +320,16 @@ static PyObject *pyStartAssertEvents(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyRetractEvent(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *event;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &event)) {
+    if (!PyArg_ParseTuple(args, "Is", &handle, &event)) {
         PyErr_SetString(RulesError, "pyRetractEvent Invalid argument");
         return NULL;
     }
 
     unsigned int result = retractEvent(handle, event);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return Py_BuildValue("i", result);
+        return Py_BuildValue("I", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -347,16 +347,16 @@ static PyObject *pyRetractEvent(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyAssertFact(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *fact;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &fact)) {
+    if (!PyArg_ParseTuple(args, "Is", &handle, &fact)) {
         PyErr_SetString(RulesError, "pyAssertFact Invalid argument");
         return NULL;
     }
 
     unsigned int result = assertFact(handle, fact);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return Py_BuildValue("i", result);
+        return Py_BuildValue("I", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -374,11 +374,11 @@ static PyObject *pyAssertFact(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyQueueAssertFact(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *sid = NULL;
     char *destination = NULL;
     char *event = NULL;
-    if (!PyArg_ParseTuple(args, "Kzss", &handle, &sid, &destination, &event)) {
+    if (!PyArg_ParseTuple(args, "Izss", &handle, &sid, &destination, &event)) {
         PyErr_SetString(RulesError, "pyQueueAssertFact Invalid argument");
         return NULL;
     }
@@ -403,9 +403,9 @@ static PyObject *pyQueueAssertFact(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyStartAssertFact(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *fact;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &fact)) {
+    if (!PyArg_ParseTuple(args, "Is", &handle, &fact)) {
         PyErr_SetString(RulesError, "pyStartAssertFact Invalid argument");
         return NULL;
     }
@@ -414,7 +414,7 @@ static PyObject *pyStartAssertFact(PyObject *self, PyObject *args) {
     void *rulesBinding = NULL;
     unsigned int result = startAssertFact(handle, fact, &rulesBinding, &replyCount);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("Ki", rulesBinding, replyCount);    
+        return Py_BuildValue("KI", rulesBinding, replyCount);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -432,16 +432,16 @@ static PyObject *pyStartAssertFact(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyAssertFacts(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *facts;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &facts)) {
+    if (!PyArg_ParseTuple(args, "Is", &handle, &facts)) {
         PyErr_SetString(RulesError, "pyAssertFacts Invalid argument");
         return NULL;
     }
 
     unsigned int result = assertFacts(handle, facts);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return Py_BuildValue("i", result);
+        return Py_BuildValue("I", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -459,9 +459,9 @@ static PyObject *pyAssertFacts(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyStartAssertFacts(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *facts;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &facts)) {
+    if (!PyArg_ParseTuple(args, "Is", &handle, &facts)) {
         PyErr_SetString(RulesError, "pyStartAssertFacts Invalid argument");
         return NULL;
     }
@@ -488,16 +488,16 @@ static PyObject *pyStartAssertFacts(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyRetractFact(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *fact;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &fact)) {
+    if (!PyArg_ParseTuple(args, "Is", &handle, &fact)) {
         PyErr_SetString(RulesError, "pyRetractFact Invalid argument");
         return NULL;
     }
 
     unsigned int result = retractFact(handle, fact);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return Py_BuildValue("i", result);
+        return Py_BuildValue("I", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -515,11 +515,11 @@ static PyObject *pyRetractFact(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyQueueRetractFact(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *sid = NULL;
     char *destination = NULL;
     char *event = NULL;
-    if (!PyArg_ParseTuple(args, "Kzss", &handle, &sid, &destination, &event)) {
+    if (!PyArg_ParseTuple(args, "Izss", &handle, &sid, &destination, &event)) {
         PyErr_SetString(RulesError, "pyQueueRetractFact Invalid argument");
         return NULL;
     }
@@ -544,9 +544,9 @@ static PyObject *pyQueueRetractFact(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyStartRetractFact(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *fact;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &fact)) {
+    if (!PyArg_ParseTuple(args, "Is", &handle, &fact)) {
         PyErr_SetString(RulesError, "pyStartRetractFact Invalid argument");
         return NULL;
     }
@@ -573,16 +573,16 @@ static PyObject *pyStartRetractFact(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyRetractFacts(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *facts;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &facts)) {
+    if (!PyArg_ParseTuple(args, "Is", &handle, &facts)) {
         PyErr_SetString(RulesError, "pyAssertFacts Invalid argument");
         return NULL;
     }
 
     unsigned int result = retractFacts(handle, facts);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return Py_BuildValue("i", result);
+        return Py_BuildValue("I", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -600,9 +600,9 @@ static PyObject *pyRetractFacts(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyStartRetractFacts(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *facts;
-    if (!PyArg_ParseTuple(args, "Ks", &handle, &facts)) {
+    if (!PyArg_ParseTuple(args, "Is", &handle, &facts)) {
         PyErr_SetString(RulesError, "pyStartRetractFacts Invalid argument");
         return NULL;
     }
@@ -629,17 +629,17 @@ static PyObject *pyStartRetractFacts(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyAssertState(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *state;
     char *sid;
-    if (!PyArg_ParseTuple(args, "Kzs", &handle, &sid, &state)) {
+    if (!PyArg_ParseTuple(args, "Izs", &handle, &sid, &state)) {
         PyErr_SetString(RulesError, "pyAssertState Invalid argument");
         return NULL;
     }
 
     unsigned int result = assertState(handle, sid, state);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return Py_BuildValue("i", result);
+        return Py_BuildValue("I", result);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -657,10 +657,10 @@ static PyObject *pyAssertState(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyStartUpdateState(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     void *actionHandle;
     char *state;
-    if (!PyArg_ParseTuple(args, "KKs", &handle, &actionHandle, &state)) {
+    if (!PyArg_ParseTuple(args, "IKs", &handle, &actionHandle, &state)) {
         PyErr_SetString(RulesError, "pyStartUpdateState Invalid argument");
         return NULL;
     }
@@ -687,8 +687,8 @@ static PyObject *pyStartUpdateState(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyStartAction(PyObject *self, PyObject *args) {
-    void *handle;
-    if (!PyArg_ParseTuple(args, "K", &handle)) {
+    unsigned int handle;
+    if (!PyArg_ParseTuple(args, "I", &handle)) {
         PyErr_SetString(RulesError, "pyStartAction Invalid argument");
         return NULL;
     }
@@ -720,10 +720,10 @@ static PyObject *pyStartAction(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyCompleteAction(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     void *actionHandle;
     char *state;
-    if (!PyArg_ParseTuple(args, "KKs", &handle, &actionHandle, &state)) {
+    if (!PyArg_ParseTuple(args, "IKs", &handle, &actionHandle, &state)) {
         PyErr_SetString(RulesError, "pyCompleteAction Invalid argument");
         return NULL;
     }
@@ -748,10 +748,10 @@ static PyObject *pyCompleteAction(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyCompleteAndStartAction(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     void *actionHandle;
     unsigned int expectedReplies;
-    if (!PyArg_ParseTuple(args, "KiK", &handle, &expectedReplies, &actionHandle)) {
+    if (!PyArg_ParseTuple(args, "IIK", &handle, &expectedReplies, &actionHandle)) {
         PyErr_SetString(RulesError, "pyCompleteAndStartAction Invalid argument");
         return NULL;
     }
@@ -780,9 +780,9 @@ static PyObject *pyCompleteAndStartAction(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyAbandonAction(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     void *actionHandle;
-    if (!PyArg_ParseTuple(args, "KK", &handle, &actionHandle)) {
+    if (!PyArg_ParseTuple(args, "IK", &handle, &actionHandle)) {
         PyErr_SetString(RulesError, "pyAbandonAction Invalid argument");
         return NULL;
     }
@@ -807,12 +807,12 @@ static PyObject *pyAbandonAction(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyStartTimer(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *sid;
     int duration = 0;
     char manualReset = 0;
     char *timer = NULL;   
-    if (!PyArg_ParseTuple(args, "Kibsz", &handle, &duration, &manualReset, &timer, &sid)) {
+    if (!PyArg_ParseTuple(args, "Iibsz", &handle, &duration, &manualReset, &timer, &sid)) {
         PyErr_SetString(RulesError, "pyStartTimer Invalid argument");
         return NULL;
     }
@@ -837,10 +837,10 @@ static PyObject *pyStartTimer(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyCancelTimer(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *sid;
     char *timerName = NULL;
-    if (!PyArg_ParseTuple(args, "Kzs", &handle, &sid, &timerName)) {
+    if (!PyArg_ParseTuple(args, "Izs", &handle, &sid, &timerName)) {
         PyErr_SetString(RulesError, "pyCancelTimer Invalid argument");
         return NULL;
     }
@@ -865,17 +865,17 @@ static PyObject *pyCancelTimer(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyAssertTimers(PyObject *self, PyObject *args) {
-    void *handle;
-    if (!PyArg_ParseTuple(args, "K", &handle)) {
+    unsigned int handle;
+    if (!PyArg_ParseTuple(args, "I", &handle)) {
         PyErr_SetString(RulesError, "pyAssertTimers Invalid argument");
         return NULL;
     }
 
     unsigned int result = assertTimers(handle);
     if (result == RULES_OK) {
-        return Py_BuildValue("i", 1);    
+        return Py_BuildValue("I", 1);    
     } else if (result == ERR_NO_TIMERS_AVAILABLE) {
-        return Py_BuildValue("i", 0);    
+        return Py_BuildValue("I", 0);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -893,9 +893,9 @@ static PyObject *pyAssertTimers(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyGetState(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *sid;
-    if (!PyArg_ParseTuple(args, "Kz", &handle, &sid)) {
+    if (!PyArg_ParseTuple(args, "Iz", &handle, &sid)) {
         PyErr_SetString(RulesError, "pyGetState Invalid argument");
         return NULL;
     }
@@ -922,9 +922,9 @@ static PyObject *pyGetState(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyDeleteState(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *sid;
-    if (!PyArg_ParseTuple(args, "Kz", &handle, &sid)) {
+    if (!PyArg_ParseTuple(args, "Iz", &handle, &sid)) {
         PyErr_SetString(RulesError, "pyDeleteState Invalid argument");
         return NULL;
     }
@@ -949,9 +949,9 @@ static PyObject *pyDeleteState(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyRenewActionLease(PyObject *self, PyObject *args) {
-    void *handle;
+    unsigned int handle;
     char *sid;
-    if (!PyArg_ParseTuple(args, "Kz", &handle, &sid)) {
+    if (!PyArg_ParseTuple(args, "Iz", &handle, &sid)) {
         PyErr_SetString(RulesError, "pyRenewActionLease Invalid argument");
         return NULL;
     }

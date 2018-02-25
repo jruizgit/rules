@@ -58,6 +58,10 @@ typedef struct all {
     unsigned short expressionsLength;
 } all;
 
+unsigned int firstEmptyEntry = 1;
+unsigned int lastEmptyEntry = MAX_HANDLES -1;
+char entriesInitialized = 0;
+
 static unsigned int validateAlgebra(char *rule);
 
 static unsigned int createBeta(ruleset *tree, 
@@ -1880,7 +1884,8 @@ static unsigned int createTree(ruleset *tree, char *rules) {
     return RULES_OK;
 }
 
-unsigned int createRuleset(void **handle, char *name, char *rules, unsigned int stateCaheSize) {
+unsigned int createRuleset(unsigned int *handle, char *name, char *rules, unsigned int stateCaheSize) {
+    INITIALIZE_ENTRIES;
 
 #ifdef _PRINT
     printf("%s\n", rules);
@@ -1967,15 +1972,17 @@ unsigned int createRuleset(void **handle, char *name, char *rules, unsigned int 
     newNode->type = NODE_ALPHA;
     newNode->value.a.operator = OP_END;
 
-    *handle = tree;
-
     // will use random numbers for state stored event mids
     srand(time(NULL));
+
+    CREATE_HANDLE(tree, handle);
     return createTree(tree, rules);
 }
 
-unsigned int deleteRuleset(void *handle) {
-    ruleset *tree = (ruleset*)(handle);
+unsigned int deleteRuleset(unsigned int handle) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+
     deleteBindingsList(tree);
     free(tree->nodePool);
     free(tree->nextPool);
@@ -1996,10 +2003,13 @@ unsigned int deleteRuleset(void *handle) {
     }
     free(tree->state);
     free(tree);
+    DELETE_HANDLE(handle);
     return RULES_OK;
 }
 
-unsigned int createClient(void **handle, char *name, unsigned int stateCaheSize) {
+unsigned int createClient(unsigned int *handle, char *name, unsigned int stateCaheSize) {
+    INITIALIZE_ENTRIES;
+
     ruleset *tree = malloc(sizeof(ruleset));
     if (!tree) {
         return ERR_OUT_OF_MEMORY;
@@ -2033,12 +2043,14 @@ unsigned int createClient(void **handle, char *name, unsigned int stateCaheSize)
         return result;
     }
 
-    *handle = tree;
+    CREATE_HANDLE(tree, handle);
     return RULES_OK;
 }
 
-unsigned int deleteClient(void *handle) {
-    ruleset *tree = (ruleset*)(handle);
+unsigned int deleteClient(unsigned int handle) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+    
     deleteBindingsList(tree);
     free(tree->stringPool);
     free(tree->stateBuckets);
@@ -2054,6 +2066,7 @@ unsigned int deleteClient(void *handle) {
     }
     
     free(tree);
+    DELETE_HANDLE(handle);
     return RULES_OK;
 }
 

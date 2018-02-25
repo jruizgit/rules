@@ -10,6 +10,8 @@
 #define ERR_RULE_BETA_LIMIT_EXCEEDED 8
 #define ERR_RULE_WITHOUT_QUALIFIER 9
 #define ERR_SETTING_NOT_FOUND 10
+#define ERR_INVALID_HANDLE 11
+#define ERR_HANDLE_LIMIT_EXCEEDED 12
 #define ERR_PARSE_VALUE 101
 #define ERR_PARSE_STRING 102
 #define ERR_PARSE_NUMBER 103
@@ -56,24 +58,71 @@
 #define QUEUE_ASSERT_EVENT 2
 #define QUEUE_RETRACT_FACT 3
 
+#define MAX_HANDLES 131072
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-unsigned int createRuleset(void **handle, 
+
+typedef struct handleEntry {
+    void *content;
+    unsigned int nextEmptyEntry;
+} handleEntry;
+
+handleEntry handleEntries[MAX_HANDLES];
+extern unsigned int firstEmptyEntry;
+extern unsigned int lastEmptyEntry;
+extern char entriesInitialized;
+
+#define INITIALIZE_ENTRIES do { \
+    if (!entriesInitialized) { \
+        for (unsigned int i = 0; i < lastEmptyEntry; ++i) { \
+            handleEntries[i].content = NULL; \
+            handleEntries[i].nextEmptyEntry = i + 1; \
+        } \
+        handleEntries[lastEmptyEntry].nextEmptyEntry = 0; \
+        entriesInitialized = 1; \
+    } \
+} while(0)
+
+#define RESOLVE_HANDLE(h, cRef) do { \
+    if (h < 1 || h > MAX_HANDLES - 1) return ERR_INVALID_HANDLE; \
+    if (!handleEntries[h].content) return ERR_INVALID_HANDLE; \
+    *cRef = handleEntries[h].content; \
+} while(0)
+
+#define CREATE_HANDLE(c, hRef) do { \
+    if (firstEmptyEntry == 0) return ERR_HANDLE_LIMIT_EXCEEDED; \
+    handleEntries[firstEmptyEntry].content = c; \
+    *hRef = firstEmptyEntry; \
+    firstEmptyEntry = handleEntries[firstEmptyEntry].nextEmptyEntry; \
+} while(0)
+
+#define DELETE_HANDLE(h) do { \
+    if (h < 1 || h > MAX_HANDLES - 1) return ERR_INVALID_HANDLE; \
+    if (!handleEntries[h].content) return ERR_INVALID_HANDLE; \
+    handleEntries[h].content = NULL; \
+    handleEntries[h].nextEmptyEntry = 0; \
+    handleEntries[lastEmptyEntry].nextEmptyEntry = h; \
+    lastEmptyEntry = h; \
+    if (!firstEmptyEntry) firstEmptyEntry = lastEmptyEntry; \
+} while(0)
+
+unsigned int createRuleset(unsigned int *handle, 
                            char *name, 
                            char *rules, 
                            unsigned int stateCaheSize);
 
-unsigned int deleteRuleset(void *handle);
+unsigned int deleteRuleset(unsigned int handle);
 
-unsigned int createClient(void **handle, 
+unsigned int createClient(unsigned int *handle, 
                           char *name,
                           unsigned int stateCaheSize);
 
-unsigned int deleteClient(void *handle);
+unsigned int deleteClient(unsigned int handle);
 
-unsigned int bindRuleset(void *handle, 
+unsigned int bindRuleset(unsigned int handle, 
                          char *host, 
                          unsigned int port, 
                          char *password,
@@ -82,111 +131,111 @@ unsigned int bindRuleset(void *handle,
 unsigned int complete(void *rulesBinding, 
                       unsigned int replyCount);
 
-unsigned int assertEvent(void *handle, 
+unsigned int assertEvent(unsigned int handle, 
                          char *message);
 
-unsigned int startAssertEvent(void *handle, 
+unsigned int startAssertEvent(unsigned int handle, 
                              char *message, 
                              void **rulesBinding, 
                              unsigned int *replyCount);
 
-unsigned int assertEvents(void *handle, 
+unsigned int assertEvents(unsigned int handle, 
                           char *messages);
 
-unsigned int startAssertEvents(void *handle, 
+unsigned int startAssertEvents(unsigned int handle, 
                               char *messages, 
                               void **rulesBinding, 
                               unsigned int *replyCount);
 
-unsigned int retractEvent(void *handle, 
+unsigned int retractEvent(unsigned int handle, 
                           char *message);
 
-unsigned int startAssertFact(void *handle, 
+unsigned int startAssertFact(unsigned int handle, 
                              char *message, 
                              void **rulesBinding, 
                              unsigned int *replyCount);
 
-unsigned int assertFact(void *handle, 
+unsigned int assertFact(unsigned int handle, 
                         char *message);
 
-unsigned int startAssertFacts(void *handle, 
+unsigned int startAssertFacts(unsigned int handle, 
                               char *messages, 
                               void **rulesBinding, 
                               unsigned int *replyCount);
 
-unsigned int assertFacts(void *handle, 
+unsigned int assertFacts(unsigned int handle, 
                          char *messages);
 
-unsigned int retractFact(void *handle, 
+unsigned int retractFact(unsigned int handle, 
                          char *message);
 
-unsigned int startRetractFact(void *handle, 
+unsigned int startRetractFact(unsigned int handle, 
                              char *message, 
                              void **rulesBinding, 
                              unsigned int *replyCount);
 
-unsigned int retractFacts(void *handle, 
+unsigned int retractFacts(unsigned int handle, 
                           char *messages);
 
-unsigned int startRetractFacts(void *handle, 
+unsigned int startRetractFacts(unsigned int handle, 
                               char *messages, 
                               void **rulesBinding, 
                               unsigned int *replyCount);
 
-unsigned int startUpdateState(void *handle, 
+unsigned int startUpdateState(unsigned int handle, 
                               void *actionHandle, 
                               char *state,
                               void **rulesBinding,
                               unsigned int *replyCount);
 
-unsigned int assertState(void *handle,
+unsigned int assertState(unsigned int handle,
                          char *sid, 
                          char *state);
 
-unsigned int startAction(void *handle, 
+unsigned int startAction(unsigned int handle, 
                          char **state, 
                          char **messages, 
                          void **actionHandle,
                          void **actionBinding);
 
-unsigned int completeAction(void *handle, 
+unsigned int completeAction(unsigned int handle, 
                             void *actionHandle, 
                             char *state);
 
-unsigned int completeAndStartAction(void *handle, 
+unsigned int completeAndStartAction(unsigned int handle, 
                                     unsigned int expectedReplies,
                                     void *actionHandle, 
                                     char **messages);
 
-unsigned int abandonAction(void *handle, 
+unsigned int abandonAction(unsigned int handle, 
                            void *actionHandle);
 
-unsigned int startTimer(void *handle, 
+unsigned int startTimer(unsigned int handle, 
                         char *sid, 
                         unsigned int duration, 
                         char manualReset,
                         char *timer);
 
-unsigned int cancelTimer(void *handle, 
+unsigned int cancelTimer(unsigned int handle, 
                          char *sid, 
                          char *timerName);
 
-unsigned int queueMessage(void *handle,
+unsigned int queueMessage(unsigned int handle,
                           unsigned int queueAction, 
                           char *sid, 
                           char *destination, 
                           char *message);
 
-unsigned int assertTimers(void *handle);
+unsigned int assertTimers(unsigned int handle);
 
-unsigned int getState(void *handle, 
+unsigned int getState(unsigned int handle, 
                       char *sid, 
                       char **state);
 
-unsigned int deleteState(void *handle, 
+unsigned int deleteState(unsigned int handle, 
                          char *sid);
 
-unsigned int renewActionLease(void *handle, 
+unsigned int renewActionLease(unsigned int handle, 
                               char *sid);
 
 #ifdef _WIN32

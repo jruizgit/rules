@@ -66,7 +66,7 @@ result = r.startAction(handle);
 console.log(JSON.parse(result[0]));
 console.log(JSON.parse(result[1]));
 r.completeAction(handle, result[2], result[0]);
-
+r.deleteRuleset(handle);
 
 console.log('proxy');
 
@@ -419,6 +419,7 @@ result = r.startAction(handle);
 console.log(JSON.parse(result[0]));
 console.log(JSON.parse(result[1]));
 r.completeAction(handle, result[2], result[0]);
+r.deleteRuleset(handle);
 
 console.log('pri0');
 
@@ -1473,56 +1474,3 @@ r.completeAction(handle, result[2], result[0]);
 
 r.deleteRuleset(handle);
 
-console.log('span0');
-
-handle = r.createRuleset('span0',  
-    JSON.stringify({
-        suspect: {
-            span: 2,
-            all: [{first: {t: 'purchase'}}]
-        }
-    })
-, 100);
-
-r.bindRuleset(handle, 'localhost', 6379, null, 0);
-
-r.assertEvent(handle, 
-    JSON.stringify({
-        id: 1,
-        sid: 1,
-        t: 'purchase'
-    })
-);
-
-r.assertEvent(handle, 
-    JSON.stringify({
-        id: 2,
-        sid: 1,
-        t: 'purchase'
-    })
-);
-
-setTimeout(function() {
-    r.assertEvent(handle, 
-        JSON.stringify({
-            id: 3,
-            sid: 1,
-            t: 'purchase'
-        })
-    );  
-
-    setTimeout(function() {
-        r.assertEvent(handle, 
-            JSON.stringify({
-                id: 4,
-                sid: 1,
-                t: 'purchase'
-            })
-        );
-        result = r.startAction(handle);
-        console.log(JSON.parse(result[0]));
-        console.log(JSON.parse(result[1]));
-        r.completeAction(handle, result[2], result[0]);
-        r.deleteRuleset(handle);
-    }, 2000);
-}, 1000);

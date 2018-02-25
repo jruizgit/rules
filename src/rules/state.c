@@ -503,19 +503,19 @@ static unsigned int resolveBindingAndEntry(ruleset *tree,
     return RULES_OK;
 }
 
-unsigned int resolveBinding(void *handle, 
+unsigned int resolveBinding(void *tree, 
                             char *sid, 
                             void **rulesBinding) {  
     stateEntry *entry = NULL;
-    return resolveBindingAndEntry(handle, sid, &entry, rulesBinding);
+    return resolveBindingAndEntry(tree, sid, &entry, rulesBinding);
 }
 
-unsigned int refreshState(void *handle, 
+unsigned int refreshState(void *tree, 
                           char *sid) {
     unsigned int result;
     stateEntry *entry = NULL;  
     void *rulesBinding;
-    result = resolveBindingAndEntry(handle, sid, &entry, &rulesBinding);
+    result = resolveBindingAndEntry(tree, sid, &entry, &rulesBinding);
     if (result != RULES_OK) {
         return result;
     }
@@ -585,13 +585,16 @@ unsigned int fetchStateProperty(void *tree,
     return RULES_OK;    
 }
 
-unsigned int getState(void *handle, char *sid, char **state) {
+unsigned int getState(unsigned int handle, char *sid, char **state) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+
     void *rulesBinding = NULL;
     if (!sid) {
         sid = "0";
     }
 
-    unsigned int result = resolveBinding(handle, sid, &rulesBinding);
+    unsigned int result = resolveBinding(tree, sid, &rulesBinding);
     if (result != RULES_OK) {
       return result;
     }
@@ -599,9 +602,9 @@ unsigned int getState(void *handle, char *sid, char **state) {
     return getSession(rulesBinding, sid, state);
 }
 
-unsigned int getStateVersion(void *handle, char *sid, unsigned long *stateVersion) {
+unsigned int getStateVersion(void *tree, char *sid, unsigned long *stateVersion) {
     void *rulesBinding = NULL;
-    unsigned int result = resolveBinding(handle, sid, &rulesBinding);
+    unsigned int result = resolveBinding(tree, sid, &rulesBinding);
     if (result != RULES_OK) {
       return result;
     }
@@ -610,17 +613,20 @@ unsigned int getStateVersion(void *handle, char *sid, unsigned long *stateVersio
 }
 
 
-unsigned int deleteState(void *handle, char *sid) {
+unsigned int deleteState(unsigned int handle, char *sid) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+
     if (!sid) {
         sid = "0";
     }
 
     void *rulesBinding = NULL;
-    unsigned int result = resolveBinding(handle, sid, &rulesBinding);
+    unsigned int result = resolveBinding(tree, sid, &rulesBinding);
     if (result != RULES_OK) {
       return result;
     }
 
     unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
-    return deleteSession(handle, rulesBinding, sid, sidHash);
+    return deleteSession(tree, rulesBinding, sid, sidHash);
 }

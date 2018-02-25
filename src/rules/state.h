@@ -74,6 +74,6 @@ unsigned int fetchStateProperty(void *tree,
                                 char **state,
                                 jsonProperty **property);
 
-unsigned int getStateVersion(void *handle, 
+unsigned int getStateVersion(void *tree, 
                              char *sid, 
                              unsigned long *stateVersion);
