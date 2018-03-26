@@ -56,6 +56,57 @@ static unsigned int evictEntry(ruleset *tree) {
     return result;
 }
 
+static void deleteEntry(ruleset *tree, char *sid, unsigned int sidHash) {
+    unsigned int bucket = sidHash % tree->stateBucketsLength;
+    unsigned int offset = tree->stateBuckets[bucket];
+    unsigned int lastOffset = UNDEFINED_HASH_OFFSET;
+    unsigned char found = 0;
+    while (!found && offset != UNDEFINED_HASH_OFFSET) {
+        stateEntry *current = &tree->state[offset];
+        if (current->sidHash == sidHash) {
+            if (!strcmp(current->sid, sid)) {
+                if (lastOffset == UNDEFINED_HASH_OFFSET) {
+                    tree->stateBuckets[bucket] = current->nextHashOffset;
+                } else {
+                    tree->state[lastOffset].nextHashOffset = current->nextHashOffset;
+                }
+
+                if (current->state) {
+                    free(current->state);
+                    current->state = NULL;
+                }
+
+                free(current->sid);
+                current->sid = NULL;
+                current->sidHash = 0;
+                current->bindingIndex = 0;
+                current->lastRefresh = 0;
+                current->jo.propertiesLength = 0;
+                found = 1;
+
+
+                // remove entry from lru double linked list
+                if (current->prevLruOffset != UNDEFINED_HASH_OFFSET) {
+                    tree->state[current->prevLruOffset].nextLruOffset = current->nextLruOffset;
+                    if (tree->mruStateOffset == offset) {
+                        tree->mruStateOffset = current->prevLruOffset;
+                    }
+                }
+
+                if (current->nextLruOffset != UNDEFINED_HASH_OFFSET) {
+                    tree->state[current->nextLruOffset].prevLruOffset = current->prevLruOffset;
+                    if (tree->lruStateOffset == offset) {
+                        tree->lruStateOffset = current->nextLruOffset;
+                    }
+                }
+            }
+        }
+
+        lastOffset = offset;
+        offset = current->nextHashOffset;
+    }
+}
+
 static unsigned int addEntry(ruleset *tree, char *sid, unsigned int sidHash) {
     unsigned newOffset;
     if (tree->stateLength == tree->maxStateLength) {
@@ -628,5 +679,11 @@ unsigned int deleteState(unsigned int handle, char *sid) {
     }
 
     unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
-    return deleteSession(tree, rulesBinding, sid, sidHash);
+    result = deleteSession(tree, rulesBinding, sid, sidHash);
+    if (result != RULES_OK) {
+      return result;
+    }
+
+    deleteEntry(tree, sid, sidHash);
+    return RULES_OK;
 }
