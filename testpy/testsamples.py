@@ -651,6 +651,11 @@ with ruleset('risk5'):
 
 with ruleset('risk6'):
     # matching primitive array
+    @when_all(m.payments.allItems((item > 100) & (item < 400)))
+    def rule1(c):
+        print('should not match {0}'.format(c.m.payments))
+
+    # matching primitive array
     @when_all(m.payments.allItems((item > 100) & (item < 500)))
     def rule1(c):
         print('fraud 1 detected {0}'.format(c.m.payments))

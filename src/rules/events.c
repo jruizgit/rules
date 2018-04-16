@@ -938,7 +938,6 @@ static unsigned int isArrayMatch(ruleset *tree,
                                  alpha *arrayAlpha,
                                  unsigned char *propertyMatch,
                                  void **rulesBinding) {
-    *propertyMatch = 0;
     unsigned int result = RULES_OK;
     if (currentProperty->type != JSON_ARRAY) {
         return RULES_OK;
@@ -950,6 +949,7 @@ static unsigned int isArrayMatch(ruleset *tree,
     jsonObject jo;
     result = readNextArrayValue(first, &first, &last, &type);
     while (result == PARSE_OK) {
+        *propertyMatch = 0;
         unsigned short top = 1;
         alpha *stack[MAX_STACK_SIZE];
         stack[0] = arrayAlpha;
@@ -1052,13 +1052,13 @@ static unsigned int isArrayMatch(ruleset *tree,
             if ((currentAlpha->betaListOffset || !currentAlpha->nextOffset) && currentAlpha != arrayAlpha) {
                 *propertyMatch = 1;
                 break;
-            }
+            } 
         }
         
         if ((arrayAlpha->operator == OP_IALL && !*propertyMatch) ||
             (arrayAlpha->operator == OP_IANY && *propertyMatch)) {
             break;
-        }
+        } 
 
         result = readNextArrayValue(last, &first, &last, &type);   
     }
