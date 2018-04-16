@@ -34,106 +34,102 @@ Reference Manual
 * `run` label the consequent definition of a rule 
   
 ```javascript
-{  
-  "ruleset": {
-    "r_0": {
-      "all": [
-        {
-          "m": {
-            "subject": "World"
-          }
+{
+  "r_0": {
+    "all": [
+      {
+        "m": {
+          "subject": "World"
         }
-      ],
-      "run": "approved"
-    }
+      }
+    ],
+    "run": "approved"
   }
-}  
+}
 ```
 ### Facts
 
 ```javascript
-{  
-  "ruleset": {
-    "r_0": {
-      "all": [
-        {
-          "first": {
-            "$and": [
-              {
-                "predicate": "eats"
-              },
-              {
-                "object": "flies"
-              }
-            ]
-          }
-        }
-      ],
-      "run": "frog"
-    },
-    "r_1": {
-      "all": [
-        {
-          "first": {
-            "$and": [
-              {
-                "predicate": "eats"
-              },
-              {
-                "object": "worms"
-              }
-            ]
-          }
-        }
-      ],
-      "run": "bird"
-    },
-    "r_2": {
-      "all": [
-        {
-          "m": {
-            "$and": [
-              {
-                "predicate": "is"
-              },
-              {
-                "object": "frog"
-              }
-            ]
-          }
-        }
-      ],
-      "run": "green"
-    },
-    "r_3": {
-      "all": [
-        {
-          "m": {
-            "$and": [
-              {
-                "predicate": "is"
-              },
-              {
-                "object": "bird"
-              }
-            ] 
-          }
-        }
-      ],
-      "run": "black"
-    },
-    "r_6": {
-      "all": [
-        {
-          "m": {
-            "$ex": {
-              "subject": 1
+{
+  "r_0": {
+    "all": [
+      {
+        "first": {
+          "$and": [
+            {
+              "predicate": "eats"
+            },
+            {
+              "object": "flies"
             }
+          ]
+        }
+      }
+    ],
+    "run": "frog"
+  },
+  "r_1": {
+    "all": [
+      {
+        "first": {
+          "$and": [
+            {
+              "predicate": "eats"
+            },
+            {
+              "object": "worms"
+            }
+          ]
+        }
+      }
+    ],
+    "run": "bird"
+  },
+  "r_2": {
+    "all": [
+      {
+        "m": {
+          "$and": [
+            {
+              "predicate": "is"
+            },
+            {
+              "object": "frog"
+            }
+          ]
+        }
+      }
+    ],
+    "run": "green"
+  },
+  "r_3": {
+    "all": [
+      {
+        "m": {
+          "$and": [
+            {
+              "predicate": "is"
+            },
+            {
+              "object": "bird"
+            }
+          ]
+        }
+      }
+    ],
+    "run": "black"
+  },
+  "r_6": {
+    "all": [
+      {
+        "m": {
+          "$ex": {
+            "subject": 1
           }
         }
-      ],
-      "run": "log"
-    }
+      }
+    ],
+    "run": "log"
   }
 }
 ```
