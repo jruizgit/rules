@@ -35,15 +35,17 @@ Reference Manual
   
 ```javascript
 {
-  "r_0": {
-    "all": [
-      {
-        "m": {
-          "subject": "World"
+  "test": {
+    "r_0": {
+      "all": [
+        {
+          "m": {
+            "subject": "World"
+          }
         }
-      }
-    ],
-    "run": "approved"
+      ],
+      "run": "approved"
+    }
   }
 }
 ```
@@ -51,85 +53,87 @@ Reference Manual
 
 ```javascript
 {
-  "r_0": {
-    "all": [
-      {
-        "first": {
-          "$and": [
-            {
-              "predicate": "eats"
-            },
-            {
-              "object": "flies"
-            }
-          ]
-        }
-      }
-    ],
-    "run": "frog"
-  },
-  "r_1": {
-    "all": [
-      {
-        "first": {
-          "$and": [
-            {
-              "predicate": "eats"
-            },
-            {
-              "object": "worms"
-            }
-          ]
-        }
-      }
-    ],
-    "run": "bird"
-  },
-  "r_2": {
-    "all": [
-      {
-        "m": {
-          "$and": [
-            {
-              "predicate": "is"
-            },
-            {
-              "object": "frog"
-            }
-          ]
-        }
-      }
-    ],
-    "run": "green"
-  },
-  "r_3": {
-    "all": [
-      {
-        "m": {
-          "$and": [
-            {
-              "predicate": "is"
-            },
-            {
-              "object": "bird"
-            }
-          ]
-        }
-      }
-    ],
-    "run": "black"
-  },
-  "r_6": {
-    "all": [
-      {
-        "m": {
-          "$ex": {
-            "subject": 1
+  "animal": {
+    "r_0": {
+      "all": [
+        {
+          "first": {
+            "$and": [
+              {
+                "predicate": "eats"
+              },
+              {
+                "object": "flies"
+              }
+            ]
           }
         }
-      }
-    ],
-    "run": "log"
+      ],
+      "run": "frog"
+    },
+    "r_2": {
+      "all": [
+        {
+          "m": {
+            "$and": [
+              {
+                "predicate": "eats"
+              },
+              {
+                "object": "worms"
+              }
+            ]
+          }
+        }
+      ],
+      "run": "bird"
+    },
+    "r_3": {
+      "all": [
+        {
+          "m": {
+            "$and": [
+              {
+                "predicate": "is"
+              },
+              {
+                "object": "frog"
+              }
+            ]
+          }
+        }
+      ],
+      "run": "green"
+    },
+    "r_5": {
+      "all": [
+        {
+          "m": {
+            "$and": [
+              {
+                "predicate": "is"
+              },
+              {
+                "object": "bird"
+              }
+            ]
+          }
+        }
+      ],
+      "run": "black"
+    },
+    "r_6": {
+      "all": [
+        {
+          "m": {
+            "$ex": {
+              "subject": 1
+            }
+          }
+        }
+      ],
+      "run": "log"
+    }
   }
 }
 ```
@@ -144,24 +148,26 @@ Facts can  be asserted using the http API. For the example above, run the follow
 
 ```javascript
 {
-  "r_0": {
-    "all": [
-      {
-        "first": {
-          "t": "purchase"
-        }
-      },
-      {
-        "second": {
-          "$neq": {
-            "location": {
-              "first": "location"
+  "risk": {
+    "r_0": {
+      "all": [
+        {
+          "first": {
+            "t": "purchase"
+          }
+        },
+        {
+          "second": {
+            "$neq": {
+              "location": {
+                "first": "location"
+              }
             }
           }
         }
-      }
-    ],
-    "run": "fraud"
+      ],
+      "run": "fraud"
+    }
   }
 }
 ```
@@ -184,56 +190,58 @@ Context state changes can be evaluated by rules. By convention, context state ch
 
 ```javascript
 {
-  "r_0": {
-    "all": [
-      {
-        "m": {
-          "$and": [
-            {
-              "status": "start"
-            },
-            {
-              "$s": 1
-            }
-          ]
+  "flow": {
+    "r_0": {
+      "all": [
+        {
+          "m": {
+            "$and": [
+              {
+                "state": "start"
+              },
+              {
+                "$s": 1
+              }
+            ]
+          }
         }
-      }
-    ],
-    "run": "next"
-  },
-  "r_1": {
-    "all": [
-      {
-        "m": {
-          "$and": [
-            {
-              "status": "next"
-            },
-            {
-              "$s": 1
-            }
-          ]
+      ],
+      "run": "next"
+    },
+    "r_1": {
+      "all": [
+        {
+          "m": {
+            "$and": [
+              {
+                "state": "next"
+              },
+              {
+                "$s": 1
+              }
+            ]
+          }
         }
-      }
-    ],
-    "run": "last"
-  },
-  "r_2": {
-    "all": [
-      {
-        "m": {
-          "$and": [
-            {
-              "status": "last"
-            },
-            {
-              "$s": 1
-            }
-          ]
+      ],
+      "run": "last"
+    },
+    "r_2": {
+      "all": [
+        {
+          "m": {
+            "$and": [
+              {
+                "state": "last"
+              },
+              {
+                "$s": 1
+              }
+            ]
+          }
         }
-      }
-    ],
-    "run": "end"
+      ],
+      "run": "end"
+    }
   }
 }
 ```
@@ -246,41 +254,43 @@ State can also be retrieved and modified using the http API. When the example ab
 
 ```javascript
 {
-  "r_0": {
-    "all": [
-      {
-        "m": {
-          "$ex": {
-            "status": 1
+  "bookstore": {
+    "r_0": {
+      "all": [
+        {
+          "m": {
+            "$ex": {
+              "status": 1
+            }
           }
         }
-      }
-    ],
-    "run": "log"
-  },
-  "r_1": {
-    "all": [
-      {
-        "m": {
-          "$ex": {
-            "name": 1
+      ],
+      "run": "log"
+    },
+    "r_1": {
+      "all": [
+        {
+          "m": {
+            "$ex": {
+              "name": 1
+            }
           }
         }
-      }
-    ],
-    "run": "retract"
-  },
-  "r_2": {
-    "all": [
-      {
-        "m$not": {
-          "$ex": {
-            "name": 1
+      ],
+      "run": "retract"
+    },
+    "r_2": {
+      "all": [
+        {
+          "m$not": {
+            "$ex": {
+              "name": 1
+            }
           }
         }
-      }
-    ],
-    "run": "log"
+      ],
+      "run": "log"
+    }
   }
 }
 ```
@@ -296,22 +306,24 @@ Logical operators:
 
 ```javascript
 {
-  "r_0": {
-    "all": [
-      {
-        "m": {
-          "$or": [
-            {
-              "subject": "approve"
-            },
-            {
-              "subject": "ok"
-            }
-          ]
+  "expense": {
+    "r_0": {
+      "all": [
+        {
+          "m": {
+            "$or": [
+              {
+                "subject": "approve"
+              },
+              {
+                "subject": "ok"
+              }
+            ]
+          }
         }
-      }
-    ],
-    "run": "approve"
+      ],
+      "run": "approve"
+    }
   }
 }
 ```  
@@ -344,17 +356,19 @@ durable_rules implements a simple pattern matching dialect. Use `"$mt"` to defin
 
 ```javascript
 {
-  "r_0": {
-    "all": [
-      {
-        "m": {
-          "$mt": {
-            "url": "(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*"
+  "match": {
+    "r_0": {
+      "all": [
+        {
+          "m": {
+            "$mt": {
+              "url": "(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*"
+            }
           }
         }
-      }
-    ],
-    "run": "log"
+      ],
+      "run": "log"
+    }
   }
 }
 ```  
@@ -364,41 +378,43 @@ The pattern matching dialect can be used for common string operations. Use `"$im
 
 ```javascript
 {
-  "r_0": {
-    "all": [
-      {
-        "m": {
-          "$mt": {
-            "subject": "hello.*"
+  "strings": {
+    "r_0": {
+      "all": [
+        {
+          "m": {
+            "$mt": {
+              "subject": "hello.*"
+            }
           }
         }
-      }
-    ],
-    "run": "logStarts"
-  },
-  "r_1": {
-    "all": [
-      {
-        "m": {
-          "$imt": {
-            "subject": ".*hello"
+      ],
+      "run": "logStarts"
+    },
+    "r_1": {
+      "all": [
+        {
+          "m": {
+            "$imt": {
+              "subject": ".*hello"
+            }
           }
         }
-      }
-    ],
-    "run": "logEnds"
-  },
-  "r_2": {
-    "all": [
-      {
-        "m": {
-          "$imt": {
-            "subject": ".*hello.*"
+      ],
+      "run": "logEnds"
+    },
+    "r_2": {
+      "all": [
+        {
+          "m": {
+            "$imt": {
+              "subject": ".*hello.*"
+            }
           }
         }
-      }
-    ],
-    "run": "logContains"
+      ],
+      "run": "logContains"
+    }
   }
 }
 ```  
@@ -410,47 +426,49 @@ The `"all"` object expresses a sequence of events or facts. The object names are
 Arithmetic operators: `"$add"`, `"$sub"`, `"$mul"`, `"$div"`  
 ```javascript
 {
-  "r_0": {
-    "all": [
-      {
-        "first": {
-          "$gt": {
-            "amount": 100
+  "risk": {
+    "r_0": {
+      "all": [
+        {
+          "first": {
+            "$gt": {
+              "amount": 100
+            }
           }
-        }
-      },
-      {
-        "second": {
-          "$gt": {
-            "amount": {
-              "$mul": {
-                "$l": {
-                  "first": "amount"
-                },
-                "$r": 2
+        },
+        {
+          "second": {
+            "$gt": {
+              "amount": {
+                "$mul": {
+                  "$l": {
+                    "first": "amount"
+                  },
+                  "$r": 2
+                }
               }
             }
           }
-        }
-      },
-      {
-        "third": {
-          "$gt": {
-            "amount": {
-              "$add": {
-                "$l": {
-                  "first": "amount"
-                },
-                "$r": {
-                  "second": "amount"
+        },
+        {
+          "third": {
+            "$gt": {
+              "amount": {
+                "$add": {
+                  "$l": {
+                    "first": "amount"
+                  },
+                  "$r": {
+                    "second": "amount"
+                  }
                 }
               }
             }
           }
         }
-      }
-    ],
-    "run": "fraud"
+      ],
+      "run": "fraud"
+    }
   }
 }
 ```
@@ -463,38 +481,40 @@ The following two labels can be used and combined to define richer event sequenc
 
 ```javascript
 {
-  "r_0": {
-    "any": [
-      {
-        "m_0$all": [
-          {
-            "first": {
-              "subject": "approve"
+  "expense": {
+    "r_0": {
+      "any": [
+        {
+          "m_0$all": [
+            {
+              "first": {
+                "subject": "approve"
+              }
+            },
+            {
+              "second": {
+                "amount": 1000
+              }
             }
-          },
-          {
-            "second": {
-              "amount": 1000
+          ]
+        },
+        {
+          "m_1$all": [
+            {
+              "third": {
+                "subject": "jumbo"
+              }
+            },
+            {
+              "fourth": {
+                "amount": 10000
+              }
             }
-          }
-        ]
-      },
-      {
-        "m_1$all": [
-          {
-            "third": {
-              "subject": "jumbo"
-            }
-          },
-          {
-            "fourth": {
-              "amount": 10000
-            }
-          }
-        ]
-      }
-    ],
-    "run": "log"
+          ]
+        }
+      ],
+      "run": "log"
+    }
   }
 }
 ```
@@ -505,30 +525,32 @@ The `$not` modifier can be used in rules with correlated sequences to evaluate t
 
 ```javascript
 {
-  "r_0": {
-    "all": [
-      {
-        "first": {
-          "t": "deposit"
+  "risk": {
+    "r_0": {
+      "all": [
+        {
+          "first": {
+            "t": "deposit"
+          }
+        },
+        {
+          "m_1$not": {
+            "t": "balance"
+          }
+        },
+        {
+          "third": {
+            "t": "withrawal"
+          }
+        },
+        {
+          "fourth": {
+            "t": "chargeback"
+          }
         }
-      },
-      {
-        "m_1$not": {
-          "t": "balance"
-        }
-      },
-      {
-        "third": {
-          "t": "withrawal"
-        }
-      },
-      {
-        "fourth": {
-          "t": "chargeback"
-        }
-      }
-    ],
-    "run": "fraud"
+      ],
+      "run": "fraud"
+    }
   }
 }
 ```
@@ -540,38 +562,40 @@ Queries on nested events or facts are also supported. The `.` notation is used f
 
 ```javascript
 {
-  "r_0": {
-    "all": [
-      {
-        "bill": {
-          "$and": [
-            {
-              "t": "bill"
-            },
-            {
-              "$gt": {
-                "invoice.amount": 50
+  "expense": {
+    "r_0": {
+      "all": [
+        {
+          "bill": {
+            "$and": [
+              {
+                "t": "bill"
+              },
+              {
+                "$gt": {
+                  "invoice.amount": 50
+                }
               }
-            }
-          ]
-        }
-      },
-      {
-        "account": {
-          "$and": [
-            {
-              "t": "account"
-            },
-            {
-              "payment.invoice.amount": {
-                "bill": "invoice.amount"
+            ]
+          }
+        },
+        {
+          "account": {
+            "$and": [
+              {
+                "t": "account"
+              },
+              {
+                "payment.invoice.amount": {
+                  "bill": "invoice.amount"
+                }
               }
-            }
-          ]
+            ]
+          }
         }
-      }
-    ],
-    "run": "log"
+      ],
+      "run": "log"
+    }
   }
 }
 ```
@@ -583,105 +607,123 @@ Use `"$iall"` to match all items in an array, `"$iany"` to match any element in 
 
 ```javascript
 {
-  "r_0": {
-    "all": [
-      {
-        "m": {
-          "$iall": {
-            "payments": {
-              "$gt": {
-                "$i": 1000
-              }
-            }
-          }
-        }
-      }
-    ],
-    "run": "fraud1"
-  },
-  "r_1": {
-    "all": [
-      {
-        "m": {
-          "$iall": {
-            "payments": {
-              "$or": [
-                {
-                  "$lt": {
-                    "$i.amount": 250
-                  }
-                },
-                {
-                  "$gte": {
-                    "$i.amount": 300
-                  }
-                }
-              ]
-            }
-          }
-        }
-      }
-    ],
-    "run": "fraud2"
-  },
-  "r_2": {
-    "all": [
-      {
-        "m": {
-          "$iany": {
-            "cards": {
-              "$mt": {
-                "$i": "three.*"
-              }
-            }
-          }
-        }
-      }
-    ],
-    "run": "fraud3"
-  },
-  "r_3": {
-    "all": [
-      {
-        "m": {
-          "$iany": {
-            "payments": {
-              "$iall": {
-                "$i": {
-                  "$lt": {
-                    "$i": 100
-                  }
+  "risk": {
+    "r_0": {
+      "all": [
+        {
+          "m": {
+            "$iall": {
+              "payments": {
+                "$gt": {
+                  "$i": 2000
                 }
               }
             }
           }
         }
-      }
-    ],
-    "run": "fraud4"
-  },
-  "r_4": {
-    "all": [
-      {
-        "m": {
-          "$and": [
-            {
-              "$iall": {
-                "payments": {
-                  "$gt": {
-                    "$i": 100
+      ],
+      "run": "fraud1"
+    },
+    "r_1": {
+      "all": [
+        {
+          "m": {
+            "$iall": {
+              "payments": {
+                "$gt": {
+                  "$i": 1000
+                }
+              }
+            }
+          }
+        }
+      ],
+      "run": "fraud2"
+    },
+    "r_2": {
+      "all": [
+        {
+          "m": {
+            "$iall": {
+              "payments": {
+                "$or": [
+                  {
+                    "$lt": {
+                      "$i.amount": 250
+                    }
+                  },
+                  {
+                    "$gte": {
+                      "$i.amount": 300
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "run": "fraud3"
+    },
+    "r_3": {
+      "all": [
+        {
+          "m": {
+            "$iany": {
+              "cards": {
+                "$mt": {
+                  "$i": "three.*"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "run": "fraud4"
+    },
+    "r_4": {
+      "all": [
+        {
+          "m": {
+            "$iany": {
+              "payments": {
+                "$iall": {
+                  "$i": {
+                    "$lt": {
+                      "$i": 100
+                    }
                   }
                 }
               }
-            },
-            {
-              "cash": true
             }
-          ]
+          }
         }
-      }
-    ],
-    "run": "fraud5"
+      ],
+      "run": "fraud5"
+    },
+    "r_5": {
+      "all": [
+        {
+          "m": {
+            "$and": [
+              {
+                "$iall": {
+                  "payments": {
+                    "$gt": {
+                      "$i": 100
+                    }
+                  }
+                }
+              },
+              {
+                "cash": true
+              }
+            ]
+          }
+        }
+      ],
+      "run": "fraud6"
+    }
   }
 }
 ```
@@ -692,57 +734,59 @@ Aside from scalars (strings, number and boolean values), it is possible to use t
 
 ```javascript
 {
-  "r_0": {
-    "all": [
-      {
-        "m": {
-          "$gt": {
-            "debit": {
-              "$mul": {
-                "$l": {
-                  "$m": "credit"
-                },
-                "$r": 2
+  "risk": {
+    "r_0": {
+      "all": [
+        {
+          "m": {
+            "$gt": {
+              "debit": {
+                "$mul": {
+                  "$l": {
+                    "$m": "credit"
+                  },
+                  "$r": 2
+                }
               }
             }
           }
         }
-      }
-    ],
-    "run": "log"
-  },
-  "r_1": {
-    "all": [
-      {
-        "first": {
-          "$gt": {
-            "amount": 100
+      ],
+      "run": "log"
+    },
+    "r_1": {
+      "all": [
+        {
+          "first": {
+            "$gt": {
+              "amount": 100
+            }
           }
-        }
-      },
-      {
-        "second": {
-          "$gt": {
-            "amount": {
-              "$add": {
-                "$l": {
-                  "first": "amount"
-                },
-                "$r": {
-                  "$div": {
-                    "$l": {
-                      "$m": "amount"
-                    },
-                    "$r": 2
+        },
+        {
+          "second": {
+            "$gt": {
+              "amount": {
+                "$add": {
+                  "$l": {
+                    "first": "amount"
+                  },
+                  "$r": {
+                    "$div": {
+                      "$l": {
+                        "$m": "amount"
+                      },
+                      "$r": 2
+                    }
                   }
                 }
               }
             }
           }
         }
-      }
-    ],
-    "run": "log"
+      ],
+      "run": "log"
+    }
   }
 }
 ```
@@ -754,44 +798,46 @@ Aside from scalars (strings, number and boolean values), it is possible to use t
 Event and fact evaluation can lead to multiple consequents. The triggering order can be controlled by using the `pri` (salience) attribute. 
 ```javascript
 {
-  "r_0": {
-    "pri": 3,
-    "all": [
-      {
-        "m": {
-          "$lt": {
-            "amount": 300
+  "attributes": {
+    "r_0": {
+      "pri": 3,
+      "all": [
+        {
+          "m": {
+            "$lt": {
+              "amount": 300
+            }
           }
         }
-      }
-    ],
-    "run": "logP3"
-  },
-  "r_1": {
-    "pri": 2,
-    "all": [
-      {
-        "m": {
-          "$lt": {
-            "amount": 200
+      ],
+      "run": "logP3"
+    },
+    "r_1": {
+      "pri": 2,
+      "all": [
+        {
+          "m": {
+            "$lt": {
+              "amount": 200
+            }
           }
         }
-      }
-    ],
-    "run": "logP2"
-  },
-  "r_2": {
-    "pri": 1,
-    "all": [
-      {
-        "m": {
-          "$lt": {
-            "amount": 100
+      ],
+      "run": "logP2"
+    },
+    "r_2": {
+      "pri": 1,
+      "all": [
+        {
+          "m": {
+            "$lt": {
+              "amount": 100
+            }
           }
         }
-      }
-    ],
-    "run": "logP1"
+      ],
+      "run": "logP1"
+    }
   }
 }
 ```
@@ -802,33 +848,36 @@ When exceptions are not handled by actions, they are stored in the context state
 
 ```javascript
 {
-  "r_0": {
-    "all": [
-      {
-        "m": {
-          "action": "start"
+  "flow": {
+    "r_0": {
+      "all": [
+        {
+          "m": {
+            "action": "start"
+          }
         }
-      }
-    ]
-  },
-  "r_1": {
-    "all": [
-      {
-        "m": {
-          "$and": [
-            {
-              "$ex": {
-                "exception": 1
+      ],
+      "run": "start"
+    },
+    "r_1": {
+      "all": [
+        {
+          "m": {
+            "$and": [
+              {
+                "$ex": {
+                  "exception": 1
+                }
+              },
+              {
+                "$s": 1
               }
-            },
-            {
-              "$s": 1
-            }
-          ]
+            ]
+          }
         }
-      }
-    ],
-    "run": "exceptionHandler"
+      ],
+      "run": "exceptionHandler"
+    }
   }
 }
 ```
@@ -851,74 +900,76 @@ Statechart rules:
 
 ```javascript
 {
-  "input": {
-    "t_0": {
-      "all": [
-        {
-          "m": {
-            "$and": [
-              {
-                "subject": "approve"
-              },
-              {
-                "$gt": {
-                  "amount": 1000
+  "expense$state": {
+    "input": {
+      "t_0": {
+        "all": [
+          {
+            "m": {
+              "$and": [
+                {
+                  "subject": "approve"
+                },
+                {
+                  "$gt": {
+                    "amount": 1000
+                  }
                 }
-              }
-            ]
+              ]
+            }
           }
-        }
-      ],
-      "to": "denied",
-      "run": "logDenied"
-    },
-    "t_1": {
-      "all": [
-        {
-          "m": {
-            "$and": [
-              {
-                "subject": "approve"
-              },
-              {
-                "$lte": {
-                  "amount": 1000
+        ],
+        "to": "denied",
+        "run": "logDenied"
+      },
+      "t_1": {
+        "all": [
+          {
+            "m": {
+              "$and": [
+                {
+                  "subject": "approve"
+                },
+                {
+                  "$lte": {
+                    "amount": 1000
+                  }
                 }
-              }
-            ]
+              ]
+            }
           }
-        }
-      ],
-      "to": "pending",
-      "run": "logPendind"
-    }
-  },
-  "pending": {
-    "t_0": {
-      "all": [
-        {
-          "m": {
-            "subject": "approved"
-          }
-        }
-      ],
-      "to": "approved",
-      "run": "logApproved"
+        ],
+        "to": "pending",
+        "run": "logPending"
+      }
     },
-    "t_1": {
-      "all": [
-        {
-          "m": {
-            "subject": "denied"
+    "pending": {
+      "t_0": {
+        "all": [
+          {
+            "m": {
+              "subject": "approved"
+            }
           }
-        }
-      ],
-      "to": "denied",
-      "run": "logDenied"
-    }
-  },
-  "denied": {},
-  "approved": {}
+        ],
+        "to": "approved",
+        "run": "logApproved"
+      },
+      "t_1": {
+        "all": [
+          {
+            "m": {
+              "subject": "denied"
+            }
+          }
+        ],
+        "to": "denied",
+        "run": "logDenied"
+      }
+    },
+    "denied": {},
+    "approved": {}
+  }
 }
 
 ```
@@ -928,49 +979,51 @@ Nested states allow for writing compact statecharts. If a context is in the nest
 
 ```javascript
 {
-  "work": {
-    "t_0": {
-      "pri": 1,
-      "all": [
-        {
-          "m": {
-            "subject": "cancel"
+   "worker$state": {
+    "work": {
+      "t_0": {
+        "pri": 1,
+        "all": [
+          {
+            "m": {
+              "subject": "cancel"
+            }
+          }
+        ],
+        "to": "canceled",
+        "run": "logCanceled"
+      },
+      "$chart": {
+        "enter": {
+          "t_0": {
+            "all": [
+              {
+                "m": {
+                  "subject": "enter"
+                }
+              }
+            ],
+            "to": "process",
+            "run": "logProcess"
+          }
+        },
+        "process": {
+          "t_0": {
+            "all": [
+              {
+                "m": {
+                  "subject": "continue"
+                }
+              }
+            ],
+            "to": "process",
+            "run": "logProcess"
           }
         }
-      ],
-      "to": "canceled",
-      "run": "logCanceled"
-    },
-    "$chart": {
-      "enter": {
-        "t_0": {
-          "all": [
-            {
-              "m": {
-                "subject": "enter"
-              }
-            }
-          ],
-          "to": "process",
-          "run": "logProcess"
-        }
-      },
-      "process": {
-        "t_0": {
-          "all": [
-            {
-              "m": {
-                "subject": "continue"
-              }
-            }
-          ],
-          "to": "process",
-          "run": "logProcess"
-        }
       }
-    }
-  },
-  "canceled": {}
+    },
+    "canceled": {}
+  }
 }
 
 ```
@@ -988,85 +1041,87 @@ Flowchart rules:
 
 ```javascript
 {
-  "input": {
-    "to": {
-      "request": {
-        "all": [
-          {
-            "m": {
-              "$and": [
-                {
-                  "subject": "approve"
-                },
-                {
-                  "$lte": {
-                    "amount": 1000
+  "expense$flow": {
+    "input": {
+      "to": {
+        "request": {
+          "all": [
+            {
+              "m": {
+                "$and": [
+                  {
+                    "subject": "approve"
+                  },
+                  {
+                    "$lte": {
+                      "amount": 1000
+                    }
                   }
-                }
-              ]
+                ]
+              }
             }
-          }
-        ]
-      },
-      "deny": {
-        "all": [
-          {
-            "m": {
-              "$and": [
-                {
-                  "subject": "approve"
-                },
-                {
-                  "$gt": {
-                    "amount": 1000
+          ]
+        },
+        "deny": {
+          "all": [
+            {
+              "m": {
+                "$and": [
+                  {
+                    "subject": "approve"
+                  },
+                  {
+                    "$gt": {
+                      "amount": 1000
+                    }
                   }
-                }
-              ]
+                ]
+              }
             }
-          }
-        ]
+          ]
+        }
       }
-    }
-  },
-  "request": {
-    "run": "logRequest",
-    "to": {
-      "approve": {
-        "all": [
-          {
-            "m": {
-              "subject": "approved"
+    },
+    "request": {
+      "run": "logRequest",
+      "to": {
+        "approve": {
+          "all": [
+            {
+              "m": {
+                "subject": "approved"
+              }
             }
-          }
-        ]
-      },
-      "deny": {
-        "all": [
-          {
-            "m": {
-              "subject": "denied"
+          ]
+        },
+        "deny": {
+          "all": [
+            {
+              "m": {
+                "subject": "denied"
+              }
             }
-          }
-        ]
-      },
-      "request": {
-        "all": [
-          {
-            "m": {
-              "subject": "retry"
+          ]
+        },
+        "request": {
+          "all": [
+            {
+              "m": {
+                "subject": "retry"
+              }
             }
-          }
-        ]
+          ]
+        }
       }
+    },
+    "approve": {
+      "run": "logApproved",
+      "to": {}
+    },
+    "deny": {
+      "run": "logDenied",
+      "to": {}
     }
-  },
-  "approve": {
-    "run": "logApproved",
-    "to": {}
-  },
-  "deny": {
-    "run": "logDenied",
-    "to": {}
   }
 }
 ```
@@ -1077,59 +1132,61 @@ Events can be scheduled with timers. A timeout condition can be included in the 
 
 ```javascript
 {
-  "r_0": {
-    "any": [
-      {
-        "m_0$all": [
-          {
-            "m_0.m": {
-              "$and": [
-                {
-                  "count": 0
-                },
-                {
-                  "$s": 1
-                }
-              ]
-            }
-          }
-        ],
-      },
-      {
-        "m_1$all": [
-          {
-            "m_1.m_0": {
-              "$and": [
-                {
-                  "$lt": {
-                    "count": 5
+   "timer": {
+    "r_0": {
+      "any": [
+        {
+          "m_0$all": [
+            {
+              "m_0.m": {
+                "$and": [
+                  {
+                    "count": 0
+                  },
+                  {
+                    "$s": 1
                   }
-                },
-                {
-                  "$s": 1
-                }
-              ]
+                ]
+              }
             }
-          },
-          {
-            "m_1.m_1": {
-              "$t": "MyTimer"
+          ]
+        },
+        {
+          "m_1$all": [
+            {
+              "m_1.m_0": {
+                "$and": [
+                  {
+                    "$lt": {
+                      "count": 5
+                    }
+                  },
+                  {
+                    "$s": 1
+                  }
+                ]
+              }
+            },
+            {
+              "m_1.m_1": {
+                "$t": "MyTimer"
+              }
             }
-          }
-        ]
-      }
-    ],
-    "run": "restartTimer"
-  },
-  "r_1": {
-    "all": [
-      {
-        "m": {
-          "cancel": true
+          ]
         }
-      }
-    ],
-    "run": "cancelTimer"
+      ],
+      "run": "restartTimer"
+    },
+    "r_1": {
+      "all": [
+        {
+          "m": {
+            "cancel": true
+          }
+        }
+      ],
+      "run": "cancelTimer"
+    }
   }
 }
 ```
@@ -1137,42 +1194,43 @@ Events can be scheduled with timers. A timeout condition can be included in the 
 The example below use a timer to detect higher event rate (use `"count"` to match a specific number of events):  
 
 ```javascript
-
 {
-  "start": {
-    "t_0": {
-      "to": "meter"
-    }
-  },
-  "meter": {
-    "t_0": {
-      "count": 3,
-      "all": [
-        {
-          "message": {
-            "$gt": {
-              "amount": 100
+  "risk$state": {
+    "start": {
+      "t_0": {
+        "to": "meter"
+      }
+    },
+    "meter": {
+      "t_0": {
+        "count": 3,
+        "all": [
+          {
+            "message": {
+              "$gt": {
+                "amount": 100
+              }
             }
           }
-        }
-      ],
-      "to": "fraud",
-      "run": "logFraud"
-    },
-    "t_1": {
-      "all": [
-        {
-          "m": {
-            "$t": "RiskTimer"
+        ],
+        "to": "fraud",
+        "run": "logFraud"
+      },
+      "t_1": {
+        "all": [
+          {
+            "m": {
+              "$t": "RiskTimer"
+            }
           }
-        }
-      ],
-      "to": "exit",
-      "run": "logExit"
-    }
-  },
-  "fraud": {},
-  "exit": {}
+        ],
+        "to": "exit",
+        "run": "logExit"
+      }
+    },
+    "fraud": {},
+    "exit": {}
+  }
 }
 ```
 
@@ -1184,42 +1242,44 @@ Try issuing the command below multiple times.
 
 ```javascript
 {
-  "start": {
-    "t_0": {
-      "to": "meter",
-      "run": "startTimer"
-    }
-  },
-  "meter": {
-    "t_0": {
-      "cap": 100,
-      "all": [
-        {
-          "message": {
-            "$gt": {
-              "amount": 100
+  "risk4$state": {
+    "start": {
+      "t_0": {
+        "to": "meter",
+        "run": "startTimer"
+      }
+    },
+    "meter": {
+      "t_0": {
+        "cap": 100,
+        "all": [
+          {
+            "message": {
+              "$gt": {
+                "amount": 100
+              }
+            }
+          },
+          {
+            "m_1": {
+              "$t": "VelocityTimer"
             }
           }
-        },
-        {
-          "m_1": {
-            "$t": "VelocityTimer"
+        ],
+        "to": "meter",
+        "run": "logVelocityAndResetTimers"
+      },
+      "t_1": {
+        "all": [
+          {
+            "m": {
+              "$t": "VelocityTimer"
+            }
           }
-        }
-      ],
-      "to": "meter",
-      "run": "logVelocityAndresetTimers"
-    },
-    "t_1": {
-      "all": [
-        {
-          "m": {
-            "$t": "VelocityTimer"
-          }
-        }
-      ],
-      "to": "meter",
-      "run": "logVelocityAndresetTimers"
+        ],
+        "to": "meter",
+        "run": "logVelocityAndResetTimers"
+      }
     }
   }
 }
