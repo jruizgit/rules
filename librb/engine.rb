@@ -1160,18 +1160,34 @@ module Engine
     end
 
     def post(ruleset_name, event)
+      if event.kind_of? Array
+        return post_batch ruleset_name, event
+      end
+
       get_ruleset(ruleset_name).assert_event event
     end
 
     def start_post(ruleset_name, event)
+      if event.kind_of? Array
+        return start_post_batch ruleset_name, event
+      end
+
       get_ruleset(ruleset_name).start_assert_event event
     end
 
     def assert(ruleset_name, fact)
+      if fact.kind_of? Array
+        return assert_facts ruleset_name, fact
+      end
+
       get_ruleset(ruleset_name).assert_fact fact
     end
 
     def start_assert(ruleset_name, fact)
+      if fact.kind_of? Array
+        return start_assert_facts ruleset_name, fact
+      end
+
       get_ruleset(ruleset_name).start_assert_fact fact
     end
 

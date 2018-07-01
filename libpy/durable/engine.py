@@ -983,15 +983,27 @@ class Host(object):
         return self.get_ruleset(ruleset_name).start_assert_events(messages)
 
     def post(self, ruleset_name, message):
+        if isinstance(message, list):
+            return self.post_batch(ruleset_name, message)
+
         return self.get_ruleset(ruleset_name).assert_event(message)
 
     def start_post(self, ruleset_name, message):
+        if isinstance(message, list):
+            return self.start_post_batch(ruleset_name, message)
+
         return self.get_ruleset(ruleset_name).start_assert_event(message)
 
     def assert_fact(self, ruleset_name, fact):
+        if isinstance(fact, list):
+            return self.assert_facts(ruleset_name, fact)
+
         return self.get_ruleset(ruleset_name).assert_fact(fact)
 
     def start_assert_fact(self, ruleset_name, fact):
+        if isinstance(fact, list):
+            return self.start_assert_facts(ruleset_name, fact)
+
         return self.get_ruleset(ruleset_name).start_assert_fact(fact)
 
     def assert_facts(self, ruleset_name, facts):

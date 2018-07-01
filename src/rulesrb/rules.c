@@ -196,7 +196,9 @@ static VALUE rbAssertEvents(VALUE self, VALUE handle, VALUE events) {
     Check_Type(events, T_STRING);
 
     unsigned int result = assertEvents(FIX2INT(handle), RSTRING_PTR(events));
-    if (result != RULES_OK) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return INT2FIX(result);    
+    } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
@@ -312,7 +314,9 @@ static VALUE rbAssertFacts(VALUE self, VALUE handle, VALUE facts) {
     Check_Type(facts, T_STRING);
 
     unsigned int result = assertFacts(FIX2INT(handle), RSTRING_PTR(facts));
-    if (result != RULES_OK) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return INT2FIX(result);    
+    } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 

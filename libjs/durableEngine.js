@@ -1207,18 +1207,34 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.startPost = function (rulesetName, message) {
+            if (message.constructor === Array) {
+                return that.startPostBatch(rulesetName, message);
+            }
+
             return that.getRuleset(rulesetName).startAssertEvent(message);
         };
 
         that.post = function (rulesetName, message) {
+            if (message.constructor === Array) {
+                return that.postBatch(rulesetName, message);
+            }
+
             return that.getRuleset(rulesetName).assertEvent(message);
         };
 
         that.startAssert = function (rulesetName, fact) {
+            if (fact.constructor === Array) {
+                return that.startAssertFacts(rulesetName, fact);
+            }
+
             return that.getRuleset(rulesetName).startAssertFact(fact);
         };
 
         that.assert = function (rulesetName, fact) {
+            if (fact.constructor === Array) {
+                return that.assertFacts(rulesetName, fact);
+            }
+
             return that.getRuleset(rulesetName).assertFact(fact);
         };
 
