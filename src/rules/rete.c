@@ -13,6 +13,7 @@
 #define HASH_PRI 1450887882 // pri
 #define HASH_COUNT 967958004 // count
 #define HASH_CAP 41178555 // cap
+#define HASH_DIST 1281379241 // dist
 #define HASH_LT 542787579 // $lt
 #define HASH_LTE 2350824890 // $lte
 #define HASH_GT 507407960 // $gt
@@ -67,6 +68,7 @@ static unsigned int validateAlgebra(char *rule);
 static unsigned int createBeta(ruleset *tree, 
                                char *rule, 
                                unsigned char operator, 
+                               unsigned short distinct,
                                unsigned int nextOffset, 
                                path *nextPath, 
                                path **outPath);
@@ -796,6 +798,11 @@ static unsigned int validateRuleset(char *rules) {
             return result;
         }
 
+        result = validateSetting(HASH_DIST, first, JSON_INT);
+        if (result != PARSE_OK && result != ERR_SETTING_NOT_FOUND) {
+            return result;
+        }
+
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
             result = readNextValue(last, &first, &last, &type);
@@ -808,7 +815,8 @@ static unsigned int validateRuleset(char *rules) {
                 if (result != RULES_OK && result != PARSE_END) {
                     return result;
                 }
-            } else if (hash != HASH_COUNT && hash != HASH_PRI && hash != HASH_CAP) {
+            } else if (hash != HASH_COUNT && hash != HASH_PRI && hash != HASH_CAP && hash != HASH_DIST) {
+                printf("%d\n", hash);
                 return ERR_UNEXPECTED_NAME;
             }
 
@@ -1360,6 +1368,7 @@ static unsigned int createAlpha(ruleset *tree,
 static unsigned int createBetaConnector(ruleset *tree, 
                                         char *rule, 
                                         path *betaPath,
+                                        unsigned short distinct,
                                         unsigned int nextOffset) {
     char *first;
     char *last;
@@ -1429,6 +1438,7 @@ static unsigned int createBetaConnector(ruleset *tree,
         expr->not = (operator == OP_NOT) ? 1 : 0;
         expr->termsLength = 0;
         expr->t.termsPointer = NULL;
+        expr->distinct = (distinct != 0) ? 1 : 0;
         if (operator == OP_NOP || operator == OP_NOT) {
             unsigned int resultOffset = NODE_M_OFFSET;
             readNextValue(last, &first, &last, &type);
@@ -1436,7 +1446,7 @@ static unsigned int createBetaConnector(ruleset *tree,
         }
         else {
             readNextValue(last, &first, &last, &type);
-            result = createBeta(tree, first, operator, connectorOffset, betaPath, NULL);
+            result = createBeta(tree, first, operator, distinct, connectorOffset, betaPath, NULL);
         }
 
         if (result != RULES_OK) {
@@ -1452,6 +1462,7 @@ static unsigned int createBetaConnector(ruleset *tree,
 static unsigned int createBeta(ruleset *tree, 
                                char *rule, 
                                unsigned char operator, 
+                               unsigned short distinct,
                                unsigned int nextOffset, 
                                path *nextPath, 
                                path **outPath) {
@@ -1496,7 +1507,7 @@ static unsigned int createBeta(ruleset *tree,
         *outPath = betaPath;
     }
 
-    return createBetaConnector(tree, rule, betaPath, nextOffset);    
+    return createBetaConnector(tree, rule, betaPath, distinct, nextOffset);    
 }
 
 static unsigned int add(any *right, any *left, any **result) {
@@ -1604,6 +1615,7 @@ static unsigned int createSingleQuery(ruleset *tree,
     newExpression->aliasOffset = expr->aliasOffset;
     newExpression->termsLength = expr->termsLength;
     newExpression->not = expr->not;
+    newExpression->distinct = expr->distinct;
     if (expr->termsLength) {
         result = allocateNext(tree, expr->termsLength, &newExpression->t.termsOffset);
         if (result != RULES_OK) {
@@ -1851,15 +1863,17 @@ static unsigned int createTree(ruleset *tree, char *rules) {
             ruleAction->value.c.count = 1;
         }
 
+        unsigned short distinct = 0;
+        getSetting(HASH_DIST, first, &distinct);
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
             readNextValue(last, &first, &last, &type);
             switch (hash) {
                 case HASH_ANY:
-                    result = createBeta(tree, first, OP_ANY, actionOffset, NULL, &betaPath);
+                    result = createBeta(tree, first, OP_ANY, distinct, actionOffset, NULL, &betaPath);
                     break;
                 case HASH_ALL:
-                    result = createBeta(tree, first, OP_ALL, actionOffset, NULL, &betaPath);
+                    result = createBeta(tree, first, OP_ALL, distinct, actionOffset, NULL, &betaPath);
                     break;
             }
             if (result != RULES_OK) {

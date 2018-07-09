@@ -243,6 +243,7 @@ class rule(object):
         self.count = None
         self.pri = None
         self.cap = None
+        self.dist = True
         self.func = []
         new_args = []
         for arg in args:
@@ -253,6 +254,8 @@ class rule(object):
                     self.pri = arg['pri']
                 elif 'cap' in arg:
                     self.cap = arg['cap']
+                elif 'dist' in arg:
+                    self.dist = arg['dist']
                 else:
                     self.func = arg
             elif isinstance(arg, value) or isinstance(arg, rule):
@@ -326,6 +329,11 @@ class rule(object):
 
         if self.cap:
             defined_expression['cap'] = self.cap
+
+        if self.dist:
+            defined_expression['dist'] = 1
+        else:
+            defined_expression['dist'] = 0
 
         return defined_expression
 
@@ -630,6 +638,9 @@ def pri(value):
 
 def cap(value):
     return {'cap': value}
+
+def distinct(value):
+    return {'dist': value}
 
 def sref(sid = None):
     return avalue('$sref', None, sid, None, None)

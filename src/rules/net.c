@@ -282,8 +282,14 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
             }
             
             if (first) {
-                if (asprintf(test, "%scompare_array(message[\"%s\"], %s, %s, %s)", *test, leftProperty, idiomString, op, par)  == -1) {
-                    return ERR_OUT_OF_MEMORY;
+                if (expr->distinct) {
+                    if (asprintf(test, "is_distinct_message(frame, message) and %scompare_array(message[\"%s\"], %s, %s, %s)", *test, leftProperty, idiomString, op, par)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
+                } else {
+                    if (asprintf(test, "%scompare_array(message[\"%s\"], %s, %s, %s)", *test, leftProperty, idiomString, op, par)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
                 }
                 
                 first = 0;
@@ -330,9 +336,16 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
 
             char *oldTest = *test;
             if (first) {
-                if (asprintf(test, "%smessage[\"%s\"] %s %s", *test, leftProperty, op, idiomString)  == -1) {
-                    return ERR_OUT_OF_MEMORY;
+                if (expr->distinct) {
+                    if (asprintf(test, "is_distinct_message(frame, message) and %smessage[\"%s\"] %s %s", *test, leftProperty, op, idiomString)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
+                } else {
+                    if (asprintf(test, "%smessage[\"%s\"] %s %s", *test, leftProperty, op, idiomString)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
                 }
+
                 first = 0;
             } else {
                 if (asprintf(test, "%s %s message[\"%s\"] %s %s", *test, comp, leftProperty, op, idiomString) == -1) {
@@ -768,6 +781,45 @@ static unsigned int loadAddMessageCommand(ruleset *tree, binding *rulesBinding) 
 "local message = {}\n"
 "local primary_message_keys = {}\n"
 "local input_keys = {}\n"
+"local is_distinct_message = function(frame, message)\n"
+"   for name, frame_message in pairs(frame) do\n"
+"       if frame_message[\"id\"] == message[\"id\"] then\n"
+"           return false\n"
+"       end\n"    
+"   end\n"
+"   return true\n"
+"end\n"
+"local compare_array = function(left_array, right_value, op, compare_all)\n"
+"   if not left_array or type(left_array) ~= \"table\" then\n"
+"        return false\n"
+"   end\n"
+"   for i = 1, #left_array, 1 do\n"
+"       local comparison = false\n"
+"       if op == 0 then\n"
+"           comparison = (left_array[i] < right_value)\n"
+"       elseif op == 1 then\n"
+"           comparison = (left_array[i] <= right_value)\n"
+"       elseif op == 2 then\n"
+"           comparison = (left_array[i] > right_value)\n"
+"       elseif op == 3 then\n"
+"           comparison = (left_array[i] >= right_value)\n"
+"       elseif op == 4 then\n"
+"           comparison = (left_array[i] == right_value)\n"
+"       elseif op == 5 then\n"
+"           comparison = (left_array[i] ~= right_value)\n"
+"       end\n"
+"       if not compare_all and comparison then\n"
+"           return true\n"
+"       end\n"
+"       if compare_all and not comparison then\n"
+"           return false\n"
+"       end\n"
+"   end"
+"   if compare_all then\n"
+"       return true\n"
+"   end\n"
+"   return false\n"
+"end\n"
 "local save_message = function(current_key, message, events_key, messages_key, save_hashset)\n"
 "    if save_hashset == 1 then\n"
 "        redis.call(\"hsetnx\", messages_key, message[\"id\"], cmsgpack.pack(message))\n"
@@ -1045,6 +1097,14 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
 "local facts_mids_cache = {}\n"
 "local events_mids_cache = {}\n"
 "local get_context\n"
+"local is_distinct_message = function(frame, message)\n"
+"   for name, frame_message in pairs(frame) do\n"
+"       if frame_message[\"id\"] == message[\"id\"] then\n"
+"           return false\n"
+"       end\n"    
+"   end\n"
+"   return true\n"
+"end\n"
 "local compare_array = function(left_array, right_value, op, compare_all)\n"
 "   if not left_array or type(left_array) ~= \"table\" then\n"
 "        return false\n"
@@ -1837,6 +1897,14 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "local results_key\n"
 "local inverse_directory\n"
 "local key\n"
+"local is_distinct_message = function(frame, message)\n"
+"   for name, frame_message in pairs(frame) do\n"
+"       if frame_message[\"id\"] == message[\"id\"] then\n"
+"           return false\n"
+"       end\n"    
+"   end\n"
+"   return true\n"
+"end\n"
 "local compare_array = function(left_array, right_value, op, compare_all)\n"
 "   if not left_array or type(left_array) ~= \"table\" then\n"
 "        return false\n"
