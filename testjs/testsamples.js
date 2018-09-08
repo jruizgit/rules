@@ -22,22 +22,42 @@ d.ruleset('risk0', function() {
     }
 });
 
-d.ruleset('risk1', function() {
+d.ruleset('indistinct', function() {
     whenAll: {
-        first = m.amount > 100
+        first = m.amount > 10
         second = m.amount > first.amount * 2
-        third = m.amount > first.amount + second.amount
+        third = m.amount > (first.amount + second.amount) / 2
     }
+    distinct: false
     run: {
-        console.log('fraud detected -> ' + first.amount);
+        console.log('indistinct detected -> ' + first.amount);
         console.log('               -> ' + second.amount);
         console.log('               -> ' + third.amount);
     }
 
     whenStart: {
-        host.post('risk1', {amount: 200});
-        host.post('risk1', {amount: 500});
-        host.post('risk1', {amount: 1000});
+        host.post('indistinct', {amount: 50});
+        host.post('indistinct', {amount: 200});
+        host.post('indistinct', {amount: 251});
+    }
+});
+
+d.ruleset('distinct', function() {
+    whenAll: {
+        first = m.amount > 10
+        second = m.amount > first.amount * 2
+        third = m.amount > (first.amount + second.amount) / 2
+    }
+    run: {
+        console.log('distinct detected -> ' + first.amount);
+        console.log('               -> ' + second.amount);
+        console.log('               -> ' + third.amount);
+    }
+
+    whenStart: {
+        host.post('distinct', {amount: 50});
+        host.post('distinct', {amount: 200});
+        host.post('distinct', {amount: 251});
     }
 });
 

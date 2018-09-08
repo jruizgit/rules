@@ -196,19 +196,36 @@ Durable.ruleset :strings do
   end
 end
 
-Durable.ruleset :risk2 do
-  when_all c.first = m.t == "purchase",
+Durable.ruleset :indistinct do
+  when_all distinct(false),
+           c.first = m.amount > 10,
            c.second = m.amount > first.amount * 2,
-           c.third = m.amount > first.amount + second.amount do
-    puts "fraud detected -> #{first.amount}" 
+           c.third = m.amount > (first.amount + second.amount) / 2 do
+    puts "indistinct detected -> #{first.amount}" 
     puts "               -> #{second.amount}"
     puts "               -> #{third.amount}"
   end
 
   when_start do
-    post :risk2, { :t => "purchase", :amount => 50 }
-    post :risk2, { :t => "purchase", :amount => 200 }
-    post :risk2, { :t => "purchase", :amount => 300 } 
+    post :indistinct, { :t => "purchase", :amount => 50 }
+    post :indistinct, { :t => "purchase", :amount => 200 }
+    post :indistinct, { :t => "purchase", :amount => 251 } 
+  end
+end
+
+Durable.ruleset :distinct do
+  when_all c.first = m.amount > 10,
+           c.second = m.amount > first.amount * 2,
+           c.third = m.amount > (first.amount + second.amount) / 2 do
+    puts "distinct detected -> #{first.amount}" 
+    puts "               -> #{second.amount}"
+    puts "               -> #{third.amount}"
+  end
+
+  when_start do
+    post :distinct, { :t => "purchase", :amount => 50 }
+    post :distinct, { :t => "purchase", :amount => 200 }
+    post :distinct, { :t => "purchase", :amount => 251 } 
   end
 end
 

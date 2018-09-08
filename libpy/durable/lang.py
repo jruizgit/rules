@@ -243,7 +243,7 @@ class rule(object):
         self.count = None
         self.pri = None
         self.cap = None
-        self.dist = True
+        self.dist = None
         self.func = []
         new_args = []
         for arg in args:
@@ -330,9 +330,10 @@ class rule(object):
         if self.cap:
             defined_expression['cap'] = self.cap
 
-        if self.dist:
+        if self.dist == True:
             defined_expression['dist'] = 1
-        else:
+
+        if self.dist == False:
             defined_expression['dist'] = 0
 
         return defined_expression

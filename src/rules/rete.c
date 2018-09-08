@@ -1863,7 +1863,7 @@ static unsigned int createTree(ruleset *tree, char *rules) {
             ruleAction->value.c.count = 1;
         }
 
-        unsigned short distinct = 0;
+        unsigned short distinct = 1;
         getSetting(HASH_DIST, first, &distinct);
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
