@@ -437,6 +437,8 @@ run_all()
 ### Correlated Sequence
 Rules can be used to efficiently evaluate sequences of correlated events or facts. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
+By default a correlated sequences capture distinct messages. In the example below the second event satisfies the second and the third condition, however the event will be captured only for the second condition. Use the `distinct` attribute to disable distinct event or fact correlation.
+
 The `when_all` annotation expresses a sequence of events or facts. The `<<` operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
 
 Arithmetic operators: +, -, *, /
@@ -444,7 +446,8 @@ Arithmetic operators: +, -, *, /
 from durable.lang import *
 
 with ruleset('risk'):
-    @when_all(c.first << m.amount > 10,
+    @when_all(# distinct(True),
+              c.first << m.amount > 10,
               c.second << m.amount > c.first.amount * 2,
               c.third << m.amount > (c.first.amount + c.second.amount) / 2)
     def detected(c):
@@ -456,7 +459,7 @@ with ruleset('risk'):
     def start(host):
         host.post('risk', { 'amount': 50 })
         host.post('risk', { 'amount': 200 })
-        host.post('risk', { 'amount': 300 })
+        host.post('risk', { 'amount': 251 })
 
 run_all()
 ```  
