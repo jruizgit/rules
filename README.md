@@ -1,5 +1,5 @@
-<sub>*note 1: The new node.js syntax was just pushed as of npm 0.36.57. The old syntax is still supported. Your feedback is welcomed.*</sub>  
-<sub>*note 2: Passing 'sid' and 'id' in events and facts is no longer required as of npm 0.36.59, gem 0.34.25 and pypi 0.33.96.*</sub> 
+<sub>*note: As of npm 0.36.87, gem 0.34.52 and pypi 0.33.128 correlated sequences record distinct messages by default. That is, explicit testing of distinct messages is no longer needed. Use the `distinct` rule attribute to revert back to the old behavior. Please see documentation for more details.*</sub>  
+
 
 
 # durable_rules    
