@@ -935,7 +935,10 @@ class Flowchart(Ruleset):
 
 class Host(object):
 
-    def __init__(self, ruleset_definitions = None, databases = [{'host': 'localhost', 'port': 6379, 'password': None, 'db': 0}], state_cache_size = 1024):
+    def __init__(self, ruleset_definitions = None, databases = None, state_cache_size = 1024):
+        if not databases:
+            databases = [{'host': 'localhost', 'port': 6379, 'password': None, 'db': 0}]
+            
         self._ruleset_directory = {}
         self._ruleset_list = []
         self._databases = databases
@@ -980,15 +983,27 @@ class Host(object):
         return self.get_ruleset(ruleset_name).start_assert_events(messages)
 
     def post(self, ruleset_name, message):
+        if isinstance(message, list):
+            return self.post_batch(ruleset_name, message)
+
         return self.get_ruleset(ruleset_name).assert_event(message)
 
     def start_post(self, ruleset_name, message):
+        if isinstance(message, list):
+            return self.start_post_batch(ruleset_name, message)
+
         return self.get_ruleset(ruleset_name).start_assert_event(message)
 
     def assert_fact(self, ruleset_name, fact):
+        if isinstance(fact, list):
+            return self.assert_facts(ruleset_name, fact)
+
         return self.get_ruleset(ruleset_name).assert_fact(fact)
 
     def start_assert_fact(self, ruleset_name, fact):
+        if isinstance(fact, list):
+            return self.start_assert_facts(ruleset_name, fact)
+
         return self.get_ruleset(ruleset_name).start_assert_fact(fact)
 
     def assert_facts(self, ruleset_name, facts):
@@ -1099,7 +1114,10 @@ class Host(object):
 
 class Queue(object):
 
-    def __init__(self, ruleset_name, database = {'host': 'localhost', 'port': 6379, 'password':None, 'db': 0}, state_cache_size = 1024):
+    def __init__(self, ruleset_name, database = None, state_cache_size = 1024):
+        if not database:
+            database = {'host': 'localhost', 'port': 6379, 'password':None, 'db': 0}
+
         self._ruleset_name = ruleset_name
         self._handle = rules.create_client(state_cache_size, ruleset_name)
         if isinstance(database, str):
@@ -1113,25 +1131,38 @@ class Queue(object):
 
             rules.bind_ruleset(database['port'], database['db'], database['host'], database['password'], self._handle)
         
+    def isClosed(self):
+        return self._handle == 0
 
     def post(self, message):
+        if self._handle == 0:
+            raise Exception('Queue has already been closed')
+
         if 'sid' in message:
             rules.queue_assert_event(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
         else:
             rules.queue_assert_event(self._handle, None, self._ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def assert_fact(self, message):
+        if self._handle == 0:
+            raise Exception('Queue has already been closed')
+
         if 'sid' in message:
             rules.queue_assert_fact(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
         else: 
             rules.queue_assert_fact(self._handle, None, self._ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def retract_fact(self, message):
+        if self._handle == 0:
+            raise Exception('Queue has already been closed')
+
         if 'sid' in message:
             rules.queue_retract_fact(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
         else:
             rules.queue_retract_fact(self._handle, None, self._ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def close(self):
-        rules.delete_client(self._handle)
+        if self._handle != 0:
+            rules.delete_client(self._handle)
+            self._handle = 0
 

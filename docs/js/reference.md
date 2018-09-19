@@ -436,6 +436,8 @@ d.runAll();
 ### Correlated Sequence
 Rules can be used to efficiently evaluate sequences of correlated events or facts. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
+By default a correlated sequences capture distinct messages. In the example below the second event satisfies the second and the third condition, however the event will be captured only for the second condition. Use the `distinct` attribute to disable distinct event or fact correlation.  
+
 The `whenAll` label expresses a sequence of events or facts. The assignment operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
 
 Arithmetic operators: +, -, *, /
@@ -444,10 +446,11 @@ var d = require('durable');
 
 d.ruleset('risk', function() {
     whenAll: {
-        first = m.amount > 100
+        first = m.amount > 10
         second = m.amount > first.amount * 2
         third = m.amount > (first.amount + second.amount) / 2
     }
+    // distinct: true
     run: {
        	console.log('fraud detected -> ' + first.amount);
         console.log('               -> ' + second.amount);
@@ -455,9 +458,9 @@ d.ruleset('risk', function() {
     }
 
     whenStart: {
+        host.post('risk', { amount: 50 });
         host.post('risk', { amount: 200 });
-        host.post('risk', { amount: 500 });
-        host.post('risk', { amount: 1000 });
+        host.post('risk', { amount: 251 });
     }
 });
 

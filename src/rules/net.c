@@ -242,6 +242,68 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
                 return ERR_OUT_OF_MEMORY;
             }
             free(oldTest);            
+        } else if (currentNode->value.a.operator == OP_IALL || currentNode->value.a.operator == OP_IANY) {
+            char *oldTest = *test;
+            char *leftProperty = &tree->stringPool[currentNode->nameOffset];
+            idiom *newIdiom = &tree->idiomPool[currentNode->value.a.right.value.idiomOffset];
+            char *op = "";
+            switch (newIdiom->operator) {
+                case OP_LT:
+                    op = "0";
+                    break;
+                case OP_LTE:
+                    op = "1";
+                    break;
+                case OP_GT:
+                    op = "2";
+                    break;
+                case OP_GTE:
+                    op = "3";
+                    break;
+                case OP_EQ:
+                    op = "4";
+                    break;
+                case OP_NEQ:
+                    op = "5";
+                    break;
+            }
+
+            char *par = "";
+            if (currentNode->value.a.operator == OP_IALL) {
+                par = "true";
+            } else {
+                par = "false";
+            }
+
+            char *idiomString = NULL;
+            unsigned int result = createIdiom(tree, &newIdiom->right, &idiomString);
+            if (result != RULES_OK) {
+                return result;
+            }
+            
+            if (first) {
+                if (expr->distinct) {
+                    if (asprintf(test, "is_distinct_message(frame, message) and %scompare_array(message[\"%s\"], %s, %s, %s)", *test, leftProperty, idiomString, op, par)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
+                } else {
+                    if (asprintf(test, "%scompare_array(message[\"%s\"], %s, %s, %s)", *test, leftProperty, idiomString, op, par)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
+                }
+                
+                first = 0;
+            } else {
+                if (asprintf(test, "%s %s compare_array(message[\"%s\"], %s, %s, %s)", *test, comp, leftProperty, idiomString, op, par)  == -1) {
+                    return ERR_OUT_OF_MEMORY;
+                }
+                
+                first = 0;   
+            }
+
+            free(idiomString);
+            free(oldTest);
+
         } else {
             char *leftProperty = &tree->stringPool[currentNode->nameOffset];
             char *op = "";
@@ -274,9 +336,16 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
 
             char *oldTest = *test;
             if (first) {
-                if (asprintf(test, "%smessage[\"%s\"] %s %s", *test, leftProperty, op, idiomString)  == -1) {
-                    return ERR_OUT_OF_MEMORY;
+                if (expr->distinct) {
+                    if (asprintf(test, "is_distinct_message(frame, message) and %smessage[\"%s\"] %s %s", *test, leftProperty, op, idiomString)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
+                } else {
+                    if (asprintf(test, "%smessage[\"%s\"] %s %s", *test, leftProperty, op, idiomString)  == -1) {
+                        return ERR_OUT_OF_MEMORY;
+                    }
                 }
+
                 first = 0;
             } else {
                 if (asprintf(test, "%s %s message[\"%s\"] %s %s", *test, comp, leftProperty, op, idiomString) == -1) {
@@ -290,7 +359,7 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
 "    if not message[\"%s\"] then\n"
 "        return \"\"\n"
 "    else\n"
-"        result = result .. message[\"%s\"]\n"
+"        result = result .. tostring(message[\"%s\"])\n"
 "    end\n", 
                                  leftProperty, 
                                  leftProperty)  == -1) {
@@ -301,7 +370,7 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
 "    if not %s then\n"
 "        return \"\"\n"
 "    else\n"
-"        result = result .. %s\n"
+"        result = result .. tostring(%s)\n"
 "    end\n",
                                 idiomString,
                                 idiomString)  == -1) {
@@ -314,7 +383,7 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
 "%s    if not message[\"%s\"] then\n"
 "        return \"\"\n"
 "    else\n"
-"        result = result .. message[\"%s\"]\n"
+"        result = result .. tostring(message[\"%s\"])\n"
 "    end\n",    
                                  *primaryKey, 
                                  leftProperty,
@@ -327,7 +396,7 @@ static unsigned int createTest(ruleset *tree, expression *expr, char **test, cha
 "%s    if not %s then\n"
 "        return \"\"\n"
 "    else\n"
-"        result = result .. %s\n"
+"        result = result .. tostring(%s)\n"
 "    end\n", 
                                  *primaryFrameKey, 
                                  idiomString,
@@ -584,7 +653,11 @@ static unsigned int loadDeleteSessionCommand(ruleset *tree, binding *rulesBindin
 "        redis.call(\"del\", all_keys[i])\n"
 "    end\n"
 "end\n"
-"redis.call(\"hdel\", \"%s!p\", ARGV[2])\n"
+"local partition_key = \"%s!p\"\n"
+"redis.call(\"hdel\", partition_key, ARGV[2])\n"
+"if redis.call(\"hlen\", partition_key) == 1 then\n"
+"    redis.call(\"hdel\", partition_key, \"index\")\n"
+"end\n"
 "redis.call(\"hdel\", \"%s!c\", sid)\n"
 "redis.call(\"hdel\", \"%s!s\", sid)\n"
 "redis.call(\"hdel\", \"%s!s!v\", sid)\n"
@@ -708,6 +781,45 @@ static unsigned int loadAddMessageCommand(ruleset *tree, binding *rulesBinding) 
 "local message = {}\n"
 "local primary_message_keys = {}\n"
 "local input_keys = {}\n"
+"local is_distinct_message = function(frame, message)\n"
+"   for name, frame_message in pairs(frame) do\n"
+"       if frame_message[\"id\"] == message[\"id\"] then\n"
+"           return false\n"
+"       end\n"    
+"   end\n"
+"   return true\n"
+"end\n"
+"local compare_array = function(left_array, right_value, op, compare_all)\n"
+"   if not left_array or type(left_array) ~= \"table\" then\n"
+"        return false\n"
+"   end\n"
+"   for i = 1, #left_array, 1 do\n"
+"       local comparison = false\n"
+"       if op == 0 then\n"
+"           comparison = (left_array[i] < right_value)\n"
+"       elseif op == 1 then\n"
+"           comparison = (left_array[i] <= right_value)\n"
+"       elseif op == 2 then\n"
+"           comparison = (left_array[i] > right_value)\n"
+"       elseif op == 3 then\n"
+"           comparison = (left_array[i] >= right_value)\n"
+"       elseif op == 4 then\n"
+"           comparison = (left_array[i] == right_value)\n"
+"       elseif op == 5 then\n"
+"           comparison = (left_array[i] ~= right_value)\n"
+"       end\n"
+"       if not compare_all and comparison then\n"
+"           return true\n"
+"       end\n"
+"       if compare_all and not comparison then\n"
+"           return false\n"
+"       end\n"
+"   end"
+"   if compare_all then\n"
+"       return true\n"
+"   end\n"
+"   return false\n"
+"end\n"
 "local save_message = function(current_key, message, events_key, messages_key, save_hashset)\n"
 "    if save_hashset == 1 then\n"
 "        redis.call(\"hsetnx\", messages_key, message[\"id\"], cmsgpack.pack(message))\n"
@@ -985,6 +1097,45 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
 "local facts_mids_cache = {}\n"
 "local events_mids_cache = {}\n"
 "local get_context\n"
+"local is_distinct_message = function(frame, message)\n"
+"   for name, frame_message in pairs(frame) do\n"
+"       if frame_message[\"id\"] == message[\"id\"] then\n"
+"           return false\n"
+"       end\n"    
+"   end\n"
+"   return true\n"
+"end\n"
+"local compare_array = function(left_array, right_value, op, compare_all)\n"
+"   if not left_array or type(left_array) ~= \"table\" then\n"
+"        return false\n"
+"   end\n"
+"   for i = 1, #left_array, 1 do\n"
+"       local comparison = false\n"
+"       if op == 0 then\n"
+"           comparison = (left_array[i] < right_value)\n"
+"       elseif op == 1 then\n"
+"           comparison = (left_array[i] <= right_value)\n"
+"       elseif op == 2 then\n"
+"           comparison = (left_array[i] > right_value)\n"
+"       elseif op == 3 then\n"
+"           comparison = (left_array[i] >= right_value)\n"
+"       elseif op == 4 then\n"
+"           comparison = (left_array[i] == right_value)\n"
+"       elseif op == 5 then\n"
+"           comparison = (left_array[i] ~= right_value)\n"
+"       end\n"
+"       if not compare_all and comparison then\n"
+"           return true\n"
+"       end\n"
+"       if compare_all and not comparison then\n"
+"           return false\n"
+"       end\n"
+"   end"
+"   if compare_all then\n"
+"       return true\n"
+"   end\n"
+"   return false\n"
+"end\n"
 "local get_mids = function(index, frame, events_key, messages_key, mids_cache, message_cache)\n"
 "    local event_mids = mids_cache[events_key]\n"
 "    local primary_key = primary_frame_keys[index](frame)\n"
@@ -1021,21 +1172,19 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
 "    end\n"
 "    return get_message(new_mid, facts_hashset, facts_message_cache)\n"
 "end\n"
-"local validate_frame_for_key = function(packed_frame, frame, index, events_list_key, messages_key, mids_cache, message_cache, sid)\n"
+"local validate_frame_for_key = function(frame, index, events_list_key, messages_key, mids_cache, message_cache, sid)\n"
 "    local new_mids = get_mids(index, frame, events_list_key, messages_key, mids_cache, message_cache)\n"
 "    for i = 1, #new_mids, 1 do\n"
 "        local message = get_message(new_mids[i], messages_key, message_cache)\n"
 "        if message and not reviewers[index](message, frame, index) then\n"
-"            local frames_key = keys[index] .. \"!i!\" .. sid .. \"!\" .. new_mids[i]\n"
-"            redis.call(\"rpush\", frames_key, tostring(packed_frame))\n"
 "            return false\n"
 "        end\n"
 "    end\n"
 "    return true\n"
 "end\n"
-"local validate_frame = function(packed_frame, frame, index, sid)\n"
-"    local first_result = validate_frame_for_key(packed_frame, frame, index, keys[index] .. \"!e!\" .. sid, events_hashset, events_mids_cache, events_message_cache, sid)\n"
-"    local second_result = validate_frame_for_key(packed_frame, frame, index, keys[index] ..\"!f!\" .. sid, facts_hashset, facts_mids_cache, facts_message_cache, sid)\n"
+"local validate_frame = function(frame, index, sid)\n"
+"    local first_result = validate_frame_for_key(frame, index, keys[index] .. \"!e!\" .. sid, events_hashset, events_mids_cache, events_message_cache, sid)\n"
+"    local second_result = validate_frame_for_key(frame, index, keys[index] ..\"!f!\" .. sid, facts_hashset, facts_mids_cache, facts_message_cache, sid)\n"
 "    return first_result and second_result\n"
 "end\n"
 "local review_frame = function(frame, rule_action_key, sid, max_score)\n"
@@ -1054,7 +1203,7 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
 "    else\n"
 "        for i = 1, #frame, 1 do\n"
 "            if frame[i] == \"$n\" then\n"
-"                if not validate_frame(frame, full_frame, i, sid) then\n"
+"                if not validate_frame(full_frame, i, sid) then\n"
 "                    cancel = true\n"
 "                    break\n"
 "                end\n"
@@ -1179,8 +1328,10 @@ static unsigned int loadPeekActionCommand(ruleset *tree, binding *rulesBinding) 
 "                until not next\n"
 "                if value == \"$null\" then\n"
 "                    sub_message[name] = cjson.null\n"
-"                else\n"
-"                   sub_message[name] = value\n"
+"                elseif name ~= \"id\" or type(value) ~= \"string\" or string.sub(value, 1, 1) ~= \"$\" then\n"
+"                   if name ~= \"$f\" then \n"
+"                       sub_message[name] = value\n"
+"                   end\n"
 "                end\n"
 "            end\n"
 "        end\n"
@@ -1735,7 +1886,6 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "local toggle\n"
 "local expressions_count\n"
 "local results\n"
-"local unpacked_results\n"
 "local context\n"
 "local keys\n"
 "local reviewers\n"
@@ -1747,6 +1897,45 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "local results_key\n"
 "local inverse_directory\n"
 "local key\n"
+"local is_distinct_message = function(frame, message)\n"
+"   for name, frame_message in pairs(frame) do\n"
+"       if frame_message[\"id\"] == message[\"id\"] then\n"
+"           return false\n"
+"       end\n"    
+"   end\n"
+"   return true\n"
+"end\n"
+"local compare_array = function(left_array, right_value, op, compare_all)\n"
+"   if not left_array or type(left_array) ~= \"table\" then\n"
+"        return false\n"
+"   end\n"
+"   for i = 1, #left_array, 1 do\n"
+"       local comparison = false\n"
+"       if op == 0 then\n"
+"           comparison = (left_array[i] < right_value)\n"
+"       elseif op == 1 then\n"
+"           comparison = (left_array[i] <= right_value)\n"
+"       elseif op == 2 then\n"
+"           comparison = (left_array[i] > right_value)\n"
+"       elseif op == 3 then\n"
+"           comparison = (left_array[i] >= right_value)\n"
+"       elseif op == 4 then\n"
+"           comparison = (left_array[i] == right_value)\n"
+"       elseif op == 5 then\n"
+"           comparison = (left_array[i] ~= right_value)\n"
+"       end\n"
+"       if not compare_all and comparison then\n"
+"           return true\n"
+"       end\n"
+"       if compare_all and not comparison then\n"
+"           return false\n"
+"       end\n"
+"   end"
+"   if compare_all then\n"
+"       return true\n"
+"   end\n"
+"   return false\n"
+"end\n"
 "local cleanup_mids = function(index, frame, events_key, messages_key, mids_cache, message_cache)\n"
 "    local event_mids = mids_cache[events_key]\n"
 "    local primary_key = primary_frame_keys[index](frame)\n"
@@ -1808,7 +1997,6 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "end\n"
 "local save_result = function(frame, index)\n"
 "    table.insert(results, 1, frame_packers[index](frame, true))\n"
-"    table.insert(unpacked_results, 1, frame)\n"
 "    for name, message in pairs(frame) do\n"
 "        if message ~= \"$n\" and not message[\"$f\"] then\n"
 "            redis.call(\"hdel\", events_hashset, message[\"id\"])\n"
@@ -2066,7 +2254,6 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "local process_message = function(message)\n"
 "    for index = 6, 5 + keys_count, 1 do\n"
 "        results = {}\n"
-"        unpacked_results = {}\n"
 "        key = ARGV[index]\n"
 "        context = context_directory[key]\n"
 "        if context then\n"
@@ -2276,12 +2463,14 @@ static unsigned int loadCommands(ruleset *tree, binding *rulesBinding) {
     return RULES_OK;
 }
 
-unsigned int bindRuleset(void *handle, 
+unsigned int bindRuleset(unsigned int handle, 
                          char *host, 
                          unsigned int port, 
                          char *password,
                          unsigned char db) {
-    ruleset *tree = (ruleset*)handle;
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+    
     bindingsList *list;
     if (tree->bindingsList) {
         list = tree->bindingsList;
@@ -2378,7 +2567,7 @@ unsigned int getBindingIndex(ruleset *tree, unsigned int sidHash, unsigned int *
                                     sidHash, 
                                     list->bindingsLength);
     redisReply *reply;
-    GET_REPLY(result, "loadEvalMessageCommand", reply);
+    GET_REPLY(result, "getBindingIndex", reply);
 
     *bindingIndex = reply->integer;
     freeReplyObject(reply);

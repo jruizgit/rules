@@ -11,11 +11,14 @@ from werkzeug.serving import make_ssl_devcert
 
 class Application(object):
 
-    def __init__(self, host, host_name, port, routing_rules = [], run = None):
+    def __init__(self, host, host_name, port, routing_rules = None, run = None):
         self._host = host
         self._host_name = host_name
         self._port = port
         self._run = run
+        if not routing_rules:
+            routing_rules = []
+
         routing_rules.append(Rule('/<ruleset_name>/definition', endpoint=self._ruleset_definition_request))
         routing_rules.append(Rule('/<ruleset_name>/state', endpoint=self._default_state_request))
         routing_rules.append(Rule('/<ruleset_name>/state/<sid>', endpoint=self._state_request))
@@ -36,7 +39,7 @@ class Application(object):
             result = self._host.get_ruleset(ruleset_name)
             return Response(json.dumps(result.get_definition(), default=encode_promise))(environ, start_response)
         elif request.method == 'POST':
-            ruleset_definition = json.loads(request.stream.read())
+            ruleset_definition = json.loads(request.stream.read().decode('utf-8'))
             self._host.set_ruleset(ruleset_name, ruleset_definition)
 
         return Response()(environ, start_response)
@@ -48,7 +51,7 @@ class Application(object):
             result = self._host.get_state(ruleset_name, sid)
             return Response(json.dumps(result))(environ, start_response)
         elif request.method == 'POST':
-            message = json.loads(request.stream.read())
+            message = json.loads(request.stream.read().decode('utf-8'))
             message['sid'] = sid
             result = self._host.patch_state(ruleset_name, message)
             return Response(json.dumps({'outcome': result}))(environ, start_response)
@@ -60,7 +63,7 @@ class Application(object):
             result = self._host.get_state(ruleset_name, None)
             return Response(json.dumps(result))(environ, start_response)
         elif request.method == 'POST':
-            message = json.loads(request.stream.read())
+            message = json.loads(request.stream.read().decode('utf-8'))
             result = self._host.patch_state(ruleset_name, message)
             return Response(json.dumps({'outcome': result}))(environ, start_response)
         
@@ -68,7 +71,7 @@ class Application(object):
         request = Request(environ)
         result = None
         if request.method == 'POST':
-            message = json.loads(request.stream.read())
+            message = json.loads(request.stream.read().decode('utf-8'))
             message['sid'] = sid
             result = self._host.post(ruleset_name, message)
             return Response(json.dumps({'outcome': result}))(environ, start_response)
@@ -77,7 +80,7 @@ class Application(object):
         request = Request(environ)
         result = None
         if request.method == 'POST':
-            message = json.loads(request.stream.read())
+            message = json.loads(request.stream.read().decode('utf-8'))
             result = self._host.post(ruleset_name, message)
             return Response(json.dumps({'outcome': result}))(environ, start_response)
 
@@ -85,7 +88,7 @@ class Application(object):
         request = Request(environ)
         result = None
         if request.method == 'POST':
-            message = json.loads(request.stream.read())
+            message = json.loads(request.stream.read().decode('utf-8'))
             message['sid'] = sid
             result = self._host.assert_fact(ruleset_name, message)
             return Response(json.dumps({'outcome': result}))(environ, start_response)
@@ -94,7 +97,7 @@ class Application(object):
         request = Request(environ)
         result = None
         if request.method == 'POST':
-            message = json.loads(request.stream.read())
+            message = json.loads(request.stream.read().decode('utf-8'))
             result = self._host.assert_fact(ruleset_name, message)
             return Response(json.dumps({'outcome': result}))(environ, start_response)
 
@@ -114,8 +117,8 @@ class Application(object):
         if self._run:
             self._run(self._host, self)
         elif self._port != 443:
-            run_simple(self._host_name, self._port, self, threaded=True)
+            run_simple(self._host_name, self._port, self, threaded = True)
         else:
-            make_ssl_devcert('key', host=self._host_name)
-            run_simple(self._host_name, self._port, self, threaded=True, ssl_context=('key.crt', 'key.key'))
+            make_ssl_devcert('key', host = self._host_name)
+            run_simple(self._host_name, self._port, self, threaded = True, ssl_context = ('key.crt', 'key.key'))
 

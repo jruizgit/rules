@@ -1207,18 +1207,34 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.startPost = function (rulesetName, message) {
+            if (message.constructor === Array) {
+                return that.startPostBatch(rulesetName, message);
+            }
+
             return that.getRuleset(rulesetName).startAssertEvent(message);
         };
 
         that.post = function (rulesetName, message) {
+            if (message.constructor === Array) {
+                return that.postBatch(rulesetName, message);
+            }
+
             return that.getRuleset(rulesetName).assertEvent(message);
         };
 
         that.startAssert = function (rulesetName, fact) {
+            if (fact.constructor === Array) {
+                return that.startAssertFacts(rulesetName, fact);
+            }
+
             return that.getRuleset(rulesetName).startAssertFact(fact);
         };
 
         that.assert = function (rulesetName, fact) {
+            if (fact.constructor === Array) {
+                return that.assertFacts(rulesetName, fact);
+            }
+
             return that.getRuleset(rulesetName).assertFact(fact);
         };
 
@@ -1326,20 +1342,39 @@ exports = module.exports = durableEngine = function () {
         database = database || {host: 'localhost', port: 6379, password: null, db: 0};
         stateCacheSize = stateCacheSize || 5000;
 
+        that.isClosed = function() {
+            return (handle == 0);
+        }
+
         that.post = function (message) {
+            if (handle == 0) {
+                throw 'Queue has already been closed';
+            }
+
             return r.queueAssertEvent(handle, message.sid, rulesetName, JSON.stringify(message));
         };
 
         that.assert = function (message) {
+            if (handle == 0) {
+                throw 'Queue has already been closed';
+            }
+
             return r.queueAssertFact(handle, message.sid, rulesetName, JSON.stringify(message));
         };
 
         that.retract = function (message) {
+            if (handle == 0) {
+                throw 'Queue has already been closed';
+            }
+
             return r.queueRetractFact(handle, message.sid, rulesetName, JSON.stringify(message));
         };
 
         that.close = function() {
-            return r.deleteClient(handle);
+            if (handle != 0) {
+                r.deleteClient(handle);
+                handle = 0;
+            }
         };
 
         handle = r.createClient(rulesetName, stateCacheSize)
@@ -1535,7 +1570,7 @@ exports = module.exports = durableEngine = function () {
                 });
             });
 
-            that.listen(port, function () {
+            return that.listen(port, function () {
                 console.log('Listening on ' + port);
             });    
         };

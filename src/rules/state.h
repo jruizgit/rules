@@ -4,7 +4,7 @@
 #define UNDEFINED_INDEX 0xFFFFFFFF
 #define MAX_NAME_LENGTH 256
 #define SID_BUFFER_LENGTH 2
-#define ID_BUFFER_LENGTH 21
+#define ID_BUFFER_LENGTH 22
 #define UNDEFINED_HASH_OFFSET 0xFFFFFFFF
 
 #define JSON_OBJECT_SEQUENCED 1
@@ -74,6 +74,6 @@ unsigned int fetchStateProperty(void *tree,
                                 char **state,
                                 jsonProperty **property);
 
-unsigned int getStateVersion(void *handle, 
+unsigned int getStateVersion(void *tree, 
                              char *sid, 
                              unsigned long *stateVersion);

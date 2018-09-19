@@ -196,22 +196,39 @@ with ruleset('strings'):
         host.assert_fact('strings', { 'subject': 'hello hi' })
         host.assert_fact('strings', { 'subject': 'has Hello string' })
         host.assert_fact('strings', { 'subject': 'does not match' })
-        
 
-with ruleset('risk0'):
-    @when_all(c.first << m.amount > 10,
+
+with ruleset('indistinct'):
+    @when_all(distinct(False),
+              c.first << m.amount > 10,
               c.second << m.amount > c.first.amount * 2,
-              c.third << m.amount > c.first.amount + c.second.amount)
+              c.third << m.amount > (c.first.amount + c.second.amount) / 2)
     def detected(c):
-        print('fraud detected -> {0}'.format(c.first.amount))
+        print('indistinct detected -> {0}'.format(c.first.amount))
         print('               -> {0}'.format(c.second.amount))
         print('               -> {0}'.format(c.third.amount))
         
     @when_start
     def start(host):
-        host.post('risk0', { 'amount': 50 })
-        host.post('risk0', { 'amount': 200 })
-        host.post('risk0', { 'amount': 300 })
+        host.post('indistinct', { 'amount': 50 })
+        host.post('indistinct', { 'amount': 200 })
+        host.post('indistinct', { 'amount': 251 })
+        
+
+with ruleset('distinct'):
+    @when_all(c.first << m.amount > 10,
+              c.second << m.amount > c.first.amount * 2,
+              c.third << m.amount > (c.first.amount + c.second.amount) / 2)
+    def detected(c):
+        print('distinct detected -> {0}'.format(c.first.amount))
+        print('               -> {0}'.format(c.second.amount))
+        print('               -> {0}'.format(c.third.amount))
+        
+    @when_start
+    def start(host):
+        host.post('distinct', { 'amount': 50 })
+        host.post('distinct', { 'amount': 200 })
+        host.post('distinct', { 'amount': 251 })
 
 
 with ruleset('expense1'):
@@ -650,6 +667,11 @@ with ruleset('risk5'):
 
 
 with ruleset('risk6'):
+    # matching primitive array
+    @when_all(m.payments.allItems((item > 100) & (item < 400)))
+    def rule1(c):
+        print('should not match {0}'.format(c.m.payments))
+
     # matching primitive array
     @when_all(m.payments.allItems((item > 100) & (item < 500)))
     def rule1(c):

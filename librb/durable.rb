@@ -449,6 +449,10 @@ module Durable
       {:cap => value}
     end
 
+    def distinct(value)
+      {:dist => value}
+    end
+
     def timeout(name)
       expression = Expression.new(:$m, :$t)
       expression == name
@@ -505,6 +509,14 @@ module Durable
 
       if options.key? :cap
         rule["cap"] = options[:cap]
+      end
+
+      if options.key? :dist
+        if (options[:dist])
+          rule["dist"] = 1
+        else
+          rule["dist"] = 0
+        end
       end
 
       @rules[rule_name] = rule

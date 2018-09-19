@@ -22,7 +22,7 @@ exports = module.exports = durableEngine = function () {
         '*': 'mul',
         '/': 'div',
         'u+': 'ex',
-        '~': 'nex',
+        'u~': 'nex',
     };
 
     var transformStartStatement = function (statement) {
@@ -512,7 +512,8 @@ exports = module.exports = durableEngine = function () {
                     });
                 } else if ((statement.label.name === 'pri') ||
                           (statement.label.name === 'count') ||
-                          (statement.label.name === 'cap')) {
+                          (statement.label.name === 'cap') ||
+                          (statement.label.name === 'distinct')) {
                     currentRule.properties.push({
                         type: 'Property',
                         key: { type: 'Identifier', name: statement.label.name },
@@ -601,7 +602,8 @@ exports = module.exports = durableEngine = function () {
                     });
                 } else if ((statement.label.name === 'pri') ||
                           (statement.label.name === 'count') ||
-                          (statement.label.name === 'cap')) {
+                          (statement.label.name === 'cap') ||
+                          (statement.label.name === 'distinct')) {
                     currentTrigger.properties.push({
                         type: 'Property',
                         key: { type: 'Identifier', name: statement.label.name },
@@ -717,14 +719,15 @@ exports = module.exports = durableEngine = function () {
                         });
                     } else if ((statement.label.name === 'pri') ||
                               (statement.label.name === 'count') ||
-                              (statement.label.name === 'cap')) {
+                              (statement.label.name === 'cap') ||
+                              (statement.label.name === 'distinct')) {
                         currentCondition.properties.push({
                             type: 'Property',
                             key: { type: 'Identifier', name: statement.label.name },
                             value: statement.body.expression
                         });
                     } else {
-                        throw 'syntax error: whenAll, pri, count or cap labels expected';   
+                        throw 'syntax error: whenAll, pri, count, distinct, or cap labels expected';   
                     }
                 }
             });
@@ -1240,6 +1243,12 @@ exports = module.exports = durableEngine = function () {
                 if (argRule.run) {
                     newDefinition['run'] = argRule.run;
                 }
+                if (argRule.distinct === true) {
+                        newDefinition['dist'] = 1;
+                } 
+                if (argRule.distinct === false) {
+                        newDefinition['dist'] = 0;
+                }
             } 
             var expDefinition;
             var func;
@@ -1267,6 +1276,10 @@ exports = module.exports = durableEngine = function () {
                     newDefinition['pri'] = expDefinition['pri'];
                 } else if (expDefinition['cap']) {
                     newDefinition['cap'] = expDefinition['cap'];
+                } else if (expDefinition['dist'] === true) {
+                    newDefinition['dist'] = 1;
+                } else if (expDefinition['dist'] === false) {
+                    newDefinition['dist'] = 0; 
                 } else {
                     newArray.push(lexp[i]);
                 }
@@ -1453,6 +1466,14 @@ exports = module.exports = durableEngine = function () {
             var that = {};
             that.define = function () {
                 return {cap: cap};
+            }
+            return that;
+        };
+
+        obj.distinct = function(dist) {
+            var that = {};
+            that.define = function () {
+                return {dist: dist};
             }
             return that;
         };
@@ -1768,13 +1789,13 @@ exports = module.exports = durableEngine = function () {
 
             var switchesDefinition = {};
             for (var i = 0; i < switches.length; ++i) {
-                var switchDefinition = switches[i].define('');
+                var switchDefinition = switches[i].define();
                 if (typeof(switchDefinition) === 'string') {
                     switchesDefinition = switchDefinition;
                     break;
                 }
 
-                switchesDefinition[switches[i].getName()] = switches[i].define('');
+                switchesDefinition[switches[i].getName()] = switches[i].define();
             }
 
             newDefinition['to'] = switchesDefinition;
@@ -1858,10 +1879,10 @@ exports = module.exports = durableEngine = function () {
         var definitions = {};
         for (var i = 0; i < rulesets.length; ++ i) {
             definitions[rulesets[i].getName()] = rulesets[i].define(); 
-            //console.log(rulesets[i].getName() + ' ***** ' + JSON.stringify(definitions[rulesets[i].getName()]))
         }
 
         var rulesHost = d.host(databases, stateCacheSize);
+        // console.log(JSON.stringify(definitions, 2, 2));
         rulesHost.registerRulesets(null, definitions);
         for (var i = 0; i < rulesets.length; ++ i) {
             if (rulesets[i].getStart()) {

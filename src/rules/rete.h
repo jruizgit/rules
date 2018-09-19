@@ -66,6 +66,7 @@ typedef struct expression {
     unsigned int nameOffset;
     unsigned int aliasOffset;
     unsigned short termsLength;
+    unsigned char distinct;
     unsigned char not;
     union {
         unsigned int termsOffset; 

@@ -403,8 +403,9 @@ static unsigned int getStringAndHash(char *start, char **first, char **last, uns
                     state = ST_STRING_PARSE;
                     delimiter = start[0];
                     *first = start + 1;
-                }
-                else if (!IS_WHITESPACE(start[0])) {
+                } else if (start[0] == '}') {
+                    return PARSE_END;
+                } else if (!IS_WHITESPACE(start[0])) {
                     return ERR_PARSE_STRING;
                 }
                 break;

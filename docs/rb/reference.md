@@ -438,6 +438,8 @@ Durable.run_all
 ### Correlated Sequence
 Rules can be used to efficiently evaluate sequences of correlated events or facts. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
+By default a correlated sequences capture distinct messages. In the example below the second event satisfies the second and the third condition, however the event will be captured only for the second condition. Use the `distinct` attribute to disable distinct event or fact correlation.
+
 The `when_all` annotation expresses a sequence of events or facts. The `=` operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
 
 Arithmetic operators: +, -, *, /
@@ -445,9 +447,10 @@ Arithmetic operators: +, -, *, /
 require "durable"
 
 Durable.ruleset :risk do
-  when_all c.first = m.t == "purchase",
+  when_all # distinct(true),
+           c.first = m.amount > 10,
            c.second = m.amount > first.amount * 2,
-           c.third = m.amount > first.amount + second.amount do
+           c.third = m.amount > (first.amount + second.amount) / 2 do
     puts "fraud detected -> #{first.amount}" 
     puts "               -> #{second.amount}"
     puts "               -> #{third.amount}"
@@ -456,7 +459,7 @@ Durable.ruleset :risk do
   when_start do
     post :risk, { :t => "purchase", :amount => 50 }
     post :risk, { :t => "purchase", :amount => 200 }
-    post :risk, { :t => "purchase", :amount => 300 } 
+    post :risk, { :t => "purchase", :amount => 251 } 
   end
 end
 

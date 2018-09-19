@@ -466,6 +466,20 @@ d.statechart('fraud7', function() {
     }
 });
 
+d.ruleset('fraud8', function() {
+    whenAll: {
+        ~m.payments
+    }
+    run: {
+        console.log('fraud 8 detected ' + JSON.stringify(m));
+        s.payments = true;
+    }
+
+    whenStart: {
+        post('fraud8', {});
+    }
+});
+
 d.ruleset('a0', function() {
     whenAll: m.subject == 'go' || m.subject == 'approve' || m.subject == 'ok'
     run: console.log('a0 approved ' + m.subject)

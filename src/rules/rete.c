@@ -13,6 +13,7 @@
 #define HASH_PRI 1450887882 // pri
 #define HASH_COUNT 967958004 // count
 #define HASH_CAP 41178555 // cap
+#define HASH_DIST 1281379241 // dist
 #define HASH_LT 542787579 // $lt
 #define HASH_LTE 2350824890 // $lte
 #define HASH_GT 507407960 // $gt
@@ -58,11 +59,16 @@ typedef struct all {
     unsigned short expressionsLength;
 } all;
 
+unsigned int firstEmptyEntry = 1;
+unsigned int lastEmptyEntry = MAX_HANDLES -1;
+char entriesInitialized = 0;
+
 static unsigned int validateAlgebra(char *rule);
 
 static unsigned int createBeta(ruleset *tree, 
                                char *rule, 
                                unsigned char operator, 
+                               unsigned short distinct,
                                unsigned int nextOffset, 
                                path *nextPath, 
                                path **outPath);
@@ -792,6 +798,11 @@ static unsigned int validateRuleset(char *rules) {
             return result;
         }
 
+        result = validateSetting(HASH_DIST, first, JSON_INT);
+        if (result != PARSE_OK && result != ERR_SETTING_NOT_FOUND) {
+            return result;
+        }
+
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
             result = readNextValue(last, &first, &last, &type);
@@ -804,7 +815,8 @@ static unsigned int validateRuleset(char *rules) {
                 if (result != RULES_OK && result != PARSE_END) {
                     return result;
                 }
-            } else if (hash != HASH_COUNT && hash != HASH_PRI && hash != HASH_CAP) {
+            } else if (hash != HASH_COUNT && hash != HASH_PRI && hash != HASH_CAP && hash != HASH_DIST) {
+                printf("%d\n", hash);
                 return ERR_UNEXPECTED_NAME;
             }
 
@@ -1110,7 +1122,7 @@ static unsigned int findAlpha(ruleset *tree,
     }
 
     if (operator == OP_IANY || operator == OP_IALL) {
-        type = JSON_NIL;
+        newAlpha->value.a.right.type = JSON_NIL;
     } else {
         result = copyValue(tree, &newAlpha->value.a.right, first, last, idiomOffset, &ref, type);
         if (result != RULES_OK) {
@@ -1306,7 +1318,39 @@ static unsigned int createAlpha(ruleset *tree,
             return result;
         }
 
-        return linkAlpha(tree, *newOffset, nextOffset);
+        node *newAlpha = &tree->nodePool[inner_offset];
+        if (newAlpha->value.a.right.type != JSON_EVENT_PROPERTY && newAlpha->value.a.right.type != JSON_EVENT_IDIOM) {
+            return linkAlpha(tree, *newOffset, nextOffset);
+        } else {
+            // Functions that can execute in client or backend should follow this pattern
+            node *oldAlpha = &tree->nodePool[*newOffset];
+            idiom *newIdiom = NULL;
+            unsigned int idiomOffset = 0;
+            result = storeIdiom(tree, &newIdiom, &idiomOffset);
+            if (result != RULES_OK) {
+                return result;
+            }
+
+            oldAlpha->value.a.right.type = JSON_EVENT_IDIOM;
+            oldAlpha->value.a.right.value.idiomOffset = idiomOffset;
+
+            newIdiom->operator = newAlpha->value.a.operator;
+            newIdiom->right.type = newAlpha->value.a.right.type;
+            if (newAlpha->value.a.right.type == JSON_EVENT_IDIOM) {
+                newIdiom->right.value.idiomOffset = newAlpha->value.a.right.value.idiomOffset;
+            } else {
+                newIdiom->right.value.property.nameHash = newAlpha->value.a.right.value.property.nameHash;
+                newIdiom->right.value.property.nameOffset = newAlpha->value.a.right.value.property.nameOffset;
+                newIdiom->right.value.property.idOffset = newAlpha->value.a.right.value.property.idOffset;
+            }
+            newIdiom->left.type = JSON_EVENT_PROPERTY;
+            newIdiom->left.value.property.nameHash = newAlpha->value.a.hash;
+            newIdiom->left.value.property.nameOffset = newAlpha->nameOffset;
+            newIdiom->left.value.property.idOffset = 0;
+
+            expr->t.termsPointer[expr->termsLength - 1] = *newOffset;
+            return linkAlpha(tree, *newOffset, nextOffset);
+        }
     }
 
     if (nextOffset == 0) {
@@ -1324,6 +1368,7 @@ static unsigned int createAlpha(ruleset *tree,
 static unsigned int createBetaConnector(ruleset *tree, 
                                         char *rule, 
                                         path *betaPath,
+                                        unsigned short distinct,
                                         unsigned int nextOffset) {
     char *first;
     char *last;
@@ -1393,6 +1438,7 @@ static unsigned int createBetaConnector(ruleset *tree,
         expr->not = (operator == OP_NOT) ? 1 : 0;
         expr->termsLength = 0;
         expr->t.termsPointer = NULL;
+        expr->distinct = (distinct != 0) ? 1 : 0;
         if (operator == OP_NOP || operator == OP_NOT) {
             unsigned int resultOffset = NODE_M_OFFSET;
             readNextValue(last, &first, &last, &type);
@@ -1400,7 +1446,7 @@ static unsigned int createBetaConnector(ruleset *tree,
         }
         else {
             readNextValue(last, &first, &last, &type);
-            result = createBeta(tree, first, operator, connectorOffset, betaPath, NULL);
+            result = createBeta(tree, first, operator, distinct, connectorOffset, betaPath, NULL);
         }
 
         if (result != RULES_OK) {
@@ -1416,6 +1462,7 @@ static unsigned int createBetaConnector(ruleset *tree,
 static unsigned int createBeta(ruleset *tree, 
                                char *rule, 
                                unsigned char operator, 
+                               unsigned short distinct,
                                unsigned int nextOffset, 
                                path *nextPath, 
                                path **outPath) {
@@ -1460,7 +1507,7 @@ static unsigned int createBeta(ruleset *tree,
         *outPath = betaPath;
     }
 
-    return createBetaConnector(tree, rule, betaPath, nextOffset);    
+    return createBetaConnector(tree, rule, betaPath, distinct, nextOffset);    
 }
 
 static unsigned int add(any *right, any *left, any **result) {
@@ -1568,6 +1615,7 @@ static unsigned int createSingleQuery(ruleset *tree,
     newExpression->aliasOffset = expr->aliasOffset;
     newExpression->termsLength = expr->termsLength;
     newExpression->not = expr->not;
+    newExpression->distinct = expr->distinct;
     if (expr->termsLength) {
         result = allocateNext(tree, expr->termsLength, &newExpression->t.termsOffset);
         if (result != RULES_OK) {
@@ -1815,15 +1863,17 @@ static unsigned int createTree(ruleset *tree, char *rules) {
             ruleAction->value.c.count = 1;
         }
 
+        unsigned short distinct = 1;
+        getSetting(HASH_DIST, first, &distinct);
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
             readNextValue(last, &first, &last, &type);
             switch (hash) {
                 case HASH_ANY:
-                    result = createBeta(tree, first, OP_ANY, actionOffset, NULL, &betaPath);
+                    result = createBeta(tree, first, OP_ANY, distinct, actionOffset, NULL, &betaPath);
                     break;
                 case HASH_ALL:
-                    result = createBeta(tree, first, OP_ALL, actionOffset, NULL, &betaPath);
+                    result = createBeta(tree, first, OP_ALL, distinct, actionOffset, NULL, &betaPath);
                     break;
             }
             if (result != RULES_OK) {
@@ -1848,7 +1898,13 @@ static unsigned int createTree(ruleset *tree, char *rules) {
     return RULES_OK;
 }
 
-unsigned int createRuleset(void **handle, char *name, char *rules, unsigned int stateCaheSize) {
+unsigned int createRuleset(unsigned int *handle, char *name, char *rules, unsigned int stateCaheSize) {
+    INITIALIZE_ENTRIES;
+
+#ifdef _PRINT
+    printf("%s\n", rules);
+#endif
+
     node *newNode;
     unsigned int stringOffset;
     unsigned int nodeOffset;
@@ -1930,15 +1986,17 @@ unsigned int createRuleset(void **handle, char *name, char *rules, unsigned int 
     newNode->type = NODE_ALPHA;
     newNode->value.a.operator = OP_END;
 
-    *handle = tree;
-
     // will use random numbers for state stored event mids
     srand(time(NULL));
+
+    CREATE_HANDLE(tree, handle);
     return createTree(tree, rules);
 }
 
-unsigned int deleteRuleset(void *handle) {
-    ruleset *tree = (ruleset*)(handle);
+unsigned int deleteRuleset(unsigned int handle) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+
     deleteBindingsList(tree);
     free(tree->nodePool);
     free(tree->nextPool);
@@ -1959,10 +2017,13 @@ unsigned int deleteRuleset(void *handle) {
     }
     free(tree->state);
     free(tree);
+    DELETE_HANDLE(handle);
     return RULES_OK;
 }
 
-unsigned int createClient(void **handle, char *name, unsigned int stateCaheSize) {
+unsigned int createClient(unsigned int *handle, char *name, unsigned int stateCaheSize) {
+    INITIALIZE_ENTRIES;
+
     ruleset *tree = malloc(sizeof(ruleset));
     if (!tree) {
         return ERR_OUT_OF_MEMORY;
@@ -1996,12 +2057,14 @@ unsigned int createClient(void **handle, char *name, unsigned int stateCaheSize)
         return result;
     }
 
-    *handle = tree;
+    CREATE_HANDLE(tree, handle);
     return RULES_OK;
 }
 
-unsigned int deleteClient(void *handle) {
-    ruleset *tree = (ruleset*)(handle);
+unsigned int deleteClient(unsigned int handle) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+    
     deleteBindingsList(tree);
     free(tree->stringPool);
     free(tree->stateBuckets);
@@ -2017,6 +2080,7 @@ unsigned int deleteClient(void *handle) {
     }
     
     free(tree);
+    DELETE_HANDLE(handle);
     return RULES_OK;
 }
 
