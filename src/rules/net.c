@@ -1442,6 +1442,29 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
         return ERR_OUT_OF_MEMORY;
     }
 
+    if (asprintf(&lua,
+"%stoggle = false\n"
+"context_directory = {}\n"
+"context = {}\n"
+"reviewers = {}\n"
+"context[\"reviewers\"] = reviewers\n"
+"frame_packers = {}\n"
+"context[\"frame_packers\"] = frame_packers\n"
+"frame_unpackers = {}\n"
+"context[\"frame_unpackers\"] = frame_unpackers\n"
+"primary_message_keys = {}\n"
+"context[\"primary_message_keys\"] = primary_message_keys\n"
+"primary_frame_keys = {}\n"
+"context[\"primary_frame_keys\"] = primary_frame_keys\n"
+"keys = {}\n"
+"context[\"keys\"] = keys\n"
+"inverse_directory = {}\n"
+"context[\"inverse_directory\"] = inverse_directory\n"
+"directory = {[\"0\"] = 1}\n"
+"context[\"directory\"] = directory\n",
+                lua) == -1) {
+        return ERR_OUT_OF_MEMORY;
+    }  
     sortActions(tree, sortedActions, &actionCount);
     for (unsigned int i = 0; i < actionCount; ++i) {
         node *currentNode = sortedActions[i];
@@ -1465,26 +1488,7 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
             join *currentJoin = &tree->joinPool[currentJoinOffset];
             oldLua = lua;
             if (asprintf(&lua, 
-"%stoggle = false\n"
-"context_directory = {}\n"
-"context = {}\n"
-"reviewers = {}\n"
-"context[\"reviewers\"] = reviewers\n"
-"frame_packers = {}\n"
-"context[\"frame_packers\"] = frame_packers\n"
-"frame_unpackers = {}\n"
-"context[\"frame_unpackers\"] = frame_unpackers\n"
-"primary_message_keys = {}\n"
-"context[\"primary_message_keys\"] = primary_message_keys\n"
-"primary_frame_keys = {}\n"
-"context[\"primary_frame_keys\"] = primary_frame_keys\n"
-"keys = {}\n"
-"context[\"keys\"] = keys\n"
-"inverse_directory = {}\n"
-"context[\"inverse_directory\"] = inverse_directory\n"
-"directory = {[\"0\"] = 1}\n"
-"context[\"directory\"] = directory\n"
-"context[\"results_key\"] = \"%s!%d!r!\" .. sid\n"
+"%scontext[\"results_key\"] = \"%s!%d!r!\" .. sid\n"
 "context[\"expressions_count\"] = %d\n",
                         lua,
                         actionName,
@@ -1850,6 +1854,26 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "    context[\"process_key_count\"] = %d\n"
 "    if not process_message(message) then\n"
 "        return\n"
+"    else\n"
+"       toggle = false\n"
+"       context_directory = {}\n"
+"       context = {}\n"
+"       reviewers = {}\n"
+"       context[\"reviewers\"] = reviewers\n"
+"       frame_packers = {}\n"
+"       context[\"frame_packers\"] = frame_packers\n"
+"       frame_unpackers = {}\n"
+"       context[\"frame_unpackers\"] = frame_unpackers\n"
+"       primary_message_keys = {}\n"
+"       context[\"primary_message_keys\"] = primary_message_keys\n"
+"       primary_frame_keys = {}\n"
+"       context[\"primary_frame_keys\"] = primary_frame_keys\n"
+"       keys = {}\n"
+"       context[\"keys\"] = keys\n"
+"       inverse_directory = {}\n"
+"       context[\"inverse_directory\"] = inverse_directory\n"
+"       directory = {[\"0\"] = 1}\n"
+"       context[\"directory\"] = directory\n"
 "    end\n"
 "end\n",
                              lua,
