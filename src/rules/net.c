@@ -2909,6 +2909,7 @@ unsigned int startNonBlockingBatch(void *rulesBinding,
         free(commands[i]);
     }
 
+    sdsfree(reContext->obuf);
     reContext->obuf = newbuf;
     int wdone = 0;
     do {
@@ -2985,6 +2986,7 @@ unsigned int executeBatchWithReply(void *rulesBinding,
         free(commands[i]);
     }
 
+    sdsfree(reContext->obuf);
     reContext->obuf = newbuf;
     redisReply *reply;
     for (unsigned int i = 0; i < replyCount; ++i) {
