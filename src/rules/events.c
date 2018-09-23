@@ -1458,8 +1458,12 @@ static unsigned int handleMessages(ruleset *tree,
                            &jo,
                            &last) == RULES_OK) {
 
-        while (*last != ',' && *last != ']' ) {
+        while (*last != ',' && *last != '\0' ) {
             ++last;
+        }
+
+        if (*last == '\0') {
+            --last;
         }
 
         lastTemp = *last;
