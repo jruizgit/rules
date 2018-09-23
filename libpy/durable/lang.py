@@ -147,7 +147,7 @@ class value(object):
         return value(self._type, self._left, '$mt', other, self.alias)
 
     def imatches(self, other):
-        return value(self._type, self._left, '$mt', other, self.alias)
+        return value(self._type, self._left, '$imt', other, self.alias)
 
     def __and__(self, other):
         return value(self._type, self, '$and', other, self.alias)
