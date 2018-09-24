@@ -656,6 +656,57 @@ Durable.ruleset :risk5 do
   end
 end
 
+Durable.ruleset :risk6 do
+  # matching primitive array
+  when_all m.payments.allItems(item > 2000) do
+    puts "Should not match #{m.payments}"
+  end
+  
+  # matching primitive array
+  when_all m.payments.allItems(item > 1000) do
+    puts "risk6 fraud 1 detected #{m.payments}"
+  end
+
+  # matching object array
+  when_all m.payments.allItems((item.amount < 250) | (item.amount >= 300)) do
+    puts "risk6 fraud 2 detected #{m.payments}"
+  end
+
+  # matching object array
+  when_all m.cards.anyItem(item.matches("three.*")) do
+    puts "risk6 fraud 3 detected #{m.cards}"
+  end
+
+  # matching nested arrays
+  when_all m.payments.anyItem(item.allItems(item < 100)) do
+    puts "risk6 fraud 4 detected #{m.payments}"
+  end
+
+  # matching array and value
+  when_all (m.payments.allItems(item > 100) & (m.cash == true)) do
+    puts "risk6 fraud 5 detected #{m.payments}"
+  end
+
+  when_all (m.field == 1) & m.payments.allItems(item.allItems((item > 100) & (item < 1000))) do
+    puts "risk6 fraud 6 detected #{m.payments}"
+  end
+
+  when_all (m.field == 1) & m.payments.allItems(item.anyItem((item > 100) | (item < 50))) do
+    puts "risk6 fraud 7 detected #{m.payments}"
+  end
+
+  when_start do
+    post :risk6, { :payments => [ 2500, 150, 450 ] }
+    post :risk6, { :payments => [ 1500, 3500, 4500 ] }
+    post :risk6, { :payments => [ { :amount => 200 }, { :amount => 300 }, { :amount => 400 } ] }
+    post :risk6, { :cards => [ "one card", "two cards", "three cards" ] }
+    post :risk6, { :payments => [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ] }
+    post :risk6, { :payments => [ 150, 350, 450 ], :cash => true }
+    post :risk6, { :field => 1, :payments => [ [ 200, 300 ], [ 150, 200 ] ] }
+    post :risk6, { :field => 1, :payments => [ [ 20, 180 ], [ 90, 190 ] ] }
+  end
+end
+
 
 # Durable.ruleset :flow do
 

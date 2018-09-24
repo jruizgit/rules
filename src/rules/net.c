@@ -2744,7 +2744,6 @@ unsigned int formatStoreMessage(void *rulesBinding,
         argvl[offset + i * 3 + 2] = 1; 
     }
 
-
     int result = redisFormatCommandArgv(command, offset + propertiesLength * 3, (const char**)argv, argvl); 
     if (result == 0) {
         return ERR_OUT_OF_MEMORY;

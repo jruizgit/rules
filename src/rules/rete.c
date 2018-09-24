@@ -816,7 +816,6 @@ static unsigned int validateRuleset(char *rules) {
                     return result;
                 }
             } else if (hash != HASH_COUNT && hash != HASH_PRI && hash != HASH_CAP && hash != HASH_DIST) {
-                printf("%d\n", hash);
                 return ERR_UNEXPECTED_NAME;
             }
 

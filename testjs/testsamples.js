@@ -630,6 +630,16 @@ d.ruleset('risk6', function() {
     }
     run: console.log('fraud 5 detected ' + JSON.stringify(m))
 
+    whenAll: {
+        m.field == 1 && m.payments.allItems(item.allItems(item > 100 && item < 1000))
+    }
+    run: console.log('fraud 6 detected ' + JSON.stringify(m.payments))
+
+    whenAll: {
+        m.field == 1 && m.payments.allItems(item.anyItem(item > 100 || item < 50))
+    }
+    run: console.log('fraud 7 detected ' + JSON.stringify(m.payments))
+
     whenStart: {
         post('risk6', { payments: [ 2500, 150, 450 ] });
         post('risk6', { payments: [ 1500, 3500, 4500 ] });
@@ -637,9 +647,10 @@ d.ruleset('risk6', function() {
         post('risk6', { cards: [ 'one card', 'two cards', 'three cards' ] });
         post('risk6', { payments: [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]});
         post('risk6', { payments: [ 150, 350, 450 ], cash : true});    
+        post('risk6', { field: 1, payments: [ [ 200, 300 ], [ 150, 200 ] ]}); 
+        post('risk6', { field: 1, payments: [ [ 20, 180 ], [ 90, 190 ] ]}); 
     }
 });
-
 
 // d.ruleset('flow', function() {
 //     whenAll: m.state == 'start'

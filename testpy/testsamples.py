@@ -692,12 +692,29 @@ with ruleset('risk6'):
     def rule4(c):
         print('fraud 4 detected {0}'.format(c.m.payments))
 
+
+    @when_all(m.payments.allItems(item > 100) & (m.cash == True))
+    def rule5(c):
+        print('fraud 5 detected {0}'.format(c.m.cash))
+
+    @when_all((m.field == 1) & m.payments.allItems(item.allItems((item > 100) & (item < 1000))))
+    def rule6(c):
+        print('fraud 6 detected {0}'.format(c.m.payments))
+
+
+    @when_all((m.field == 1) & m.payments.allItems(item.anyItem((item > 100) | (item < 50))))
+    def rule7(c):
+        print('fraud 7 detected {0}'.format(c.m.payments))
+
     @when_start
     def start(host):
         host.post('risk6', {'payments': [ 150, 300, 450 ]})
         host.post('risk6', {'payments': [ { 'amount' : 200 }, { 'amount' : 300 }, { 'amount' : 450 } ]})
         host.post('risk6', {'cards': [ 'one card', 'two cards', 'three cards' ]})
         host.post('risk6', {'payments': [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]})  
+        host.post('risk6', {'payments': [ 150, 350, 600 ], 'cash': True })  
+        host.post('risk6', {'field': 1, 'payments': [ [ 200, 300 ], [ 150, 200 ] ]})  
+        host.post('risk6', {'field': 1, 'payments': [ [ 20, 180 ], [ 90, 190 ] ]})
 
 # with ruleset('flow'):
 #     @when_all(m.status == 'start')

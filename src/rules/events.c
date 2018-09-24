@@ -981,6 +981,7 @@ static unsigned int isArrayMatch(ruleset *tree,
         while (top) {
             --top;
             currentAlpha = stack[top];
+            // add all disjunctive nodes to stack
             if (currentAlpha->nextListOffset) {
                 unsigned int *nextList = &tree->nextPool[currentAlpha->nextListOffset];
                 for (unsigned int entry = 0; nextList[entry] != 0; ++entry) {
@@ -1004,6 +1005,7 @@ static unsigned int isArrayMatch(ruleset *tree,
                 }
             }
 
+            // calculate conjunctive nodes
             if (currentAlpha->nextOffset) {
                 unsigned int *nextHashset = &tree->nextPool[currentAlpha->nextOffset];
                 for(unsigned int propertyIndex = 0; propertyIndex < jo.propertiesLength; ++propertyIndex) {
@@ -1013,13 +1015,14 @@ static unsigned int isArrayMatch(ruleset *tree,
                         if (currentProperty->hash == hashNode->value.a.hash) {
                             unsigned char match = 0;
                             if (hashNode->value.a.operator == OP_IALL || hashNode->value.a.operator == OP_IANY) {
+                                // isArrayMatch finds a valid path, thus use propertyMatch
                                 result = isArrayMatch(tree, 
                                                       sid, 
                                                       message,
                                                       messageObject,
                                                       currentProperty, 
                                                       &hashNode->value.a,
-                                                      &match,
+                                                      propertyMatch,
                                                       rulesBinding);
                             } else {
                                 result = isMatch(tree,
@@ -1030,31 +1033,34 @@ static unsigned int isArrayMatch(ruleset *tree,
                                                  &hashNode->value.a,
                                                  &match,
                                                  rulesBinding);
+
+                                if (match) {
+                                    if (top == MAX_STACK_SIZE) {
+                                        return ERR_MAX_STACK_SIZE;
+                                    }
+
+                                    stack[top] = &hashNode->value.a; 
+                                    ++top;
+                                }
                             }
 
                             if (result != RULES_OK) {
                                 return result;
-                            }
-
-                            if (match) {
-                                if (top == MAX_STACK_SIZE) {
-                                    return ERR_MAX_STACK_SIZE;
-                                }
-
-                                stack[top] = &hashNode->value.a; 
-                                ++top;
                             }
                         }
                     }               
                 }
             }
 
-            if ((currentAlpha->betaListOffset || !currentAlpha->nextOffset) && currentAlpha != arrayAlpha) {
+            // no next offset means we found a valid path
+            if (!currentAlpha->nextOffset) {
                 *propertyMatch = 1;
                 break;
             } 
         }
         
+        // OP_IANY, one element led a a valid path
+        // OP_IALL, all elements led to a valid path
         if ((arrayAlpha->operator == OP_IALL && !*propertyMatch) ||
             (arrayAlpha->operator == OP_IANY && *propertyMatch)) {
             break;
