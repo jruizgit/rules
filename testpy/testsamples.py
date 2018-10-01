@@ -706,6 +706,12 @@ with ruleset('risk6'):
     def rule7(c):
         print('fraud 7 detected {0}'.format(c.m.payments))
 
+
+    @when_all(m.payments.anyItem(-item.field1 & (item.field2 == 2)))
+    def rule8(c):
+        print('fraud 8 detected {0}'.format(c.m.payments))
+
+ 
     @when_start
     def start(host):
         host.post('risk6', {'payments': [ 150, 300, 450 ]})
@@ -715,6 +721,10 @@ with ruleset('risk6'):
         host.post('risk6', {'payments': [ 150, 350, 600 ], 'cash': True })  
         host.post('risk6', {'field': 1, 'payments': [ [ 200, 300 ], [ 150, 200 ] ]})  
         host.post('risk6', {'field': 1, 'payments': [ [ 20, 180 ], [ 90, 190 ] ]})
+        host.post('risk6', {'payments': [ {'field2': 2 } ]})
+        host.post('risk6', {'payments': [ {'field2': 1 } ]})
+        host.post('risk6', {'payments': [ {'field1': 1, 'field2': 2} ]})
+        host.post('risk6', {'payments': [ {'field1': 1, 'field2': 1} ]})
 
 # with ruleset('flow'):
 #     @when_all(m.status == 'start')

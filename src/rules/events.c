@@ -989,6 +989,7 @@ static unsigned int isArrayMatch(ruleset *tree,
                     char exists = 0;
                     for(unsigned int propertyIndex = 0; propertyIndex < jo.propertiesLength; ++propertyIndex) {
                         if (listNode->value.a.hash == jo.properties[propertyIndex].hash) {
+                            // filter out not exists (OP_NEX)
                             exists = 1;
                             break;
                         }
@@ -1052,8 +1053,8 @@ static unsigned int isArrayMatch(ruleset *tree,
                 }
             }
 
-            // no next offset means we found a valid path
-            if (!currentAlpha->nextOffset) {
+            // no next offset and no nextListOffest means we found a valid path
+            if (!currentAlpha->nextOffset && !currentAlpha->nextListOffset) {
                 *propertyMatch = 1;
                 break;
             } 
@@ -1094,6 +1095,7 @@ static unsigned int handleAlpha(ruleset *tree,
     while (top) {
         --top;
         currentAlpha = stack[top];
+        // add all disjunctive nodes to stack
         if (currentAlpha->nextListOffset) {
             unsigned int *nextList = &tree->nextPool[currentAlpha->nextListOffset];
             for (entry = 0; nextList[entry] != 0; ++entry) {
@@ -1101,6 +1103,7 @@ static unsigned int handleAlpha(ruleset *tree,
                 char exists = 0;
                 for(unsigned int propertyIndex = 0; propertyIndex < jo->propertiesLength; ++propertyIndex) {
                     if (listNode->value.a.hash == jo->properties[propertyIndex].hash) {
+                        // filter out not exists (OP_NEX)
                         exists = 1;
                         break;
                     }
@@ -1117,6 +1120,7 @@ static unsigned int handleAlpha(ruleset *tree,
             }
         }
 
+        // calculate conjunctive nodes
         if (currentAlpha->nextOffset) {
             unsigned int *nextHashset = &tree->nextPool[currentAlpha->nextOffset];
             for(unsigned int propertyIndex = 0; propertyIndex < jo->propertiesLength; ++propertyIndex) {

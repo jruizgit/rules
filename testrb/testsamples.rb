@@ -695,6 +695,10 @@ Durable.ruleset :risk6 do
     puts "risk6 fraud 7 detected #{m.payments}"
   end
 
+  when_all m.payments.anyItem(-item.field1 & (item.field2 == 2)) do
+    puts "risk6 fraud 8 detected #{m.payments}"
+  end
+
   when_start do
     post :risk6, { :payments => [ 2500, 150, 450 ] }
     post :risk6, { :payments => [ 1500, 3500, 4500 ] }
@@ -704,6 +708,10 @@ Durable.ruleset :risk6 do
     post :risk6, { :payments => [ 150, 350, 450 ], :cash => true }
     post :risk6, { :field => 1, :payments => [ [ 200, 300 ], [ 150, 200 ] ] }
     post :risk6, { :field => 1, :payments => [ [ 20, 180 ], [ 90, 190 ] ] }
+    post :risk6, { :payments => [ { :field2 => 2 } ] }
+    post :risk6, { :payments => [ { :field2 => 1 } ] }
+    post :risk6, { :payments => [ { :field1 => 1 , :field2 => 2 } ] }
+    post :risk6, { :payments => [ { :field1 => 1 , :field2 => 1 } ] }
   end
 end
 
