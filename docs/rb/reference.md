@@ -17,6 +17,7 @@ Reference Manual
   * [Choice of Sequences](reference.md#choice-of-sequences)
   * [Lack of Information](reference.md#lack-of-information)
   * [Nested Objects](reference.md#nested-objects)
+  * [Arrays](reference.md#arrays)
   * [Facts and Events as rvalues](reference.md#facts-and-events-as-rvalues)
 * [Consequents](reference.md#consequents)  
   * [Conflict Resolution](reference.md#conflict-resolution)
@@ -552,6 +553,62 @@ end
 Durable.run_all
 ```  
 [top](reference.md#table-of-contents)  
+
+### Arrays
+
+```ruby
+require "durable"
+
+Durable.ruleset :risk do 
+  # matching primitive array
+  when_all m.payments.allItems(item > 1000) do
+    puts "fraud 1 detected #{m.payments}"
+  end
+
+  # matching object array
+  when_all m.payments.allItems((item.amount < 250) | (item.amount >= 300)) do
+    puts "fraud 2 detected #{m.payments}"
+  end
+
+  # matching object array
+  when_all m.cards.anyItem(item.matches("three.*")) do
+    puts "fraud 3 detected #{m.cards}"
+  end
+
+  # matching nested arrays
+  when_all m.payments.anyItem(item.allItems(item < 100)) do
+    puts "fraud 4 detected #{m.payments}"
+  end
+
+  # matching array and value
+  when_all (m.payments.allItems(item > 100) & (m.cash == true)) do
+    puts "fraud 5 detected #{m.payments}"
+  end
+
+  when_all (m.field == 1) & m.payments.allItems(item.allItems((item > 100) & (item < 1000))) do
+    puts "fraud 6 detected #{m.payments}"
+  end
+
+  when_all (m.field == 1) & m.payments.allItems(item.anyItem((item > 100) | (item < 50))) do
+    puts "fraud 7 detected #{m.payments}"
+  end
+
+  when_start do
+    post :risk, { :payments => [ 2500, 150, 450 ] }
+    post :risk, { :payments => [ 1500, 3500, 4500 ] }
+    post :risk, { :payments => [ { :amount => 200 }, { :amount => 300 }, { :amount => 400 } ] }
+    post :risk, { :cards => [ "one card", "two cards", "three cards" ] }
+    post :risk, { :payments => [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ] }
+    post :risk, { :payments => [ 150, 350, 450 ], :cash => true }
+    post :risk, { :field => 1, :payments => [ [ 200, 300 ], [ 150, 200 ] ] }
+    post :risk, { :field => 1, :payments => [ [ 20, 180 ], [ 90, 190 ] ] }
+  end
+end
+        
+Durable.run_all
+```  
+[top](reference.md#table-of-contents)  
+
 
 ### Facts and Events as rvalues
 
