@@ -1463,40 +1463,19 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
         for (unsigned int ii = 0; ii < currentNode->value.c.joinsLength; ++ii) {
             unsigned int currentJoinOffset = tree->nextPool[currentNode->value.c.joinsOffset + ii];
             join *currentJoin = &tree->joinPool[currentJoinOffset];
-            oldLua = lua;
-            if (asprintf(&lua, 
-"%scontext[\"results_key\"] = \"%s!%d!r!\" .. sid\n"
-"context[\"expressions_count\"] = %d\n",
-                        lua,
-                        actionName,
-                        ii,
-                        currentJoin->expressionsLength)  == -1) {
-                return ERR_OUT_OF_MEMORY;
-            }  
-            free(oldLua);
-
             for (unsigned int iii = 0; iii < currentJoin->expressionsLength; ++iii) {
                 unsigned int expressionOffset = tree->nextPool[currentJoin->expressionsOffset + iii];
                 expression *expr = &tree->expressionPool[expressionOffset];
                 char *currentKey = &tree->stringPool[expr->nameOffset];
                 char *currentAlias = &tree->stringPool[expr->aliasOffset];
-                char *nextKeyTest;
-
+                unsigned int nextExpressionOffset = 0;
                 if (iii == (currentJoin->expressionsLength - 1)) {
-                    nextKeyTest = (char*)calloc(1, sizeof(char));
-                    if (!nextKeyTest) {
-                        return ERR_OUT_OF_MEMORY;
-                    }
+                    nextExpressionOffset = tree->nextPool[currentJoin->expressionsOffset];
                 } else {
-                    unsigned int nextExpressionOffset = tree->nextPool[currentJoin->expressionsOffset + iii + 1];
-                    expression *nextExpr = &tree->expressionPool[nextExpressionOffset];
-                    if (asprintf(&nextKeyTest, 
-"or input_keys[\"%s\"]", 
-                                 &tree->stringPool[nextExpr->nameOffset])  == -1) {
-                        return ERR_OUT_OF_MEMORY;
-                    }
+                    nextExpressionOffset = tree->nextPool[currentJoin->expressionsOffset + iii + 1];
                 }
-                
+
+                expression *nextExpr = &tree->expressionPool[nextExpressionOffset];
                 if (iii == 0) {
                     if (expr->not) { 
                         if (asprintf(&packFrameLua,
@@ -1512,9 +1491,12 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 
                         oldLua = lua;
                         if (asprintf(&lua, 
-"%sif input_keys[\"%s\"] %s then\n"
-"    toggle = true\n"
-"    context_directory[\"%s\"] = context\n"
+"%sfunction_tree[\"%s\"] = function(key, context)\n"
+"    if not context then\n"
+"        context = create_context()\n"
+"        context[\"results_key\"] = \"%s!%d!r!\" .. sid\n"
+"        context[\"expressions_count\"] = %d\n"
+"    end\n"
 "    context[\"keys\"][1] = \"%s\"\n"
 "    context[\"inverse_directory\"][1] = true\n"
 "    context[\"directory\"][\"%s\"] = 1\n"
@@ -1539,12 +1521,12 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "    end\n"
 "    context[\"primary_frame_keys\"][1] = function(frame)\n"
 "        return \"\"\n"
-"    end\n"
-"end\n",
+"    end\n",
                                      lua,
-                                     currentKey,
-                                     nextKeyTest,
-                                     currentKey,
+                                     &tree->stringPool[nextExpr->nameOffset],
+                                     actionName,
+                                     ii,
+                                     currentJoin->expressionsLength,
                                      currentKey,
                                      currentKey,
                                      currentAlias,
@@ -1555,32 +1537,36 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
                         free(oldLua);
                     // not (expr->not)
                     } else {
+
                         if (asprintf(&packFrameLua,
-"    message = frame[\"%s\"]\n"
-"    if full_encode and not message[\"$f\"] then\n"
-"        result[1] = message\n"
-"    else\n"
-"        result[1] = message[\"id\"]\n"
-"    end\n",
+"        message = frame[\"%s\"]\n"
+"        if full_encode and not message[\"$f\"] then\n"
+"            result[1] = message\n"
+"        else\n"
+"            result[1] = message[\"id\"]\n"
+"        end\n",
                                     currentAlias)  == -1) {
                             return ERR_OUT_OF_MEMORY;
                         }
 
                         if (asprintf(&unpackFrameLua,
-"    message = fetch_message(frame[1])\n"
-"    if not message then\n"
-"        return nil\n"
-"    end\n"
-"    result[\"%s\"] = message\n",
+"        message = fetch_message(frame[1])\n"
+"        if not message then\n"
+"            return nil\n"
+"        end\n"
+"        result[\"%s\"] = message\n",
                                     currentAlias)  == -1) {
                             return ERR_OUT_OF_MEMORY;
                         }
 
                         oldLua = lua;
                         if (asprintf(&lua, 
-"%sif input_keys[\"%s\"] %s then\n"
-"    toggle = true\n"
-"    context_directory[\"%s\"] = context\n"
+"%sfunction_tree[\"%s\"] = function(key, context)\n"
+"    if not context then\n"
+"        context = create_context()\n"
+"        context[\"results_key\"] = \"%s!%d!r!\" .. sid\n"
+"        context[\"expressions_count\"] = %d\n"
+"    end\n"
 "    context[\"keys\"][1] = \"%s\"\n"
 "    context[\"inverse_directory\"][1] = true\n"
 "    context[\"directory\"][\"%s\"] = 1\n"
@@ -1607,12 +1593,12 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "    end\n"
 "    context[\"primary_frame_keys\"][1] = function(frame)\n"
 "        return \"\"\n"
-"    end\n"
-"end\n",
+"    end\n",
                                      lua,
-                                     currentKey,
-                                     nextKeyTest,
-                                     currentKey,
+                                     &tree->stringPool[nextExpr->nameOffset],
+                                     actionName,
+                                     ii,
+                                     currentJoin->expressionsLength,
                                      currentKey,
                                      currentKey,
                                      currentAlias,
@@ -1624,10 +1610,24 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
                     }
                 // not (iii == 0)
                 } else {
+                    if (iii < (currentJoin->expressionsLength - 1)) {
+                        oldLua = lua;
+                        if (asprintf(&lua, 
+"%s    function_tree[\"%s\"](key, context)\n"
+"end\n"
+"function_tree[\"%s\"] = function(key, context)\n",
+                                    lua,
+                                    &tree->stringPool[nextExpr->nameOffset],
+                                    &tree->stringPool[nextExpr->nameOffset])  == -1) {
+                            return ERR_OUT_OF_MEMORY;
+                        }
+                        free(oldLua);
+                    }
+                    
                     char *test = NULL;
                     char *primaryKeyLua = NULL;
                     char *primaryFrameKeyLua = NULL;
-                    
+
                     unsigned int result = createTest(tree, expr, &test, &primaryKeyLua, &primaryFrameKeyLua);
                     if (result != RULES_OK) {
                         return result;
@@ -1654,9 +1654,11 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 
                         oldLua = lua;
                         if (asprintf(&lua,
-"%sif toggle %s then\n"
-"    toggle = true\n"
-"    context_directory[\"%s\"] = context\n"
+"%s    if not context then\n"
+"        context = create_context()\n"
+"        context[\"results_key\"] = \"%s!%d!r!\" .. sid\n"
+"        context[\"expressions_count\"] = %d\n"
+"    end\n"
 "    context[\"keys\"][%d] = \"%s\"\n"
 "    context[\"inverse_directory\"][%d] = true\n"
 "    context[\"directory\"][\"%s\"] = %d\n"
@@ -1685,11 +1687,11 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "    context[\"primary_frame_keys\"][%d] = function(frame)\n"
 "        local result = \"\"\n%s"
 "        return result\n"
-"    end\n"
-"end\n",
+"    end\n",
                                      lua,
-                                     nextKeyTest,
-                                     currentKey,
+                                     actionName,
+                                     ii,
+                                     currentJoin->expressionsLength,
                                      iii + 1, 
                                      currentKey,
                                      iii + 1, 
@@ -1714,12 +1716,12 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
                     } else {
                         oldPackFrameLua = packFrameLua;
                         if (asprintf(&packFrameLua,
-"%s    message = frame[\"%s\"]\n"
-"    if full_encode and not message[\"$f\"] then\n"
-"        result[%d] = message\n"
-"    else\n"
-"        result[%d] = message[\"id\"]\n"
-"    end\n",
+"%s        message = frame[\"%s\"]\n"
+"        if full_encode and not message[\"$f\"] then\n"
+"            result[%d] = message\n"
+"        else\n"
+"            result[%d] = message[\"id\"]\n"
+"        end\n",
                                      packFrameLua,
                                      currentAlias,
                                      iii + 1,
@@ -1730,11 +1732,11 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 
                         oldUnpackFrameLua = unpackFrameLua;
                         if (asprintf(&unpackFrameLua,
-"%s    message = fetch_message(frame[%d])\n"
-"    if not message then\n"
-"        return nil\n"
-"    end\n"
-"    result[\"%s\"] = message\n",
+"%s       message = fetch_message(frame[%d])\n"
+"        if not message then\n"
+"            return nil\n"
+"        end\n"
+"        result[\"%s\"] = message\n",
                                      unpackFrameLua,
                                      iii + 1,
                                      currentAlias)  == -1) {
@@ -1744,9 +1746,11 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 
                         oldLua = lua;
                         if (asprintf(&lua,
-"%sif toggle %s then\n"
-"    toggle = true\n"
-"    context_directory[\"%s\"] = context\n"
+"%s    if not context then\n"
+"        context = create_context()\n"
+"        context[\"results_key\"] = \"%s!%d!r!\" .. sid\n"
+"        context[\"expressions_count\"] = %d\n"
+"    end\n"
 "    context[\"keys\"][%d] = \"%s\"\n"
 "    context[\"directory\"][\"%s\"] = %d\n"
 "    context[\"reviewers\"][%d] = function(message, frame, index)\n"
@@ -1774,11 +1778,11 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "    context[\"primary_frame_keys\"][%d] = function(frame)\n"
 "        local result = \"\"\n%s"
 "        return result\n"
-"    end\n"
-"end\n",
+"    end\n",
                                      lua,
-                                     nextKeyTest,
-                                     currentKey,
+                                     actionName,
+                                     ii,
+                                     currentJoin->expressionsLength,
                                      iii + 1, 
                                      currentKey,
                                      currentKey,
@@ -1799,7 +1803,6 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
                         free(oldLua);
                     // done not (expr->not)
                     }
-                    free(nextKeyTest);
                     free(test);
                     free(primaryKeyLua);
                     free(primaryFrameKeyLua);
@@ -1810,14 +1813,9 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
             if (currentNode->value.c.cap > 0) {
                 oldLua = lua;
                 if (asprintf(&lua,
-"%sif toggle then\n"
-"    context[\"process_key\"] = process_key_with_cap\n"
+"%s    context[\"process_key\"] = process_key_with_cap\n"
 "    context[\"process_key_count\"] = %d\n"
-"    if not process_message(message) then\n"
-"        return\n"
-"    else\n"
-"        cleanup_context()\n"
-"    end\n"
+"    return process_message(message, key, context)\n"
 "end\n",
                              lua,
                              currentNode->value.c.cap)  == -1) {
@@ -1828,17 +1826,28 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
             } else {
                 oldLua = lua;
                 if (asprintf(&lua,
-"%sif toggle then\n"
-"    context[\"process_key\"] = process_key_with_window\n"
+"%s    context[\"process_key\"] = process_key_with_window\n"
 "    context[\"process_key_count\"] = %d\n"
-"    if not process_message(message) then\n"
-"        return\n"
-"    else\n"
-"        cleanup_context()\n"
-"    end\n"
+"    return process_message(message, key, context)\n"
 "end\n",
                              lua,
                              currentNode->value.c.count)  == -1) {
+                    return ERR_OUT_OF_MEMORY;
+                }
+                free(oldLua);
+            }
+
+            unsigned int firstExpressionOffset = tree->nextPool[currentJoin->expressionsOffset];
+            unsigned int secondExpressionOffset = tree->nextPool[currentJoin->expressionsOffset + 1];
+            expression *firstExpr = &tree->expressionPool[firstExpressionOffset];
+            expression *secondExpr = &tree->expressionPool[secondExpressionOffset];
+            if (currentJoin->expressionsLength > 1) {
+                oldLua = lua;
+                if (asprintf(&lua,
+"%sfunction_tree[\"%s\"] = function_tree[\"%s\"]\n",
+                             lua,
+                             &tree->stringPool[firstExpr->nameOffset], 
+                             &tree->stringPool[secondExpr->nameOffset])  == -1) {
                     return ERR_OUT_OF_MEMORY;
                 }
                 free(oldLua);
@@ -1866,11 +1875,9 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "local events_message_cache = {}\n"
 "local facts_mids_cache = {}\n"
 "local events_mids_cache = {}\n"
-"local context_directory = {}\n"
 "local input_keys = {}\n"
-"local toggle\n"
+"local function_tree = {}\n"
 "local results\n"
-"local context\n"
 "local is_distinct_message = function(frame, message)\n"
 "   for name, frame_message in pairs(frame) do\n"
 "       if frame_message[\"id\"] == message[\"id\"] then\n"
@@ -2225,26 +2232,18 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "    end\n"
 "    return result_recorded\n"
 "end\n"
-"local process_message = function(message)\n"
-"    for index = 6, 5 + keys_count, 1 do\n"
-"        results = {}\n"
-"        local key = ARGV[index]\n"
-"        local context = context_directory[key]\n"
-"        if context then\n"
-"            local process_key = context[\"process_key\"]\n"
-"            local process_key_count = context[\"process_key_count\"]\n"
-"            local result_recorded = process_key(message, process_key_count, key, context)\n"
-"            if assert_fact == 0 and result_recorded then\n"
-"                return false\n"
-"            end\n"
-"        end\n"
+"local process_message = function(message, key, context)\n"
+"    results = {}\n"
+"    local process_key = context[\"process_key\"]\n"
+"    local process_key_count = context[\"process_key_count\"]\n"
+"    local result_recorded = process_key(message, process_key_count, key, context)\n"
+"    if assert_fact == 0 and result_recorded then\n"
+"        return false\n"
 "    end\n"
 "    return true\n"
 "end\n"
-"local cleanup_context = function()\n"
-"    toggle = false\n"
-"    context_directory = {}\n"
-"    context = {}\n"
+"local create_context = function()\n"
+"    local context = {}\n"
 "    context[\"reviewers\"] = {}\n"
 "    context[\"frame_packers\"] = {}\n"
 "    context[\"frame_unpackers\"] = {}\n"
@@ -2253,6 +2252,7 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "    context[\"keys\"] = {}\n"
 "    context[\"inverse_directory\"] = {}\n"
 "    context[\"directory\"] = {[\"0\"] = 1}\n"
+"    return context\n"
 "end\n"
 "local message = nil\n"
 "if #ARGV > (6 + keys_count) then\n"
@@ -2297,8 +2297,12 @@ static unsigned int loadEvalMessageCommand(ruleset *tree, binding *rulesBinding)
 "for index = 6, 5 + keys_count, 1 do\n"
 "    input_keys[ARGV[index]] = true\n"
 "end\n"
-"cleanup_context()\n"
-"%s\n",
+"%s"
+"for index =  6, 5 + keys_count, 1 do\n"
+"    if function_tree[ARGV[index]](ARGV[index], nil) == false then\n"
+"        return\n"
+"    end\n"
+"end\n",
                  name,
                  name,
                  name,

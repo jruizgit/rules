@@ -6,6 +6,10 @@ d.ruleset('test', function() {
     whenAll: m.subject == 'World'
     // consequent
     run: console.log('Hello ' + m.subject)
+
+    whenStart: {
+        post('test', {subject: 'World'});
+    }
 });
 
 d.ruleset('risk0', function() {
@@ -91,9 +95,9 @@ d.ruleset('expense1', function() {
     }
     run: {
         if (first) {
-            console.log('Approved ' + first.subject + ' ' + second.amount);     
+            console.log('expense1 Approved ' + first.subject + ' ' + second.amount);     
         } else {
-            console.log('Approved ' + third.subject + ' ' + fourth.amount);        
+            console.log('expense1 Approved ' + third.subject + ' ' + fourth.amount);        
         }
     }
 
@@ -108,7 +112,7 @@ d.ruleset('expense1', function() {
 
 d.ruleset('expense0', function() {
     whenAll: m.subject == 'approve' || m.subject == 'ok'
-    run: console.log('Approved')
+    run: console.log('expense0 Approved')
     
     whenStart: post('expense0', { subject: 'approve' })
 });
@@ -169,19 +173,19 @@ d.ruleset('flow0', function() {
     whenAll: s.state == 'start'
     run: {
         s.state = 'next';
-        console.log('start');
+        console.log('flow0 start');
     }
 
     whenAll: s.state == 'next'
     run: {
         s.state = 'last';
-        console.log('next');
+        console.log('flow0 next');
     }
 
     whenAll: s.state == 'last'
     run: {
         s.state = 'end';
-        console.log('last');
+        console.log('flow0 last');
         deleteState();
     }
 
@@ -191,14 +195,14 @@ d.ruleset('flow0', function() {
 d.ruleset('expense2', function() {
     whenAll: m.amount < 100
     count: 3
-    run: console.log('approved ' + JSON.stringify(m));
+    run: console.log('expense2 approved ' + JSON.stringify(m));
 
     whenAll: {
         expense = m.amount >= 100
         approval = m.review == true
     }
     cap: 2
-    run: console.log('rejected ' + JSON.stringify(m));
+    run: console.log('expense2 rejected ' + JSON.stringify(m));
 
     whenStart: {
         postBatch('expense2', { amount: 10 },
@@ -217,7 +221,7 @@ d.ruleset('flow1', function() {
     runAsync: {
         setTimeout(function() {
             s.state = 'second';
-            console.log('first completed');
+            console.log('flow1 first completed');
             
             // completes the async action
             complete();
@@ -227,7 +231,8 @@ d.ruleset('flow1', function() {
     whenAll: s.state == 'second'
     runAsync: {
         setTimeout(function() {
-            console.log('second completed');
+            console.log('flow1 second completed');
+            s.state = 'last'
             complete();
         }, 6000);
         
@@ -268,7 +273,7 @@ d.ruleset('timer', function() {
         s.count += 1;
         // MyTimer will expire in 5 seconds
         startTimer('MyTimer', 5);
-        console.log('Pusle ->' + new Date());
+        console.log('timer Pusle ->' + new Date());
     }
 
     whenAll: {
@@ -276,7 +281,7 @@ d.ruleset('timer', function() {
     }
     run: {
         cancelTimer('MyTimer');
-        console.log('canceled timer');
+        console.log('timer canceled timer');
     }
 
     whenStart: {
@@ -296,11 +301,11 @@ d.statechart('risk3', function() {
         to: 'fraud'
         whenAll: message = m.amount > 100
         count: 3
-        run: m.forEach(function(e, i){ console.log(JSON.stringify(e.message)) });
+        run: m.forEach(function(e, i){ console.log('risk3 ' + JSON.stringify(e.message)) });
 
         to: 'exit'
         whenAll: timeout('RiskTimer')
-        run: console.log('exit')    
+        run: console.log('risk3 exit')    
     }
 
     fraud: {}
@@ -335,7 +340,7 @@ d.statechart('risk4', function() {
         }
         cap: 100
         run: {
-            console.log('velocity: ' + m.length + ' events in 5 seconds');
+            console.log('risk4 velocity: ' + m.length + ' events in 5 seconds');
             // resets and restarts the manual reset timer
             resetTimer('VelocityTimer');
             startTimer('VelocityTimer', 5, true);
@@ -346,7 +351,7 @@ d.statechart('risk4', function() {
             timeout('VelocityTimer')
         }
         run: {
-            console.log('velocity: no events in 5 seconds');
+            console.log('risk4 velocity: no events in 5 seconds');
             resetTimer('VelocityTimer');
             startTimer('VelocityTimer', 5, true);
         }
@@ -368,21 +373,21 @@ d.statechart('expense3', function() {
     input: {
         to: 'denied'
         whenAll: m.subject == 'approve' && m.amount > 1000
-        run: console.log('Denied amount: ' + m.amount)
+        run: console.log('expense3 Denied amount: ' + m.amount)
 
         to: 'pending'
         whenAll: m.subject == 'approve' && m.amount <= 1000
-        run: console.log('Requesting approve amount: ' + m.amount);
+        run: console.log('expense3 Requesting approve amount: ' + m.amount);
     }
 
     pending: {
         to: 'approved'
         whenAll: m.subject == 'approved'
-        run: console.log('Expense approved')
+        run: console.log('expense3 Expense approved')
 
         to: 'denied'
         whenAll: m.subject == 'denied'
-        run: console.log('Expense denied')
+        run: console.log('expense3 Expense denied')
     }
     
     denied: {}
@@ -402,19 +407,19 @@ d.statechart('worker', function() {
         enter: {
             to: 'process'
             whenAll: m.subject == 'enter'
-            run: console.log('start process')
+            run: console.log('worker start process')
         }
 
         process: {
             to: 'process'
             whenAll: m.subject == 'continue'
-            run: console.log('continue processing')
+            run: console.log('worker continue processing')
         }
     
         to: 'canceled'
         pri: 1
         whenAll: m.subject == 'cancel'
-        run: console.log('cancel process')
+        run: console.log('worker cancel process')
     }
 
     canceled: {}
@@ -433,18 +438,18 @@ d.flowchart('expense', function() {
     }
 
     request: {
-        run: console.log('Requesting approve')
+        run: console.log('expense Requesting approve ' + m.sid + ' ' + m.amount)
         approve: m.subject == 'approved'
         deny: m.subject == 'denied'
         self: m.subject == 'retry'
     }
 
     approve: {
-        run: console.log('Expense approved')
+        run: console.log('expense Expense approved ' + m.sid)
     }
 
     deny: {
-        run: console.log('Expense denied')
+        run: console.log('expense Expense denied ' + m.sid)
     }
 
     whenStart: {
@@ -501,8 +506,8 @@ d.ruleset('expense4', function() {
         account = m.t == 'account' && m.payment.invoice.amount == bill.invoice.amount
     }
     run: {
-        console.log('bill amount ->' + bill.invoice.amount);
-        console.log('account payment amount ->' + account.payment.invoice.amount);
+        console.log('expense4 bill amount ->' + bill.invoice.amount);
+        console.log('expense4 account payment amount ->' + account.payment.invoice.amount);
     }
 
     whenStart: {
@@ -517,11 +522,11 @@ d.ruleset('expense4', function() {
 d.ruleset('bookstore', function() {
     // this rule will trigger for events with status
     whenAll: +m.status
-    run: console.log('reference ' + m.reference + ' status ' + m.status)
+    run: console.log('bookstore reference ' + m.reference + ' status ' + m.status)
 
     whenAll: +m.name
     run: { 
-        console.log('Added: ' + m.name);
+        console.log('bookstore added: ' + m.name);
         retract({
             name: 'The new book',
             reference: '75323',
@@ -532,12 +537,12 @@ d.ruleset('bookstore', function() {
 
     // this rule will be triggered when the fact is retracted
     whenAll: none(+m.name)
-    run: console.log('no books');
+    run: console.log('bookstore no books');
 
 
     whenStart: {
         // will return 0 because the fact assert was successful 
-        console.log(assert('bookstore', {
+        console.log('bookstore result ' + assert('bookstore', {
             name: 'The new book',
             seller: 'bookstore',
             reference: '75323',
@@ -545,7 +550,7 @@ d.ruleset('bookstore', function() {
         }));
 
         // will return 212 because the fact has already been asserted 
-        console.log(assert('bookstore', {
+        console.log('bookstore result ' + assert('bookstore', {
             reference: '75323',
             name: 'The new book',
             price: 500,
@@ -553,13 +558,13 @@ d.ruleset('bookstore', function() {
         }));
 
         // will return 0 because a new event is being posted
-        console.log(post('bookstore', {
+        console.log('bookstore result ' + post('bookstore', {
             reference: '75323',
             status: 'Active'
         }));
 
         // will return 0 because a new event is being posted
-        console.log(post('bookstore', {
+        console.log('bookstore result ' + post('bookstore', {
             reference: '75323',
             status: 'Active'
         }));
@@ -572,7 +577,7 @@ d.ruleset('risk5', function() {
     whenAll: {
         m.debit > 2 * m.credit
     }
-    run: console.log('debit ' + m.debit + ' more than twice the credit ' + m.credit)
+    run: console.log('risk5 debit ' + m.debit + ' more than twice the credit ' + m.credit)
    
     // correlates two events, evaluated in the beta tree (redis)
     whenAll: {
@@ -580,8 +585,8 @@ d.ruleset('risk5', function() {
         second = m.amount > first.amount + m.amount / 2
     }
     run: {
-        console.log('fraud detected -> ' + first.amount);
-        console.log('fraud detected -> ' + second.amount);
+        console.log('risk5 fraud detected -> ' + first.amount);
+        console.log('risk5 fraud detected -> ' + second.amount);
     }
 
     whenStart: {
@@ -598,52 +603,52 @@ d.ruleset('risk6', function() {
     whenAll: {
         m.payments.allItems(item > 2000)
     }
-    run: console.log('should not match ' + m.payments)
+    run: console.log('risk6 should not match ' + m.payments)
 
     // matching primitive array
     whenAll: {
         m.payments.allItems(item > 1000)
     }
-    run: console.log('fraud 1 detected ' + m.payments)
+    run: console.log('risk6 fraud 1 detected ' + m.payments)
 
     // matching object array
     whenAll: {
         m.payments.allItems(item.amount < 250 || item.amount >= 300)
     }
-    run: console.log('fraud 2 detected ' + JSON.stringify(m.payments))
+    run: console.log('risk6 fraud 2 detected ' + JSON.stringify(m.payments))
    
     // pattern matching string array
     whenAll: {
         m.cards.anyItem(item.matches('three.*'))
     }
-    run: console.log('fraud 3 detected ' + m.cards)
+    run: console.log('risk6 fraud 3 detected ' + m.cards)
 
     // matching nested arrays
     whenAll: {
         m.payments.anyItem(item.allItems(item < 100))
     }
-    run: console.log('fraud 4 detected ' + JSON.stringify(m.payments))
+    run: console.log('risk6 fraud 4 detected ' + JSON.stringify(m.payments))
 
     // matching array and value
     whenAll: {
         m.payments.allItems(item > 100) && m.cash == true
     }
-    run: console.log('fraud 5 detected ' + JSON.stringify(m))
+    run: console.log('risk6 fraud 5 detected ' + JSON.stringify(m))
 
     whenAll: {
         m.field == 1 && m.payments.allItems(item.allItems(item > 100 && item < 1000))
     }
-    run: console.log('fraud 6 detected ' + JSON.stringify(m.payments))
+    run: console.log('risk6 fraud 6 detected ' + JSON.stringify(m.payments))
 
     whenAll: {
         m.field == 1 && m.payments.allItems(item.anyItem(item > 100 || item < 50))
     }
-    run: console.log('fraud 7 detected ' + JSON.stringify(m.payments))
+    run: console.log('risk6 fraud 7 detected ' + JSON.stringify(m.payments))
 
     whenAll: { 
         m.payments.anyItem(~item.field1 && item.field2 == 2) 
     }
-    run: console.log('fraud 8 detected ' + JSON.stringify(m.payments));
+    run: console.log('risk6 fraud 8 detected ' + JSON.stringify(m.payments));
 
     whenStart: {
         post('risk6', { payments: [ 2500, 150, 450 ] });
