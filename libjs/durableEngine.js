@@ -1403,13 +1403,13 @@ exports = module.exports = durableEngine = function () {
                 response.contentType = 'application/json; charset=utf-8';
                 host.ensureRuleset(request.params.rulesetName, function (err, result) {
                     if (err) {
-                        response.send({ error: err }, 500);
+                        response.status(500).send({ error: err });
                     }
                     else {
                         try {
-                            response.send(host.getState(request.params.rulesetName, request.params.sid));
+                            response.status(200).send(host.getState(request.params.rulesetName, request.params.sid));
                         } catch (reason) {
-                            response.send({ error: reason }, 500);
+                            response.status(500).send({ error: reason });
                         }
                     }
                 });
@@ -1419,13 +1419,13 @@ exports = module.exports = durableEngine = function () {
                 response.contentType = 'application/json; charset=utf-8';
                 host.ensureRuleset(request.params.rulesetName, function (err, result) {
                     if (err) {
-                        response.send({ error: err }, 500);
+                        response.status(500).send({ error: err });
                     }
                     else {
                         try {
-                            response.send(host.getState(request.params.rulesetName, null));
+                            response.status(200).send(host.getState(request.params.rulesetName, null));
                         } catch (reason) {
-                            response.send({ error: reason }, 500);
+                            response.status(500).send({ error: reason });
                         }
                     }
                 });
@@ -1438,13 +1438,13 @@ exports = module.exports = durableEngine = function () {
                 document.id = request.params.sid;
                 host.ensureRuleset(request.params.rulesetName, function (err, result) {
                     if (err)
-                        response.send({ error: err }, 500);
+                        response.status(500).send({ error: err });
                     else {
                         try {
                             var result = host.patchState(request.params.rulesetName, document);
-                            response.send({ outcome: result }, 200);
+                            response.status(200).send({ outcome: result });
                         } catch (reason) {
-                            response.send({ error: reason }, 500);
+                            response.status(500).send({ error: reason });
                         }
                     }
                 });
@@ -1455,13 +1455,13 @@ exports = module.exports = durableEngine = function () {
                 var document = request.body;
                 host.ensureRuleset(request.params.rulesetName, function (err, result) {
                     if (err)
-                        response.send({ error: err }, 500);
+                        response.status(500).send({ error: err });
                     else {
                         try {
                             var result = host.patchState(request.params.rulesetName, document);
-                            response.send({ outcome: result }, 200);
+                            response.status(200).send({ outcome: result });
                         } catch (reason) {
-                            response.send({ error: reason }, 500);
+                            response.status(500).send({ error: reason });
                         }
                     }
                 });
@@ -1474,14 +1474,14 @@ exports = module.exports = durableEngine = function () {
 
                 host.ensureRuleset(request.params.rulesetName, function (err, result) {
                     if (err) {
-                        response.send({ error: err }, 500);
+                        response.status(500).send({ error: err });
                     }
                     else {
                         try {
                             var result = host.post(request.params.rulesetName, message);
-                            response.send({ outcome: result }, 200);
+                            response.status(200).send({ outcome: result });
                         } catch (reason) {
-                            response.send({ error: reason }, 500);
+                            response.status(500).send({ error: reason });
                         }
                     }
                 });
@@ -1492,14 +1492,14 @@ exports = module.exports = durableEngine = function () {
                 var message = request.body;
                 host.ensureRuleset(request.params.rulesetName, function (err, result) {
                     if (err) {
-                        response.send({ error: err }, 500);
+                        response.status(500).send({ error: err });
                     }
                     else {
                         try {
                             var result = host.post(request.params.rulesetName, message);
-                            response.send({ outcome: result }, 200);
+                            response.status(200).send({ outcome: result });
                         } catch (reason) {
-                            response.send({ error: reason }, 500);
+                            response.status(500).send({ error: reason });
                         }
                     }
                 });
@@ -1512,14 +1512,14 @@ exports = module.exports = durableEngine = function () {
 
                 host.ensureRuleset(request.params.rulesetName, function (err, result) {
                     if (err) {
-                        response.send({ error: err }, 500);
+                        response.status(500).send({ error: err });
                     }
                     else {
                         try {
                             var result = host.assert(request.params.rulesetName, message);
-                            response.send({ outcome: result }, 200);
+                            response.status(200).send({ outcome: result });
                         } catch (reason) {
-                            response.send({ error: reason }, 500);
+                            response.status(500).send({ error: reason });
                         }
                     }
                 });
@@ -1530,14 +1530,14 @@ exports = module.exports = durableEngine = function () {
                 var message = request.body;
                 host.ensureRuleset(request.params.rulesetName, function (err, result) {
                     if (err) {
-                        response.send({ error: err }, 500);
+                        response.status(500).send({ error: err });
                     }
                     else {
                         try {
                             var result = host.assert(request.params.rulesetName, message);
-                            response.send({ outcome: result }, 200);
+                            response.status(200).send({ outcome: result });
                         } catch (reason) {
-                            response.send({ error: reason }, 500);
+                            response.status(500).send({ error: reason });
                         }
                     }
                 });
@@ -1547,12 +1547,12 @@ exports = module.exports = durableEngine = function () {
                 response.contentType = 'application/json; charset=utf-8';
                 host.ensureRuleset(request.params.rulesetName, function (err, result) {
                     if (err)
-                        response.send({ error: err }, 500);
+                        response.status(500).send({ error: err });
                     else {
                         try {
-                            response.send(host.getRuleset(request.params.rulesetName).getDefinition());
+                            response.status(200).send(host.getRuleset(request.params.rulesetName).getDefinition());
                         } catch (reason) {
-                            response.send({ error: reason }, 500);
+                            response.status(500).send({ error: reason });
                         }
                     }
                 });
@@ -1562,10 +1562,10 @@ exports = module.exports = durableEngine = function () {
                 response.contentType = "application/json; charset=utf-8";
                 host.setRuleset(request.params.rulesetName, request.body, function (err, result) {
                     if (err) {
-                        response.send({ error: err }, 500);
+                        response.status(500).send({ error: err });
                     }
                     else {
-                        response.send();
+                        response.status(200).send();
                     }
                 });
             });
