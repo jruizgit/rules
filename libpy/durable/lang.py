@@ -76,9 +76,6 @@ class avalue(object):
         if self._name == '$s':
             raise Exception('s not allowed as rvalue')
 
-        if self._name == '$sref':
-            self._name = '$s'
-
         if not self._op:
             if self._sid:
                 return {self._name: {'name': self._left, 'id': self._sid}}
@@ -642,9 +639,6 @@ def cap(value):
 
 def distinct(value):
     return {'dist': value}
-
-def sref(sid = None):
-    return avalue('$sref', None, sid, None, None)
 
 def select(name):
     for rset in _rulesets:

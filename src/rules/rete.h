@@ -30,6 +30,10 @@
 #define NODE_ACTION 2
 #define NODE_M_OFFSET 0
 
+#define MAX_STATE_INDEX_LENGTH 1024
+#define MAX_LEFT_FRAME_INDEX_LENGTH 1024
+#define MAX_RIGHT_FRAME_INDEX_LENGTH 128
+
 typedef struct reference {
     unsigned int nameHash;
     unsigned int nameOffset;
@@ -74,11 +78,6 @@ typedef struct expression {
     } t;
 } expression;
 
-typedef struct join {
-    unsigned int expressionsOffset;
-    unsigned short expressionsLength;
-} join;
-
 typedef struct alpha {
     unsigned int hash;
     unsigned char operator;
@@ -88,11 +87,14 @@ typedef struct alpha {
     jsonValue right;
 } alpha;
 
-typedef struct betaConnector {
+typedef struct beta {
+    unsigned int leftFrameIndex[MAX_LEFT_FRAME_INDEX_LENGTH];
+    unsigned int rightFrameIndex[MAX_RIGHT_FRAME_INDEX_LENGTH];
+    unsigned int expressionOffset;
     unsigned int hash;
     unsigned int nextOffset;
     unsigned char not;
-} betaConnector;
+} beta;
 
 typedef struct action {
     unsigned int index;
@@ -108,37 +110,43 @@ typedef struct node {
     unsigned char type;
     union { 
         alpha a; 
-        betaConnector b; 
+        beta b; 
         action c; 
     } value;
 } node;
 
-
 typedef struct ruleset {
     unsigned int nameOffset;
-    node *nodePool;
-    unsigned int nodeOffset;
-    unsigned int *nextPool;
-    unsigned int nextOffset;
-    char *stringPool;
-    unsigned int stringPoolLength; 
-    expression *expressionPool;
-    unsigned int expressionOffset;
-    idiom *idiomPool;
-    unsigned int idiomOffset;
-    join *joinPool;
-    unsigned int joinOffset;
-    char *regexStateMachinePool;
-    unsigned int regexStateMachineOffset;
     unsigned int actionCount;
     void *bindingsList;
-    unsigned int *stateBuckets;
-    unsigned int stateBucketsLength;
-    stateEntry *state; 
-    unsigned int maxStateLength;
-    unsigned int stateLength;
-    unsigned int lruStateOffset;
-    unsigned int mruStateOffset;
+    
+    node *nodePool;
+    unsigned int nodeOffset;
+    
+    unsigned int *nextPool;
+    unsigned int nextOffset;
+    
+    char *stringPool;
+    unsigned int stringPoolLength; 
+    
+    expression *expressionPool;
+    unsigned int expressionOffset;
+    
+    idiom *idiomPool;
+    unsigned int idiomOffset;
+    
+    char *regexStateMachinePool;
+    unsigned int regexStateMachineOffset;
+    
+    pool statePool;
+    unsigned int stateIndex[MAX_STATE_INDEX_LENGTH];
+    
+    pool messagePool;
+
+    pool leftFramePool;
+
+    pool rightFramePool;
+
     unsigned int orNodeOffset;
     unsigned int andNodeOffset;
     unsigned int endNodeOffset;

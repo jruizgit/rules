@@ -6,211 +6,92 @@
 #include "json.h"
 #include "net.h"
 
-unsigned int fnv1Hash32(char *str, unsigned int len) {
+
+#define INIT(type, pool, length) do { \
+    pool.content = malloc(length * sizeof(type)); \
+    if (!pool.content) { \
+        return ERR_OUT_OF_MEMORY; \
+    } \
+    pool.contentLength = length; \
+    for (unsigned int i = 0; i < pool.contentLength; ++ i) { \
+        ((type *)pool.content)[i].nextOffset = i + 1; \
+        ((type *)pool.content)[i].prevOffset = i - 1; \
+    } \
+    pool.freeOffset = 0; \
+} while(0)
+
+#define GET(type, index, max, pool, nodeHash, value) do { \
+    unsigned int offset = index[nodeHash % max]; \
+    value = NULL; \
+    while (offset != UNDEFINED_HASH_OFFSET) { \
+        type *current = &pool.content[offset]; \
+        if (current->hash != nodeHash) { \
+            offset = current->nextOffset; \
+        } else { \
+            value = current; \
+            offset = UNDEFINED_HASH_OFFSET; \
+        } \
+    } \
+} while(0)
+
+#define NEW(type, index, max, pool, nodeHash, value) do { \
+    unsigned int valueOffset = pool.freeOffset; \
+    value = &pool.content[valueOffset]; \
+    if (value->nextOffset == UNDEFINED_HASH_OFFSET) { \
+        pool.content = realloc(pool.content, (pool.contentLength * 2) * sizeof(type)); \
+        if (!pool.content) { \
+            return ERR_OUT_OF_MEMORY; \
+        } \
+        for (unsigned int i = pool.contentLength; i < pool.contentLength * 2; ++ i) { \
+            ((type *)pool.content)[i].nextOffset = i + 1; \
+            ((type *)pool.content)[i].prevOffset = i - 1; \
+        } \
+        value->nextOffset = pool.contentLength; \
+        ((type *)pool.content)[pool.contentLength].prevOffset = pool.freeOffset; \
+        pool.contentLength *= 2; \
+        ((type *)pool.content)[pool.contentLength - 1].nextOffset = UNDEFINED_HASH_OFFSET; \
+    } \
+    pool.freeOffset = value->nextOffset; \
+    value->prevOffset = UNDEFINED_HASH_OFFSET; \
+    value->hash = nodeHash; \
+    value->nextOffset = index[nodeHash % max]; \
+    index[nodeHash % max] = valueOffset; \
+} while(0)
+
+
+#define DELETE(type, index, max, pool, nodeHash) do { \
+    unsigned int offset = index[nodeHash % max]; \
+    while (offset != UNDEFINED_HASH_OFFSET) { \
+        type *current = &pool.content[offset]; \
+        if (current->hash != nodeHash) { \
+            offset = current->nextOffset; \
+        } else { \
+            if (current->nextOffset != UNDEFINED_HASH_OFFSET) {\
+                ((type *)pool.content)[current->nextOffset].prevOffset = current->prevOffset; \
+            } \
+            if (current->prevOffset != UNDEFINED_HASH_OFFSET) {\
+                ((type *)pool.content)[current->prevOffset].nextOffset = current->nextOffset; \
+            } \
+            current->prevOffset = UNDEFINED_HASH_OFFSET; \
+            current->nextOffset = pool.freeOffset; \
+            pool.freeOffset = offset; \
+            offset = UNDEFINED_HASH_OFFSET; \
+        } \
+    } \
+} while(0)
+
+unsigned int fnv1Hash32(char *str, unsigned int length) {
     unsigned int hash = FNV_32_OFFSET_BASIS;
-    for(unsigned int i = 0; i < len; str++, i++) {
+    for(unsigned int i = 0; i < length; str++, i++) {
         hash ^= (*str);
         hash *= FNV_32_PRIME;
     }
     return hash;
 }
 
-static unsigned int evictEntry(ruleset *tree) {
-    stateEntry *lruEntry = &tree->state[tree->lruStateOffset];
-    unsigned int lruBucket = lruEntry->sidHash % tree->stateBucketsLength;
-    unsigned int offset = tree->stateBuckets[lruBucket];
-    unsigned int lastOffset = UNDEFINED_HASH_OFFSET;
-    unsigned char found = 0;
-    while (!found) {
-        stateEntry *current = &tree->state[offset];
-        if (current->sidHash == lruEntry->sidHash) {
-            if (!strcmp(current->sid, lruEntry->sid)) {
-                if (lastOffset == UNDEFINED_HASH_OFFSET) {
-                    tree->stateBuckets[lruBucket] = current->nextHashOffset;
-                } else {
-                    tree->state[lastOffset].nextHashOffset = current->nextHashOffset;
-                }
-
-                if (current->state) {
-                    free(current->state);
-                    current->state = NULL;
-                }
-
-                free(current->sid);
-                current->sid = NULL;
-                current->sidHash = 0;
-                current->bindingIndex = 0;
-                current->lastRefresh = 0;
-                current->jo.propertiesLength = 0;
-                found = 1;
-            }
-        }
-
-        lastOffset = offset;
-        offset = current->nextHashOffset;
-    }
-
-    unsigned int result = tree->lruStateOffset;
-    tree->lruStateOffset = lruEntry->nextLruOffset;
-    tree->state[tree->lruStateOffset].prevLruOffset = UNDEFINED_HASH_OFFSET;
-    return result;
-}
-
-static void deleteEntry(ruleset *tree, char *sid, unsigned int sidHash) {
-    unsigned int bucket = sidHash % tree->stateBucketsLength;
-    unsigned int offset = tree->stateBuckets[bucket];
-    unsigned int lastOffset = UNDEFINED_HASH_OFFSET;
-    unsigned char found = 0;
-    while (!found && offset != UNDEFINED_HASH_OFFSET) {
-        stateEntry *current = &tree->state[offset];
-        if (current->sidHash == sidHash) {
-            if (!strcmp(current->sid, sid)) {
-                if (lastOffset == UNDEFINED_HASH_OFFSET) {
-                    tree->stateBuckets[bucket] = current->nextHashOffset;
-                } else {
-                    tree->state[lastOffset].nextHashOffset = current->nextHashOffset;
-                }
-
-                if (current->state) {
-                    free(current->state);
-                    current->state = NULL;
-                }
-
-                free(current->sid);
-                current->sid = NULL;
-                current->sidHash = 0;
-                current->bindingIndex = 0;
-                current->lastRefresh = 0;
-                current->jo.propertiesLength = 0;
-                found = 1;
-
-
-                // remove entry from lru double linked list
-                if (current->prevLruOffset != UNDEFINED_HASH_OFFSET) {
-                    tree->state[current->prevLruOffset].nextLruOffset = current->nextLruOffset;
-                    if (tree->mruStateOffset == offset) {
-                        tree->mruStateOffset = current->prevLruOffset;
-                    }
-                }
-
-                if (current->nextLruOffset != UNDEFINED_HASH_OFFSET) {
-                    tree->state[current->nextLruOffset].prevLruOffset = current->prevLruOffset;
-                    if (tree->lruStateOffset == offset) {
-                        tree->lruStateOffset = current->nextLruOffset;
-                    }
-                }
-            }
-        }
-
-        lastOffset = offset;
-        offset = current->nextHashOffset;
-    }
-}
-
-static unsigned int addEntry(ruleset *tree, char *sid, unsigned int sidHash) {
-    unsigned newOffset;
-    if (tree->stateLength == tree->maxStateLength) {
-        newOffset = evictEntry(tree);
-    } else {
-        newOffset = tree->stateLength;
-        ++tree->stateLength;
-    }
-
-    stateEntry *current = &tree->state[newOffset];
-    current->prevLruOffset = UNDEFINED_HASH_OFFSET;
-    current->nextLruOffset = UNDEFINED_HASH_OFFSET;
-    current->nextHashOffset = UNDEFINED_HASH_OFFSET;
-    current->sid = malloc(strlen(sid) + 1);
-    strcpy(current->sid, sid);
-    current->sidHash = sidHash;
-    unsigned int bucket = sidHash % tree->stateBucketsLength;
-    unsigned int offset = tree->stateBuckets[bucket];
-    if (offset == UNDEFINED_HASH_OFFSET) {
-        tree->stateBuckets[bucket] = newOffset;
-    }
-    else {
-        while (1) {
-            current = &tree->state[offset];
-            if (current->nextHashOffset == UNDEFINED_HASH_OFFSET) {
-                current->nextHashOffset = newOffset;
-                break;
-            }
-
-            offset = current->nextHashOffset;
-        }
-    }
-
-    return newOffset;
-}
-
-static unsigned char ensureEntry(ruleset *tree, char *sid, unsigned int sidHash, stateEntry **result) {
-    unsigned int bucket = sidHash % tree->stateBucketsLength;
-    unsigned int offset = tree->stateBuckets[bucket];
-    stateEntry *current = NULL;
-    unsigned char found = 0;
-    // find state entry by sid in hash table
-    while (offset != UNDEFINED_HASH_OFFSET) {
-        current = &tree->state[offset];
-        if (current->sidHash == sidHash) {
-            if (!strcmp(current->sid, sid)) {
-                found = 1;
-                break;
-            }
-        }
-
-        offset = current->nextHashOffset;
-    }  
-
-    // create entry if not found
-    if (offset == UNDEFINED_HASH_OFFSET) {
-        offset = addEntry(tree, sid, sidHash);
-        current = &tree->state[offset];
-    }
-
-    // remove entry from lru double linked list
-    if (current->prevLruOffset != UNDEFINED_HASH_OFFSET) {
-        tree->state[current->prevLruOffset].nextLruOffset = current->nextLruOffset;
-        if (tree->mruStateOffset == offset) {
-            tree->mruStateOffset = current->prevLruOffset;
-        }
-    }
-
-    if (current->nextLruOffset != UNDEFINED_HASH_OFFSET) {
-        tree->state[current->nextLruOffset].prevLruOffset = current->prevLruOffset;
-        if (tree->lruStateOffset == offset) {
-            tree->lruStateOffset = current->nextLruOffset;
-        }
-    }
-
-    // attach entry to end of linked list
-    current->nextLruOffset = UNDEFINED_HASH_OFFSET;
-    current->prevLruOffset = tree->mruStateOffset;
-    if (tree->mruStateOffset == UNDEFINED_HASH_OFFSET) {
-        tree->lruStateOffset = offset;
-    } else {
-        tree->state[tree->mruStateOffset].nextLruOffset = offset;
-    }
-    tree->mruStateOffset = offset;
-
-    *result = current;
-    return found;
-}
-
-static stateEntry *getEntry(ruleset *tree, char *sid, unsigned int sidHash) {
-    unsigned int bucket = sidHash % tree->stateBucketsLength;
-    unsigned int offset = tree->stateBuckets[bucket];
-    while (offset != UNDEFINED_HASH_OFFSET) {
-        stateEntry *current = &tree->state[offset];
-        if (current->sidHash == sidHash) {
-            if (!strcmp(current->sid, sid)) {
-                return current;
-            }
-        }
-
-        offset = current->nextHashOffset;
-    }  
-    
-    return NULL;
+unsigned int initStatePool(void *tree, unsigned int length) {
+    INIT(stateNode, ((ruleset*)tree)->statePool, length);
+    return RULES_OK;
 }
 
 static void insertSortProperties(jsonObject *jo, jsonProperty **properties) {
@@ -263,7 +144,7 @@ static void calculateId(jsonObject *jo) {
     for (unsigned short i = 0; i < jo->propertiesLength; ++i) {
         jsonProperty *property = properties[i];
         for (unsigned short ii = 0; ii < property->nameLength; ++ii) {
-            hash ^= property->name[ii];
+            hash ^= jo->content[property->nameOffset + ii];
             hash *= FNV_64_PRIME;
         }
 
@@ -273,7 +154,7 @@ static void calculateId(jsonObject *jo) {
         }
 
         for (unsigned short ii = 0; ii < valueLength; ++ii) {
-            hash ^= property->valueString[ii];
+            hash ^= jo->content[property->valueOffset + ii];
             hash *= FNV_64_PRIME;
         }
     }
@@ -308,11 +189,10 @@ static unsigned int fixupIds(jsonObject *jo, char generateId) {
 
         strncpy(jo->sidBuffer, "0", 1);
         property->hash = HASH_SID;
-        property->isMaterial = 1;
-        property->valueString = jo->sidBuffer;
+        property->valueOffset = 0;
         property->valueLength = 1;
-        strncpy(property->name, "sid", 3);
-        property->nameLength = 3;
+        property->nameLength = 0;
+        property->nameOffset = 0;
         property->type = JSON_STRING;
     } 
 
@@ -334,11 +214,10 @@ static unsigned int fixupIds(jsonObject *jo, char generateId) {
 
         jo->idBuffer[0] = 0;
         property->hash = HASH_ID;
-        property->isMaterial = 1;
-        property->valueString = jo->idBuffer;
+        property->valueOffset = 0;
         property->valueLength = 0;
-        strncpy(property->name, "id", 2);
-        property->nameLength = 2;
+        property->nameLength = 0;
+        property->nameOffset = 0;
         property->type = JSON_STRING;
         if (generateId) {
             calculateId(jo);
@@ -348,10 +227,25 @@ static unsigned int fixupIds(jsonObject *jo, char generateId) {
     return RULES_OK;
 }
 
+unsigned int getObjectProperty(jsonObject *jo, unsigned int hash, jsonProperty **property) {
+    unsigned int candidate = hash % MAX_OBJECT_PROPERTIES;
+    for (unsigned short i = 0; i < MAX_OBJECT_PROPERTIES; ++i) {
+        unsigned char index = jo->propertyIndex[(candidate + i) % MAX_OBJECT_PROPERTIES];
+        if (index == 0) {
+            break;
+        }
+
+        if (jo->properties[index].hash == hash) {
+            *property = &jo->properties[index];   
+            return RULES_OK;
+        }
+    }
+    return ERR_PROPERTY_NOT_FOUND;
+}
+
 unsigned int constructObject(char *root,
                              char *parentName, 
                              char *object,
-                             char layout,
                              char generateId,
                              jsonObject *jo,
                              char **next) {
@@ -359,6 +253,7 @@ unsigned int constructObject(char *root,
     char *lastName;
     char *first;
     char *last;
+    char temp;
     unsigned char type;
     unsigned int hash;
     int parentNameLength;
@@ -369,6 +264,8 @@ unsigned int constructObject(char *root,
         jo->idIndex = UNDEFINED_INDEX;
         jo->sidIndex = UNDEFINED_INDEX;
         jo->propertiesLength = 0;
+        jo->content = root;
+        memset(jo->propertyIndex, 0, MAX_OBJECT_PROPERTIES * sizeof(unsigned char));
     }
 
     object = (object ? object : root);
@@ -381,60 +278,65 @@ unsigned int constructObject(char *root,
 
         jsonProperty *property = NULL;
         if (type != JSON_OBJECT) {
-            switch (layout) {
-                case JSON_OBJECT_SEQUENCED:
-                    property = &jo->properties[jo->propertiesLength];
-                    if (!parentName) {
-                        if (hash == HASH_ID) {
-                            jo->idIndex = jo->propertiesLength;
-                        } else if (hash == HASH_SID) {
-                            jo->sidIndex = jo->propertiesLength;
-                        }
-                    }
-                    break;
-                case JSON_OBJECT_HASHED: 
-                {
-                    unsigned int candidate = hash % MAX_OBJECT_PROPERTIES;
-                    while (jo->properties[candidate].type != 0) {
-                        candidate = (candidate + 1) % MAX_OBJECT_PROPERTIES;
-                    }
-
-                    if (!parentName) {
-                        if (hash == HASH_ID) {
-                            jo->idIndex = candidate;
-                        } else if (hash == HASH_SID) {
-                            jo->sidIndex = candidate;
-                        }
-                    }
-
-                    property = &jo->properties[candidate];
-                }
-                break;
-            }
-            
             ++jo->propertiesLength;
             if (jo->propertiesLength == MAX_OBJECT_PROPERTIES) {
                 return ERR_EVENT_MAX_PROPERTIES;
+            } 
+
+            unsigned int candidate = hash % MAX_OBJECT_PROPERTIES;
+            while (jo->propertyIndex[candidate] != 0) {
+                candidate = (candidate + 1) % MAX_OBJECT_PROPERTIES;
+            }
+            jo->propertyIndex[candidate] = jo->propertiesLength;
+            property = &jo->properties[jo->propertiesLength]; 
+
+            if (!parentName) {
+                if (hash == HASH_ID) {
+                    jo->idIndex = candidate;
+                } else if (hash == HASH_SID) {
+                    jo->sidIndex = candidate;
+                }
             }
 
-            property->isMaterial = 0;
-            property->valueString = first;
-            property->valueLength = last - first;
+            property->valueOffset = first - root;
+            property->valueLength = last - first + 1;
             property->type = type;
+
+            switch(type) {
+                case JSON_INT:
+                    temp = first[property->valueLength];
+                    first[property->valueLength] = '\0';
+                    property->value.i = atol(first);
+                    first[property->valueLength] = temp;
+                    break;
+                case JSON_DOUBLE:
+                    temp = first[property->valueLength];
+                    first[property->valueLength] = '\0';
+                    property->value.d = atof(first);
+                    first[property->valueLength] = temp;
+                    break;
+                case JSON_BOOL:
+                    if (property->valueLength == 4 && strncmp("true", first, 4) == 0) {
+                        property->value.b = 1;
+                    } else {
+                        property->value.b = 0;
+                    }
+
+                    break;
+                case JSON_STRING:
+                    property->valueLength = property->valueLength - 1;
+                    break;
+            }
+
         }
         
         if (!parentName) {
             int nameLength = lastName - firstName;
-            if (nameLength > MAX_NAME_LENGTH) {
-                return ERR_MAX_PROPERTY_NAME_LENGTH;
-            }
-
             if (type != JSON_OBJECT) {
-                strncpy(property->name, firstName, nameLength);
+                property->nameOffset = firstName - root;
                 property->nameLength = nameLength;
                 property->hash = hash;
-            } else {
-                
+            } else {            
 #ifdef _WIN32
                 char *newParent = (char *)_alloca(sizeof(char)*(nameLength + 1));
 #else
@@ -444,8 +346,7 @@ unsigned int constructObject(char *root,
                 newParent[nameLength] = '\0';
                 result = constructObject(root,
                                          newParent, 
-                                         first, 
-                                         layout,
+                                         first,
                                          0, 
                                          jo,
                                          next);
@@ -456,30 +357,24 @@ unsigned int constructObject(char *root,
         } else {
             int nameLength = lastName - firstName;
             int fullNameLength = nameLength + parentNameLength + 1;
-            if (fullNameLength > MAX_NAME_LENGTH) {
-                return ERR_MAX_PROPERTY_NAME_LENGTH;
-            }
-
-            if (type != JSON_OBJECT) {
-                strncpy(property->name, parentName, parentNameLength);
-                property->name[parentNameLength] = '.';
-                strncpy(&property->name[parentNameLength + 1], firstName, nameLength);
-                property->nameLength = fullNameLength;
-                property->hash = fnv1Hash32(property->name, fullNameLength);
-            } else {
 #ifdef _WIN32
-                char *fullName = (char *)_alloca(sizeof(char)*(fullNameLength + 1));
+            char *fullName = (char *)_alloca(sizeof(char)*(fullNameLength + 1));
 #else
-                char fullName[fullNameLength + 1];
+            char fullName[fullNameLength + 1];
 #endif
-                strncpy(fullName, parentName, parentNameLength);
-                fullName[parentNameLength] = '.';
-                strncpy(&fullName[parentNameLength + 1], firstName, nameLength);
-                fullName[fullNameLength] = '\0';
+            strncpy(fullName, parentName, parentNameLength);
+            fullName[parentNameLength] = '.';
+            strncpy(&fullName[parentNameLength + 1], firstName, nameLength);
+            fullName[fullNameLength] = '\0';
+            if (type != JSON_OBJECT) {
+                property->nameOffset = firstName - root;
+                property->nameLength = nameLength;
+                property->hash = fnv1Hash32(fullName, fullNameLength);
+            } else {
+
                 result = constructObject(root,
                                          fullName, 
-                                         first, 
-                                         layout,
+                                         first,
                                          0, 
                                          jo, 
                                          next);
@@ -503,137 +398,23 @@ unsigned int constructObject(char *root,
     return (result == PARSE_END ? RULES_OK: result);
 }
 
-void rehydrateProperty(jsonProperty *property, char *state) {
-    if (!property->isMaterial) {
-        unsigned short propertyLength = property->valueLength + 1;
-        char *propertyFirst = property->valueString;
-        unsigned char propertyType = property->type;
-        unsigned char b = 0;
-        char temp;
-
-        switch(propertyType) {
-            case JSON_INT:
-                temp = propertyFirst[propertyLength];
-                propertyFirst[propertyLength] = '\0';
-                property->value.i = atol(propertyFirst);
-                propertyFirst[propertyLength] = temp;
-                break;
-            case JSON_DOUBLE:
-                temp = propertyFirst[propertyLength];
-                propertyFirst[propertyLength] = '\0';
-                property->value.d = atof(propertyFirst);
-                propertyFirst[propertyLength] = temp;
-                break;
-            case JSON_BOOL:
-                if (propertyLength == 4 && strncmp("true", propertyFirst, 4) == 0) {
-                    b = 1;
-                }
-
-                property->value.b = b;
-                break;
-        }
-
-        property->isMaterial = 1;
-    }
-}
-
-static unsigned int resolveBindingAndEntry(ruleset *tree, 
-                                          char *sid, 
-                                          stateEntry **entry,
-                                          void **rulesBinding) {   
+unsigned int resolveBinding(void *tree, 
+                            char *sid, 
+                            void **rulesBinding) {  
     unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
-    if (!ensureEntry(tree, sid, sidHash, entry)) {
-        unsigned int result = getBindingIndex(tree, sidHash, &(*entry)->bindingIndex);
+    stateNode *node;
+    GET(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, node);
+    if (!node) {
+        NEW(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, node);
+        unsigned int result = getBindingIndex(tree, sidHash, &node->bindingIndex);
         if (result != RULES_OK) {
             return result;
         }
     }
     
-    bindingsList *list = tree->bindingsList;
-    *rulesBinding = &list->bindings[(*entry)->bindingIndex];
+    bindingsList *list = ((ruleset*)tree)->bindingsList;
+    *rulesBinding = &list->bindings[node->bindingIndex];
     return RULES_OK;
-}
-
-unsigned int resolveBinding(void *tree, 
-                            char *sid, 
-                            void **rulesBinding) {  
-    stateEntry *entry = NULL;
-    return resolveBindingAndEntry(tree, sid, &entry, rulesBinding);
-}
-
-unsigned int refreshState(void *tree, 
-                          char *sid) {
-    unsigned int result;
-    stateEntry *entry = NULL;  
-    void *rulesBinding;
-    result = resolveBindingAndEntry(tree, sid, &entry, &rulesBinding);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    if (entry->state) {
-        free(entry->state);
-        entry->state = NULL;
-    }
-
-    result = getSession(rulesBinding, sid, &entry->state);
-    if (result != RULES_OK) {
-        if (result == ERR_NEW_SESSION) {
-            entry->lastRefresh = time(NULL);    
-        }
-        return result;
-    }
-
-    memset(entry->jo.properties, 0, MAX_OBJECT_PROPERTIES * sizeof(jsonProperty));
-    entry->jo.propertiesLength = 0;
-    char *next;
-    result =  constructObject(entry->state,
-                             NULL, 
-                             NULL, 
-                             JSON_OBJECT_HASHED, 
-                             0,
-                             &entry->jo, 
-                             &next);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    entry->lastRefresh = time(NULL);
-    return RULES_OK;
-}
-
-unsigned int fetchStateProperty(void *tree,
-                                char *sid, 
-                                unsigned int propertyHash, 
-                                unsigned int maxTime, 
-                                unsigned char ignoreStaleState,
-                                char **state,
-                                jsonProperty **property) {
-    unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
-    stateEntry *entry = getEntry(tree, sid, sidHash);
-    if (entry == NULL || entry->lastRefresh == 0) {
-        return ERR_STATE_NOT_LOADED;
-    }
-    
-    if (!ignoreStaleState && (time(NULL) - entry->lastRefresh > maxTime)) {
-        return ERR_STALE_STATE;
-    }
-
-    unsigned int propertyIndex = propertyHash % MAX_OBJECT_PROPERTIES;
-    jsonProperty *result = &entry->jo.properties[propertyIndex];
-    while (result->type != 0 && result->hash != propertyHash) {
-        propertyIndex = (propertyIndex + 1) % MAX_OBJECT_PROPERTIES;  
-        result = &entry->jo.properties[propertyIndex];   
-    }
-
-    if (!result->type) {
-        return ERR_PROPERTY_NOT_FOUND;
-    }
-
-    *state = entry->state;
-    rehydrateProperty(result, *state);
-    *property = result;
-    return RULES_OK;    
 }
 
 unsigned int getState(unsigned int handle, char *sid, char **state) {
@@ -684,6 +465,6 @@ unsigned int deleteState(unsigned int handle, char *sid) {
       return result;
     }
 
-    deleteEntry(tree, sid, sidHash);
+    DELETE(stateNode, tree->stateIndex, MAX_STATE_INDEX_LENGTH, tree->statePool, sidHash);
     return RULES_OK;
 }

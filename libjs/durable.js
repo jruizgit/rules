@@ -1022,13 +1022,6 @@ exports = module.exports = durableEngine = function () {
 
             var localLeft = left;
             var localType = type;
-            if (type === '$sref') {
-                localType = '$s';
-                if (sid) {
-                    localLeft = {name: left, id: sid};
-                }
-            }
-
             var newDefinition = {};
             if (!op) {
                 newDefinition[localType] = localLeft;
@@ -1419,16 +1412,6 @@ exports = module.exports = durableEngine = function () {
         return m.$t.eq(name);
     };
 
-    var sref = function(sid) {
-        return r.createProxy(
-            function(name) {
-                return term('$sref', name, sid);
-            },
-            function(name, value) {
-                return;
-            }
-        )
-    };
 
     var extend = function (obj) {        
         obj.add = add;

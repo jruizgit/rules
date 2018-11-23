@@ -458,10 +458,6 @@ module Durable
       expression == name
     end
     
-    def sref(sid = nil)
-      Arithmetic.new :$s, nil, sid
-    end
-
     protected
 
     def get_options(*args)
