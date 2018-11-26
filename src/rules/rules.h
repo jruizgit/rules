@@ -12,6 +12,7 @@
 #define ERR_SETTING_NOT_FOUND 10
 #define ERR_INVALID_HANDLE 11
 #define ERR_HANDLE_LIMIT_EXCEEDED 12
+#define ERR_TERM_LIMIT_EXCEEDED 13
 #define ERR_PARSE_VALUE 101
 #define ERR_PARSE_STRING 102
 #define ERR_PARSE_NUMBER 103
@@ -108,14 +109,12 @@ extern char entriesInitialized;
 
 unsigned int createRuleset(unsigned int *handle, 
                            char *name, 
-                           char *rules, 
-                           unsigned int stateCaheSize);
+                           char *rules);
 
 unsigned int deleteRuleset(unsigned int handle);
 
 unsigned int createClient(unsigned int *handle, 
-                          char *name,
-                          unsigned int stateCaheSize);
+                          char *name);
 
 unsigned int deleteClient(unsigned int handle);
 

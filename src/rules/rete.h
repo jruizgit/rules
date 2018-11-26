@@ -33,6 +33,7 @@
 #define MAX_STATE_INDEX_LENGTH 1024
 #define MAX_LEFT_FRAME_INDEX_LENGTH 1024
 #define MAX_RIGHT_FRAME_INDEX_LENGTH 128
+#define MAX_EXPRESSION_TERMS 32
 
 typedef struct reference {
     unsigned int nameHash;
@@ -72,10 +73,7 @@ typedef struct expression {
     unsigned short termsLength;
     unsigned char distinct;
     unsigned char not;
-    union {
-        unsigned int termsOffset; 
-        unsigned int *termsPointer;
-    } t;
+    unsigned int terms[MAX_EXPRESSION_TERMS];
 } expression;
 
 typedef struct alpha {

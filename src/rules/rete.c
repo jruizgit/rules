@@ -39,6 +39,11 @@
 #define HASH_R 1203507539 //$r
 #define HASH_FORWARD 739185624 // $forward
 
+#define MAX_STATE_NODES 8
+#define MAX_MESSAGE_NODES 8
+#define MAX_LEFT_FRAME_NODES 8
+#define MAX_RIGHT_FRAME_NODES 8
+
 unsigned int firstEmptyEntry = 1;
 unsigned int lastEmptyEntry = MAX_HANDLES -1;
 char entriesInitialized = 0;
@@ -129,23 +134,10 @@ static unsigned int storeIdiom(ruleset *tree,
 }
 
 static unsigned int appendTerm(expression *expr, unsigned int nodeOffset) {
-    if (expr->termsLength == 0) {
-        expr->termsLength = 1;
-        expr->t.termsPointer = malloc(sizeof(unsigned int));
-        if (!expr->t.termsPointer) {
-            return ERR_OUT_OF_MEMORY;
-        }
-
-        expr->t.termsPointer[0] = nodeOffset;
-    }
-    else {
-        expr->termsLength = expr->termsLength + 1;
-        expr->t.termsPointer = realloc(expr->t.termsPointer, expr->termsLength * sizeof(unsigned int));
-        if (!expr->t.termsPointer) {
-            return ERR_OUT_OF_MEMORY;
-        }
-
-        expr->t.termsPointer[expr->termsLength - 1] = nodeOffset;
+    expr->terms[expr->termsLength] = nodeOffset;
+    ++expr->termsLength;
+    if (expr->termsLength == MAX_EXPRESSION_TERMS) {
+        return ERR_TERM_LIMIT_EXCEEDED;
     }
 
     return RULES_OK;   
@@ -1198,7 +1190,7 @@ static unsigned int createAlpha(ruleset *tree,
             newIdiom->left.value.property.nameOffset = newAlpha->nameOffset;
             newIdiom->left.value.property.idOffset = 0;
 
-            expr->t.termsPointer[expr->termsLength - 1] = *newOffset;
+            expr->terms[expr->termsLength - 1] = *newOffset;
             return linkAlpha(tree, *newOffset, nextOffset);
         }
     }
@@ -1279,7 +1271,6 @@ static unsigned int createBeta(ruleset *tree,
         expr->aliasOffset = stringOffset;
         expr->not = (operator == OP_NOT) ? 1 : 0;
         expr->termsLength = 0;
-        expr->t.termsPointer = NULL;
         expr->distinct = (distinct != 0) ? 1 : 0;
         if (operator == OP_NOP || operator == OP_NOT) {
             unsigned int resultOffset = NODE_M_OFFSET;
@@ -1303,6 +1294,188 @@ static unsigned int createBeta(ruleset *tree,
 
 #ifdef _PRINT
 
+static void printIdiom(ruleset *tree, jsonValue *newValue) {
+    char *rightProperty;
+    char *rightAlias;
+    char *valueString;
+    idiom *newIdiom;
+    switch (newValue->type) {
+        case JSON_EVENT_PROPERTY:
+            rightProperty = &tree->stringPool[newValue->value.property.nameOffset];
+            rightAlias = &tree->stringPool[newValue->value.property.idOffset];
+            printf("frame[\"%s\"][\"%s\"]", rightAlias, rightProperty);
+            break;
+        case JSON_EVENT_LOCAL_PROPERTY:
+            rightProperty = &tree->stringPool[newValue->value.property.nameOffset];
+            printf("message[\"%s\"]", rightProperty);
+            break;
+        case JSON_EVENT_LOCAL_IDIOM:
+        case JSON_EVENT_IDIOM:
+            newIdiom = &tree->idiomPool[newValue->value.idiomOffset];
+            printf("(");
+            printIdiom(tree, &newIdiom->left);
+            switch (newIdiom->operator) {
+                case OP_ADD:
+                    printf("+");
+                    break;
+                case OP_SUB:
+                    printf("-");
+                    break;
+                case OP_MUL:
+                    printf("*");
+                    break;
+                case OP_DIV:
+                    printf("/");
+                    break;
+            }
+            printIdiom(tree, &newIdiom->right);
+            printf(")");
+            break;
+        case JSON_STRING:
+            valueString = &tree->stringPool[newValue->value.stringOffset];
+            printf("%s", valueString);
+            break;
+        case JSON_INT:
+            printf("%ld", newValue->value.i);
+            break;
+        case JSON_DOUBLE:
+            printf("%g", newValue->value.d);
+            break;
+        case JSON_BOOL:
+            if (newValue->value.b == 0) {
+                printf("false");
+            }
+            else {
+                printf("true");
+            }
+            break;
+    }
+}
+
+static void printExpression(ruleset *tree, expression *expr, int level, unsigned int offset) {
+    for (int i = 0; i < level; ++ i) {
+        printf("    ");
+    }
+
+    char *comp = NULL;
+    char *compStack[32];
+    unsigned char compTop = 0;
+    unsigned char first = 1;
+    
+    for (unsigned short i = 0; i < expr->termsLength; ++i) {
+        unsigned int currentNodeOffset = expr->terms[i];
+        node *currentNode = &tree->nodePool[currentNodeOffset];
+        if (currentNode->value.a.operator == OP_AND || currentNode->value.a.operator == OP_OR) {
+            if (first) {
+                printf("(");
+            } else {
+                printf("%s (", comp);
+            }
+            
+            compStack[compTop] = comp;
+            ++compTop;
+            first = 1;
+
+            if (currentNode->value.a.operator == OP_AND) {
+                comp = "and";    
+            } else {
+                comp = "or";    
+            }
+            
+        } else if (currentNode->value.a.operator == OP_END) {
+            --compTop;
+            comp = compStack[compTop];
+            printf(")");            
+        } else if (currentNode->value.a.operator == OP_IALL || currentNode->value.a.operator == OP_IANY) {
+            char *leftProperty = &tree->stringPool[currentNode->nameOffset];
+            idiom *newIdiom = &tree->idiomPool[currentNode->value.a.right.value.idiomOffset];
+            char *op = "";
+            switch (newIdiom->operator) {
+                case OP_LT:
+                    op = "<";
+                    break;
+                case OP_LTE:
+                    op = "<=";
+                    break;
+                case OP_GT:
+                    op = ">";
+                    break;
+                case OP_GTE:
+                    op = ">=";
+                    break;
+                case OP_EQ:
+                    op = "==";
+                    break;
+                case OP_NEQ:
+                    op = "!=";
+                    break;
+            }
+
+            char *par = "";
+            if (currentNode->value.a.operator == OP_IALL) {
+                par = "true";
+            } else {
+                par = "false";
+            }
+
+            if (!first) {
+                printf("%s compare_array(message[\"%s\"], ", comp, leftProperty);
+
+            } else {
+                if (expr->distinct) {
+                    printf("distinct(frame, message) and compare_array(message[\"%s\"], ", leftProperty);
+                } else {
+                    printf("compare_array(message[\"%s\"], ", leftProperty);
+                }
+    
+                first = 0;   
+            }
+
+            printIdiom(tree, &newIdiom->right);
+            printf(", %s, %s)\n", op, par);
+
+        } else {
+            char *leftProperty = &tree->stringPool[currentNode->nameOffset];
+            char *op = "";
+            switch (currentNode->value.a.operator) {
+                case OP_LT:
+                    op = "<";
+                    break;
+                case OP_LTE:
+                    op = "<=";
+                    break;
+                case OP_GT:
+                    op = ">";
+                    break;
+                case OP_GTE:
+                    op = ">=";
+                    break;
+                case OP_EQ:
+                    op = "==";
+                    break;
+                case OP_NEQ:
+                    op = "!=";
+                    break;
+            }
+
+            if (!first) {
+                printf(" %s message[\"%s\"] %s ", comp, leftProperty, op);
+            } else {
+                if (expr->distinct) {
+                    printf("distinct(frame, message) and message[\"%s\"] %s ", leftProperty, op);
+                } else {
+                    printf("message[\"%s\"] %s ", leftProperty, op);
+                }
+    
+                first = 0;   
+            }
+
+            printIdiom(tree, &currentNode->value.a.right);
+        }
+    }
+    printf("\n");
+}
+
 static void printActionNode(ruleset *tree, node *actionNode, int level, unsigned int offset) {
     for (int i = 0; i < level; ++ i) {
         printf("    ");
@@ -1323,6 +1496,10 @@ static void printBetaNode(ruleset *tree, node *betaNode, int level, unsigned int
     }
 
     printf("-> beta: name %s, not %d, offset %u\n", &tree->stringPool[betaNode->nameOffset], betaNode->value.b.not, offset);
+    if (betaNode->value.b.expressionOffset) {
+        expression *exp = &tree->expressionPool[betaNode->value.b.expressionOffset];
+        printExpression(tree, exp, level, betaNode->value.b.expressionOffset);
+    }
     node *currentNode = &tree->nodePool[betaNode->value.b.nextOffset];
     if (currentNode->type == NODE_ACTION) {
         printActionNode(tree, currentNode, level + 1, betaNode->value.b.nextOffset);
@@ -1437,7 +1614,7 @@ static unsigned int createTree(ruleset *tree, char *rules) {
     return RULES_OK;
 }
 
-unsigned int createRuleset(unsigned int *handle, char *name, char *rules, unsigned int stateCaheSize) {
+unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     INITIALIZE_ENTRIES;
 
 #ifdef _PRINT
@@ -1473,7 +1650,10 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules, unsign
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
-    initStatePool(tree, stateCaheSize);
+    initStatePool(tree, MAX_STATE_NODES);
+    initMessagePool(tree, MAX_MESSAGE_NODES);
+    initLeftFramePool(tree, MAX_LEFT_FRAME_NODES);
+    initRightFramePool(tree, MAX_RIGHT_FRAME_NODES);
 
     result = storeString(tree, name, &tree->nameOffset, strlen(name));
     if (result != RULES_OK) {
@@ -1541,7 +1721,7 @@ unsigned int deleteRuleset(unsigned int handle) {
     return RULES_OK;
 }
 
-unsigned int createClient(unsigned int *handle, char *name, unsigned int stateCaheSize) {
+unsigned int createClient(unsigned int *handle, char *name) {
     INITIALIZE_ENTRIES;
 
     ruleset *tree = malloc(sizeof(ruleset));
@@ -1562,7 +1742,7 @@ unsigned int createClient(unsigned int *handle, char *name, unsigned int stateCa
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
-    initStatePool(tree, stateCaheSize);
+    initStatePool(tree, MAX_STATE_NODES);
     
     unsigned int result = storeString(tree, name, &tree->nameOffset, strlen(name));
     if (result != RULES_OK) {

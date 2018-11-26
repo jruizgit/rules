@@ -20,11 +20,13 @@
     pool.freeOffset = 0; \
 } while(0)
 
+// Index offset by one  in type *current = &pool.content[offset - 1];
 #define GET(type, index, max, pool, nodeHash, value) do { \
     unsigned int offset = index[nodeHash % max]; \
     value = NULL; \
+    printf("%d\n", offset); \
     while (offset != UNDEFINED_HASH_OFFSET) { \
-        type *current = &pool.content[offset]; \
+        type *current = &pool.content[offset - 1]; \
         if (current->hash != nodeHash) { \
             offset = current->nextOffset; \
         } else { \
@@ -34,6 +36,7 @@
     } \
 } while(0)
 
+// Index offset by one in last two lines of macro
 #define NEW(type, index, max, pool, nodeHash, value) do { \
     unsigned int valueOffset = pool.freeOffset; \
     value = &pool.content[valueOffset]; \
@@ -54,8 +57,8 @@
     pool.freeOffset = value->nextOffset; \
     value->prevOffset = UNDEFINED_HASH_OFFSET; \
     value->hash = nodeHash; \
-    value->nextOffset = index[nodeHash % max]; \
-    index[nodeHash % max] = valueOffset; \
+    value->nextOffset = index[nodeHash % max] - 1; \
+    index[nodeHash % max] = valueOffset + 1; \
 } while(0)
 
 
@@ -93,6 +96,22 @@ unsigned int initStatePool(void *tree, unsigned int length) {
     INIT(stateNode, ((ruleset*)tree)->statePool, length);
     return RULES_OK;
 }
+
+unsigned int initMessagePool(void *tree, unsigned int length) {
+    INIT(messageNode, ((ruleset*)tree)->messagePool, length);
+    return RULES_OK;
+}
+
+unsigned int initLeftFramePool(void *tree, unsigned int length) {
+    INIT(leftFrameNode, ((ruleset*)tree)->leftFramePool, length);
+    return RULES_OK;
+}
+
+unsigned int initRightFramePool(void *tree, unsigned int length) {
+    INIT(rightFrameNode, ((ruleset*)tree)->rightFramePool, length);
+    return RULES_OK;
+}
+
 
 static void insertSortProperties(jsonObject *jo, jsonProperty **properties) {
     for (unsigned short i = 1; i < jo->propertiesLength; ++i) {
@@ -235,8 +254,9 @@ unsigned int getObjectProperty(jsonObject *jo, unsigned int hash, jsonProperty *
             break;
         }
 
-        if (jo->properties[index].hash == hash) {
-            *property = &jo->properties[index];   
+        // Property index offset by 1
+        if (jo->properties[index - 1].hash == hash) {
+            *property = &jo->properties[index - 1];   
             return RULES_OK;
         }
     }
@@ -278,17 +298,18 @@ unsigned int constructObject(char *root,
 
         jsonProperty *property = NULL;
         if (type != JSON_OBJECT) {
-            ++jo->propertiesLength;
-            if (jo->propertiesLength == MAX_OBJECT_PROPERTIES) {
-                return ERR_EVENT_MAX_PROPERTIES;
-            } 
-
             unsigned int candidate = hash % MAX_OBJECT_PROPERTIES;
             while (jo->propertyIndex[candidate] != 0) {
                 candidate = (candidate + 1) % MAX_OBJECT_PROPERTIES;
             }
-            jo->propertyIndex[candidate] = jo->propertiesLength;
+
+            // Property index offset by 1
+            jo->propertyIndex[candidate] = jo->propertiesLength + 1;
             property = &jo->properties[jo->propertiesLength]; 
+            ++jo->propertiesLength;
+            if (jo->propertiesLength == MAX_OBJECT_PROPERTIES) {
+                return ERR_EVENT_MAX_PROPERTIES;
+            } 
 
             if (!parentName) {
                 if (hash == HASH_ID) {
@@ -401,10 +422,12 @@ unsigned int constructObject(char *root,
 unsigned int resolveBinding(void *tree, 
                             char *sid, 
                             void **rulesBinding) {  
+    printf("resolveBinding\n");
     unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
     stateNode *node;
     GET(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, node);
     if (!node) {
+        printf("newNode\n");
         NEW(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, node);
         unsigned int result = getBindingIndex(tree, sidHash, &node->bindingIndex);
         if (result != RULES_OK) {

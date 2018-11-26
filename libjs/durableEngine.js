@@ -419,7 +419,7 @@ exports = module.exports = durableEngine = function () {
         return newObject;
     };
 
-    var ruleset = function (name, host, rulesetDefinition, stateCacheSize) {
+    var ruleset = function (name, host, rulesetDefinition) {
         var that = {};
         var actions = {};
         var handle;
@@ -772,11 +772,11 @@ exports = module.exports = durableEngine = function () {
             delete(rule.run);
         }
 
-        handle = r.createRuleset(name, JSON.stringify(rulesetDefinition), stateCacheSize);
+        handle = r.createRuleset(name, JSON.stringify(rulesetDefinition));
         return that;
     }
 
-    var stateChart = function (name, host, chartDefinition, stateCacheSize) {
+    var stateChart = function (name, host, chartDefinition) {
         
         var transform = function (parentName, parentTriggers, parentStartState, host, chart, rules) {
             var startState = {};
@@ -919,7 +919,7 @@ exports = module.exports = durableEngine = function () {
 
         var rules = {};
         transform(null, null, null, host, chartDefinition, rules);
-        var that = ruleset(name, host, rules, stateCacheSize);
+        var that = ruleset(name, host, rules);
         that.getDefinition = function () {
             chartDefinition.$type = 'stateChart';
             return chartDefinition;
@@ -928,7 +928,7 @@ exports = module.exports = durableEngine = function () {
         return that;
     };
 
-    var flowChart = function (name, host, chartDefinition, stateCacheSize) {
+    var flowChart = function (name, host, chartDefinition) {
         
         var transform = function (host, chart, rules) {
             var visited = {};
@@ -1065,7 +1065,7 @@ exports = module.exports = durableEngine = function () {
 
         var rules = {};
         transform(host, chartDefinition, rules);
-        var that = ruleset(name, host, rules, stateCacheSize);
+        var that = ruleset(name, host, rules);
 
         that.getDefinition = function () {
             chartDefinition.$type = 'flowChart';
@@ -1075,7 +1075,7 @@ exports = module.exports = durableEngine = function () {
         return that;
     };
 
-    var createRulesets = function (parentName, host, rulesetDefinitions, stateCacheSize) {
+    var createRulesets = function (parentName, host, rulesetDefinitions) {
         var branches = {};
         for (var name in rulesetDefinitions) {
             var currentDefinition = rulesetDefinitions[name];
@@ -1087,7 +1087,7 @@ exports = module.exports = durableEngine = function () {
                     name = parentName + '.' + name;
                 }
 
-                branches[name] = stateChart(name, host, currentDefinition, stateCacheSize);
+                branches[name] = stateChart(name, host, currentDefinition);
             } else {
                 index = name.indexOf('$flow');
                 if (index !== -1) {
@@ -1096,13 +1096,13 @@ exports = module.exports = durableEngine = function () {
                         name = parentName + '.' + name;
                     }
 
-                    branches[name] = flowChart(name, host, currentDefinition, stateCacheSize);
+                    branches[name] = flowChart(name, host, currentDefinition);
                 } else {
                     if (parentName) {
                         name = parentName + '.' + name;
                     }
 
-                    branches[name] = ruleset(name, host, currentDefinition, stateCacheSize);
+                    branches[name] = ruleset(name, host, currentDefinition);
                 }
             }
         }
@@ -1110,13 +1110,12 @@ exports = module.exports = durableEngine = function () {
         return branches;
     };
 
-    var host = function (databases, stateCacheSize) {
+    var host = function (databases) {
         var that = {};
         var rulesDirectory = {};
         var instanceDirectory = {};
         var rulesList = [];
         databases = databases || [{host: 'localhost', port: 6379, password:null, db:0}];
-        stateCacheSize = stateCacheSize || 1024;
         
         that.getAction = function (actionName) {
             throw 'Action ' + actionName + ' not found';
@@ -1168,7 +1167,7 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.registerRulesets = function (parentName, rulesetDefinitions) {
-            var rulesets = createRulesets(parentName, that, rulesetDefinitions, stateCacheSize);
+            var rulesets = createRulesets(parentName, that, rulesetDefinitions);
             var names = [];
             for (var rulesetName in rulesets) {
                 var rulesetDefinition = rulesets[rulesetName];
@@ -1336,12 +1335,11 @@ exports = module.exports = durableEngine = function () {
         return that;
     }
 
-    var queue = function(rulesetName, database, stateCacheSize) {
+    var queue = function(rulesetName, database) {
         var that = {};
         var handle;
         database = database || {host: 'localhost', port: 6379, password: null, db: 0};
-        stateCacheSize = stateCacheSize || 5000;
-
+        
         that.isClosed = function() {
             return (handle == 0);
         }
@@ -1377,7 +1375,7 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
-        handle = r.createClient(rulesetName, stateCacheSize)
+        handle = r.createClient(rulesetName)
         if (typeof(database) === 'string') {
             r.bindRuleset(handle, database, 0, null, 0);
         } else {

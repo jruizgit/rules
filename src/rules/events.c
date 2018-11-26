@@ -276,6 +276,7 @@ static unsigned int handleAction(ruleset *tree,
                                  unsigned int *addCount,
                                  char **removeCommand,
                                  void **rulesBinding) {
+    printf("handle action %s\n", prefix);
     unsigned int result = ERR_UNEXPECTED_VALUE;
     if (*rulesBinding == NULL) {
         result = resolveBinding(tree, 
@@ -286,6 +287,7 @@ static unsigned int handleAction(ruleset *tree,
         }
     }
 
+    printf("handle action 2\n");
     switch (actionType) {
         case ACTION_ASSERT_EVENT:
         case ACTION_ASSERT_FACT:
@@ -349,6 +351,7 @@ static unsigned int handleBeta(ruleset *tree,
                                unsigned int *addCount,
                                char **removeCommand,
                                void **rulesBinding) {
+    printf("handle beta\n");
     int prefixLength = 0;
     node *currentNode = betaNode;
     while (currentNode != NULL) {
@@ -423,7 +426,6 @@ static unsigned int valueToProperty(ruleset *tree,
                                     jsonValue *sourceValue, 
                                     jsonProperty **targetProperty,
                                     char **targetStringValue) {
-
     unsigned int result = RULES_OK;
     switch(sourceValue->type) {
         case JSON_EVENT_LOCAL_IDIOM:
@@ -567,7 +569,8 @@ static unsigned int isMatch(ruleset *tree,
     }
 
     char *rightStringValue;
-    jsonProperty *rightProperty = NULL;
+    jsonProperty rightValue;
+    jsonProperty *rightProperty = &rightValue;
     result = valueToProperty(tree,
                              sid,
                              messageObject,
@@ -581,44 +584,44 @@ static unsigned int isMatch(ruleset *tree,
 
         return RULES_OK;
     }
-    
+
     int leftLength;
     int rightLength;
     unsigned short type = propertyType << 8;
-    type = type + rightProperty->type;
+    type = type + rightValue.type;
     switch(type) {
         case OP_BOOL_BOOL:
-            *propertyMatch = compareBool(currentProperty->value.b, rightProperty->value.b, alphaOp);
+            *propertyMatch = compareBool(currentProperty->value.b, rightValue.value.b, alphaOp);
             break;
         case OP_BOOL_INT: 
-            *propertyMatch = compareInt(currentProperty->value.b, rightProperty->value.i, alphaOp);
+            *propertyMatch = compareInt(currentProperty->value.b, rightValue.value.i, alphaOp);
             break;
         case OP_BOOL_DOUBLE: 
-            *propertyMatch = compareDouble(currentProperty->value.b, rightProperty->value.d, alphaOp);
+            *propertyMatch = compareDouble(currentProperty->value.b, rightValue.value.d, alphaOp);
             break;
         case OP_BOOL_STRING:
             if (currentProperty->value.b) {
                 *propertyMatch = compareStringProperty("true",
-                                                       rightStringValue + rightProperty->valueOffset, 
-                                                       rightProperty->valueLength,
+                                                       rightStringValue + rightValue.valueOffset, 
+                                                       rightValue.valueLength,
                                                        alphaOp);
             }
             else {
                 *propertyMatch = compareStringProperty("false",
-                                                       rightStringValue + rightProperty->valueOffset, 
-                                                       rightProperty->valueLength,
+                                                       rightStringValue + rightValue.valueOffset, 
+                                                       rightValue.valueLength,
                                                        alphaOp);
             }
             
             break;
         case OP_INT_BOOL:
-            *propertyMatch = compareInt(currentProperty->value.i, rightProperty->value.b, alphaOp);
+            *propertyMatch = compareInt(currentProperty->value.i, rightValue.value.b, alphaOp);
             break;
         case OP_INT_INT: 
-            *propertyMatch = compareInt(currentProperty->value.i, rightProperty->value.i, alphaOp);
+            *propertyMatch = compareInt(currentProperty->value.i, rightValue.value.i, alphaOp);
             break;
         case OP_INT_DOUBLE: 
-            *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.d, alphaOp);
+            *propertyMatch = compareDouble(currentProperty->value.i, rightValue.value.d, alphaOp);
             break;
         case OP_INT_STRING:
             {
@@ -631,23 +634,23 @@ static unsigned int isMatch(ruleset *tree,
                 snprintf(leftStringInt, sizeof(char)*(rightLength), "%ld", currentProperty->value.i);
 #endif         
                 *propertyMatch = compareStringProperty(leftStringInt, 
-                                                       rightStringValue + rightProperty->valueOffset,
-                                                       rightProperty->valueLength, 
+                                                       rightStringValue + rightValue.valueOffset,
+                                                       rightValue.valueLength, 
                                                        alphaOp);
             }
             break;
         case OP_DOUBLE_BOOL:
-            *propertyMatch = compareDouble(currentProperty->value.d, rightProperty->value.b, alphaOp);
+            *propertyMatch = compareDouble(currentProperty->value.d, rightValue.value.b, alphaOp);
             break;
         case OP_DOUBLE_INT: 
-            *propertyMatch = compareDouble(currentProperty->value.d, rightProperty->value.i, alphaOp);
+            *propertyMatch = compareDouble(currentProperty->value.d, rightValue.value.i, alphaOp);
             break;
         case OP_DOUBLE_DOUBLE: 
-            *propertyMatch = compareDouble(currentProperty->value.d, rightProperty->value.d, alphaOp);
+            *propertyMatch = compareDouble(currentProperty->value.d, rightValue.value.d, alphaOp);
             break;
         case OP_DOUBLE_STRING:
             {
-                rightLength = rightProperty->valueLength + 1;
+                rightLength = rightValue.valueLength + 1;
 #ifdef _WIN32
                 char *leftStringDouble = (char *)_alloca(sizeof(char)*(rightLength));
                 sprintf_s(leftStringDouble, sizeof(char)*(rightLength), "%f", currentProperty->value.d);
@@ -656,8 +659,8 @@ static unsigned int isMatch(ruleset *tree,
                 snprintf(leftStringDouble, sizeof(char)*(rightLength), "%f", currentProperty->value.d);
 #endif         
                 *propertyMatch = compareStringProperty(leftStringDouble,
-                                                       rightStringValue + rightProperty->valueOffset,
-                                                       rightProperty->valueLength, 
+                                                       rightStringValue + rightValue.valueOffset,
+                                                       rightValue.valueLength, 
                                                        alphaOp);
             }
             break;
@@ -680,12 +683,12 @@ static unsigned int isMatch(ruleset *tree,
                 leftLength = currentProperty->valueLength + 1;
 #ifdef _WIN32
                 char *rightStringInt = (char *)_alloca(sizeof(char)*(leftLength));
-                sprintf_s(rightStringInt, sizeof(char)*(leftLength), "%ld", rightProperty->value.i);
+                sprintf_s(rightStringInt, sizeof(char)*(leftLength), "%ld", rightValue.value.i);
 #else
                 char rightStringInt[leftLength];
-                snprintf(rightStringInt, sizeof(char)*(leftLength), "%ld", rightProperty->value.i);
+                snprintf(rightStringInt, sizeof(char)*(leftLength), "%ld", rightValue.value.i);
 #endif
-                *propertyMatch = compareString(messageObject->content + currentProperty->valueOffset, 
+                *propertyMatch = compareString(messageObject->content + rightValue.valueOffset, 
                                                currentProperty->valueLength, 
                                                rightStringInt, 
                                                alphaOp);
@@ -696,10 +699,10 @@ static unsigned int isMatch(ruleset *tree,
                 leftLength = currentProperty->valueLength + 1;
 #ifdef _WIN32
                 char *rightStringDouble = (char *)_alloca(sizeof(char)*(leftLength));
-                sprintf_s(rightStringDouble, sizeof(char)*(leftLength), "%f", rightProperty->value.d);
+                sprintf_s(rightStringDouble, sizeof(char)*(leftLength), "%f", rightValue.value.d);
 #else
                 char rightStringDouble[leftLength];
-                snprintf(rightStringDouble, sizeof(char)*(leftLength), "%f", rightProperty->value.d);
+                snprintf(rightStringDouble, sizeof(char)*(leftLength), "%f", rightValue.value.d);
 #endif              
                 *propertyMatch = compareString(messageObject->content + currentProperty->valueOffset, 
                                                currentProperty->valueLength, 
@@ -710,8 +713,8 @@ static unsigned int isMatch(ruleset *tree,
         case OP_STRING_STRING:
             *propertyMatch = compareStringAndStringProperty(messageObject->content + currentProperty->valueOffset, 
                                                             currentProperty->valueLength, 
-                                                            rightStringValue + rightProperty->valueOffset,
-                                                            rightProperty->valueLength,
+                                                            rightStringValue + rightValue.valueOffset,
+                                                            rightValue.valueLength,
                                                             alphaOp);
             break;
         case OP_BOOL_NIL:
@@ -746,6 +749,7 @@ static unsigned int isMatch(ruleset *tree,
 
     }
     
+    printf("isMatch %d\n", *propertyMatch);
     return result;
 }
 
@@ -787,10 +791,11 @@ static unsigned int isArrayMatch(ruleset *tree,
         } else {
             jo.content = first;
             jo.propertiesLength = 1;
-            jo.properties[1].hash = HASH_I;
-            jo.properties[1].type = type;
-            jo.properties[1].valueOffset = 0;
-            jo.properties[1].valueLength = last - first;
+            jo.properties[0].hash = HASH_I;
+            jo.properties[0].type = type;
+            jo.properties[0].valueOffset = 0;
+            jo.properties[0].valueLength = last - first;
+            // Property index offset by 1
             jo.propertyIndex[HASH_I % MAX_OBJECT_PROPERTIES] = 1;
         }
 
@@ -898,7 +903,8 @@ static unsigned int handleAlpha(ruleset *tree,
                                 char **addKeys,
                                 unsigned int *addCount,
                                 char **removeCommand,
-                                void **rulesBinding) {                        
+                                void **rulesBinding) { 
+    printf("handle alpha\n");                       
     unsigned int result = ERR_EVENT_NOT_HANDLED;
     unsigned short top = 1;
     unsigned int entry;
@@ -1015,6 +1021,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                                       char **commands,
                                       unsigned int *commandCount,
                                       void **rulesBinding) {
+    printf("handle message core\n");
     unsigned int result;
     char *storeCommand;
     jsonProperty *sidProperty = &jo->properties[jo->sidIndex];
@@ -1091,7 +1098,7 @@ static unsigned int handleMessageCore(ruleset *tree,
             ++*commandCount;
         }
 
-        if (addCount > 0) {
+        if (addCount > 100) {
             char *addCommand = NULL;
             result = formatStoreMessage(*rulesBinding,
                                         sid,
@@ -1117,7 +1124,7 @@ static unsigned int handleMessageCore(ruleset *tree,
             ++*commandCount;
         }
 
-        if (evalCount > 0) {
+        if (evalCount > 100) {
             char *evalCommand = NULL;
             result = formatEvalMessage(*rulesBinding,
                                         sid,

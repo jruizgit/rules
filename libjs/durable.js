@@ -1858,13 +1858,13 @@ exports = module.exports = durableEngine = function () {
 
     var rulesets = [];
 
-    var createHost = function(databases, stateCacheSize) {
+    var createHost = function(databases) {
         var definitions = {};
         for (var i = 0; i < rulesets.length; ++ i) {
             definitions[rulesets[i].getName()] = rulesets[i].define(); 
         }
 
-        var rulesHost = d.host(databases, stateCacheSize);
+        var rulesHost = d.host(databases);
         // console.log(JSON.stringify(definitions, 2, 2));
         rulesHost.registerRulesets(null, definitions);
         for (var i = 0; i < rulesets.length; ++ i) {
@@ -1876,12 +1876,12 @@ exports = module.exports = durableEngine = function () {
         return rulesHost;
     } 
 
-    var createQueue = function(rulesetName, database, stateCacheSize) {
-        return d.queue(rulesetName, database, stateCacheSize);
+    var createQueue = function(rulesetName, database) {
+        return d.queue(rulesetName, database);
     }
 
-    var runAll = function(databases, port, basePath, run, stateCacheSize) {
-        var rulesHost = createHost(databases, stateCacheSize);
+    var runAll = function(databases, port, basePath, run) {
+        var rulesHost = createHost(databases);
         var app = d.application(rulesHost, port, basePath);
         if (run) {
             run(rulesHost, app);

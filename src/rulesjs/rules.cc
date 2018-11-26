@@ -33,16 +33,15 @@ private:
 void jsCreateRuleset(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
-    if (args.Length() < 3) {
+    if (args.Length() < 2) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsString() || !args[1]->IsString() || !args[2]->IsNumber()) {
+    } else if (!args[0]->IsString() || !args[1]->IsString()) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int output = 0;
         unsigned int result = createRuleset(&output, 
                                             TO_STRING(args[0]), 
-                                            TO_STRING(args[1]),
-                                            args[2]->IntegerValue());
+                                            TO_STRING(args[1]));
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not create ruleset, error code: %d", result) == -1) {
@@ -80,12 +79,12 @@ void jsCreateClient(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     unsigned int output = 0;
-    if (args.Length() < 2) {
+    if (args.Length() < 1) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[1]->IsNumber() || !args[0]->IsString()) {
+    } else if (!args[0]->IsString()) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
-        unsigned int result = createClient(&output, TO_STRING(args[0]), args[1]->IntegerValue());
+        unsigned int result = createClient(&output, TO_STRING(args[0]));
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not create client, error code: %d", result) == -1) {

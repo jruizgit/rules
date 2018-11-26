@@ -5,7 +5,7 @@
 #define SID_BUFFER_LENGTH 2
 #define ID_BUFFER_LENGTH 22
 
-#define UNDEFINED_HASH_OFFSET 0xFFFFFFFF
+#define UNDEFINED_HASH_OFFSET 0
 #define MAX_OBJECT_PROPERTIES 64
 #define MAX_MESSAGE_FRAMES 32
 
@@ -94,6 +94,12 @@ unsigned int resolveBinding(void *tree,
 
 
 unsigned int initStatePool(void *tree, unsigned int length);
+
+unsigned int initMessagePool(void *tree, unsigned int length);
+
+unsigned int initLeftFramePool(void *tree, unsigned int length);
+
+unsigned int initRightFramePool(void *tree, unsigned int length);
 
 unsigned int getStateVersion(void *tree, 
                              char *sid, 
