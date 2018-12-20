@@ -70,10 +70,10 @@ static unsigned int handleMessage(ruleset *tree,
                                   unsigned int *commandCount,
                                   void **rulesBinding);
 
-static unsigned int reduceIdiom(ruleset *tree, 
+static unsigned int reduceExpression(ruleset *tree, 
                                 char *sid,
                                 jsonObject *messageObject,
-                                unsigned int idiomOffset,
+                                unsigned int expressionOffset,
                                 jsonProperty **targetValue);
 
 static unsigned char compareBool(unsigned char left, 
@@ -423,22 +423,22 @@ static unsigned int handleBeta(ruleset *tree,
 static unsigned int valueToProperty(ruleset *tree,
                                     char *sid,
                                     jsonObject *messageObject,
-                                    jsonValue *sourceValue, 
+                                    operand *sourceOperand, 
                                     jsonProperty **targetProperty,
                                     char **targetStringValue) {
     unsigned int result = RULES_OK;
-    switch(sourceValue->type) {
+    switch(sourceOperand->type) {
         case JSON_EVENT_LOCAL_IDIOM:
-            result = reduceIdiom(tree, 
+            result = reduceExpression(tree, 
                                  sid, 
                                  messageObject,
-                                 sourceValue->value.idiomOffset,
+                                 sourceOperand->value.expressionOffset,
                                  targetProperty);
 
             return result;
         case JSON_EVENT_LOCAL_PROPERTY:
             result = getObjectProperty(messageObject,
-                                       sourceValue->value.property.nameHash,
+                                       sourceOperand->value.id.propertyNameHash,
                                        targetProperty);
 
             return RULES_OK;
@@ -447,22 +447,22 @@ static unsigned int valueToProperty(ruleset *tree,
                 return ERR_UNEXPECTED_TYPE;
             }
 
-            *targetStringValue = &tree->stringPool[sourceValue->value.stringOffset];
+            *targetStringValue = &tree->stringPool[sourceOperand->value.stringOffset];
             (*targetProperty)->valueLength = strlen(*targetStringValue);
             (*targetProperty)->valueOffset = 0;
             break;
         case JSON_INT:
-            (*targetProperty)->value.i = sourceValue->value.i;
+            (*targetProperty)->value.i = sourceOperand->value.i;
             break;
         case JSON_DOUBLE:
-            (*targetProperty)->value.d = sourceValue->value.d;
+            (*targetProperty)->value.d = sourceOperand->value.d;
             break;
         case JSON_BOOL:
-            (*targetProperty)->value.b = sourceValue->value.b;
+            (*targetProperty)->value.b = sourceOperand->value.b;
             break;
     }
 
-    (*targetProperty)->type = sourceValue->type;
+    (*targetProperty)->type = sourceOperand->type;
     return result;
 }
 
@@ -514,19 +514,19 @@ static unsigned int reduceProperties(unsigned char operator,
     return RULES_OK;
 }
 
-static unsigned int reduceIdiom(ruleset *tree, 
+static unsigned int reduceExpression(ruleset *tree, 
                                 char *sid,
                                 jsonObject *messageObject,
-                                unsigned int idiomOffset,
+                                unsigned int expressionOffset,
                                 jsonProperty **targetValue) {
     unsigned int result = RULES_OK;
-    idiom *currentIdiom = &tree->idiomPool[idiomOffset];
+    expression *currentExpression = &tree->expressionPool[expressionOffset];
     jsonProperty leftValue;
     jsonProperty *leftProperty = &leftValue;
     result = valueToProperty(tree,
                              sid,
                              messageObject,
-                             &currentIdiom->left,
+                             &currentExpression->left,
                              &leftProperty,
                              NULL);
     if (result != RULES_OK) {
@@ -538,14 +538,14 @@ static unsigned int reduceIdiom(ruleset *tree,
     result = valueToProperty(tree,
                              sid,
                              messageObject,
-                             &currentIdiom->right,
+                             &currentExpression->right,
                              &rightProperty,
                              NULL);
     if (result != RULES_OK) {
         return result;
     }
 
-    result = reduceProperties(currentIdiom->operator, 
+    result = reduceProperties(currentExpression->operator, 
                             leftProperty, 
                             rightProperty, 
                             *targetValue);

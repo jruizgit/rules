@@ -79,9 +79,36 @@ static unsigned int storeString(ruleset *tree,
     return RULES_OK;
 }
 
+static unsigned int storeExpressionSequence(ruleset *tree, 
+                                    expressionSequence **newExpressionSequence, 
+                                    unsigned int *expressionSequenceOffset) {
+
+    if (!tree->expressionSequencePool) {
+        tree->expressionSequencePool = malloc(sizeof(expressionSequence));
+        if (!tree->expressionSequencePool) {
+            return ERR_OUT_OF_MEMORY;
+        }
+
+        *expressionSequenceOffset = 0;
+        *newExpressionSequence = &tree->expressionSequencePool[0];
+        tree->expressionSequenceOffset = 1;
+    } else {
+        tree->expressionSequencePool = realloc(tree->expressionSequencePool, (tree->expressionSequenceOffset + 1) * sizeof(expressionSequence));
+        if (!tree->expressionSequencePool) {
+            return ERR_OUT_OF_MEMORY;
+        }
+
+        *expressionSequenceOffset = tree->expressionSequenceOffset;
+        *newExpressionSequence = &tree->expressionSequencePool[tree->expressionSequenceOffset];
+        tree->expressionSequenceOffset = tree->expressionSequenceOffset + 1;        
+    }
+
+    return RULES_OK;
+}
+
 static unsigned int storeExpression(ruleset *tree, 
-                                    expression **newExpression, 
-                                    unsigned int *expressionOffset) {
+                               expression **newExpression, 
+                               unsigned int *expressionOffset) {
 
     if (!tree->expressionPool) {
         tree->expressionPool = malloc(sizeof(expression));
@@ -106,37 +133,10 @@ static unsigned int storeExpression(ruleset *tree,
     return RULES_OK;
 }
 
-static unsigned int storeIdiom(ruleset *tree, 
-                               idiom **newIdiom, 
-                               unsigned int *idiomOffset) {
-
-    if (!tree->idiomPool) {
-        tree->idiomPool = malloc(sizeof(idiom));
-        if (!tree->idiomPool) {
-            return ERR_OUT_OF_MEMORY;
-        }
-
-        *idiomOffset = 0;
-        *newIdiom = &tree->idiomPool[0];
-        tree->idiomOffset = 1;
-    } else {
-        tree->idiomPool = realloc(tree->idiomPool, (tree->idiomOffset + 1) * sizeof(idiom));
-        if (!tree->idiomPool) {
-            return ERR_OUT_OF_MEMORY;
-        }
-
-        *idiomOffset = tree->idiomOffset;
-        *newIdiom = &tree->idiomPool[tree->idiomOffset];
-        tree->idiomOffset = tree->idiomOffset + 1;        
-    }
-
-    return RULES_OK;
-}
-
-static unsigned int appendTerm(expression *expr, unsigned int nodeOffset) {
-    expr->terms[expr->termsLength] = nodeOffset;
-    ++expr->termsLength;
-    if (expr->termsLength == MAX_EXPRESSION_TERMS) {
+static unsigned int appendTerm(expressionSequence *exprs, unsigned int nodeOffset) {
+    exprs->terms[exprs->termsLength] = nodeOffset;
+    ++exprs->termsLength;
+    if (exprs->termsLength == MAX_EXPRESSION_TERMS) {
         return ERR_TERM_LIMIT_EXCEEDED;
     }
 
@@ -238,11 +238,11 @@ static unsigned int ensureBetaList(ruleset *tree, node *newNode) {
 }
 
 static unsigned int copyValue(ruleset *tree, 
-                              jsonValue *right, 
+                              operand *right, 
                               char *first, 
                               char *last,
-                              unsigned int idiomOffset,
-                              reference *ref,
+                              unsigned int expressionOffset,
+                              identifier *id,
                               unsigned char type) {
     unsigned int result = RULES_OK;
     right->type = type;
@@ -251,13 +251,13 @@ static unsigned int copyValue(ruleset *tree,
     switch(type) {
         case JSON_EVENT_PROPERTY:
         case JSON_EVENT_LOCAL_PROPERTY:
-            right->value.property.nameHash = ref->nameHash;
-            right->value.property.nameOffset = ref->nameOffset;
-            right->value.property.idOffset = ref->idOffset;
+            right->value.id.propertyNameHash = id->propertyNameHash;
+            right->value.id.propertyNameOffset = id->propertyNameOffset;
+            right->value.id.nameOffset = id->nameOffset;
             break;
         case JSON_EVENT_IDIOM:
         case JSON_EVENT_LOCAL_IDIOM:
-            right->value.idiomOffset = idiomOffset;
+            right->value.expressionOffset = expressionOffset;
             break;
         case JSON_STRING:
             leftLength = last - first;
@@ -305,10 +305,10 @@ static unsigned int copyValue(ruleset *tree,
 }
 
 static unsigned char compareValue(ruleset *tree, 
-                                  jsonValue *right, 
+                                  operand *right, 
                                   char *first, 
                                   char *last,
-                                  reference *ref,
+                                  identifier *id,
                                   unsigned char type) {
     
     if (right->type != type) {
@@ -320,9 +320,9 @@ static unsigned char compareValue(ruleset *tree,
     switch(type) {
         case JSON_EVENT_PROPERTY:
         case JSON_EVENT_LOCAL_PROPERTY:
-            if (right->value.property.nameHash == ref->nameHash &&
-                right->value.property.nameOffset == ref->nameOffset &&
-                right->value.property.idOffset == ref->idOffset)
+            if (right->value.id.propertyNameHash == id->propertyNameHash &&
+                right->value.id.propertyNameOffset == id->propertyNameOffset &&
+                right->value.id.nameOffset == id->nameOffset)
                 return 1;
 
             return 0;
@@ -388,7 +388,7 @@ static unsigned int validateSetting(unsigned int settingHash, char *rule, unsign
     return ERR_SETTING_NOT_FOUND;
 }
 
-static unsigned int validateReference(char *rule, unsigned char *referenceType) {
+static unsigned int validateIdentifier(char *rule, unsigned char *identifierType) {
     char *first;
     char *last;
     unsigned int hash;
@@ -399,10 +399,10 @@ static unsigned int validateReference(char *rule, unsigned char *referenceType) 
         return result;
     }
 
-    *referenceType = JSON_EVENT_PROPERTY;
+    *identifierType = JSON_EVENT_PROPERTY;
 
     if (hash == HASH_M) {
-         *referenceType = JSON_EVENT_LOCAL_PROPERTY;
+         *identifierType = JSON_EVENT_LOCAL_PROPERTY;
     }
 
     result = readNextString(last, &first, &last, &hash);
@@ -413,7 +413,7 @@ static unsigned int validateReference(char *rule, unsigned char *referenceType) 
     return PARSE_OK;
 }
 
-static unsigned int validateIdiom(char *rule, unsigned char *idiomType) {
+static unsigned int validateExpression(char *rule, unsigned char *expressionType) {
     char *first;
     char *last;
     unsigned char type;
@@ -427,43 +427,43 @@ static unsigned int validateIdiom(char *rule, unsigned char *idiomType) {
 
     if (hash != HASH_ADD && hash != HASH_SUB &&
         hash != HASH_MUL && hash != HASH_DIV) {
-        return validateReference(rule, idiomType);
+        return validateIdentifier(rule, expressionType);
     } else {
         result = readNextValue(last, &first, &last, &type);
         if (result != PARSE_OK) {
             return result;
         }
         
-        *idiomType = 0;
+        *expressionType = 0;
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
-            unsigned char newIdiomType = 0;
+            unsigned char newExpressionType = 0;
             result = readNextValue(last, &first, &last, &type);
             if (result != PARSE_OK) {
                 return result;
             }
 
             if (type == JSON_OBJECT) {
-                result = validateIdiom(first, &newIdiomType);
+                result = validateExpression(first, &newExpressionType);
                 if (result != PARSE_OK) {
                     return result;
                 }
             }
 
-            if (newIdiomType == JSON_EVENT_PROPERTY || newIdiomType == JSON_EVENT_IDIOM) {
-                if (*idiomType == JSON_EVENT_LOCAL_PROPERTY || *idiomType == JSON_EVENT_LOCAL_PROPERTY) {
+            if (newExpressionType == JSON_EVENT_PROPERTY || newExpressionType == JSON_EVENT_IDIOM) {
+                if (*expressionType == JSON_EVENT_LOCAL_PROPERTY || *expressionType == JSON_EVENT_LOCAL_PROPERTY) {
                     return ERR_UNEXPECTED_TYPE;
                 }
 
-                *idiomType = JSON_EVENT_IDIOM;
+                *expressionType = JSON_EVENT_IDIOM;
             }                  
 
-            if (newIdiomType == JSON_EVENT_LOCAL_PROPERTY || newIdiomType == JSON_EVENT_LOCAL_IDIOM) {
-                if (*idiomType == JSON_EVENT_PROPERTY || *idiomType == JSON_EVENT_PROPERTY) {
+            if (newExpressionType == JSON_EVENT_LOCAL_PROPERTY || newExpressionType == JSON_EVENT_LOCAL_IDIOM) {
+                if (*expressionType == JSON_EVENT_PROPERTY || *expressionType == JSON_EVENT_PROPERTY) {
                     return ERR_UNEXPECTED_TYPE;
                 }
 
-                *idiomType = JSON_EVENT_IDIOM;
+                *expressionType = JSON_EVENT_IDIOM;
             }
 
             if (hash != HASH_L && hash != HASH_R) {
@@ -478,7 +478,7 @@ static unsigned int validateIdiom(char *rule, unsigned char *idiomType) {
 }
 
 
-static unsigned int validateExpression(char *rule) {
+static unsigned int validateExpressionSequence(char *rule) {
     char *first;
     char *last;
     unsigned char type;
@@ -535,7 +535,7 @@ static unsigned int validateExpression(char *rule) {
 
             result = readNextArrayValue(first, &first, &last, &type);
             while (result == PARSE_OK) {
-                result = validateExpression(first);
+                result = validateExpressionSequence(first);
                 if (result != PARSE_OK) {
                     return result;
                 }
@@ -564,14 +564,14 @@ static unsigned int validateExpression(char *rule) {
         return result;
     }
 
-    // Validating expression rValue
+    // Validating expressionSequence rValue
     result = readNextValue(last, &first, &last, &type);
     if (result != PARSE_OK) {
         return result;
     }
 
     if (operator == OP_IALL || operator == OP_IANY) {
-        result = validateExpression(first);
+        result = validateExpressionSequence(first);
         return result;
     }
 
@@ -591,8 +591,8 @@ static unsigned int validateExpression(char *rule) {
     }
 
     if (type == JSON_OBJECT) {
-        unsigned char idiomType = 0;
-        result = validateIdiom(first, &idiomType);
+        unsigned char expressionType = 0;
+        result = validateExpression(first, &expressionType);
         if (result != PARSE_OK) {
             return result;
         }
@@ -634,7 +634,7 @@ static unsigned int validateAlgebra(char *rule) {
         }
         
         if (!reenter) {
-            result = validateExpression(first);
+            result = validateExpressionSequence(first);
         }
         else {
             result = validateAlgebra(first);
@@ -775,26 +775,26 @@ static unsigned int linkAlpha(ruleset *tree,
     return RULES_OK;
 }
 
-static unsigned int readReference(ruleset *tree, char *rule, unsigned char *idiomType, reference *ref) {
+static unsigned int readIdentifier(ruleset *tree, char *rule, unsigned char *expressionType, identifier *id) {
     char *first;
     char *last;
     unsigned int hash;
     unsigned int result;
-    *idiomType = JSON_EVENT_PROPERTY;    
-    ref->idOffset = 0;
+    *expressionType = JSON_EVENT_PROPERTY;    
+    id->nameOffset = 0;
     readNextName(rule, &first, &last, &hash);
-    result = storeString(tree, first, &ref->idOffset, last - first); 
+    result = storeString(tree, first, &id->nameOffset, last - first); 
     if (result != RULES_OK) {
         return result;
     }  
 
     if (hash == HASH_M) {
-        *idiomType = JSON_EVENT_LOCAL_PROPERTY;
+        *expressionType = JSON_EVENT_LOCAL_PROPERTY;
     }
 
     readNextString(last, &first, &last, &hash);
-    ref->nameHash = hash;
-    result = storeString(tree, first, &ref->nameOffset, last - first);
+    id->propertyNameHash = hash;
+    result = storeString(tree, first, &id->propertyNameOffset, last - first);
     if (result != RULES_OK) {
         return result;
     } 
@@ -802,7 +802,7 @@ static unsigned int readReference(ruleset *tree, char *rule, unsigned char *idio
     return RULES_OK;
 }
 
-static unsigned int readIdiom(ruleset *tree, char *rule, unsigned char *idiomType, unsigned int *idiomOffset, reference *ref) {
+static unsigned int readExpression(ruleset *tree, char *rule, unsigned char *expressionType, unsigned int *expressionOffset, identifier *id) {
     char *first;
     char *last;
     unsigned char type = 0;
@@ -827,48 +827,48 @@ static unsigned int readIdiom(ruleset *tree, char *rule, unsigned char *idiomTyp
     }
 
     if (operator == OP_NOP) {
-        result = readReference(tree, rule, idiomType, ref);
+        result = readIdentifier(tree, rule, expressionType, id);
         if (result != RULES_OK) {
             return result;
         }
     } else {
-        idiom *newIdiom = NULL;
-        result = storeIdiom(tree, &newIdiom, idiomOffset);
+        expression *newExpression = NULL;
+        result = storeExpression(tree, &newExpression, expressionOffset);
         if (result != RULES_OK) {
             return result;
         }
 
-        *idiomType = JSON_EVENT_IDIOM;  
-        newIdiom->operator = operator;
+        *expressionType = JSON_EVENT_IDIOM;  
+        newExpression->operator = operator;
         readNextValue(last, &first, &last, &type);
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
-            unsigned int newIdiomOffset = 0;
-            reference newRef;
+            unsigned int newExpressionOffset = 0;
+            identifier newRef;
             readNextValue(last, &first, &last, &type);
             if (type == JSON_OBJECT) {
-                result = readIdiom(tree, first, &type, &newIdiomOffset, &newRef);
+                result = readExpression(tree, first, &type, &newExpressionOffset, &newRef);
                 if (result != RULES_OK) {
                     return result;
                 }
             }
             
             if (type == JSON_EVENT_PROPERTY || type == JSON_EVENT_IDIOM) {
-                *idiomType = JSON_EVENT_IDIOM;  
+                *expressionType = JSON_EVENT_IDIOM;  
             }
 
-            if (*idiomType != JSON_EVENT_IDIOM && (type == JSON_EVENT_LOCAL_PROPERTY || type == JSON_EVENT_LOCAL_IDIOM)) {
-                *idiomType = JSON_EVENT_LOCAL_IDIOM;  
+            if (*expressionType != JSON_EVENT_IDIOM && (type == JSON_EVENT_LOCAL_PROPERTY || type == JSON_EVENT_LOCAL_IDIOM)) {
+                *expressionType = JSON_EVENT_LOCAL_IDIOM;  
             }
 
-            // newIdiom address might have changed after readIdiom
-            newIdiom = &tree->idiomPool[*idiomOffset];
+            // newExpression address might have changed after readExpression
+            newExpression = &tree->expressionPool[*expressionOffset];
             switch (hash) {
                 case HASH_L:
-                    copyValue(tree, &newIdiom->left, first, last, newIdiomOffset, &newRef, type);
+                    copyValue(tree, &newExpression->left, first, last, newExpressionOffset, &newRef, type);
                     break;
                 case HASH_R:
-                    copyValue(tree, &newIdiom->right, first, last, newIdiomOffset, &newRef, type);
+                    copyValue(tree, &newExpression->right, first, last, newExpressionOffset, &newRef, type);
                     break;
             }
 
@@ -883,7 +883,7 @@ static unsigned int findAlpha(ruleset *tree,
                               unsigned int parentOffset, 
                               unsigned char operator, 
                               char *rule,
-                              expression *expr, 
+                              expressionSequence *exprs, 
                               unsigned int *resultOffset) {
     char *first;
     char *last;
@@ -892,14 +892,14 @@ static unsigned int findAlpha(ruleset *tree,
     unsigned char type;
     unsigned int entry;
     unsigned int hash;
-    unsigned int idiomOffset;
+    unsigned int expressionOffset;
     unsigned int result;
-    reference ref;
+    identifier id;
     
     readNextName(rule, &firstName, &lastName, &hash);
     readNextValue(lastName, &first, &last, &type);
     if (type == JSON_OBJECT && operator != OP_IALL && operator != OP_IANY) {
-        result = readIdiom(tree, first, &type, &idiomOffset, &ref);
+        result = readExpression(tree, first, &type, &expressionOffset, &id);
         if (result != RULES_OK) {
             return result;
         }
@@ -914,7 +914,7 @@ static unsigned int findAlpha(ruleset *tree,
             if (currentNode->value.a.hash == hash && 
                 currentNode->value.a.operator == operator) {
                 if (operator != OP_IALL && operator != OP_IANY) {
-                    if (compareValue(tree, &currentNode->value.a.right, first, last, &ref, type)) {
+                    if (compareValue(tree, &currentNode->value.a.right, first, last, &id, type)) {
                         *resultOffset = parentNext[entry];
                         return RULES_OK;
                     }
@@ -930,7 +930,7 @@ static unsigned int findAlpha(ruleset *tree,
             if (currentNode->value.a.hash == hash && 
                 currentNode->value.a.operator == operator) {
                 if (operator != OP_IALL && operator != OP_IANY) {
-                    if (compareValue(tree, &currentNode->value.a.right, first, last, &ref, type)) {
+                    if (compareValue(tree, &currentNode->value.a.right, first, last, &id, type)) {
                         *resultOffset = parentNext[entry];
                         return RULES_OK;
                     }
@@ -966,13 +966,13 @@ static unsigned int findAlpha(ruleset *tree,
     if (operator == OP_IANY || operator == OP_IALL) {
         newAlpha->value.a.right.type = JSON_NIL;
     } else {
-        result = copyValue(tree, &newAlpha->value.a.right, first, last, idiomOffset, &ref, type);
+        result = copyValue(tree, &newAlpha->value.a.right, first, last, expressionOffset, &id, type);
         if (result != RULES_OK) {
             return result;
         }
 
         if (type == JSON_EVENT_PROPERTY || type == JSON_EVENT_IDIOM) {
-            result = appendTerm(expr, *resultOffset);
+            result = appendTerm(exprs, *resultOffset);
             if (result != RULES_OK) {
                 return result;
             }
@@ -1020,7 +1020,7 @@ static unsigned int createForwardAlpha(ruleset *tree,
 
 static unsigned int createAlpha(ruleset *tree, 
                                 char *rule, 
-                                expression *expr,
+                                expressionSequence *exprs,
                                 unsigned int nextOffset,
                                 unsigned int *newOffset) {
     char *first;
@@ -1069,7 +1069,7 @@ static unsigned int createAlpha(ruleset *tree,
             operator = OP_LTE;
             break;
         case HASH_AND:
-            result = appendTerm(expr, tree->andNodeOffset);
+            result = appendTerm(exprs, tree->andNodeOffset);
             if (result != RULES_OK) {
                 return result;
             }
@@ -1079,7 +1079,7 @@ static unsigned int createAlpha(ruleset *tree,
             unsigned int resultOffset = parentOffset;
             result = readNextArrayValue(first, &first, &last, &type);
             while (result == PARSE_OK) {
-                result = createAlpha(tree, first, expr, 0, &resultOffset);
+                result = createAlpha(tree, first, exprs, 0, &resultOffset);
                 if (result != RULES_OK) {
                     return result;
                 }
@@ -1089,7 +1089,7 @@ static unsigned int createAlpha(ruleset *tree,
             }
             *newOffset = previousOffset;
 
-            result = appendTerm(expr, tree->endNodeOffset);
+            result = appendTerm(exprs, tree->endNodeOffset);
             if (result != RULES_OK) {
                 return result;
             }
@@ -1100,7 +1100,7 @@ static unsigned int createAlpha(ruleset *tree,
 
             return RULES_OK;
         case HASH_OR:
-            result = appendTerm(expr, tree->orNodeOffset);
+            result = appendTerm(exprs, tree->orNodeOffset);
             if (result != RULES_OK) {
                 return result;
             }
@@ -1114,7 +1114,7 @@ static unsigned int createAlpha(ruleset *tree,
             result = readNextArrayValue(first, &first, &last, &type);
             while (result == PARSE_OK) {
                 unsigned int single_offset = parentOffset;
-                result = createAlpha(tree, first, expr, 0, &single_offset);
+                result = createAlpha(tree, first, exprs, 0, &single_offset);
                 if (result != RULES_OK) {
                     return result;
                 }
@@ -1127,7 +1127,7 @@ static unsigned int createAlpha(ruleset *tree,
                 result = readNextArrayValue(last, &first, &last, &type);   
             }
 
-            result = appendTerm(expr, tree->endNodeOffset);
+            result = appendTerm(exprs, tree->endNodeOffset);
             if (result != RULES_OK) {
                 return result;
             }
@@ -1147,7 +1147,7 @@ static unsigned int createAlpha(ruleset *tree,
     }
     
     if (operator == OP_IANY || operator == OP_IALL) {
-        unsigned int result = findAlpha(tree, parentOffset, operator, first, expr, newOffset);
+        unsigned int result = findAlpha(tree, parentOffset, operator, first, exprs, newOffset);
         if (result != RULES_OK) {
             return result;
         }   
@@ -1155,7 +1155,7 @@ static unsigned int createAlpha(ruleset *tree,
         unsigned int inner_offset = *newOffset;
         readNextName(first, &first, &last, &hash);
         readNextValue(last, &first, &last, &type);
-        result = createAlpha(tree, first, expr, nextOffset, &inner_offset);
+        result = createAlpha(tree, first, exprs, nextOffset, &inner_offset);
         if (result != RULES_OK) {
             return result;
         }
@@ -1166,39 +1166,39 @@ static unsigned int createAlpha(ruleset *tree,
         } else {
             // Functions that can execute in client or backend should follow this pattern
             node *oldAlpha = &tree->nodePool[*newOffset];
-            idiom *newIdiom = NULL;
-            unsigned int idiomOffset = 0;
-            result = storeIdiom(tree, &newIdiom, &idiomOffset);
+            expression *newExpression = NULL;
+            unsigned int expressionOffset = 0;
+            result = storeExpression(tree, &newExpression, &expressionOffset);
             if (result != RULES_OK) {
                 return result;
             }
 
             oldAlpha->value.a.right.type = JSON_EVENT_IDIOM;
-            oldAlpha->value.a.right.value.idiomOffset = idiomOffset;
+            oldAlpha->value.a.right.value.expressionOffset = expressionOffset;
 
-            newIdiom->operator = newAlpha->value.a.operator;
-            newIdiom->right.type = newAlpha->value.a.right.type;
+            newExpression->operator = newAlpha->value.a.operator;
+            newExpression->right.type = newAlpha->value.a.right.type;
             if (newAlpha->value.a.right.type == JSON_EVENT_IDIOM) {
-                newIdiom->right.value.idiomOffset = newAlpha->value.a.right.value.idiomOffset;
+                newExpression->right.value.expressionOffset = newAlpha->value.a.right.value.expressionOffset;
             } else {
-                newIdiom->right.value.property.nameHash = newAlpha->value.a.right.value.property.nameHash;
-                newIdiom->right.value.property.nameOffset = newAlpha->value.a.right.value.property.nameOffset;
-                newIdiom->right.value.property.idOffset = newAlpha->value.a.right.value.property.idOffset;
+                newExpression->right.value.id.propertyNameHash = newAlpha->value.a.right.value.id.propertyNameHash;
+                newExpression->right.value.id.propertyNameOffset = newAlpha->value.a.right.value.id.propertyNameOffset;
+                newExpression->right.value.id.nameOffset = newAlpha->value.a.right.value.id.nameOffset;
             }
-            newIdiom->left.type = JSON_EVENT_PROPERTY;
-            newIdiom->left.value.property.nameHash = newAlpha->value.a.hash;
-            newIdiom->left.value.property.nameOffset = newAlpha->nameOffset;
-            newIdiom->left.value.property.idOffset = 0;
+            newExpression->left.type = JSON_EVENT_PROPERTY;
+            newExpression->left.value.id.propertyNameHash = newAlpha->value.a.hash;
+            newExpression->left.value.id.propertyNameOffset = newAlpha->nameOffset;
+            newExpression->left.value.id.nameOffset = 0;
 
-            expr->terms[expr->termsLength - 1] = *newOffset;
+            exprs->terms[exprs->termsLength - 1] = *newOffset;
             return linkAlpha(tree, *newOffset, nextOffset);
         }
     }
 
     if (nextOffset == 0) {
-        return findAlpha(tree, parentOffset, operator, first, expr, newOffset);
+        return findAlpha(tree, parentOffset, operator, first, exprs, newOffset);
     } else {
-        unsigned int result = findAlpha(tree, parentOffset, operator, first, expr, newOffset);
+        unsigned int result = findAlpha(tree, parentOffset, operator, first, exprs, newOffset);
         if (result != RULES_OK) {
             return result;
         }
@@ -1250,7 +1250,7 @@ static unsigned int createBeta(ruleset *tree,
             return result;
         }
 
-        expression *expr;
+        expressionSequence *exprs;
         newBeta->nameOffset = stringOffset;
         newBeta->type = NODE_BETA_CONNECTOR;
         newBeta->value.b.nextOffset = nextOffset;
@@ -1262,20 +1262,20 @@ static unsigned int createBeta(ruleset *tree,
         }
         previousOffset = betaOffset;
 
-        result = storeExpression(tree, &expr, &newBeta->value.b.expressionOffset);
+        result = storeExpressionSequence(tree, &exprs, &newBeta->value.b.expressionSequenceOffset);
         if (result != RULES_OK) {
             return result;
         }
 
-        expr->nameOffset = stringOffset;
-        expr->aliasOffset = stringOffset;
-        expr->not = (operator == OP_NOT) ? 1 : 0;
-        expr->termsLength = 0;
-        expr->distinct = (distinct != 0) ? 1 : 0;
+        exprs->nameOffset = stringOffset;
+        exprs->aliasOffset = stringOffset;
+        exprs->not = (operator == OP_NOT) ? 1 : 0;
+        exprs->termsLength = 0;
+        exprs->distinct = (distinct != 0) ? 1 : 0;
         if (operator == OP_NOP || operator == OP_NOT) {
             unsigned int resultOffset = NODE_M_OFFSET;
             readNextValue(last, &first, &last, &type);
-            result = createAlpha(tree, first, expr, betaOffset, &resultOffset);
+            result = createAlpha(tree, first, exprs, betaOffset, &resultOffset);
         }
         else {
             readNextValue(last, &first, &last, &type);
@@ -1294,27 +1294,27 @@ static unsigned int createBeta(ruleset *tree,
 
 #ifdef _PRINT
 
-static void printIdiom(ruleset *tree, jsonValue *newValue) {
+static void printExpression(ruleset *tree, operand *newValue) {
     char *rightProperty;
     char *rightAlias;
     char *valueString;
-    idiom *newIdiom;
+    expression *newExpression;
     switch (newValue->type) {
         case JSON_EVENT_PROPERTY:
-            rightProperty = &tree->stringPool[newValue->value.property.nameOffset];
-            rightAlias = &tree->stringPool[newValue->value.property.idOffset];
+            rightProperty = &tree->stringPool[newValue->value.id.propertyNameOffset];
+            rightAlias = &tree->stringPool[newValue->value.id.nameOffset];
             printf("frame[\"%s\"][\"%s\"]", rightAlias, rightProperty);
             break;
         case JSON_EVENT_LOCAL_PROPERTY:
-            rightProperty = &tree->stringPool[newValue->value.property.nameOffset];
+            rightProperty = &tree->stringPool[newValue->value.id.propertyNameOffset];
             printf("message[\"%s\"]", rightProperty);
             break;
         case JSON_EVENT_LOCAL_IDIOM:
         case JSON_EVENT_IDIOM:
-            newIdiom = &tree->idiomPool[newValue->value.idiomOffset];
+            newExpression = &tree->expressionPool[newValue->value.expressionOffset];
             printf("(");
-            printIdiom(tree, &newIdiom->left);
-            switch (newIdiom->operator) {
+            printExpression(tree, &newExpression->left);
+            switch (newExpression->operator) {
                 case OP_ADD:
                     printf("+");
                     break;
@@ -1328,7 +1328,7 @@ static void printIdiom(ruleset *tree, jsonValue *newValue) {
                     printf("/");
                     break;
             }
-            printIdiom(tree, &newIdiom->right);
+            printExpression(tree, &newExpression->right);
             printf(")");
             break;
         case JSON_STRING:
@@ -1352,7 +1352,7 @@ static void printIdiom(ruleset *tree, jsonValue *newValue) {
     }
 }
 
-static void printExpression(ruleset *tree, expression *expr, int level, unsigned int offset) {
+static void printExpressionSequence(ruleset *tree, expressionSequence *exprs, int level, unsigned int offset) {
     for (int i = 0; i < level; ++ i) {
         printf("    ");
     }
@@ -1362,8 +1362,8 @@ static void printExpression(ruleset *tree, expression *expr, int level, unsigned
     unsigned char compTop = 0;
     unsigned char first = 1;
     
-    for (unsigned short i = 0; i < expr->termsLength; ++i) {
-        unsigned int currentNodeOffset = expr->terms[i];
+    for (unsigned short i = 0; i < exprs->termsLength; ++i) {
+        unsigned int currentNodeOffset = exprs->terms[i];
         node *currentNode = &tree->nodePool[currentNodeOffset];
         if (currentNode->value.a.operator == OP_AND || currentNode->value.a.operator == OP_OR) {
             if (first) {
@@ -1388,9 +1388,9 @@ static void printExpression(ruleset *tree, expression *expr, int level, unsigned
             printf(")");            
         } else if (currentNode->value.a.operator == OP_IALL || currentNode->value.a.operator == OP_IANY) {
             char *leftProperty = &tree->stringPool[currentNode->nameOffset];
-            idiom *newIdiom = &tree->idiomPool[currentNode->value.a.right.value.idiomOffset];
+            expression *newExpression = &tree->expressionPool[currentNode->value.a.right.value.expressionOffset];
             char *op = "";
-            switch (newIdiom->operator) {
+            switch (newExpression->operator) {
                 case OP_LT:
                     op = "<";
                     break;
@@ -1422,7 +1422,7 @@ static void printExpression(ruleset *tree, expression *expr, int level, unsigned
                 printf("%s compare_array(message[\"%s\"], ", comp, leftProperty);
 
             } else {
-                if (expr->distinct) {
+                if (exprs->distinct) {
                     printf("distinct(frame, message) and compare_array(message[\"%s\"], ", leftProperty);
                 } else {
                     printf("compare_array(message[\"%s\"], ", leftProperty);
@@ -1431,7 +1431,7 @@ static void printExpression(ruleset *tree, expression *expr, int level, unsigned
                 first = 0;   
             }
 
-            printIdiom(tree, &newIdiom->right);
+            printExpression(tree, &newExpression->right);
             printf(", %s, %s)\n", op, par);
 
         } else {
@@ -1461,7 +1461,7 @@ static void printExpression(ruleset *tree, expression *expr, int level, unsigned
             if (!first) {
                 printf(" %s message[\"%s\"] %s ", comp, leftProperty, op);
             } else {
-                if (expr->distinct) {
+                if (exprs->distinct) {
                     printf("distinct(frame, message) and message[\"%s\"] %s ", leftProperty, op);
                 } else {
                     printf("message[\"%s\"] %s ", leftProperty, op);
@@ -1470,7 +1470,7 @@ static void printExpression(ruleset *tree, expression *expr, int level, unsigned
                 first = 0;   
             }
 
-            printIdiom(tree, &currentNode->value.a.right);
+            printExpression(tree, &currentNode->value.a.right);
         }
     }
     printf("\n");
@@ -1496,9 +1496,9 @@ static void printBetaNode(ruleset *tree, node *betaNode, int level, unsigned int
     }
 
     printf("-> beta: name %s, not %d, offset %u\n", &tree->stringPool[betaNode->nameOffset], betaNode->value.b.not, offset);
-    if (betaNode->value.b.expressionOffset) {
-        expression *exp = &tree->expressionPool[betaNode->value.b.expressionOffset];
-        printExpression(tree, exp, level, betaNode->value.b.expressionOffset);
+    if (betaNode->value.b.expressionSequenceOffset) {
+        expressionSequence *exp = &tree->expressionSequencePool[betaNode->value.b.expressionSequenceOffset];
+        printExpressionSequence(tree, exp, level, betaNode->value.b.expressionSequenceOffset);
     }
     node *currentNode = &tree->nodePool[betaNode->value.b.nextOffset];
     if (currentNode->type == NODE_ACTION) {
@@ -1641,10 +1641,10 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     tree->nodeOffset = 0;
     tree->nextPool = NULL;
     tree->nextOffset = 0;
+    tree->expressionSequencePool = NULL;
+    tree->expressionSequenceOffset = 0;
     tree->expressionPool = NULL;
     tree->expressionOffset = 0;
-    tree->idiomPool = NULL;
-    tree->idiomOffset = 0;
     tree->regexStateMachinePool = NULL;
     tree->regexStateMachineOffset = 0;
     tree->actionCount = 0;
@@ -1713,8 +1713,8 @@ unsigned int deleteRuleset(unsigned int handle) {
     free(tree->nodePool);
     free(tree->nextPool);
     free(tree->stringPool);
+    free(tree->expressionSequencePool);
     free(tree->expressionPool);
-    free(tree->idiomPool);
     free(tree->statePool.content);
     free(tree);
     DELETE_HANDLE(handle);
@@ -1735,10 +1735,10 @@ unsigned int createClient(unsigned int *handle, char *name) {
     tree->nodeOffset = 0;
     tree->nextPool = NULL;
     tree->nextOffset = 0;
+    tree->expressionSequencePool = NULL;
+    tree->expressionSequenceOffset = 0;
     tree->expressionPool = NULL;
     tree->expressionOffset = 0;
-    tree->idiomPool = NULL;
-    tree->idiomOffset = 0;
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));

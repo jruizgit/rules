@@ -35,11 +35,11 @@
 #define MAX_RIGHT_FRAME_INDEX_LENGTH 128
 #define MAX_EXPRESSION_TERMS 32
 
-typedef struct reference {
-    unsigned int nameHash;
+typedef struct identifier {
+    unsigned int propertyNameHash;
+    unsigned int propertyNameOffset;
     unsigned int nameOffset;
-    unsigned int idOffset;
-} reference;
+} identifier;
 
 typedef struct regexReference {
     unsigned int stringOffset;
@@ -48,33 +48,33 @@ typedef struct regexReference {
     unsigned short vocabularyLength;
 } regexReference;
 
-typedef struct jsonValue {
+typedef struct operand {
     unsigned char type;
     union { 
         long i; 
         double d; 
         unsigned char b; 
         unsigned int stringOffset;
-        unsigned int idiomOffset;
+        unsigned int expressionOffset;
         regexReference regex;
-        reference property;
+        identifier id;
     } value;
-} jsonValue;
-
-typedef struct idiom {
-    unsigned char operator;
-    jsonValue left;
-    jsonValue right; 
-} idiom;
+} operand;
 
 typedef struct expression {
+    unsigned char operator;
+    operand left;
+    operand right; 
+} expression;
+
+typedef struct expressionSequence {
     unsigned int nameOffset;
     unsigned int aliasOffset;
     unsigned short termsLength;
     unsigned char distinct;
     unsigned char not;
     unsigned int terms[MAX_EXPRESSION_TERMS];
-} expression;
+} expressionSequence;
 
 typedef struct alpha {
     unsigned int hash;
@@ -82,13 +82,13 @@ typedef struct alpha {
     unsigned int betaListOffset;
     unsigned int nextListOffset;
     unsigned int nextOffset;
-    jsonValue right;
+    operand right;
 } alpha;
 
 typedef struct beta {
     unsigned int leftFrameIndex[MAX_LEFT_FRAME_INDEX_LENGTH];
     unsigned int rightFrameIndex[MAX_RIGHT_FRAME_INDEX_LENGTH];
-    unsigned int expressionOffset;
+    unsigned int expressionSequenceOffset;
     unsigned int hash;
     unsigned int nextOffset;
     unsigned char not;
@@ -127,11 +127,11 @@ typedef struct ruleset {
     char *stringPool;
     unsigned int stringPoolLength; 
     
+    expressionSequence *expressionSequencePool;
+    unsigned int expressionSequenceOffset;
+    
     expression *expressionPool;
     unsigned int expressionOffset;
-    
-    idiom *idiomPool;
-    unsigned int idiomOffset;
     
     char *regexStateMachinePool;
     unsigned int regexStateMachineOffset;
