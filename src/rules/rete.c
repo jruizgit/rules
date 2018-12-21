@@ -96,33 +96,6 @@ static unsigned int storeString(ruleset *tree,
     return RULES_OK;
 }
 
-static unsigned int storeExpressionSequence(ruleset *tree, 
-                                    expressionSequence **newExpressionSequence, 
-                                    unsigned int *expressionSequenceOffset) {
-
-    if (!tree->expressionSequencePool) {
-        tree->expressionSequencePool = malloc(sizeof(expressionSequence));
-        if (!tree->expressionSequencePool) {
-            return ERR_OUT_OF_MEMORY;
-        }
-
-        *expressionSequenceOffset = 0;
-        *newExpressionSequence = &tree->expressionSequencePool[0];
-        tree->expressionSequenceOffset = 1;
-    } else {
-        tree->expressionSequencePool = realloc(tree->expressionSequencePool, (tree->expressionSequenceOffset + 1) * sizeof(expressionSequence));
-        if (!tree->expressionSequencePool) {
-            return ERR_OUT_OF_MEMORY;
-        }
-
-        *expressionSequenceOffset = tree->expressionSequenceOffset;
-        *newExpressionSequence = &tree->expressionSequencePool[tree->expressionSequenceOffset];
-        tree->expressionSequenceOffset = tree->expressionSequenceOffset + 1;        
-    }
-
-    return RULES_OK;
-}
-
 static unsigned int storeExpression(ruleset *tree, 
                                expression **newExpression, 
                                unsigned int *expressionOffset) {
@@ -278,6 +251,12 @@ static void copyOperand(operand *op,
             target->value.regex.stateMachineOffset = op->value.regex.stateMachineOffset;
             break;
     }
+}
+
+static void copyExpression(expression *expr, expression *target) {
+    target->operator = expr->operator;
+    copyOperand(&expr->right, &target->right);
+    copyOperand(&expr->left, &target->left);
 }
 
 static unsigned int copyValue(ruleset *tree, 
@@ -783,7 +762,7 @@ static unsigned int linkAlpha(ruleset *tree,
         }
 
         parentBetaList[entry] = nextOffset;
-    } else if (nextNode->value.a.operator == OP_NEX) {
+    } else if (nextNode->value.a.expression.operator == OP_NEX) {
         result = ensureNextList(tree, parentAlpha);
         if (result != RULES_OK) {
             return result;
@@ -805,7 +784,7 @@ static unsigned int linkAlpha(ruleset *tree,
         }
 
         unsigned int *parentNext = &tree->nextPool[parentAlpha->value.a.nextOffset];
-        unsigned int hash = nextNode->value.a.hash;
+        unsigned int hash = nextNode->value.a.expression.left.value.id.propertyNameHash;
         for (entry = hash & HASH_MASK; parentNext[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
             if ((entry + 1) % NEXT_BUCKET_LENGTH == (hash & HASH_MASK)) {
                 return ERR_RULE_LIMIT_EXCEEDED;
@@ -954,10 +933,10 @@ static unsigned int findAlpha(ruleset *tree,
         parentNext = &tree->nextPool[parent->value.a.nextOffset];
         for (entry = hash & HASH_MASK; parentNext[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
             node *currentNode = &tree->nodePool[parentNext[entry]];
-            if (currentNode->value.a.hash == hash && 
-                currentNode->value.a.operator == operator) {
+            if (currentNode->value.a.expression.left.value.id.propertyNameHash == hash && 
+                currentNode->value.a.expression.operator == operator) {
                 if (operator != OP_IALL && operator != OP_IANY) {
-                    if (compareValue(tree, &currentNode->value.a.right, first, last, &id, type)) {
+                    if (compareValue(tree, &currentNode->value.a.expression.right, first, last, &id, type)) {
                         *resultOffset = parentNext[entry];
                         return RULES_OK;
                     }
@@ -970,10 +949,10 @@ static unsigned int findAlpha(ruleset *tree,
         parentNext = &tree->nextPool[parent->value.a.nextListOffset];
         for (entry = 0; parentNext[entry] != 0; ++entry) {
             node *currentNode = &tree->nodePool[parentNext[entry]];
-            if (currentNode->value.a.hash == hash && 
-                currentNode->value.a.operator == operator) {
+            if (currentNode->value.a.expression.left.value.id.propertyNameHash == hash && 
+                currentNode->value.a.expression.operator == operator) {
                 if (operator != OP_IALL && operator != OP_IANY) {
-                    if (compareValue(tree, &currentNode->value.a.right, first, last, &id, type)) {
+                    if (compareValue(tree, &currentNode->value.a.expression.right, first, last, &id, type)) {
                         *resultOffset = parentNext[entry];
                         return RULES_OK;
                     }
@@ -996,8 +975,10 @@ static unsigned int findAlpha(ruleset *tree,
 
     newAlpha->nameOffset = stringOffset;
     newAlpha->type = NODE_ALPHA;
-    newAlpha->value.a.hash = hash;
-    newAlpha->value.a.operator = operator;
+    newAlpha->value.a.expression.left.type = JSON_MESSAGE_IDENTIFIER;
+    newAlpha->value.a.expression.left.value.id.propertyNameHash = hash;
+    newAlpha->value.a.expression.left.value.id.propertyNameOffset = newAlpha->nameOffset;
+    newAlpha->value.a.expression.operator = operator;
     if (operator == OP_MT) {
         type = JSON_REGEX;
     }
@@ -1007,9 +988,9 @@ static unsigned int findAlpha(ruleset *tree,
     }
 
     if (operator == OP_IANY || operator == OP_IALL) {
-        newAlpha->value.a.right.type = JSON_NIL;
+        newAlpha->value.a.expression.right.type = JSON_NIL;
     } else {
-        result = copyValue(tree, &newAlpha->value.a.right, first, last, expressionOffset, &id, type);
+        result = copyValue(tree, &newAlpha->value.a.expression.right, first, last, expressionOffset, &id, type);
         if (result != RULES_OK) {
             return result;
         }
@@ -1017,10 +998,7 @@ static unsigned int findAlpha(ruleset *tree,
         if (type == JSON_IDENTIFIER || type == JSON_EXPRESSION) {
             expression *expr;
             GET_EXPRESSION(exprs, expr);
-            expr->operator = operator;
-            expr->left.value.id.propertyNameOffset = newAlpha->nameOffset;
-            expr->left.value.id.propertyNameHash = newAlpha->value.a.hash;
-            copyOperand(&newAlpha->value.a.right, &expr->right);
+            copyExpression(&newAlpha->value.a.expression, expr);
         } 
     }
 
@@ -1057,8 +1035,9 @@ static unsigned int createForwardAlpha(ruleset *tree,
 
     newAlpha->nameOffset = 0;
     newAlpha->type = NODE_ALPHA;
-    newAlpha->value.a.hash = HASH_FORWARD;
-    newAlpha->value.a.operator = OP_NEX;
+    newAlpha->value.a.expression.left.type = JSON_MESSAGE_IDENTIFIER;
+    newAlpha->value.a.expression.left.value.id.propertyNameHash = HASH_FORWARD;
+    newAlpha->value.a.expression.operator = OP_NEX;
 
     return RULES_OK;
 }
@@ -1190,7 +1169,7 @@ static unsigned int createAlpha(ruleset *tree,
         }
 
         node *newAlpha = &tree->nodePool[inner_offset];
-        if (newAlpha->value.a.right.type != JSON_IDENTIFIER && newAlpha->value.a.right.type != JSON_EXPRESSION) {
+        if (newAlpha->value.a.expression.right.type != JSON_IDENTIFIER && newAlpha->value.a.expression.right.type != JSON_EXPRESSION) {
             return linkAlpha(tree, *newOffset, nextOffset);
         } else {
             // Functions that can execute in client or backend should follow this pattern
@@ -1202,28 +1181,13 @@ static unsigned int createAlpha(ruleset *tree,
                 return result;
             }
 
-            oldAlpha->value.a.right.type = JSON_EXPRESSION;
-            oldAlpha->value.a.right.value.expressionOffset = expressionOffset;
-
-            newExpression->operator = newAlpha->value.a.operator;
-            newExpression->right.type = newAlpha->value.a.right.type;
-            if (newAlpha->value.a.right.type == JSON_EXPRESSION) {
-                newExpression->right.value.expressionOffset = newAlpha->value.a.right.value.expressionOffset;
-            } else {
-                newExpression->right.value.id.propertyNameHash = newAlpha->value.a.right.value.id.propertyNameHash;
-                newExpression->right.value.id.propertyNameOffset = newAlpha->value.a.right.value.id.propertyNameOffset;
-                newExpression->right.value.id.nameOffset = newAlpha->value.a.right.value.id.nameOffset;
-            }
-            newExpression->left.type = JSON_IDENTIFIER;
-            newExpression->left.value.id.propertyNameHash = newAlpha->value.a.hash;
-            newExpression->left.value.id.propertyNameOffset = newAlpha->nameOffset;
-            newExpression->left.value.id.nameOffset = 0;
+            oldAlpha->value.a.expression.right.type = JSON_EXPRESSION;
+            oldAlpha->value.a.expression.right.value.expressionOffset = expressionOffset;
+            copyExpression(&newAlpha->value.a.expression, newExpression);
 
             expression *betaExpression;
             GET_EXPRESSION(exprs, betaExpression);
-            betaExpression->operator = newExpression->operator;
-            copyOperand(&newExpression->right, &betaExpression->right);
-            copyOperand(&newExpression->left, &betaExpression->left);
+            copyExpression(newExpression, betaExpression);
             return linkAlpha(tree, *newOffset, nextOffset);
         }
     }
@@ -1283,32 +1247,26 @@ static unsigned int createBeta(ruleset *tree,
             return result;
         }
 
-        expressionSequence *exprs;
         newBeta->nameOffset = stringOffset;
         newBeta->type = NODE_BETA_CONNECTOR;
         newBeta->value.b.nextOffset = nextOffset;
         newBeta->value.b.not = (operator == OP_NOT) ? 1 : 0;
         newBeta->value.b.hash = hash;
-
+        
         if (previousOffset != 0) {
             tree->nodePool[previousOffset].value.b.nextOffset = betaOffset;
         }
         previousOffset = betaOffset;
 
-        result = storeExpressionSequence(tree, &exprs, &newBeta->value.b.expressionSequenceOffset);
-        if (result != RULES_OK) {
-            return result;
-        }
-
-        exprs->nameOffset = stringOffset;
-        exprs->aliasOffset = stringOffset;
-        exprs->not = (operator == OP_NOT) ? 1 : 0;
-        exprs->length = 0;
-        exprs->distinct = (distinct != 0) ? 1 : 0;
+        newBeta->value.b.expressionSequence.nameOffset = stringOffset;
+        newBeta->value.b.expressionSequence.aliasOffset = stringOffset;
+        newBeta->value.b.expressionSequence.not = (operator == OP_NOT) ? 1 : 0;
+        newBeta->value.b.expressionSequence.length = 0;
+        newBeta->value.b.expressionSequence.distinct = (distinct != 0) ? 1 : 0;
         if (operator == OP_NOP || operator == OP_NOT) {
             unsigned int resultOffset = NODE_M_OFFSET;
             readNextValue(last, &first, &last, &type);
-            result = createAlpha(tree, first, exprs, betaOffset, &resultOffset);
+            result = createAlpha(tree, first, &newBeta->value.b.expressionSequence, betaOffset, &resultOffset);
         }
         else {
             readNextValue(last, &first, &last, &type);
@@ -1385,7 +1343,7 @@ static void printExpression(ruleset *tree, operand *newValue) {
     }
 }
 
-static void printExpressionSequence(ruleset *tree, expressionSequence *exprs, int level, unsigned int offset) {
+static void printExpressionSequence(ruleset *tree, expressionSequence *exprs, int level) {
     for (int i = 0; i < level; ++ i) {
         printf("    ");
     }
@@ -1528,9 +1486,8 @@ static void printBetaNode(ruleset *tree, node *betaNode, int level, unsigned int
     }
 
     printf("-> beta: name %s, not %d, offset %u\n", &tree->stringPool[betaNode->nameOffset], betaNode->value.b.not, offset);
-    if (betaNode->value.b.expressionSequenceOffset) {
-        expressionSequence *exp = &tree->expressionSequencePool[betaNode->value.b.expressionSequenceOffset];
-        printExpressionSequence(tree, exp, level, betaNode->value.b.expressionSequenceOffset);
+    if (betaNode->value.b.expressionSequence.length != 0) {
+        printExpressionSequence(tree, &betaNode->value.b.expressionSequence, level);
     }
     node *currentNode = &tree->nodePool[betaNode->value.b.nextOffset];
     if (currentNode->type == NODE_ACTION) {
@@ -1545,7 +1502,7 @@ static void printAlphaNode(ruleset *tree, node *alphaNode, int level, unsigned i
         printf("    ");
     }
 
-    printf("-> alpha: name %s, operator %x, offset %u\n", &tree->stringPool[alphaNode->nameOffset], alphaNode->value.a.operator, offset);
+    printf("-> alpha: name %s, operator %x, offset %u\n", &tree->stringPool[alphaNode->nameOffset], alphaNode->value.a.expression.operator, offset);
     if (alphaNode->value.a.nextOffset) {
         unsigned int *nextHashset = &tree->nextPool[alphaNode->value.a.nextOffset];
         for (unsigned int entry = 0; entry < NEXT_BUCKET_LENGTH; ++entry) { 
@@ -1673,8 +1630,6 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     tree->nodeOffset = 0;
     tree->nextPool = NULL;
     tree->nextOffset = 0;
-    tree->expressionSequencePool = NULL;
-    tree->expressionSequenceOffset = 0;
     tree->expressionPool = NULL;
     tree->expressionOffset = 0;
     tree->regexStateMachinePool = NULL;
@@ -1704,32 +1659,7 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
 
     newNode->nameOffset = stringOffset;
     newNode->type = NODE_ALPHA;
-    newNode->value.a.operator = OP_TYPE;
-    result = storeAlpha(tree, &newNode, &tree->andNodeOffset);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    newNode->nameOffset = 0;
-    newNode->type = NODE_ALPHA;
-    newNode->value.a.operator = OP_AND;
-    result = storeAlpha(tree, &newNode, &tree->orNodeOffset);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    newNode->nameOffset = 0;
-    newNode->type = NODE_ALPHA;
-    newNode->value.a.operator = OP_OR;
-    result = storeAlpha(tree, &newNode, &tree->endNodeOffset);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    newNode->nameOffset = 0;
-    newNode->type = NODE_ALPHA;
-    newNode->value.a.operator = OP_END;
-
+    newNode->value.a.expression.operator = OP_TYPE;
     // will use random numbers for state stored event mids
     srand(time(NULL));
 
@@ -1745,7 +1675,6 @@ unsigned int deleteRuleset(unsigned int handle) {
     free(tree->nodePool);
     free(tree->nextPool);
     free(tree->stringPool);
-    free(tree->expressionSequencePool);
     free(tree->expressionPool);
     free(tree->statePool.content);
     free(tree);
@@ -1767,8 +1696,6 @@ unsigned int createClient(unsigned int *handle, char *name) {
     tree->nodeOffset = 0;
     tree->nextPool = NULL;
     tree->nextOffset = 0;
-    tree->expressionSequencePool = NULL;
-    tree->expressionSequenceOffset = 0;
     tree->expressionPool = NULL;
     tree->expressionOffset = 0;
     tree->actionCount = 0;

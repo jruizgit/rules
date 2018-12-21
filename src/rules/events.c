@@ -559,7 +559,7 @@ static unsigned int isMatch(ruleset *tree,
                             alpha *currentAlpha,
                             unsigned char *propertyMatch,
                             void **rulesBinding) {
-    unsigned char alphaOp = currentAlpha->operator;
+    unsigned char alphaOp = currentAlpha->expression.operator;
     unsigned char propertyType = currentProperty->type;
     unsigned int result = RULES_OK;
     *propertyMatch = 0;
@@ -574,7 +574,7 @@ static unsigned int isMatch(ruleset *tree,
     result = valueToProperty(tree,
                              sid,
                              messageObject,
-                             &currentAlpha->right,
+                             &currentAlpha->expression.right,
                              &rightProperty,
                              &rightStringValue);
     if (result != RULES_OK) {
@@ -742,9 +742,9 @@ static unsigned int isMatch(ruleset *tree,
                                            messageObject->content + currentProperty->valueOffset, 
                                            currentProperty->valueLength, 
                                            (type == OP_STRING_REGEX) ? 0 : 1,
-                                           currentAlpha->right.value.regex.vocabularyLength,
-                                           currentAlpha->right.value.regex.statesLength,
-                                           currentAlpha->right.value.regex.stateMachineOffset);
+                                           currentAlpha->expression.right.value.regex.vocabularyLength,
+                                           currentAlpha->expression.right.value.regex.statesLength,
+                                           currentAlpha->expression.right.value.regex.stateMachineOffset);
             break;
 
     }
@@ -809,7 +809,7 @@ static unsigned int isArrayMatch(ruleset *tree,
                     node *listNode = &tree->nodePool[nextList[entry]];
                     char exists = 0;
                     for(unsigned int propertyIndex = 0; propertyIndex < jo.propertiesLength; ++propertyIndex) {
-                        if (listNode->value.a.hash == jo.properties[propertyIndex].hash) {
+                        if (listNode->value.a.expression.left.value.id.propertyNameHash == jo.properties[propertyIndex].hash) {
                             // filter out not exists (OP_NEX)
                             exists = 1;
                             break;
@@ -834,9 +834,9 @@ static unsigned int isArrayMatch(ruleset *tree,
                     jsonProperty *currentProperty = &jo.properties[propertyIndex];
                     for (unsigned int entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
                         node *hashNode = &tree->nodePool[nextHashset[entry]];
-                        if (currentProperty->hash == hashNode->value.a.hash) {
+                        if (currentProperty->hash == hashNode->value.a.expression.left.value.id.propertyNameHash) {
                             unsigned char match = 0;
-                            if (hashNode->value.a.operator == OP_IALL || hashNode->value.a.operator == OP_IANY) {
+                            if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
                                 // isArrayMatch finds a valid path, thus use propertyMatch
                                 result = isArrayMatch(tree, 
                                                       sid, 
@@ -881,8 +881,8 @@ static unsigned int isArrayMatch(ruleset *tree,
         
         // OP_IANY, one element led a a valid path
         // OP_IALL, all elements led to a valid path
-        if ((arrayAlpha->operator == OP_IALL && !*propertyMatch) ||
-            (arrayAlpha->operator == OP_IANY && *propertyMatch)) {
+        if ((arrayAlpha->expression.operator == OP_IALL && !*propertyMatch) ||
+            (arrayAlpha->expression.operator == OP_IANY && *propertyMatch)) {
             break;
         } 
 
@@ -920,7 +920,7 @@ static unsigned int handleAlpha(ruleset *tree,
             for (entry = 0; nextList[entry] != 0; ++entry) {
                 node *listNode = &tree->nodePool[nextList[entry]];
                 jsonProperty *property;
-                unsigned int aresult = getObjectProperty(jo, listNode->value.a.hash, &property);
+                unsigned int aresult = getObjectProperty(jo, listNode->value.a.expression.left.value.id.propertyNameHash, &property);
                 if (aresult == ERR_PROPERTY_NOT_FOUND) {
                     // filter out not exists (OP_NEX)
                     if (top == MAX_STACK_SIZE) {
@@ -940,8 +940,8 @@ static unsigned int handleAlpha(ruleset *tree,
                 jsonProperty *currentProperty = &jo->properties[propertyIndex];
                 for (entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
                     node *hashNode = &tree->nodePool[nextHashset[entry]];
-                    if (currentProperty->hash == hashNode->value.a.hash) {
-                        if (hashNode->value.a.right.type == JSON_IDENTIFIER || hashNode->value.a.right.type == JSON_EXPRESSION) {
+                    if (currentProperty->hash == hashNode->value.a.expression.left.value.id.propertyNameHash) {
+                        if (hashNode->value.a.expression.right.type == JSON_IDENTIFIER || hashNode->value.a.expression.right.type == JSON_EXPRESSION) {
                             if (top == MAX_STACK_SIZE) {
                                 return ERR_MAX_STACK_SIZE;
                             }
@@ -950,7 +950,7 @@ static unsigned int handleAlpha(ruleset *tree,
                         } else {
                             unsigned char match = 0;
                             unsigned int mresult = RULES_OK;
-                            if (hashNode->value.a.operator == OP_IALL || hashNode->value.a.operator == OP_IANY) {
+                            if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
                                 mresult = isArrayMatch(tree, 
                                                        sid, 
                                                        jo,

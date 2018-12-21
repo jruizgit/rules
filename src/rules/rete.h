@@ -77,18 +77,16 @@ typedef struct expressionSequence {
 } expressionSequence;
 
 typedef struct alpha {
-    unsigned int hash;
-    unsigned char operator;
+    expression expression;
     unsigned int betaListOffset;
     unsigned int nextListOffset;
     unsigned int nextOffset;
-    operand right;
 } alpha;
 
 typedef struct beta {
+    expressionSequence expressionSequence;
     unsigned int leftFrameIndex[MAX_LEFT_FRAME_INDEX_LENGTH];
     unsigned int rightFrameIndex[MAX_RIGHT_FRAME_INDEX_LENGTH];
-    unsigned int expressionSequenceOffset;
     unsigned int hash;
     unsigned int nextOffset;
     unsigned char not;
@@ -127,9 +125,6 @@ typedef struct ruleset {
     char *stringPool;
     unsigned int stringPoolLength; 
     
-    expressionSequence *expressionSequencePool;
-    unsigned int expressionSequenceOffset;
-    
     expression *expressionPool;
     unsigned int expressionOffset;
     
@@ -145,9 +140,6 @@ typedef struct ruleset {
 
     pool rightFramePool;
 
-    unsigned int orNodeOffset;
-    unsigned int andNodeOffset;
-    unsigned int endNodeOffset;
 } ruleset;
 
 
