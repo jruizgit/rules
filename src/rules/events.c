@@ -428,7 +428,7 @@ static unsigned int valueToProperty(ruleset *tree,
                                     char **targetStringValue) {
     unsigned int result = RULES_OK;
     switch(sourceOperand->type) {
-        case JSON_EVENT_LOCAL_IDIOM:
+        case JSON_MESSAGE_EXPRESSION:
             result = reduceExpression(tree, 
                                  sid, 
                                  messageObject,
@@ -436,7 +436,7 @@ static unsigned int valueToProperty(ruleset *tree,
                                  targetProperty);
 
             return result;
-        case JSON_EVENT_LOCAL_PROPERTY:
+        case JSON_MESSAGE_IDENTIFIER:
             result = getObjectProperty(messageObject,
                                        sourceOperand->value.id.propertyNameHash,
                                        targetProperty);
@@ -941,7 +941,7 @@ static unsigned int handleAlpha(ruleset *tree,
                 for (entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
                     node *hashNode = &tree->nodePool[nextHashset[entry]];
                     if (currentProperty->hash == hashNode->value.a.hash) {
-                        if (hashNode->value.a.right.type == JSON_EVENT_PROPERTY || hashNode->value.a.right.type == JSON_EVENT_IDIOM) {
+                        if (hashNode->value.a.right.type == JSON_IDENTIFIER || hashNode->value.a.right.type == JSON_EXPRESSION) {
                             if (top == MAX_STACK_SIZE) {
                                 return ERR_MAX_STACK_SIZE;
                             }

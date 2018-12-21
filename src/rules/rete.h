@@ -33,7 +33,7 @@
 #define MAX_STATE_INDEX_LENGTH 1024
 #define MAX_LEFT_FRAME_INDEX_LENGTH 1024
 #define MAX_RIGHT_FRAME_INDEX_LENGTH 128
-#define MAX_EXPRESSION_TERMS 32
+#define MAX_SEQUENCE_EXPRESSIONS 32
 
 typedef struct identifier {
     unsigned int propertyNameHash;
@@ -70,10 +70,10 @@ typedef struct expression {
 typedef struct expressionSequence {
     unsigned int nameOffset;
     unsigned int aliasOffset;
-    unsigned short termsLength;
+    unsigned short length;
     unsigned char distinct;
     unsigned char not;
-    unsigned int terms[MAX_EXPRESSION_TERMS];
+    expression expressions[MAX_SEQUENCE_EXPRESSIONS];
 } expressionSequence;
 
 typedef struct alpha {
