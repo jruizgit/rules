@@ -345,6 +345,7 @@ unsigned int constructObject(char *root,
 
                     break;
                 case JSON_STRING:
+                    property->value.s = first;
                     property->valueLength = property->valueLength - 1;
                     break;
             }

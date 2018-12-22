@@ -70,191 +70,471 @@ static unsigned int handleMessage(ruleset *tree,
                                   unsigned int *commandCount,
                                   void **rulesBinding);
 
-static unsigned int reduceExpression(ruleset *tree, 
-                                char *sid,
-                                jsonObject *messageObject,
-                                unsigned int expressionOffset,
-                                jsonProperty **targetValue);
+static unsigned int reduceExpression(ruleset *tree,
+                                     jsonObject *messageObject,
+                                     expression *currentExpression,
+                                     jsonProperty *targetProperty);
 
-static unsigned char compareBool(unsigned char left, 
-                                 unsigned char right, 
-                                 unsigned char op) {
-    switch(op) {
-        case OP_LT:
-            return (left < right);
-        case OP_LTE:
-            return 1;
-        case OP_GT:
-            return (left > right);
-        case OP_GTE: 
-            return 1;
-        case OP_EQ:
-            return (left == right);
-        case OP_NEQ:
-            return (left != right);
-    }
-
-    return 0;
-}
-
-static unsigned char compareInt(long left, 
-                                long right, 
-                                unsigned char op) {
-    switch(op) {
-        case OP_LT:
-            return (left < right);
-        case OP_LTE:
-            return (left <= right);
-        case OP_GT:
-            return (left > right);
-        case OP_GTE: 
-            return (left >= right);
-        case OP_EQ:
-            return (left == right);
-        case OP_NEQ:
-            return (left != right);
-    }
-
-    return 0;
-}
-
-static unsigned char compareDouble(double left, 
-                                   double right, 
-                                   unsigned char op) {
-    switch(op) {
-        case OP_LT:
-            return (left < right);
-        case OP_LTE:
-            return (left <= right);
-        case OP_GT:
-            return (left > right);
-        case OP_GTE: 
-            return (left >= right);
-        case OP_EQ:
-            return (left == right);
-        case OP_NEQ:
-            return (left != right);
-    }
-
-    return 0;
-}
-
-static unsigned char compareString(char *leftFirst, 
-                                   unsigned short leftLength, 
-                                   char *right, 
-                                   unsigned char op) {
-    char temp = leftFirst[leftLength];
-    leftFirst[leftLength] = '\0';
-    int result = strcmp(leftFirst, right);
-    leftFirst[leftLength] = temp;
-    switch(op) {
-        case OP_LT:
-            return (result < 0);
-        case OP_LTE:
-            return (result <= 0);
-        case OP_GT:
-            return (result > 0);
-        case OP_GTE: 
-            return (result >= 0);
-        case OP_EQ:
-            return (result == 0);
-        case OP_NEQ:
-            return (result != 0);
-    }
-
-    return 0;
-}
-
-static unsigned char compareStringProperty(char *left, 
-                                           char *rightFirst, 
-                                           unsigned short rightLength, 
-                                           unsigned char op) {
-    char temp = rightFirst[rightLength];
-    rightFirst[rightLength] = '\0';
-    int result = strcmp(left, rightFirst);
-    rightFirst[rightLength] = temp;
-    switch(op) {
-        case OP_LT:
-            return (result < 0);
-        case OP_LTE:
-            return (result <= 0);
-        case OP_GT:
-            return (result > 0);
-        case OP_GTE: 
-            return (result >= 0);
-        case OP_EQ:
-            return (result == 0);
-        case OP_NEQ:
-            return (result != 0);
-    }
-
-    return 0;
-}
-
-static unsigned char compareStringAndStringProperty(char *leftFirst, 
-                                                    unsigned short leftLength, 
-                                                    char *rightFirst, 
-                                                    unsigned short rightLength,
-                                                    unsigned char op) {
-    
-    char rightTemp = rightFirst[rightLength];
-    rightFirst[rightLength] = '\0';        
-    char leftTemp = leftFirst[leftLength];
-    leftFirst[leftLength] = '\0';
-    int result = strcmp(leftFirst, rightFirst);
-    rightFirst[rightLength] = rightTemp;
-    leftFirst[leftLength] = leftTemp;
-    switch(op) {
-        case OP_LT:
-            return (result < 0);
-        case OP_LTE:
-            return (result <= 0);
-        case OP_GT:
-            return (result > 0);
-        case OP_GTE: 
-            return (result >= 0);
-        case OP_EQ:
-            return (result == 0);
-        case OP_NEQ:
-            return (result != 0);
-    }
-
-    return 0;
-
-}
-
-static long reduceInt(long left, 
-                      long right, 
-                      unsigned char op) {
+static unsigned int reduceString(char *left, 
+                                 unsigned short leftLength, 
+                                 char *right, 
+                                 unsigned short rightLength,
+                                 unsigned char op,
+                                 jsonProperty *targetProperty) {
+    char rightTemp = right[rightLength];
+    right[rightLength] = '\0';        
+    char leftTemp = left[leftLength];
+    left[leftLength] = '\0';
+    int result = strcmp(left, right);
+    right[rightLength] = rightTemp;
+    left[leftLength] = leftTemp;
     switch(op) {
         case OP_ADD:
-            return left + right;
         case OP_SUB:
-            return left - right;
         case OP_MUL:
-            return left * right;
         case OP_DIV: 
-            return left / right;
+            return ERR_OPERATION_NOT_SUPPORTED;
+        case OP_LT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (result < 0);
+            break;
+        case OP_LTE:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (result <= 0);
+            break;
+        case OP_GT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (result > 0);
+            break;
+        case OP_GTE: 
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (result >= 0);
+            break;
+        case OP_EQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (result == 0);
+            break;
+        case OP_NEQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (result != 0);
+            break;
     }
 
-    return 0;
+    return RULES_OK;
 }
 
-static double reduceDouble(double left, 
-                           double right, 
-                           unsigned char op) {
+static unsigned int reduceBool(unsigned char left, 
+                               unsigned char right, 
+                               unsigned char op,
+                               jsonProperty *targetProperty) {
     switch(op) {
         case OP_ADD:
-            return left + right;
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = left & right;
+            break;
         case OP_SUB:
-            return left - right;
+            return ERR_OPERATION_NOT_SUPPORTED;
         case OP_MUL:
-            return left * right;
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = left ^ right;
+            break;
         case OP_DIV: 
-            return left / right;
+            return ERR_OPERATION_NOT_SUPPORTED;
+        case OP_LT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left < right);
+            break;
+        case OP_LTE:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left <= right);
+            break;
+        case OP_GT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left > right);
+            break;
+        case OP_GTE: 
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left >= right);
+            break;
+        case OP_EQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left == right);
+            break;
+        case OP_NEQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left != right);
+            break;
     }
 
-    return 0;
+    return RULES_OK;
+}
+
+static unsigned int reduceInt(long left, 
+                              long right, 
+                              unsigned char op,
+                              jsonProperty *targetProperty) {
+    switch(op) {
+        case OP_ADD:
+            targetProperty->type = JSON_INT;
+            targetProperty->value.i = left + right;
+            break;
+        case OP_SUB:
+            targetProperty->type = JSON_INT;
+            targetProperty->value.i = left - right;
+            break;
+        case OP_MUL:
+            targetProperty->type = JSON_INT;
+            targetProperty->value.i = left * right;
+            break;
+        case OP_DIV: 
+            targetProperty->type = JSON_INT;
+            targetProperty->value.i = left / right;
+            break;
+        case OP_LT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left < right);
+            break;
+        case OP_LTE:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left <= right);
+            break;
+        case OP_GT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left > right);
+            break;
+        case OP_GTE: 
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left >= right);
+            break;
+        case OP_EQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left == right);
+            break;
+        case OP_NEQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left != right);
+            break;
+    }
+
+    return RULES_OK;
+}
+
+static unsigned int reduceDouble(double left, 
+                                 double right, 
+                                 unsigned char op,
+                                 jsonProperty *targetProperty) {
+    switch(op) {
+        case OP_ADD:
+            targetProperty->type = JSON_DOUBLE;
+            targetProperty->value.d = left + right;
+            break;
+        case OP_SUB:
+            targetProperty->type = JSON_DOUBLE;
+            targetProperty->value.d = left - right;
+            break;
+        case OP_MUL:
+            targetProperty->type = JSON_DOUBLE;
+            targetProperty->value.d = left * right;
+            break;
+        case OP_DIV: 
+            targetProperty->type = JSON_DOUBLE;
+            targetProperty->value.d = left / right;
+            break;
+        case OP_LT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left < right);
+            break;
+        case OP_LTE:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left <= right);
+            break;
+        case OP_GT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left > right);
+            break;
+        case OP_GTE: 
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left >= right);
+            break;
+        case OP_EQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left == right);
+            break;
+        case OP_NEQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left != right);
+            break;
+    }
+
+    return RULES_OK;
+}
+
+static unsigned int reduceOperand(ruleset *tree,
+                                    jsonObject *messageObject,
+                                    operand *sourceOperand, 
+                                    jsonProperty **targetProperty) {
+    (*targetProperty)->type = sourceOperand->type;
+    switch(sourceOperand->type) {
+        case JSON_MESSAGE_EXPRESSION:
+            {
+                expression *currentExpression = &tree->expressionPool[sourceOperand->value.expressionOffset];
+                return reduceExpression(tree, 
+                                        messageObject,
+                                        currentExpression,
+                                        *targetProperty);
+            }
+        case JSON_MESSAGE_IDENTIFIER:
+            return getObjectProperty(messageObject,
+                                       sourceOperand->value.id.propertyNameHash,
+                                       targetProperty);
+
+        case JSON_STRING:
+            {
+                char *stringValue = &tree->stringPool[sourceOperand->value.stringOffset];
+                (*targetProperty)->valueLength = strlen(stringValue);
+                (*targetProperty)->valueOffset = 0;
+                (*targetProperty)->value.s = stringValue;
+                return RULES_OK;
+            }
+        case JSON_INT:
+            (*targetProperty)->value.i = sourceOperand->value.i;
+            return RULES_OK;
+        case JSON_DOUBLE:
+            (*targetProperty)->value.d = sourceOperand->value.d;
+            return RULES_OK;
+        case JSON_BOOL:
+            (*targetProperty)->value.b = sourceOperand->value.b;
+            return RULES_OK;
+    }
+
+    return ERR_OPERATION_NOT_SUPPORTED;
+}
+
+static unsigned int reduceProperties(unsigned char operator,
+                                     jsonProperty *leftProperty,
+                                     jsonProperty *rightProperty,
+                                     jsonProperty *targetProperty) {
+    unsigned short type = leftProperty->type << 8;
+    type = type + rightProperty->type;
+    switch(type) {
+        case OP_BOOL_BOOL:
+            return reduceBool(leftProperty->value.b, rightProperty->value.b, operator, targetProperty); 
+        case OP_BOOL_INT: 
+            return reduceInt(leftProperty->value.b, rightProperty->value.i, operator, targetProperty);
+        case OP_BOOL_DOUBLE: 
+            return reduceDouble(leftProperty->value.b, rightProperty->value.d, operator, targetProperty); 
+        case OP_INT_BOOL:
+            return reduceInt(leftProperty->value.i, rightProperty->value.b, operator, targetProperty); 
+        case OP_INT_INT:
+            return reduceInt(leftProperty->value.i, rightProperty->value.i, operator, targetProperty); 
+        case OP_INT_DOUBLE: 
+            return reduceDouble(leftProperty->value.i, rightProperty->value.d, operator, targetProperty); 
+        case OP_DOUBLE_BOOL:
+            return reduceDouble(leftProperty->value.d, rightProperty->value.b, operator, targetProperty); 
+        case OP_DOUBLE_INT:
+            return reduceDouble(leftProperty->value.d, rightProperty->value.i, operator, targetProperty); 
+        case OP_DOUBLE_DOUBLE:
+            return reduceDouble(leftProperty->value.d, rightProperty->value.d, operator, targetProperty); 
+        case OP_BOOL_STRING:
+            if (leftProperty->value.b) {
+                return reduceString("true ",
+                                    4,
+                                    rightProperty->value.s,
+                                    rightProperty->valueLength, 
+                                    operator,
+                                    targetProperty);
+            }
+            else {
+                return reduceString("false ",
+                                    5,
+                                    rightProperty->value.s,
+                                    rightProperty->valueLength, 
+                                    operator,
+                                    targetProperty);
+            }
+        case OP_INT_STRING:
+            {
+#ifdef _WIN32
+                char *leftString = (char *)_alloca(sizeof(char)*(leftProperty->valueLength + 1));
+                sprintf_s(leftString, sizeof(char)*(leftProperty->valueLength + 1), "%ld", leftProperty->value.i);
+#else
+                char leftString[leftProperty->valueLength + 1];
+                snprintf(leftString, sizeof(char)*(leftProperty->valueLength + 1), "%ld", leftProperty->value.i);
+#endif         
+                return reduceString(leftString,
+                                    leftProperty->valueLength,
+                                    rightProperty->value.s,
+                                    rightProperty->valueLength, 
+                                    operator,
+                                    targetProperty);
+            }
+        case OP_DOUBLE_STRING:
+            {
+#ifdef _WIN32
+                char *leftString = (char *)_alloca(sizeof(char)*(leftProperty->valueLength + 1));
+                sprintf_s(leftString, sizeof(char)*(leftProperty->valueLength + 1), "%f", leftProperty->value.d);
+#else
+                char leftString[leftProperty->valueLength + 1];
+                snprintf(leftString, sizeof(char)*(leftProperty->valueLength + 1), "%f", leftProperty->value.d);
+#endif         
+                return reduceString(leftString,
+                                    leftProperty->valueLength,
+                                    rightProperty->value.s,
+                                    rightProperty->valueLength, 
+                                    operator,
+                                    targetProperty);
+            }
+        case OP_STRING_BOOL:
+            if (rightProperty->value.b) {
+                return reduceString(leftProperty->value.s,
+                                    leftProperty->valueLength, 
+                                    "true ",
+                                    4,
+                                    operator,
+                                    targetProperty);
+            }
+            else {
+                return reduceString(leftProperty->value.s,
+                                    leftProperty->valueLength,
+                                    "false ",
+                                    5, 
+                                    operator,
+                                    targetProperty);
+            }
+        case OP_STRING_INT: 
+            {
+#ifdef _WIN32
+                char *rightString = (char *)_alloca(sizeof(char)*(rightProperty->valueLength + 1));
+                sprintf_s(rightString, sizeof(char)*(rightProperty->valueLength + 1), "%ld", rightProperty->value.i);
+#else
+                char rightString[rightProperty->valueLength + 1];
+                snprintf(rightString, sizeof(char)*(rightProperty->valueLength + 1), "%ld", rightProperty->value.i);
+#endif         
+                return reduceString(leftProperty->value.s,
+                                    leftProperty->valueLength,
+                                    rightString,
+                                    rightProperty->valueLength,
+                                    operator,
+                                    targetProperty);
+            }
+        case OP_STRING_DOUBLE: 
+            {
+#ifdef _WIN32
+                char *rightString = (char *)_alloca(sizeof(char)*(rightProperty->valueLength + 1));
+                sprintf_s(rightString, sizeof(char)*(rightProperty->valueLength + 1), "%f", rightProperty->value.d);
+#else
+                char rightString[rightProperty->valueLength + 1];
+                snprintf(rightString, sizeof(char)*(rightProperty->valueLength + 1), "%f", rightProperty->value.d);
+#endif         
+                return reduceString(leftProperty->value.s,
+                                    leftProperty->valueLength,
+                                    rightString,
+                                    rightProperty->valueLength,
+                                    operator,
+                                    targetProperty);
+            }
+        case OP_STRING_STRING:
+            return reduceString(leftProperty->value.s,
+                                leftProperty->valueLength,
+                                rightProperty->value.s,
+                                rightProperty->valueLength,
+                                operator,
+                                targetProperty);
+        case OP_BOOL_NIL:
+        case OP_INT_NIL:
+        case OP_DOUBLE_NIL:
+        case OP_STRING_NIL:
+            targetProperty->type = JSON_BOOL;
+            if (operator == OP_NEQ) {
+                targetProperty->value.b = 1;
+            } else {
+                targetProperty->value.b = 0;
+            }
+
+            return RULES_OK;
+        case OP_NIL_NIL:
+            targetProperty->type = JSON_BOOL;
+            if (operator == OP_EQ) {
+                targetProperty->value.b = 1;
+            } else {
+                targetProperty->value.b = 0;
+            }
+
+            return RULES_OK;
+    }    
+
+    return ERR_OPERATION_NOT_SUPPORTED;
+}
+
+static unsigned int reduceExpression(ruleset *tree,
+                                     jsonObject *messageObject,
+                                     expression *currentExpression,
+                                     jsonProperty *targetProperty) {
+    unsigned int result = RULES_OK;
+    jsonProperty leftValue;
+    jsonProperty *leftProperty = &leftValue;
+    result = reduceOperand(tree,
+                           messageObject,
+                           &currentExpression->left,
+                           &leftProperty);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    if (currentExpression->right.type == JSON_REGEX || currentExpression->right.type == JSON_REGEX) {
+        targetProperty->type = JSON_BOOL;
+        targetProperty->value.b = evaluateRegex(tree,
+                                                leftProperty->value.s, 
+                                                leftProperty->valueLength, 
+                                                (currentExpression->right.type == JSON_REGEX) ? 0 : 1,
+                                                currentExpression->right.value.regex.vocabularyLength,
+                                                currentExpression->right.value.regex.statesLength,
+                                                currentExpression->right.value.regex.stateMachineOffset);
+        return RULES_OK;
+    }
+
+    jsonProperty rightValue;
+    jsonProperty *rightProperty = &rightValue;
+    result = reduceOperand(tree,
+                           messageObject,
+                           &currentExpression->right,
+                           &rightProperty);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    return reduceProperties(currentExpression->operator, 
+                              leftProperty, 
+                              rightProperty, 
+                              targetProperty);
+}
+
+static unsigned int isMatch(ruleset *tree,
+                            jsonObject *messageObject,
+                            alpha *currentAlpha,
+                            unsigned char *propertyMatch) {
+    *propertyMatch = 0;
+    if (currentAlpha->expression.operator == OP_EX) {
+        *propertyMatch = 1;
+        return RULES_OK;
+    }
+
+    jsonProperty resultProperty;
+    unsigned int result = reduceExpression(tree,
+                                           messageObject,
+                                           &currentAlpha->expression,
+                                           &resultProperty);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    if (resultProperty.type != JSON_BOOL) {
+        return ERR_OPERATION_NOT_SUPPORTED;
+    }
+
+    *propertyMatch = resultProperty.value.b;
+    printf("isMatch %d\n", *propertyMatch);
+    return RULES_OK;
 }
 
 static void freeCommands(char **commands,
@@ -287,7 +567,6 @@ static unsigned int handleAction(ruleset *tree,
         }
     }
 
-    printf("handle action 2\n");
     switch (actionType) {
         case ACTION_ASSERT_EVENT:
         case ACTION_ASSERT_FACT:
@@ -420,346 +699,14 @@ static unsigned int handleBeta(ruleset *tree,
 }
 
 
-static unsigned int valueToProperty(ruleset *tree,
-                                    char *sid,
-                                    jsonObject *messageObject,
-                                    operand *sourceOperand, 
-                                    jsonProperty **targetProperty,
-                                    char **targetStringValue) {
-    unsigned int result = RULES_OK;
-    switch(sourceOperand->type) {
-        case JSON_MESSAGE_EXPRESSION:
-            result = reduceExpression(tree, 
-                                 sid, 
-                                 messageObject,
-                                 sourceOperand->value.expressionOffset,
-                                 targetProperty);
-
-            return result;
-        case JSON_MESSAGE_IDENTIFIER:
-            result = getObjectProperty(messageObject,
-                                       sourceOperand->value.id.propertyNameHash,
-                                       targetProperty);
-
-            return RULES_OK;
-        case JSON_STRING:
-            if (!targetStringValue) {
-                return ERR_UNEXPECTED_TYPE;
-            }
-
-            *targetStringValue = &tree->stringPool[sourceOperand->value.stringOffset];
-            (*targetProperty)->valueLength = strlen(*targetStringValue);
-            (*targetProperty)->valueOffset = 0;
-            break;
-        case JSON_INT:
-            (*targetProperty)->value.i = sourceOperand->value.i;
-            break;
-        case JSON_DOUBLE:
-            (*targetProperty)->value.d = sourceOperand->value.d;
-            break;
-        case JSON_BOOL:
-            (*targetProperty)->value.b = sourceOperand->value.b;
-            break;
-    }
-
-    (*targetProperty)->type = sourceOperand->type;
-    return result;
-}
-
-static unsigned int reduceProperties(unsigned char operator,
-                                     jsonProperty *leftProperty,
-                                     jsonProperty *rightProperty,
-                                     jsonProperty *targetValue) {
-    unsigned short type = leftProperty->type << 8;
-    type = type + rightProperty->type;
-    switch(type) {
-        case OP_BOOL_BOOL:
-            targetValue->value.i = reduceInt(leftProperty->value.b, rightProperty->value.b, operator); 
-            targetValue->type = JSON_INT;
-            break;
-        case OP_BOOL_INT: 
-            targetValue->value.i = reduceInt(leftProperty->value.b, rightProperty->value.i, operator); 
-            targetValue->type = JSON_INT;
-            break;
-        case OP_BOOL_DOUBLE: 
-            targetValue->value.d = reduceDouble(leftProperty->value.b, rightProperty->value.d, operator); 
-            targetValue->type = JSON_DOUBLE;
-            break;
-        case OP_INT_BOOL:
-            targetValue->value.i = reduceInt(leftProperty->value.i, rightProperty->value.b, operator); 
-            targetValue->type = JSON_INT;
-            break;
-        case OP_INT_INT:
-            targetValue->value.i = reduceInt(leftProperty->value.i, rightProperty->value.i, operator); 
-            targetValue->type = JSON_INT;
-            break;
-        case OP_INT_DOUBLE: 
-            targetValue->value.d = reduceDouble(leftProperty->value.i, rightProperty->value.d, operator); 
-            targetValue->type = JSON_DOUBLE;
-            break;
-        case OP_DOUBLE_BOOL:
-            targetValue->value.d = reduceDouble(leftProperty->value.d, rightProperty->value.b, operator); 
-            targetValue->type = JSON_DOUBLE;
-            break;
-        case OP_DOUBLE_INT:
-            targetValue->value.d = reduceDouble(leftProperty->value.d, rightProperty->value.i, operator); 
-            targetValue->type = JSON_DOUBLE; 
-            break;
-        case OP_DOUBLE_DOUBLE:
-            targetValue->value.d = reduceDouble(leftProperty->value.d, rightProperty->value.d, operator); 
-            targetValue->type = JSON_DOUBLE; 
-            break;
-    }    
-
-    return RULES_OK;
-}
-
-static unsigned int reduceExpression(ruleset *tree, 
-                                char *sid,
-                                jsonObject *messageObject,
-                                unsigned int expressionOffset,
-                                jsonProperty **targetValue) {
-    unsigned int result = RULES_OK;
-    expression *currentExpression = &tree->expressionPool[expressionOffset];
-    jsonProperty leftValue;
-    jsonProperty *leftProperty = &leftValue;
-    result = valueToProperty(tree,
-                             sid,
-                             messageObject,
-                             &currentExpression->left,
-                             &leftProperty,
-                             NULL);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    jsonProperty rightValue;
-    jsonProperty *rightProperty = &rightValue;
-    result = valueToProperty(tree,
-                             sid,
-                             messageObject,
-                             &currentExpression->right,
-                             &rightProperty,
-                             NULL);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    result = reduceProperties(currentExpression->operator, 
-                            leftProperty, 
-                            rightProperty, 
-                            *targetValue);
-    return result;
-}
-
-static unsigned int isMatch(ruleset *tree,
-                            char *sid,
-                            jsonObject *messageObject,
-                            jsonProperty *currentProperty, 
-                            alpha *currentAlpha,
-                            unsigned char *propertyMatch,
-                            void **rulesBinding) {
-    unsigned char alphaOp = currentAlpha->expression.operator;
-    unsigned char propertyType = currentProperty->type;
-    unsigned int result = RULES_OK;
-    *propertyMatch = 0;
-    if (alphaOp == OP_EX) {
-        *propertyMatch = 1;
-        return RULES_OK;
-    }
-
-    char *rightStringValue;
-    jsonProperty rightValue;
-    jsonProperty *rightProperty = &rightValue;
-    result = valueToProperty(tree,
-                             sid,
-                             messageObject,
-                             &currentAlpha->expression.right,
-                             &rightProperty,
-                             &rightStringValue);
-    if (result != RULES_OK) {
-        if (result != ERR_PROPERTY_NOT_FOUND) {
-            return result;    
-        }
-
-        return RULES_OK;
-    }
-
-    int leftLength;
-    int rightLength;
-    unsigned short type = propertyType << 8;
-    type = type + rightValue.type;
-    switch(type) {
-        case OP_BOOL_BOOL:
-            *propertyMatch = compareBool(currentProperty->value.b, rightValue.value.b, alphaOp);
-            break;
-        case OP_BOOL_INT: 
-            *propertyMatch = compareInt(currentProperty->value.b, rightValue.value.i, alphaOp);
-            break;
-        case OP_BOOL_DOUBLE: 
-            *propertyMatch = compareDouble(currentProperty->value.b, rightValue.value.d, alphaOp);
-            break;
-        case OP_BOOL_STRING:
-            if (currentProperty->value.b) {
-                *propertyMatch = compareStringProperty("true",
-                                                       rightStringValue + rightValue.valueOffset, 
-                                                       rightValue.valueLength,
-                                                       alphaOp);
-            }
-            else {
-                *propertyMatch = compareStringProperty("false",
-                                                       rightStringValue + rightValue.valueOffset, 
-                                                       rightValue.valueLength,
-                                                       alphaOp);
-            }
-            
-            break;
-        case OP_INT_BOOL:
-            *propertyMatch = compareInt(currentProperty->value.i, rightValue.value.b, alphaOp);
-            break;
-        case OP_INT_INT: 
-            *propertyMatch = compareInt(currentProperty->value.i, rightValue.value.i, alphaOp);
-            break;
-        case OP_INT_DOUBLE: 
-            *propertyMatch = compareDouble(currentProperty->value.i, rightValue.value.d, alphaOp);
-            break;
-        case OP_INT_STRING:
-            {
-                rightLength = rightProperty->valueLength + 1;
-#ifdef _WIN32
-                char *leftStringInt = (char *)_alloca(sizeof(char)*(rightLength));
-                sprintf_s(leftStringInt, sizeof(char)*(rightLength), "%ld", currentProperty->value.i);
-#else
-                char leftStringInt[rightLength];
-                snprintf(leftStringInt, sizeof(char)*(rightLength), "%ld", currentProperty->value.i);
-#endif         
-                *propertyMatch = compareStringProperty(leftStringInt, 
-                                                       rightStringValue + rightValue.valueOffset,
-                                                       rightValue.valueLength, 
-                                                       alphaOp);
-            }
-            break;
-        case OP_DOUBLE_BOOL:
-            *propertyMatch = compareDouble(currentProperty->value.d, rightValue.value.b, alphaOp);
-            break;
-        case OP_DOUBLE_INT: 
-            *propertyMatch = compareDouble(currentProperty->value.d, rightValue.value.i, alphaOp);
-            break;
-        case OP_DOUBLE_DOUBLE: 
-            *propertyMatch = compareDouble(currentProperty->value.d, rightValue.value.d, alphaOp);
-            break;
-        case OP_DOUBLE_STRING:
-            {
-                rightLength = rightValue.valueLength + 1;
-#ifdef _WIN32
-                char *leftStringDouble = (char *)_alloca(sizeof(char)*(rightLength));
-                sprintf_s(leftStringDouble, sizeof(char)*(rightLength), "%f", currentProperty->value.d);
-#else
-                char leftStringDouble[rightLength];
-                snprintf(leftStringDouble, sizeof(char)*(rightLength), "%f", currentProperty->value.d);
-#endif         
-                *propertyMatch = compareStringProperty(leftStringDouble,
-                                                       rightStringValue + rightValue.valueOffset,
-                                                       rightValue.valueLength, 
-                                                       alphaOp);
-            }
-            break;
-        case OP_STRING_BOOL:
-            if (rightProperty->value.b) {
-                *propertyMatch = compareString(messageObject->content + currentProperty->valueOffset, 
-                                               currentProperty->valueLength, 
-                                               "true", 
-                                               alphaOp);
-            }
-            else {
-                *propertyMatch = compareString(messageObject->content + currentProperty->valueOffset, 
-                                               currentProperty->valueLength, 
-                                               "false", 
-                                               alphaOp);
-            }
-            break;
-        case OP_STRING_INT: 
-            {
-                leftLength = currentProperty->valueLength + 1;
-#ifdef _WIN32
-                char *rightStringInt = (char *)_alloca(sizeof(char)*(leftLength));
-                sprintf_s(rightStringInt, sizeof(char)*(leftLength), "%ld", rightValue.value.i);
-#else
-                char rightStringInt[leftLength];
-                snprintf(rightStringInt, sizeof(char)*(leftLength), "%ld", rightValue.value.i);
-#endif
-                *propertyMatch = compareString(messageObject->content + rightValue.valueOffset, 
-                                               currentProperty->valueLength, 
-                                               rightStringInt, 
-                                               alphaOp);
-            }
-            break;
-        case OP_STRING_DOUBLE: 
-            {
-                leftLength = currentProperty->valueLength + 1;
-#ifdef _WIN32
-                char *rightStringDouble = (char *)_alloca(sizeof(char)*(leftLength));
-                sprintf_s(rightStringDouble, sizeof(char)*(leftLength), "%f", rightValue.value.d);
-#else
-                char rightStringDouble[leftLength];
-                snprintf(rightStringDouble, sizeof(char)*(leftLength), "%f", rightValue.value.d);
-#endif              
-                *propertyMatch = compareString(messageObject->content + currentProperty->valueOffset, 
-                                               currentProperty->valueLength, 
-                                               rightStringDouble, 
-                                               alphaOp);
-            }
-            break;
-        case OP_STRING_STRING:
-            *propertyMatch = compareStringAndStringProperty(messageObject->content + currentProperty->valueOffset, 
-                                                            currentProperty->valueLength, 
-                                                            rightStringValue + rightValue.valueOffset,
-                                                            rightValue.valueLength,
-                                                            alphaOp);
-            break;
-        case OP_BOOL_NIL:
-        case OP_INT_NIL:
-        case OP_DOUBLE_NIL:
-        case OP_STRING_NIL:
-            if (alphaOp == OP_NEQ) {
-                *propertyMatch = 1;
-            } else {
-                *propertyMatch = 0;
-            }
-
-            break;
-        case OP_NIL_NIL:
-            if (alphaOp == OP_EQ) {
-                *propertyMatch = 1;
-            } else {
-                *propertyMatch = 0;
-            }
-
-            break;
-        case OP_STRING_REGEX:
-        case OP_STRING_IREGEX:
-            *propertyMatch = evaluateRegex(tree,
-                                           messageObject->content + currentProperty->valueOffset, 
-                                           currentProperty->valueLength, 
-                                           (type == OP_STRING_REGEX) ? 0 : 1,
-                                           currentAlpha->expression.right.value.regex.vocabularyLength,
-                                           currentAlpha->expression.right.value.regex.statesLength,
-                                           currentAlpha->expression.right.value.regex.stateMachineOffset);
-            break;
-
-    }
-    
-    printf("isMatch %d\n", *propertyMatch);
-    return result;
-}
-
-static unsigned int isArrayMatch(ruleset *tree,
+static unsigned int handleAplhaArray(ruleset *tree,
                                  char *sid,
                                  jsonObject *messageObject,
                                  jsonProperty *currentProperty,
                                  alpha *arrayAlpha,
                                  unsigned char *propertyMatch,
                                  void **rulesBinding) {
+    printf("handle alpha array\n");  
     unsigned int result = RULES_OK;
     if (currentProperty->type != JSON_ARRAY) {
         return RULES_OK;
@@ -837,8 +784,8 @@ static unsigned int isArrayMatch(ruleset *tree,
                         if (currentProperty->hash == hashNode->value.a.expression.left.value.id.propertyNameHash) {
                             unsigned char match = 0;
                             if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
-                                // isArrayMatch finds a valid path, thus use propertyMatch
-                                result = isArrayMatch(tree, 
+                                // handleAplhaArray finds a valid path, thus use propertyMatch
+                                result = handleAplhaArray(tree, 
                                                       sid, 
                                                       messageObject,
                                                       currentProperty, 
@@ -847,12 +794,9 @@ static unsigned int isArrayMatch(ruleset *tree,
                                                       rulesBinding);
                             } else {
                                 result = isMatch(tree,
-                                                 sid,
                                                  messageObject,
-                                                 currentProperty,
                                                  &hashNode->value.a,
-                                                 &match,
-                                                 rulesBinding);
+                                                 &match);
 
                                 if (match) {
                                     if (top == MAX_STACK_SIZE) {
@@ -951,7 +895,7 @@ static unsigned int handleAlpha(ruleset *tree,
                             unsigned char match = 0;
                             unsigned int mresult = RULES_OK;
                             if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
-                                mresult = isArrayMatch(tree, 
+                                mresult = handleAplhaArray(tree, 
                                                        sid, 
                                                        jo,
                                                        currentProperty, 
@@ -960,12 +904,9 @@ static unsigned int handleAlpha(ruleset *tree,
                                                        rulesBinding);
                             } else {
                                 mresult = isMatch(tree, 
-                                                  sid, 
-                                                  jo,
-                                                  currentProperty, 
+                                                  jo, 
                                                   &hashNode->value.a,
-                                                  &match,
-                                                  rulesBinding);
+                                                  &match);
                             }
 
                             if (mresult != RULES_OK){

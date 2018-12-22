@@ -21,6 +21,7 @@ typedef struct jsonProperty {
         long i; 
         double d; 
         unsigned char b; 
+        char *s;
     } value;
 } jsonProperty;
 
