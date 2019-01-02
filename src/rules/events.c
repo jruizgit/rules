@@ -71,8 +71,9 @@ static unsigned int handleMessage(ruleset *tree,
                                   void **rulesBinding);
 
 static unsigned int reduceExpression(ruleset *tree,
-                                     jsonObject *messageObject,
                                      expression *currentExpression,
+                                     jsonObject *messageObject,
+                                     messageFrame *messageContext,
                                      jsonProperty *targetProperty);
 
 static unsigned int reduceString(char *left, 
@@ -270,23 +271,25 @@ static unsigned int reduceDouble(double left,
 }
 
 static unsigned int reduceOperand(ruleset *tree,
-                                    jsonObject *messageObject,
-                                    operand *sourceOperand, 
-                                    jsonProperty **targetProperty) {
+                                  operand *sourceOperand, 
+                                  jsonObject *messageObject,
+                                  messageFrame *messageContext,
+                                  jsonProperty **targetProperty) {
     (*targetProperty)->type = sourceOperand->type;
     switch(sourceOperand->type) {
         case JSON_MESSAGE_EXPRESSION:
             {
                 expression *currentExpression = &tree->expressionPool[sourceOperand->value.expressionOffset];
                 return reduceExpression(tree, 
-                                        messageObject,
                                         currentExpression,
+                                        messageObject,
+                                        messageContext,
                                         *targetProperty);
             }
         case JSON_MESSAGE_IDENTIFIER:
             return getObjectProperty(messageObject,
-                                       sourceOperand->value.id.propertyNameHash,
-                                       targetProperty);
+                                     sourceOperand->value.id.propertyNameHash,
+                                     targetProperty);
 
         case JSON_STRING:
             {
@@ -467,15 +470,17 @@ static unsigned int reduceProperties(unsigned char operator,
 }
 
 static unsigned int reduceExpression(ruleset *tree,
-                                     jsonObject *messageObject,
                                      expression *currentExpression,
+                                     jsonObject *messageObject,
+                                     messageFrame *messageContext,
                                      jsonProperty *targetProperty) {
     unsigned int result = RULES_OK;
     jsonProperty leftValue;
     jsonProperty *leftProperty = &leftValue;
     result = reduceOperand(tree,
-                           messageObject,
                            &currentExpression->left,
+                           messageObject,
+                           messageContext,
                            &leftProperty);
     if (result != RULES_OK) {
         return result;
@@ -496,23 +501,125 @@ static unsigned int reduceExpression(ruleset *tree,
     jsonProperty rightValue;
     jsonProperty *rightProperty = &rightValue;
     result = reduceOperand(tree,
-                           messageObject,
                            &currentExpression->right,
+                           messageObject,
+                           messageContext,
                            &rightProperty);
     if (result != RULES_OK) {
         return result;
     }
 
     return reduceProperties(currentExpression->operator, 
-                              leftProperty, 
-                              rightProperty, 
-                              targetProperty);
+                            leftProperty, 
+                            rightProperty, 
+                            targetProperty);
 }
 
-static unsigned int isMatch(ruleset *tree,
-                            jsonObject *messageObject,
-                            alpha *currentAlpha,
-                            unsigned char *propertyMatch) {
+static unsigned int reduceExpressionSequence(ruleset *tree,
+                                             expressionSequence *exprs,
+                                             unsigned short operator,
+                                             jsonObject *messageObject,
+                                             messageFrame *messageContext,
+                                             unsigned short *i,
+                                             jsonProperty *targetProperty) {
+    unsigned int result = RULES_OK;
+    while (*i < exprs->length) {
+        expression *currentExpression = &exprs->expressions[*i];
+        if (currentExpression->operator == OP_END) {
+            return RULES_OK;          
+        } 
+
+        if ((operator != OP_NOP) &&
+            ((operator == OP_OR && targetProperty->value.b) || 
+             (operator == OP_AND && !targetProperty->value.b))) {
+            if (currentExpression->operator == OP_AND || currentExpression->operator == OP_OR) {
+                jsonProperty dummyProperty;
+                dummyProperty.type = JSON_BOOL;
+                if (currentExpression->operator == OP_AND) {
+                    dummyProperty.value.b = 0;
+                } else {
+                    dummyProperty.value.b = 1;
+                }
+
+                ++*i;
+                result = reduceExpressionSequence(tree,
+                                                  exprs,
+                                                  currentExpression->operator,
+                                                  messageObject,
+                                                  messageContext,
+                                                  i,
+                                                  &dummyProperty);
+                if (result != RULES_OK) {
+                    return result;
+                }
+            }
+        } else {
+            if (currentExpression->operator == OP_AND || currentExpression->operator == OP_OR) {
+                ++*i;
+                result = reduceExpressionSequence(tree,
+                                                  exprs,
+                                                  currentExpression->operator,
+                                                  messageObject,
+                                                  messageContext,
+                                                  i,
+                                                  targetProperty);
+                if (result != RULES_OK) {
+                    return result;
+                }
+            } else if (currentExpression->operator == OP_IALL || currentExpression->operator == OP_IANY) {
+                
+            } else {
+                unsigned int result = reduceExpression(tree,
+                                                       currentExpression,
+                                                       messageObject,
+                                                       messageContext,
+                                                       targetProperty);
+                if (result != RULES_OK) {
+                    return result;
+                }
+
+                if (targetProperty->type != JSON_BOOL) {
+                    return ERR_OPERATION_NOT_SUPPORTED;
+                }
+            }
+        }
+
+        ++*i;
+    }
+
+    return RULES_OK;
+}
+
+static unsigned int isBetaMatch(ruleset *tree,
+                                beta *currentBeta, 
+                                jsonObject *messageObject,
+                                messageFrame *messageContext,
+                                unsigned char *propertyMatch) {
+    jsonProperty resultProperty;
+    unsigned int result = reduceExpressionSequence(tree,
+                                                   &currentBeta->expressionSequence,
+                                                   OP_NOP,
+                                                   messageObject,
+                                                   messageContext,
+                                                   0,
+                                                   &resultProperty);
+    if (result != RULES_OK) {
+        return result;
+    }
+
+    if (resultProperty.type != JSON_BOOL) {
+        return ERR_OPERATION_NOT_SUPPORTED;
+    }
+
+    *propertyMatch = resultProperty.value.b;
+    printf("isBetaMatch %d\n", *propertyMatch);
+    return RULES_OK;
+}
+
+static unsigned int isAlphaMatch(ruleset *tree,
+                                 alpha *currentAlpha,
+                                 jsonObject *messageObject,
+                                 unsigned char *propertyMatch) {
     *propertyMatch = 0;
     if (currentAlpha->expression.operator == OP_EX) {
         *propertyMatch = 1;
@@ -521,8 +628,9 @@ static unsigned int isMatch(ruleset *tree,
 
     jsonProperty resultProperty;
     unsigned int result = reduceExpression(tree,
-                                           messageObject,
                                            &currentAlpha->expression,
+                                           messageObject,
+                                           NULL,
                                            &resultProperty);
     if (result != RULES_OK) {
         return result;
@@ -533,7 +641,7 @@ static unsigned int isMatch(ruleset *tree,
     }
 
     *propertyMatch = resultProperty.value.b;
-    printf("isMatch %d\n", *propertyMatch);
+    printf("isAlphaMatch %d\n", *propertyMatch);
     return RULES_OK;
 }
 
@@ -793,10 +901,10 @@ static unsigned int handleAplhaArray(ruleset *tree,
                                                       propertyMatch,
                                                       rulesBinding);
                             } else {
-                                result = isMatch(tree,
-                                                 messageObject,
-                                                 &hashNode->value.a,
-                                                 &match);
+                                result = isAlphaMatch(tree,
+                                                      &hashNode->value.a,
+                                                      messageObject,
+                                                      &match);
 
                                 if (match) {
                                     if (top == MAX_STACK_SIZE) {
@@ -903,10 +1011,10 @@ static unsigned int handleAlpha(ruleset *tree,
                                                        &match,
                                                        rulesBinding);
                             } else {
-                                mresult = isMatch(tree, 
-                                                  jo, 
-                                                  &hashNode->value.a,
-                                                  &match);
+                                mresult = isAlphaMatch(tree, 
+                                                       &hashNode->value.a,
+                                                       jo, 
+                                                       &match);
                             }
 
                             if (mresult != RULES_OK){

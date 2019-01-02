@@ -6,6 +6,10 @@
 #include "json.h"
 #include "net.h"
 
+#define MAX_STATE_NODES 8
+#define MAX_MESSAGE_NODES 8
+#define MAX_LEFT_FRAME_NODES 8
+#define MAX_RIGHT_FRAME_NODES 8
 
 #define INIT(type, pool, length) do { \
     pool.content = malloc(length * sizeof(type)); \
@@ -24,7 +28,6 @@
 #define GET(type, index, max, pool, nodeHash, value) do { \
     unsigned int offset = index[nodeHash % max]; \
     value = NULL; \
-    printf("%d\n", offset); \
     while (offset != UNDEFINED_HASH_OFFSET) { \
         type *current = &pool.content[offset - 1]; \
         if (current->hash != nodeHash) { \
@@ -92,26 +95,69 @@ unsigned int fnv1Hash32(char *str, unsigned int length) {
     return hash;
 }
 
-unsigned int initStatePool(void *tree, unsigned int length) {
-    INIT(stateNode, ((ruleset*)tree)->statePool, length);
+unsigned int initStatePool(void *tree) {
+    INIT(stateNode, ((ruleset*)tree)->statePool, MAX_STATE_NODES);
     return RULES_OK;
 }
 
-unsigned int initMessagePool(void *tree, unsigned int length) {
-    INIT(messageNode, ((ruleset*)tree)->messagePool, length);
+unsigned int initMessagePool(void *tree) {
+    INIT(messageNode, ((ruleset*)tree)->messagePool, MAX_MESSAGE_NODES);
     return RULES_OK;
 }
 
-unsigned int initLeftFramePool(void *tree, unsigned int length) {
-    INIT(leftFrameNode, ((ruleset*)tree)->leftFramePool, length);
+unsigned int initLeftFramePool(void *tree) {
+    INIT(leftFrameNode, ((ruleset*)tree)->leftFramePool, MAX_LEFT_FRAME_NODES);
     return RULES_OK;
 }
 
-unsigned int initRightFramePool(void *tree, unsigned int length) {
-    INIT(rightFrameNode, ((ruleset*)tree)->rightFramePool, length);
+unsigned int initRightFramePool(void *tree) {
+    INIT(rightFrameNode, ((ruleset*)tree)->rightFramePool, MAX_RIGHT_FRAME_NODES);
     return RULES_OK;
 }
 
+unsigned int getHash(char *sid, char *key) {
+    unsigned int fullKeyLength = strlen(sid) + strlen(key) + 2;
+#ifdef _WIN32
+    char *fullKey = (char *)_alloca(sizeof(char)*(fullKeyLength));
+    sprintf_s(fullKey, sizeof(char)*(fullKeyLength), "%s!%s", sid, key);
+#else
+    char fullKey[fullKeyLength];
+    snprintf(fullKey, sizeof(char)*(fullKeyLength), "%s!%s", sid, key);
+#endif
+    return fnv1Hash32(fullKey, fullKeyLength - 1);
+}
+
+unsigned int getLeftFrame(void *tree, 
+                          unsigned int *index, 
+                          unsigned int hash, 
+                          leftFrameNode **node) {
+    GET(leftFrameNode, index, MAX_LEFT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->leftFramePool, hash, (*node));
+    return RULES_OK;
+}
+
+unsigned int createLeftFrame(void *tree, 
+                             unsigned int *index, 
+                             unsigned int hash, 
+                             leftFrameNode **node) {
+    NEW(leftFrameNode, index, MAX_LEFT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->leftFramePool, hash, (*node));
+    return RULES_OK;
+}
+
+unsigned int getRightFrame(void *tree, 
+                           unsigned int *index, 
+                           unsigned int hash, 
+                           rightFrameNode **node) {
+    GET(rightFrameNode, index, MAX_RIGHT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->rightFramePool, hash, (*node));
+    return RULES_OK;
+}
+
+unsigned int createRightFrame(void *tree, 
+                              unsigned int *index, 
+                              unsigned int hash, 
+                              rightFrameNode **node) {
+    NEW(rightFrameNode, index, MAX_RIGHT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->rightFramePool, hash, (*node));
+    return RULES_OK;
+}
 
 static void insertSortProperties(jsonObject *jo, jsonProperty **properties) {
     for (unsigned short i = 1; i < jo->propertiesLength; ++i) {

@@ -39,11 +39,6 @@
 #define HASH_R 1203507539 //$r
 #define HASH_FORWARD 739185624 // $forward
 
-#define MAX_STATE_NODES 8
-#define MAX_MESSAGE_NODES 8
-#define MAX_LEFT_FRAME_NODES 8
-#define MAX_RIGHT_FRAME_NODES 8
-
 #define GET_EXPRESSION(exprs, expr) do { \
     expr = &exprs->expressions[exprs->length]; \
     ++exprs->length; \
@@ -1637,10 +1632,10 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
-    initStatePool(tree, MAX_STATE_NODES);
-    initMessagePool(tree, MAX_MESSAGE_NODES);
-    initLeftFramePool(tree, MAX_LEFT_FRAME_NODES);
-    initRightFramePool(tree, MAX_RIGHT_FRAME_NODES);
+    initStatePool(tree);
+    initMessagePool(tree);
+    initLeftFramePool(tree);
+    initRightFramePool(tree);
 
     result = storeString(tree, name, &tree->nameOffset, strlen(name));
     if (result != RULES_OK) {
@@ -1701,7 +1696,7 @@ unsigned int createClient(unsigned int *handle, char *name) {
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
-    initStatePool(tree, MAX_STATE_NODES);
+    initStatePool(tree);
     
     unsigned int result = storeString(tree, name, &tree->nameOffset, strlen(name));
     if (result != RULES_OK) {

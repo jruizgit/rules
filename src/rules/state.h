@@ -94,13 +94,35 @@ unsigned int resolveBinding(void *tree,
                             void **rulesBinding);
 
 
-unsigned int initStatePool(void *tree, unsigned int length);
+unsigned int initStatePool(void *tree);
 
-unsigned int initMessagePool(void *tree, unsigned int length);
+unsigned int initMessagePool(void *tree);
 
-unsigned int initLeftFramePool(void *tree, unsigned int length);
+unsigned int initLeftFramePool(void *tree);
 
-unsigned int initRightFramePool(void *tree, unsigned int length);
+unsigned int initRightFramePool(void *tree);
+
+unsigned int getHash(char *sid, char *key);
+
+unsigned int getLeftFrame(void *tree, 
+                          unsigned int *index, 
+                          unsigned int hash, 
+                          leftFrameNode **node);
+
+unsigned int createLeftFrame(void *tree, 
+                             unsigned int *index, 
+                             unsigned int hash, 
+                             leftFrameNode **node);
+
+unsigned int getRightFrame(void *tree, 
+                           unsigned int *index, 
+                           unsigned int hash, 
+                           rightFrameNode **node);
+
+unsigned int createRightFrame(void *tree, 
+                              unsigned int *index, 
+                              unsigned int hash, 
+                              rightFrameNode **node);
 
 unsigned int getStateVersion(void *tree, 
                              char *sid, 
