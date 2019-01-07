@@ -31,6 +31,7 @@
 #define NODE_M_OFFSET 0
 
 #define MAX_STATE_INDEX_LENGTH 1024
+#define MAX_MESSAGE_INDEX_LENGTH 16384
 #define MAX_LEFT_FRAME_INDEX_LENGTH 1024
 #define MAX_RIGHT_FRAME_INDEX_LENGTH 128
 #define MAX_SEQUENCE_EXPRESSIONS 32
@@ -39,6 +40,7 @@ typedef struct identifier {
     unsigned int propertyNameHash;
     unsigned int propertyNameOffset;
     unsigned int nameOffset;
+    unsigned int nameHash;
 } identifier;
 
 typedef struct regexReference {
@@ -135,6 +137,7 @@ typedef struct ruleset {
     unsigned int stateIndex[MAX_STATE_INDEX_LENGTH];
     
     pool messagePool;
+    unsigned int messageIndex[MAX_MESSAGE_INDEX_LENGTH];
 
     pool leftFramePool;
 

@@ -11,38 +11,37 @@
 #define MAX_LEFT_FRAME_NODES 8
 #define MAX_RIGHT_FRAME_NODES 8
 
+// The first node is never used as it corresponds to UNDEFINED_HASH_OFFSET
 #define INIT(type, pool, length) do { \
     pool.content = malloc(length * sizeof(type)); \
     if (!pool.content) { \
         return ERR_OUT_OF_MEMORY; \
     } \
     pool.contentLength = length; \
-    for (unsigned int i = 0; i < pool.contentLength; ++ i) { \
+    for (unsigned int i = 1; i < length; ++ i) { \
         ((type *)pool.content)[i].nextOffset = i + 1; \
         ((type *)pool.content)[i].prevOffset = i - 1; \
     } \
-    pool.freeOffset = 0; \
+    ((type *)pool.content)[length - 1].nextOffset = UNDEFINED_HASH_OFFSET; \
+    ((type *)pool.content)[0].prevOffset = UNDEFINED_HASH_OFFSET; \
+    pool.freeOffset = 1; \
 } while(0)
 
-// Index offset by one  in type *current = &pool.content[offset - 1];
-#define GET(type, index, max, pool, nodeHash, value) do { \
-    unsigned int offset = index[nodeHash % max]; \
-    value = NULL; \
-    while (offset != UNDEFINED_HASH_OFFSET) { \
-        type *current = &pool.content[offset - 1]; \
-        if (current->hash != nodeHash) { \
-            offset = current->nextOffset; \
+#define GET(type, index, max, pool, nodeHash, valueOffset) do { \
+    valueOffset = index[nodeHash % max]; \
+    while (valueOffset != UNDEFINED_HASH_OFFSET) { \
+        type *value = &pool.content[valueOffset]; \
+        if (value->hash != nodeHash) { \
+            valueOffset = value->nextOffset; \
         } else { \
-            value = current; \
-            offset = UNDEFINED_HASH_OFFSET; \
+            break; \
         } \
     } \
 } while(0)
 
-// Index offset by one in last two lines of macro
-#define NEW(type, index, max, pool, nodeHash, value) do { \
-    unsigned int valueOffset = pool.freeOffset; \
-    value = &pool.content[valueOffset]; \
+#define NEW(type, pool, valueOffset) do { \
+    valueOffset = pool.freeOffset; \
+    type *value = &pool.content[valueOffset]; \
     if (value->nextOffset == UNDEFINED_HASH_OFFSET) { \
         pool.content = realloc(pool.content, (pool.contentLength * 2) * sizeof(type)); \
         if (!pool.content) { \
@@ -53,38 +52,27 @@
             ((type *)pool.content)[i].prevOffset = i - 1; \
         } \
         value->nextOffset = pool.contentLength; \
-        ((type *)pool.content)[pool.contentLength].prevOffset = pool.freeOffset; \
+        ((type *)pool.content)[pool.contentLength].prevOffset = valueOffset; \
         pool.contentLength *= 2; \
         ((type *)pool.content)[pool.contentLength - 1].nextOffset = UNDEFINED_HASH_OFFSET; \
     } \
+    ((type *)pool.content)[value->nextOffset].prevOffset = UNDEFINED_HASH_OFFSET; \
     pool.freeOffset = value->nextOffset; \
-    value->prevOffset = UNDEFINED_HASH_OFFSET; \
-    value->hash = nodeHash; \
-    value->nextOffset = index[nodeHash % max] - 1; \
-    index[nodeHash % max] = valueOffset + 1; \
 } while(0)
 
-
-#define DELETE(type, index, max, pool, nodeHash) do { \
-    unsigned int offset = index[nodeHash % max]; \
-    while (offset != UNDEFINED_HASH_OFFSET) { \
-        type *current = &pool.content[offset]; \
-        if (current->hash != nodeHash) { \
-            offset = current->nextOffset; \
-        } else { \
-            if (current->nextOffset != UNDEFINED_HASH_OFFSET) {\
-                ((type *)pool.content)[current->nextOffset].prevOffset = current->prevOffset; \
-            } \
-            if (current->prevOffset != UNDEFINED_HASH_OFFSET) {\
-                ((type *)pool.content)[current->prevOffset].nextOffset = current->nextOffset; \
-            } \
-            current->prevOffset = UNDEFINED_HASH_OFFSET; \
-            current->nextOffset = pool.freeOffset; \
-            pool.freeOffset = offset; \
-            offset = UNDEFINED_HASH_OFFSET; \
-        } \
+#define SET(type, index, max, pool, nodeHash, valueOffset)  do { \
+    type *value = &pool.content[valueOffset]; \
+    value->hash = nodeHash; \
+    value->prevOffset = UNDEFINED_HASH_OFFSET; \
+    value->nextOffset = index[nodeHash % max]; \
+    index[nodeHash % max] = valueOffset; \
+    if (value->nextOffset != UNDEFINED_HASH_OFFSET) { \
+        ((type *)pool.content)[value->nextOffset].prevOffset = valueOffset; \
     } \
 } while(0)
+
+#define DELETE(type, index, max, pool, hash) do { \
+} while (0)
 
 unsigned int fnv1Hash32(char *str, unsigned int length) {
     unsigned int hash = FNV_32_OFFSET_BASIS;
@@ -93,6 +81,18 @@ unsigned int fnv1Hash32(char *str, unsigned int length) {
         hash *= FNV_32_PRIME;
     }
     return hash;
+}
+
+unsigned int getHash(char *sid, char *key) {
+    unsigned int fullKeyLength = strlen(sid) + strlen(key) + 2;
+#ifdef _WIN32
+    char *fullKey = (char *)_alloca(sizeof(char)*(fullKeyLength));
+    sprintf_s(fullKey, sizeof(char)*(fullKeyLength), "%s!%s", sid, key);
+#else
+    char fullKey[fullKeyLength];
+    snprintf(fullKey, sizeof(char)*(fullKeyLength), "%s!%s", sid, key);
+#endif
+    return fnv1Hash32(fullKey, fullKeyLength - 1);
 }
 
 unsigned int initStatePool(void *tree) {
@@ -115,47 +115,115 @@ unsigned int initRightFramePool(void *tree) {
     return RULES_OK;
 }
 
-unsigned int getHash(char *sid, char *key) {
-    unsigned int fullKeyLength = strlen(sid) + strlen(key) + 2;
-#ifdef _WIN32
-    char *fullKey = (char *)_alloca(sizeof(char)*(fullKeyLength));
-    sprintf_s(fullKey, sizeof(char)*(fullKeyLength), "%s!%s", sid, key);
-#else
-    char fullKey[fullKeyLength];
-    snprintf(fullKey, sizeof(char)*(fullKeyLength), "%s!%s", sid, key);
-#endif
-    return fnv1Hash32(fullKey, fullKeyLength - 1);
+unsigned int getMessageFromFrame(messageFrame *messages,
+                                 unsigned int hash,
+                                 unsigned int *messageNodeOffset) {
+    unsigned short size = 0;
+    unsigned short index = hash % MAX_MESSAGE_FRAMES;
+    *messageNodeOffset = UNDEFINED_HASH_OFFSET;
+    while (messages[index].hash && *messageNodeOffset == UNDEFINED_HASH_OFFSET && size < MAX_MESSAGE_FRAMES) {
+        if (messages[index].hash == hash) {
+            *messageNodeOffset = messages[index].messageNodeOffset;
+        }
+        ++size;
+        index = (index + 1) % MAX_MESSAGE_FRAMES;
+    }
+
+    if (*messageNodeOffset == UNDEFINED_HASH_OFFSET) {
+        return ERR_MESSAGE_NOT_FOUND;
+    }        
+    return RULES_OK;
+}
+
+unsigned int setMessageInFrame(messageFrame *messages,
+                               unsigned int hash, 
+                               unsigned int messageNodeOffset) {
+    unsigned short size = 0;
+    unsigned short index = hash % MAX_MESSAGE_FRAMES;
+    while (messages[index].hash) {
+        index = (index + 1) % MAX_MESSAGE_FRAMES;
+        ++size;
+        if (size == MAX_MESSAGE_FRAMES) {
+            return ERR_MAX_MESSAGES_IN_FRAME;
+        }
+    }
+    messages[index].hash = hash;
+    messages[index].messageNodeOffset = messageNodeOffset;
+    return RULES_OK;   
 }
 
 unsigned int getLeftFrame(void *tree, 
                           unsigned int *index, 
                           unsigned int hash, 
-                          leftFrameNode **node) {
-    GET(leftFrameNode, index, MAX_LEFT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->leftFramePool, hash, (*node));
+                          unsigned int *valueOffset) {
+    GET(leftFrameNode, index, MAX_LEFT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->leftFramePool, hash, *valueOffset);
+    if (*valueOffset == UNDEFINED_HASH_OFFSET) {
+        return ERR_FRAME_NOT_FOUND;
+    }
+    return RULES_OK;
+}
+
+unsigned int setLeftFrame(void *tree, 
+                          unsigned int *index, 
+                          unsigned int hash, 
+                          unsigned int valueOffset) {
+    SET(leftFrameNode, index, MAX_LEFT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->leftFramePool, hash, valueOffset);
     return RULES_OK;
 }
 
 unsigned int createLeftFrame(void *tree, 
-                             unsigned int *index, 
-                             unsigned int hash, 
-                             leftFrameNode **node) {
-    NEW(leftFrameNode, index, MAX_LEFT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->leftFramePool, hash, (*node));
+                             unsigned int *valueOffset) {
+    NEW(leftFrameNode, ((ruleset*)tree)->leftFramePool, *valueOffset);
+    leftFrameNode *value = &((ruleset*)tree)->leftFramePool.content[*valueOffset]; 
+    memset(value->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
+    return RULES_OK;
+}
+
+unsigned int cloneLeftFrame(void *tree, 
+                            unsigned int valueOffset,
+                            unsigned int *newValueOffset) {
+    NEW(leftFrameNode, ((ruleset*)tree)->leftFramePool, *newValueOffset);
+    leftFrameNode *newValue = &((ruleset*)tree)->leftFramePool.content[*newValueOffset]; 
+    leftFrameNode *value = &((ruleset*)tree)->leftFramePool.content[valueOffset]; 
+    memcpy(newValue->messages, value->messages, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
     return RULES_OK;
 }
 
 unsigned int getRightFrame(void *tree, 
                            unsigned int *index, 
                            unsigned int hash, 
-                           rightFrameNode **node) {
-    GET(rightFrameNode, index, MAX_RIGHT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->rightFramePool, hash, (*node));
+                           unsigned int *valueOffset) {
+    GET(rightFrameNode, index, MAX_RIGHT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->rightFramePool, hash, *valueOffset);
+    if (*valueOffset == UNDEFINED_HASH_OFFSET) {
+        return ERR_FRAME_NOT_FOUND;
+    }
+    return RULES_OK;
+}
+
+unsigned int setRightFrame(void *tree, 
+                           unsigned int *index, 
+                           unsigned int hash, 
+                           unsigned int valueOffset) {
+    SET(rightFrameNode, index, MAX_RIGHT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->rightFramePool, hash, valueOffset);
     return RULES_OK;
 }
 
 unsigned int createRightFrame(void *tree, 
-                              unsigned int *index, 
-                              unsigned int hash, 
-                              rightFrameNode **node) {
-    NEW(rightFrameNode, index, MAX_RIGHT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->rightFramePool, hash, (*node));
+                              unsigned int *valueOffset) {
+    NEW(rightFrameNode, ((ruleset*)tree)->rightFramePool, *valueOffset);
+    return RULES_OK;
+}
+
+unsigned int storeMessage(void *tree,
+                          char *sid,
+                          char *mid,
+                          jsonObject *message,
+                          unsigned int *valueOffset) {
+    unsigned int hash = getHash(sid, mid);
+    NEW(messageNode, ((ruleset*)tree)->messagePool, *valueOffset);
+    SET(messageNode, ((ruleset*)tree)->messageIndex, MAX_MESSAGE_INDEX_LENGTH, ((ruleset*)tree)->messagePool, hash, *valueOffset);
+    messageNode *node = &((ruleset*)tree)->messagePool.content[*valueOffset];
+    memcpy(&node->jo, message, sizeof(jsonObject));
     return RULES_OK;
 }
 
@@ -471,19 +539,22 @@ unsigned int resolveBinding(void *tree,
                             void **rulesBinding) {  
     printf("resolveBinding\n");
     unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
-    stateNode *node;
-    GET(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, node);
-    if (!node) {
+    unsigned int nodeOffset;
+    GET(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, nodeOffset);
+    if (nodeOffset == UNDEFINED_HASH_OFFSET) {
         printf("newNode\n");
-        NEW(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, node);
+        NEW(stateNode, ((ruleset*)tree)->statePool, nodeOffset);
+        SET(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, nodeOffset);
+        stateNode *node = &((ruleset*)tree)->statePool.content[nodeOffset];
         unsigned int result = getBindingIndex(tree, sidHash, &node->bindingIndex);
         if (result != RULES_OK) {
             return result;
         }
+
+        bindingsList *list = ((ruleset*)tree)->bindingsList;
+        *rulesBinding = &list->bindings[node->bindingIndex];
     }
     
-    bindingsList *list = ((ruleset*)tree)->bindingsList;
-    *rulesBinding = &list->bindings[node->bindingIndex];
     return RULES_OK;
 }
 

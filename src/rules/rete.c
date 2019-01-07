@@ -221,6 +221,7 @@ static void copyOperand(operand *op,
             target->value.id.propertyNameHash = op->value.id.propertyNameHash;
             target->value.id.propertyNameOffset = op->value.id.propertyNameOffset;
             target->value.id.nameOffset = op->value.id.nameOffset;
+            target->value.id.nameHash = op->value.id.nameHash;
             break;
         case JSON_EXPRESSION:
         case JSON_MESSAGE_EXPRESSION:
@@ -271,6 +272,7 @@ static unsigned int copyValue(ruleset *tree,
             right->value.id.propertyNameHash = id->propertyNameHash;
             right->value.id.propertyNameOffset = id->propertyNameOffset;
             right->value.id.nameOffset = id->nameOffset;
+            right->value.id.nameHash = id->nameHash;
             break;
         case JSON_EXPRESSION:
         case JSON_MESSAGE_EXPRESSION:
@@ -339,6 +341,7 @@ static unsigned char compareValue(ruleset *tree,
         case JSON_MESSAGE_IDENTIFIER:
             if (right->value.id.propertyNameHash == id->propertyNameHash &&
                 right->value.id.propertyNameOffset == id->propertyNameOffset &&
+                right->value.id.nameHash == id->nameHash &&
                 right->value.id.nameOffset == id->nameOffset)
                 return 1;
 
@@ -800,6 +803,7 @@ static unsigned int readIdentifier(ruleset *tree, char *rule, unsigned char *exp
     *expressionType = JSON_IDENTIFIER;    
     id->nameOffset = 0;
     readNextName(rule, &first, &last, &hash);
+    id->nameHash = hash;
     result = storeString(tree, first, &id->nameOffset, last - first); 
     if (result != RULES_OK) {
         return result;
@@ -973,6 +977,8 @@ static unsigned int findAlpha(ruleset *tree,
     newAlpha->value.a.expression.left.type = JSON_MESSAGE_IDENTIFIER;
     newAlpha->value.a.expression.left.value.id.propertyNameHash = hash;
     newAlpha->value.a.expression.left.value.id.propertyNameOffset = newAlpha->nameOffset;
+    newAlpha->value.a.expression.left.value.id.nameOffset = 0;
+    newAlpha->value.a.expression.left.value.id.nameHash = 0;
     newAlpha->value.a.expression.operator = operator;
     if (operator == OP_MT) {
         type = JSON_REGEX;
@@ -1031,7 +1037,10 @@ static unsigned int createForwardAlpha(ruleset *tree,
     newAlpha->nameOffset = 0;
     newAlpha->type = NODE_ALPHA;
     newAlpha->value.a.expression.left.type = JSON_MESSAGE_IDENTIFIER;
+    newAlpha->value.a.expression.left.value.id.propertyNameOffset = 0;
     newAlpha->value.a.expression.left.value.id.propertyNameHash = HASH_FORWARD;
+    newAlpha->value.a.expression.left.value.id.nameOffset = 0;
+    newAlpha->value.a.expression.left.value.id.nameHash = 0;
     newAlpha->value.a.expression.operator = OP_NEX;
 
     return RULES_OK;
@@ -1247,6 +1256,8 @@ static unsigned int createBeta(ruleset *tree,
         newBeta->value.b.nextOffset = nextOffset;
         newBeta->value.b.not = (operator == OP_NOT) ? 1 : 0;
         newBeta->value.b.hash = hash;
+        memset(newBeta->value.b.leftFrameIndex, 0, MAX_LEFT_FRAME_INDEX_LENGTH * sizeof(unsigned int));
+        memset(newBeta->value.b.rightFrameIndex, 0, MAX_RIGHT_FRAME_INDEX_LENGTH * sizeof(unsigned int));
         
         if (previousOffset != 0) {
             tree->nodePool[previousOffset].value.b.nextOffset = betaOffset;
@@ -1632,6 +1643,7 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
+    memset(tree->messageIndex, 0, MAX_MESSAGE_INDEX_LENGTH * sizeof(unsigned int));
     initStatePool(tree);
     initMessagePool(tree);
     initLeftFramePool(tree);
