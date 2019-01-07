@@ -18,7 +18,7 @@
         return ERR_OUT_OF_MEMORY; \
     } \
     pool.contentLength = length; \
-    for (unsigned int i = 1; i < length; ++ i) { \
+    for (unsigned int i = 0; i < length; ++ i) { \
         ((type *)pool.content)[i].nextOffset = i + 1; \
         ((type *)pool.content)[i].prevOffset = i - 1; \
     } \
@@ -41,7 +41,7 @@
 
 #define NEW(type, pool, valueOffset) do { \
     valueOffset = pool.freeOffset; \
-    type *value = &pool.content[valueOffset]; \
+    type *value = &((type *)pool.content)[valueOffset]; \
     if (value->nextOffset == UNDEFINED_HASH_OFFSET) { \
         pool.content = realloc(pool.content, (pool.contentLength * 2) * sizeof(type)); \
         if (!pool.content) { \

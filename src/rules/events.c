@@ -688,7 +688,6 @@ static unsigned int handleBeta(ruleset *tree,
                                jsonObject *messageObject,
                                node *betaNode,
                                unsigned short actionType) {
-    printf("handle beta\n");
     unsigned int currentMessageOffset;
     CHECK_RESULT(storeMessage(tree,
                               sid,
@@ -1073,13 +1072,18 @@ static unsigned int handleMessageCore(ruleset *tree,
     char *storeCommand;
     jsonProperty *sidProperty = &jo->properties[jo->sidIndex];
     jsonProperty *midProperty = &jo->properties[jo->idIndex];
-    
+
 #ifdef _WIN32
     char *sid = (char *)_alloca(sizeof(char)*(sidProperty->valueLength + 1));
 #else
     char sid[sidProperty->valueLength + 1];
 #endif  
-    strncpy(sid, jo->content + sidProperty->valueOffset, sidProperty->valueLength);
+    if (sidProperty->valueOffset) {
+        strncpy(sid, jo->content + sidProperty->valueOffset, sidProperty->valueLength);
+    } else {
+        strncpy(sid, jo->sidBuffer, sidProperty->valueLength);
+    }
+
     sid[sidProperty->valueLength] = '\0';
     
 #ifdef _WIN32
@@ -1087,7 +1091,12 @@ static unsigned int handleMessageCore(ruleset *tree,
 #else
     char mid[midProperty->valueLength + 1];
 #endif
-    strncpy(mid, jo->content + midProperty->valueOffset, midProperty->valueLength);
+    if (midProperty->valueOffset) {
+        strncpy(mid, jo->content + midProperty->valueOffset, midProperty->valueLength);
+    } else {
+        strncpy(mid, jo->idBuffer, midProperty->valueLength);
+    }
+
     mid[midProperty->valueLength] = '\0';
     
     if (*commandCount == MAX_COMMAND_COUNT) {
