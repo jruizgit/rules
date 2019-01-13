@@ -223,6 +223,7 @@ static unsigned int reduceInt(long left,
             break;
     }
 
+    printf("reduce int %d\n", targetProperty->type);
     return RULES_OK;
 }
 
@@ -283,6 +284,7 @@ static unsigned int reduceOperand(ruleset *tree,
                                   jsonProperty **targetProperty) {
     (*targetProperty)->type = sourceOperand->type;
     switch(sourceOperand->type) {
+        case JSON_EXPRESSION:
         case JSON_MESSAGE_EXPRESSION:
             {
                 expression *currentExpression = &tree->expressionPool[sourceOperand->value.expressionOffset];
@@ -292,26 +294,25 @@ static unsigned int reduceOperand(ruleset *tree,
                                         messageContext,
                                         *targetProperty);
             }
-        case JSON_MESSAGE_IDENTIFIER:
-            return getObjectProperty(messageObject,
-                                     sourceOperand->value.id.propertyNameHash,
-                                     targetProperty);
-
         case JSON_IDENTIFIER:
             {
-                unsigned int messageOffset;
-                unsigned int result = getMessageFromFrame(messageContext, 
+                printf("reducing identifier\n");
+                unsigned int result = getMessageFromFrame(tree,
+                                                          messageContext, 
                                                           sourceOperand->value.id.nameHash, 
-                                                          &messageOffset);
+                                                          &messageObject);
                 if (result != RULES_OK) {
                     return result;
                 }
 
-                messageNode *referencedMessage = &tree->messagePool.content[messageOffset];
-                return getObjectProperty(&referencedMessage->jo,
-                                         sourceOperand->value.id.propertyNameHash,
-                                         targetProperty);
+                // break omitted intentionally, continue to next case
             }
+        case JSON_MESSAGE_IDENTIFIER:
+            printf("inspect message %s\n", messageObject->content);
+            printf("looking for message property %s\n", &tree->stringPool[sourceOperand->value.id.propertyNameOffset]);
+            return getObjectProperty(messageObject,
+                                     sourceOperand->value.id.propertyNameHash,
+                                     targetProperty);
         case JSON_STRING:
             {
                 char *stringValue = &tree->stringPool[sourceOperand->value.stringOffset];
@@ -331,6 +332,7 @@ static unsigned int reduceOperand(ruleset *tree,
             return RULES_OK;
     }
 
+    printf("type not supported %d\n", sourceOperand->type);
     return ERR_OPERATION_NOT_SUPPORTED;
 }
 
@@ -529,7 +531,7 @@ static unsigned int reduceExpression(ruleset *tree,
     if (result != RULES_OK) {
         return result;
     }
-
+    printf("left property %d, operator %d, right property %d\n", leftProperty->value.i, currentExpression->operator, rightProperty->value.i);
     return reduceProperties(currentExpression->operator, 
                             leftProperty, 
                             rightProperty, 
@@ -546,6 +548,7 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
     unsigned int result = RULES_OK;
     while (*i < exprs->length) {
         expression *currentExpression = &exprs->expressions[*i];
+        printf("expression sequence %d\n", currentExpression->operator);
         if (currentExpression->operator == OP_END) {
             return RULES_OK;          
         } 
@@ -602,6 +605,8 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
                 if (targetProperty->type != JSON_BOOL) {
                     return ERR_OPERATION_NOT_SUPPORTED;
                 }
+
+                printf("reduced expression %d\n", targetProperty->value.b);
             }
         }
 
@@ -617,12 +622,13 @@ static unsigned int isBetaMatch(ruleset *tree,
                                 messageFrame *messageContext,
                                 unsigned char *propertyMatch) {
     jsonProperty resultProperty;
+    unsigned short i = 0;
     unsigned int result = reduceExpressionSequence(tree,
                                                    &currentBeta->expressionSequence,
                                                    OP_NOP,
                                                    messageObject,
                                                    messageContext,
-                                                   0,
+                                                   &i,
                                                    &resultProperty);
     if (result != RULES_OK) {
         return result;
@@ -675,10 +681,17 @@ static void freeCommands(char **commands,
 
 static unsigned int handleAction(ruleset *tree, 
                                  char *sid, 
-                                 char *mid,
                                  node *node, 
-                                 unsigned char actionType) {
+                                 unsigned char actionType,
+                                 leftFrameNode *frame) {
     printf("handle action %s\n", &tree->stringPool[node->nameOffset]);
+    printf("frame\n");
+    for (int i = 0; i < MAX_MESSAGE_FRAMES; ++i) {
+        if (frame->messages[i].hash) {
+            messageNode *node = MESSAGE_NODE(tree, frame->messages[i].messageNodeOffset);
+            printf("    -> %s\n", node->jo.content);
+        }
+    }
     return RULES_OK;
 }
 
@@ -702,35 +715,40 @@ static unsigned int handleBeta(ruleset *tree,
     unsigned int currentFrameOffset = 0;
                     
     while (currentNode != NULL) {
-        printf("%s, %u\n", &tree->stringPool[currentNode->nameOffset], currentNode->value.b.hash);
         if (currentNode->type == NODE_ACTION) {
             currentNode = NULL;
             actionNode = currentNode;
         } else {
             if (!currentFrame) {
+                printf("expressions %d\n", currentNode->value.b.expressionSequence.length);
                 if (!currentNode->value.b.expressionSequence.length) {
-                    CHECK_RESULT(createLeftFrame(tree, &currentFrameOffset));
-                    currentFrame = &tree->leftFramePool.content[currentFrameOffset];
+                    CHECK_RESULT(createLeftFrame(tree, 
+                                                 &currentFrameOffset, 
+                                                 &currentFrame));
+                    printf("created left Frame %d\n", currentFrameOffset);
                 } else {
                     unsigned rightFrameOffset;
-                    CHECK_RESULT(createRightFrame(tree, &rightFrameOffset));
-                    
+                    rightFrameNode *rightFrame;
+                    CHECK_RESULT(createRightFrame(tree, 
+                                                  &rightFrameOffset, 
+                                                  &rightFrame));
+
+                    printf("created rightFrame %d, %d, %d\n", rightFrameOffset, rightFrame->prevOffset, rightFrame->nextOffset);
                     //TODO get real message hash
                     unsigned int messageHash = getHash(sid, "1");
-                    rightFrameNode *rightFrame = &tree->rightFramePool.content[rightFrameOffset];
                     rightFrame->messageOffset = currentMessageOffset;
                     CHECK_RESULT(setRightFrame(tree,
                                                currentNode->value.b.rightFrameIndex,
                                                messageHash,
                                                rightFrameOffset)); 
 
+                    printf("set rightFrame %d, %d, %d\n", rightFrameOffset, rightFrame->prevOffset, rightFrame->nextOffset);
                     // Find frame for message
                     CHECK_RESULT(getLeftFrame(tree,
                                               currentNode->value.b.leftFrameIndex,
                                               messageHash,
-                                              &currentFrameOffset));
+                                              &currentFrame));
 
-                    currentFrame = &tree->leftFramePool.content[currentFrameOffset];
                     unsigned char match = 0;
                     while (!match) {
                         CHECK_RESULT(isBetaMatch(tree,
@@ -738,9 +756,14 @@ static unsigned int handleBeta(ruleset *tree,
                                                  messageObject,
                                                  currentFrame->messages,
                                                  &match));
+                        printf("first match %d\n", match);
                         if (!match) {
                             currentFrameOffset = currentFrame->nextOffset;
-                            currentFrame = &tree->leftFramePool.content[currentFrameOffset];
+                            if (currentFrameOffset == UNDEFINED_HASH_OFFSET) {
+                                return ERR_FRAME_NOT_FOUND;
+                            }
+
+                            currentFrame = LEFT_FRAME_NODE(tree, currentFrameOffset);
                             if (currentFrame->hash != messageHash) {
                                 return ERR_FRAME_NOT_FOUND;
                             }
@@ -749,10 +772,9 @@ static unsigned int handleBeta(ruleset *tree,
                     }
 
                     CHECK_RESULT(cloneLeftFrame(tree,
-                                                currentFrameOffset,
-                                                &currentFrameOffset));
-
-                    currentFrame = &tree->leftFramePool.content[currentFrameOffset];
+                                                currentFrame,
+                                                &currentFrameOffset,
+                                                &currentFrame));
                 }
 
                 CHECK_RESULT(setMessageInFrame(currentFrame->messages,
@@ -768,36 +790,42 @@ static unsigned int handleBeta(ruleset *tree,
                                           currentFrameOffset));
 
                 // Find message for frame
-                unsigned int rightFrameOffset;
+                rightFrameNode *rightFrame;
                 CHECK_RESULT(getRightFrame(tree,
                                            currentNode->value.b.rightFrameIndex,
                                            frameHash,
-                                           &rightFrameOffset));
+                                           &rightFrame));
 
-                rightFrameNode *rightFrame = &tree->rightFramePool.content[rightFrameOffset];
-                jsonObject *rightMessage = &tree->messagePool.content[rightFrame->messageOffset];
+                printf("got getRightFrame %d, %d, %d\n", rightFrame->messageOffset, rightFrame->prevOffset, rightFrame->nextOffset);
+                messageNode *rightMessage = MESSAGE_NODE(tree, rightFrame->messageOffset); 
+                printf("message content %s\n", rightMessage->jo.content);
                 unsigned char match = 0;
                 while (!match) {
                     CHECK_RESULT(isBetaMatch(tree,
                                              &currentNode->value.b,
-                                             rightMessage,
+                                             &rightMessage->jo,
                                              currentFrame->messages,
                                              &match));
+                    printf("second match %d\n", match);
                     if (!match) {
-                        rightFrameOffset = rightFrame->nextOffset;
-                        rightFrame = &tree->rightFramePool.content[rightFrameOffset];
-                        rightMessage = &tree->messagePool.content[rightFrame->messageOffset];
+                        unsigned int rightFrameOffset = rightFrame->nextOffset;
+                        if (rightFrameOffset == UNDEFINED_HASH_OFFSET) {
+                            return ERR_FRAME_NOT_FOUND;
+                        }
+
+                        rightFrame = RIGHT_FRAME_NODE(tree, rightFrameOffset); 
                         if (rightFrame->hash != frameHash) {
                             return ERR_FRAME_NOT_FOUND;
                         }
+
+                        rightMessage = MESSAGE_NODE(tree, rightFrame->messageOffset);
                     }
                 }                
 
                 CHECK_RESULT(cloneLeftFrame(tree,
-                                            currentFrameOffset,
-                                            &currentFrameOffset));
-
-                currentFrame = &tree->leftFramePool.content[currentFrameOffset];
+                                            currentFrame,
+                                            &currentFrameOffset,
+                                            &currentFrame));
 
                 CHECK_RESULT(setMessageInFrame(currentFrame->messages,
                                                currentNode->value.b.hash,
@@ -811,9 +839,9 @@ static unsigned int handleBeta(ruleset *tree,
 
     return handleAction(tree, 
                         sid, 
-                        mid,
                         actionNode, 
-                        actionType);
+                        actionType,
+                        currentFrame);
 }
 
 
@@ -1050,7 +1078,7 @@ static unsigned int handleAlpha(ruleset *tree,
                                                   jo,
                                                   &tree->nodePool[betaList[entry]],  
                                                   actionType);
-                if (bresult != RULES_OK) {
+                if (bresult != RULES_OK && bresult != ERR_FRAME_NOT_FOUND) {
                     return bresult;
                 }
             }
@@ -1137,72 +1165,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                          &removeCommand,
                          rulesBinding);
     if (result == RULES_OK) {
-        if (*commandCount == MAX_COMMAND_COUNT - 3) {
-            for (unsigned int i = 0; i < addCount; ++i) {
-                free(addKeys[i]);
-            }
-
-            for (unsigned int i = 0; i < evalCount; ++i) {
-                free(evalKeys[i]);
-            }
-            
-            return ERR_MAX_COMMAND_COUNT;
-        }
-
-        if (removeCommand) {
-            commands[*commandCount] = removeCommand;
-            ++*commandCount;
-        }
-
-        if (addCount > 100) {
-            char *addCommand = NULL;
-            result = formatStoreMessage(*rulesBinding,
-                                        sid,
-                                        jo,
-                                        actionType == ACTION_ASSERT_FACT ? 1 : 0,
-                                        evalCount == 0 ? 1 : 0, 
-                                        addKeys,
-                                        addCount,
-                                        &addCommand);
-            for (unsigned int i = 0; i < addCount; ++i) {
-                free(addKeys[i]);
-            }
-
-            if (result != RULES_OK) {
-                for (unsigned int i = 0; i < evalCount; ++i) {
-                    free(evalKeys[i]);
-                }
-
-                return result;
-            }
-
-            commands[*commandCount] = addCommand;
-            ++*commandCount;
-        }
-
-        if (evalCount > 100) {
-            char *evalCommand = NULL;
-            result = formatEvalMessage(*rulesBinding,
-                                        sid,
-                                        mid,
-                                        jo,
-                                        actionType == ACTION_REMOVE_FACT ? ACTION_RETRACT_FACT : actionType,
-                                        evalKeys,
-                                        evalCount,
-                                        &evalCommand);
-
-            for (unsigned int i = 0; i < evalCount; ++i) {
-                free(evalKeys[i]);
-            }
-
-            if (result != RULES_OK) {
-                return result;
-            }
-
-            commands[*commandCount] = evalCommand;
-            ++*commandCount;
-        }
-
+        
         if (!state) {            
 #ifdef _WIN32
             char *stateMessage = (char *)_alloca(sizeof(char)*(36 + sidProperty->valueLength));
@@ -1216,31 +1179,6 @@ static unsigned int handleMessageCore(ruleset *tree,
             snprintf(newState, sizeof(char)*(12 + sidProperty->valueLength), "{\"sid\":\"%s\"}", sid);
 #endif
 
-            if (*commandCount == MAX_COMMAND_COUNT) {
-                return ERR_MAX_COMMAND_COUNT;
-            }
-
-            result = formatStoreSession(*rulesBinding, sid, newState, 1, &storeCommand);
-            if (result != RULES_OK) {
-                return result;
-            }
-
-            commands[*commandCount] = storeCommand;
-            ++*commandCount;
-            result = handleMessage(tree, 
-                                   NULL,
-                                   stateMessage,  
-                                   ACTION_ASSERT_EVENT,
-                                   commands,
-                                   commandCount,
-                                   rulesBinding);
-            if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-                return result;
-            }
-
-            if (result == ERR_EVENT_NOT_HANDLED) {
-                return RULES_OK;
-            }
         }
 
         return RULES_OK;

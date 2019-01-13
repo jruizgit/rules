@@ -9,6 +9,12 @@
 #define MAX_OBJECT_PROPERTIES 64
 #define MAX_MESSAGE_FRAMES 32
 
+#define MESSAGE_NODE(tree, offset) &((messageNode *)((ruleset *)tree)->messagePool.content)[offset]
+
+#define RIGHT_FRAME_NODE(tree, offset) &((rightFrameNode *)((ruleset *)tree)->rightFramePool.content)[offset]
+
+#define LEFT_FRAME_NODE(tree, offset) &((leftFrameNode *)((ruleset *)tree)->leftFramePool.content)[offset]
+
 typedef struct jsonProperty {
     unsigned int hash;
     unsigned char type;
@@ -103,9 +109,10 @@ unsigned int initLeftFramePool(void *tree);
 
 unsigned int initRightFramePool(void *tree);
 
-unsigned int getMessageFromFrame(messageFrame *messages,
+unsigned int getMessageFromFrame(void *tree,
+                                 messageFrame *messages,
                                  unsigned int hash,
-                                 unsigned int *messageNodeOffset);
+                                 jsonObject **message);
 
 unsigned int setMessageInFrame(messageFrame *messages,
                                unsigned int hash, 
@@ -113,8 +120,8 @@ unsigned int setMessageInFrame(messageFrame *messages,
 
 unsigned int getLeftFrame(void *tree, 
                           unsigned int *index, 
-                          unsigned int hash, 
-                          unsigned int *valueOffset);
+                          unsigned int hash,
+                          leftFrameNode **node);
 
 unsigned int setLeftFrame(void *tree, 
                           unsigned int *index, 
@@ -122,16 +129,18 @@ unsigned int setLeftFrame(void *tree,
                           unsigned int valueOffset);
 
 unsigned int createLeftFrame(void *tree, 
-                             unsigned int *valueOffset);
+                             unsigned int *valueOffset,
+                             leftFrameNode **node);
 
 unsigned int cloneLeftFrame(void *tree, 
-                            unsigned int valueOffset,
-                            unsigned int *newValueOffset);
+                            leftFrameNode *oldNode,                        
+                            unsigned int *newValueOffset,
+                            leftFrameNode **newNode);
 
 unsigned int getRightFrame(void *tree, 
                            unsigned int *index, 
-                           unsigned int hash, 
-                           unsigned int *valueOffset);
+                           unsigned int hash,
+                           rightFrameNode **node);
 
 unsigned int setRightFrame(void *tree, 
                            unsigned int *index, 
@@ -139,7 +148,8 @@ unsigned int setRightFrame(void *tree,
                            unsigned int valueOffset);
 
 unsigned int createRightFrame(void *tree, 
-                              unsigned int *valueOffset);
+                              unsigned int *valueOffset,
+                              rightFrameNode **node);
 
 unsigned int storeMessage(void *tree,
                           char *sid,

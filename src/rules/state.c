@@ -7,7 +7,7 @@
 #include "net.h"
 
 #define MAX_STATE_NODES 8
-#define MAX_MESSAGE_NODES 8
+#define MAX_MESSAGE_NODES 2
 #define MAX_LEFT_FRAME_NODES 8
 #define MAX_RIGHT_FRAME_NODES 8
 
@@ -30,7 +30,7 @@
 #define GET(type, index, max, pool, nodeHash, valueOffset) do { \
     valueOffset = index[nodeHash % max]; \
     while (valueOffset != UNDEFINED_HASH_OFFSET) { \
-        type *value = &pool.content[valueOffset]; \
+        type *value = &((type *)pool.content)[valueOffset]; \
         if (value->hash != nodeHash) { \
             valueOffset = value->nextOffset; \
         } else { \
@@ -55,13 +55,16 @@
         ((type *)pool.content)[pool.contentLength].prevOffset = valueOffset; \
         pool.contentLength *= 2; \
         ((type *)pool.content)[pool.contentLength - 1].nextOffset = UNDEFINED_HASH_OFFSET; \
+        printf("new length %d\n", pool.contentLength); \
     } \
     ((type *)pool.content)[value->nextOffset].prevOffset = UNDEFINED_HASH_OFFSET; \
     pool.freeOffset = value->nextOffset; \
+    value->nextOffset = UNDEFINED_HASH_OFFSET; \
+    value->prevOffset = UNDEFINED_HASH_OFFSET; \
 } while(0)
 
 #define SET(type, index, max, pool, nodeHash, valueOffset)  do { \
-    type *value = &pool.content[valueOffset]; \
+    type *value = &((type *)pool.content)[valueOffset]; \
     value->hash = nodeHash; \
     value->prevOffset = UNDEFINED_HASH_OFFSET; \
     value->nextOffset = index[nodeHash % max]; \
@@ -115,23 +118,27 @@ unsigned int initRightFramePool(void *tree) {
     return RULES_OK;
 }
 
-unsigned int getMessageFromFrame(messageFrame *messages,
+unsigned int getMessageFromFrame(void *tree,
+                                 messageFrame *messages,
                                  unsigned int hash,
-                                 unsigned int *messageNodeOffset) {
+                                 jsonObject **message) {
     unsigned short size = 0;
     unsigned short index = hash % MAX_MESSAGE_FRAMES;
-    *messageNodeOffset = UNDEFINED_HASH_OFFSET;
-    while (messages[index].hash && *messageNodeOffset == UNDEFINED_HASH_OFFSET && size < MAX_MESSAGE_FRAMES) {
+    unsigned int messageNodeOffset = UNDEFINED_HASH_OFFSET;
+    while (messages[index].hash && messageNodeOffset == UNDEFINED_HASH_OFFSET && size < MAX_MESSAGE_FRAMES) {
         if (messages[index].hash == hash) {
-            *messageNodeOffset = messages[index].messageNodeOffset;
+            messageNodeOffset = messages[index].messageNodeOffset;
         }
         ++size;
         index = (index + 1) % MAX_MESSAGE_FRAMES;
     }
 
-    if (*messageNodeOffset == UNDEFINED_HASH_OFFSET) {
+    if (messageNodeOffset == UNDEFINED_HASH_OFFSET) {
         return ERR_MESSAGE_NOT_FOUND;
     }        
+
+    messageNode *node = MESSAGE_NODE(tree, messageNodeOffset);
+    *message = &node->jo;
     return RULES_OK;
 }
 
@@ -155,11 +162,14 @@ unsigned int setMessageInFrame(messageFrame *messages,
 unsigned int getLeftFrame(void *tree, 
                           unsigned int *index, 
                           unsigned int hash, 
-                          unsigned int *valueOffset) {
-    GET(leftFrameNode, index, MAX_LEFT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->leftFramePool, hash, *valueOffset);
-    if (*valueOffset == UNDEFINED_HASH_OFFSET) {
+                          leftFrameNode **node) {
+    unsigned int valueOffset;
+    GET(leftFrameNode, index, MAX_LEFT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->leftFramePool, hash, valueOffset);
+    if (valueOffset == UNDEFINED_HASH_OFFSET) {
         return ERR_FRAME_NOT_FOUND;
     }
+
+    *node = LEFT_FRAME_NODE(tree, valueOffset);
     return RULES_OK;
 }
 
@@ -172,31 +182,35 @@ unsigned int setLeftFrame(void *tree,
 }
 
 unsigned int createLeftFrame(void *tree, 
-                             unsigned int *valueOffset) {
+                             unsigned int *valueOffset,
+                             leftFrameNode **node) {
     NEW(leftFrameNode, ((ruleset*)tree)->leftFramePool, *valueOffset);
-    leftFrameNode *value = &((ruleset*)tree)->leftFramePool.content[*valueOffset]; 
-    memset(value->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
+    *node = LEFT_FRAME_NODE(tree, *valueOffset);
+    memset((*node)->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
     return RULES_OK;
 }
 
 unsigned int cloneLeftFrame(void *tree, 
-                            unsigned int valueOffset,
-                            unsigned int *newValueOffset) {
+                            leftFrameNode *oldNode,                        
+                            unsigned int *newValueOffset,
+                            leftFrameNode **newNode) {
     NEW(leftFrameNode, ((ruleset*)tree)->leftFramePool, *newValueOffset);
-    leftFrameNode *newValue = &((ruleset*)tree)->leftFramePool.content[*newValueOffset]; 
-    leftFrameNode *value = &((ruleset*)tree)->leftFramePool.content[valueOffset]; 
-    memcpy(newValue->messages, value->messages, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
+    *newNode = LEFT_FRAME_NODE(tree, *newValueOffset);
+    memcpy((*newNode)->messages, oldNode->messages, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
     return RULES_OK;
 }
 
 unsigned int getRightFrame(void *tree, 
                            unsigned int *index, 
                            unsigned int hash, 
-                           unsigned int *valueOffset) {
-    GET(rightFrameNode, index, MAX_RIGHT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->rightFramePool, hash, *valueOffset);
-    if (*valueOffset == UNDEFINED_HASH_OFFSET) {
+                           rightFrameNode **node) {
+    unsigned int valueOffset;
+    GET(rightFrameNode, index, MAX_RIGHT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->rightFramePool, hash, valueOffset);
+    if (valueOffset == UNDEFINED_HASH_OFFSET) {
         return ERR_FRAME_NOT_FOUND;
     }
+
+    *node = RIGHT_FRAME_NODE(tree, valueOffset);
     return RULES_OK;
 }
 
@@ -209,8 +223,17 @@ unsigned int setRightFrame(void *tree,
 }
 
 unsigned int createRightFrame(void *tree, 
-                              unsigned int *valueOffset) {
+                              unsigned int *valueOffset,
+                              rightFrameNode **node) {
     NEW(rightFrameNode, ((ruleset*)tree)->rightFramePool, *valueOffset);
+    *node = RIGHT_FRAME_NODE(tree, *valueOffset);
+
+    unsigned int offset = *valueOffset;
+    while (offset) {
+        rightFrameNode *value = RIGHT_FRAME_NODE(tree, offset);
+        printf("right %d, %d, %d\n", offset, value->prevOffset, value->nextOffset);  
+        offset =  value->nextOffset;
+    }
     return RULES_OK;
 }
 
@@ -222,8 +245,22 @@ unsigned int storeMessage(void *tree,
     unsigned int hash = getHash(sid, mid);
     NEW(messageNode, ((ruleset*)tree)->messagePool, *valueOffset);
     SET(messageNode, ((ruleset*)tree)->messageIndex, MAX_MESSAGE_INDEX_LENGTH, ((ruleset*)tree)->messagePool, hash, *valueOffset);
-    messageNode *node = &((ruleset*)tree)->messagePool.content[*valueOffset];
+    messageNode *node = MESSAGE_NODE(tree, *valueOffset);
     memcpy(&node->jo, message, sizeof(jsonObject));
+    unsigned int messageLength = (strlen(message->content) + 1) * sizeof(char);
+    node->jo.content = malloc(messageLength);
+    if (!node->jo.content) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    memcpy(node->jo.content, message->content, messageLength);
+    unsigned int currentOffset = *valueOffset;
+    while (currentOffset) {
+        node = MESSAGE_NODE(tree, currentOffset);
+        printf("stored %d, %d, %d, %s\n", currentOffset, node->prevOffset, node->nextOffset, node->jo.content);  
+        currentOffset =  node->nextOffset;
+    }
+
+
     return RULES_OK;
 }
 
