@@ -39,11 +39,13 @@
 #define HASH_R 1203507539 //$r
 #define HASH_FORWARD 739185624 // $forward
 
+#define MAX_ACTIONS 4096
+
 #define GET_EXPRESSION(exprs, expr) do { \
     expr = &exprs->expressions[exprs->length]; \
     ++exprs->length; \
     if (exprs->length == MAX_SEQUENCE_EXPRESSIONS) { \
-        return ERR_TERM_LIMIT_EXCEEDED; \
+        return ERR_EXPRESSION_LIMIT_EXCEEDED; \
     } \
 } while(0)
 
@@ -51,7 +53,7 @@
     exprs->expressions[exprs->length].operator = op; \
     ++exprs->length; \
     if (exprs->length == MAX_SEQUENCE_EXPRESSIONS) { \
-        return ERR_TERM_LIMIT_EXCEEDED; \
+        return ERR_EXPRESSION_LIMIT_EXCEEDED; \
     } \
 } while(0)
 
@@ -1256,8 +1258,8 @@ static unsigned int createBeta(ruleset *tree,
         newBeta->value.b.nextOffset = nextOffset;
         newBeta->value.b.not = (operator == OP_NOT) ? 1 : 0;
         newBeta->value.b.hash = hash;
-        memset(newBeta->value.b.leftFrameIndex, 0, MAX_LEFT_FRAME_INDEX_LENGTH * sizeof(unsigned int));
-        memset(newBeta->value.b.rightFrameIndex, 0, MAX_RIGHT_FRAME_INDEX_LENGTH * sizeof(unsigned int));
+        newBeta->value.b.index = tree->betaCount;
+        ++tree->betaCount;
         
         if (previousOffset != 0) {
             tree->nodePool[previousOffset].value.b.nextOffset = betaOffset;
@@ -1477,12 +1479,11 @@ static void printActionNode(ruleset *tree, node *actionNode, int level, unsigned
         printf("    ");
     }
 
-    printf("-> action: name %s, count %d, cap %d, priority %d, joins %d, offset %u\n", 
+    printf("-> action: name %s, count %d, cap %d, priority %d, offset %u\n", 
           &tree->stringPool[actionNode->nameOffset],
           actionNode->value.c.count,
           actionNode->value.c.cap,
           actionNode->value.c.priority,
-          actionNode->value.c.joinsLength,
           offset);
 }
 
@@ -1544,6 +1545,7 @@ static unsigned int createTree(ruleset *tree, char *rules) {
     unsigned char type;
     unsigned int hash;
     unsigned int result = readNextName(rules, &firstName, &lastName, &hash);
+    node *ruleActions[MAX_ACTIONS];
     while (result == PARSE_OK) {
         node *ruleAction;
         unsigned int actionOffset;
@@ -1552,10 +1554,15 @@ static unsigned int createTree(ruleset *tree, char *rules) {
             return result;
         }
         
+        if (tree->actionCount == MAX_ACTIONS) {
+            return ERR_RULE_LIMIT_EXCEEDED;
+        }
+
         ruleAction->value.c.index = tree->actionCount;
+        ruleActions[tree->actionCount] = ruleAction;
         ++tree->actionCount;
         ruleAction->type = NODE_ACTION;
-
+        
         // tree->stringPool can change after storing strings
         // need to resolve namespace every time it is used.
         char *namespace = &tree->stringPool[tree->nameOffset];
@@ -1584,6 +1591,21 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         getSetting(HASH_CAP, first, &ruleAction->value.c.cap);
         if (!ruleAction->value.c.count && !ruleAction->value.c.cap) {
             ruleAction->value.c.count = 1;
+        }
+
+        //Ensure action index is assigned based on priority
+        unsigned int currentIndex = ruleAction->value.c.index;
+        while (currentIndex) {
+            if (ruleActions[currentIndex]->value.c.priority >= ruleActions[currentIndex - 1]->value.c.priority) {
+                break;
+            } else {
+                node *tempAction = ruleActions[currentIndex];
+                ruleActions[currentIndex] = ruleActions[currentIndex - 1];
+                ruleActions[currentIndex]->value.c.index = currentIndex;
+                ruleActions[currentIndex - 1] = tempAction;
+                ruleActions[currentIndex - 1]->value.c.index = currentIndex - 1;  
+                --currentIndex; 
+            }
         }
 
         unsigned short distinct = 1;
@@ -1643,12 +1665,8 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
-    memset(tree->messageIndex, 0, MAX_MESSAGE_INDEX_LENGTH * sizeof(unsigned int));
     initStatePool(tree);
-    initMessagePool(tree);
-    initLeftFramePool(tree);
-    initRightFramePool(tree);
-
+    
     result = storeString(tree, name, &tree->nameOffset, strlen(name));
     if (result != RULES_OK) {
         return result;
@@ -1706,6 +1724,7 @@ unsigned int createClient(unsigned int *handle, char *name) {
     tree->expressionPool = NULL;
     tree->expressionOffset = 0;
     tree->actionCount = 0;
+    tree->betaCount = 0;
     tree->bindingsList = NULL;
     memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
     initStatePool(tree);

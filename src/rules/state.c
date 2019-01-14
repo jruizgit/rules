@@ -103,22 +103,7 @@ unsigned int initStatePool(void *tree) {
     return RULES_OK;
 }
 
-unsigned int initMessagePool(void *tree) {
-    INIT(messageNode, ((ruleset*)tree)->messagePool, MAX_MESSAGE_NODES);
-    return RULES_OK;
-}
-
-unsigned int initLeftFramePool(void *tree) {
-    INIT(leftFrameNode, ((ruleset*)tree)->leftFramePool, MAX_LEFT_FRAME_NODES);
-    return RULES_OK;
-}
-
-unsigned int initRightFramePool(void *tree) {
-    INIT(rightFrameNode, ((ruleset*)tree)->rightFramePool, MAX_RIGHT_FRAME_NODES);
-    return RULES_OK;
-}
-
-unsigned int getMessageFromFrame(void *tree,
+unsigned int getMessageFromFrame(stateNode *state,
                                  messageFrame *messages,
                                  unsigned int hash,
                                  jsonObject **message) {
@@ -137,7 +122,7 @@ unsigned int getMessageFromFrame(void *tree,
         return ERR_MESSAGE_NOT_FOUND;
     }        
 
-    messageNode *node = MESSAGE_NODE(tree, messageNodeOffset);
+    messageNode *node = MESSAGE_NODE(state, messageNodeOffset);
     *message = &node->jo;
     return RULES_OK;
 }
@@ -159,93 +144,114 @@ unsigned int setMessageInFrame(messageFrame *messages,
     return RULES_OK;   
 }
 
-unsigned int getLeftFrame(void *tree, 
-                          unsigned int *index, 
+unsigned int getLeftFrame(stateNode *state,
+                          unsigned int index, 
                           unsigned int hash, 
                           leftFrameNode **node) {
     unsigned int valueOffset;
-    GET(leftFrameNode, index, MAX_LEFT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->leftFramePool, hash, valueOffset);
+    GET(leftFrameNode, 
+        state->betaState[index].leftFrameIndex, 
+        MAX_LEFT_FRAME_INDEX_LENGTH, 
+        state->betaState[index].leftFramePool, 
+        hash, 
+        valueOffset);
     if (valueOffset == UNDEFINED_HASH_OFFSET) {
         return ERR_FRAME_NOT_FOUND;
     }
 
-    *node = LEFT_FRAME_NODE(tree, valueOffset);
+    *node = LEFT_FRAME_NODE(state, index, valueOffset);
     return RULES_OK;
 }
 
-unsigned int setLeftFrame(void *tree, 
-                          unsigned int *index, 
+unsigned int setLeftFrame(stateNode *state, 
+                          unsigned int index, 
                           unsigned int hash, 
                           unsigned int valueOffset) {
-    SET(leftFrameNode, index, MAX_LEFT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->leftFramePool, hash, valueOffset);
+    SET(leftFrameNode, 
+        state->betaState[index].leftFrameIndex, 
+        MAX_LEFT_FRAME_INDEX_LENGTH, 
+        state->betaState[index].leftFramePool, 
+        hash, 
+        valueOffset);
     return RULES_OK;
 }
 
-unsigned int createLeftFrame(void *tree, 
+unsigned int createLeftFrame(stateNode *state,
+                             unsigned int index, 
                              unsigned int *valueOffset,
                              leftFrameNode **node) {
-    NEW(leftFrameNode, ((ruleset*)tree)->leftFramePool, *valueOffset);
-    *node = LEFT_FRAME_NODE(tree, *valueOffset);
+    NEW(leftFrameNode, 
+        state->betaState[index].leftFramePool, 
+        *valueOffset);
+    *node = LEFT_FRAME_NODE(state, index, *valueOffset);
     memset((*node)->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
     return RULES_OK;
 }
 
-unsigned int cloneLeftFrame(void *tree, 
+unsigned int cloneLeftFrame(stateNode *state,
+                            unsigned int index, 
                             leftFrameNode *oldNode,                        
                             unsigned int *newValueOffset,
                             leftFrameNode **newNode) {
-    NEW(leftFrameNode, ((ruleset*)tree)->leftFramePool, *newValueOffset);
-    *newNode = LEFT_FRAME_NODE(tree, *newValueOffset);
+    NEW(leftFrameNode, 
+        state->betaState[index].leftFramePool, 
+        *newValueOffset);
+    *newNode = LEFT_FRAME_NODE(state, index, *newValueOffset);
     memcpy((*newNode)->messages, oldNode->messages, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
     return RULES_OK;
 }
 
-unsigned int getRightFrame(void *tree, 
-                           unsigned int *index, 
+unsigned int getRightFrame(stateNode *state,
+                           unsigned int index, 
                            unsigned int hash, 
                            rightFrameNode **node) {
     unsigned int valueOffset;
-    GET(rightFrameNode, index, MAX_RIGHT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->rightFramePool, hash, valueOffset);
+    GET(rightFrameNode, 
+        state->betaState[index].rightFrameIndex, 
+        MAX_RIGHT_FRAME_INDEX_LENGTH, 
+        state->betaState[index].rightFramePool, 
+        hash, 
+        valueOffset);
     if (valueOffset == UNDEFINED_HASH_OFFSET) {
         return ERR_FRAME_NOT_FOUND;
     }
 
-    *node = RIGHT_FRAME_NODE(tree, valueOffset);
+    *node = RIGHT_FRAME_NODE(state, index, valueOffset);
     return RULES_OK;
 }
 
-unsigned int setRightFrame(void *tree, 
-                           unsigned int *index, 
+unsigned int setRightFrame(stateNode *state,
+                           unsigned int index, 
                            unsigned int hash, 
                            unsigned int valueOffset) {
-    SET(rightFrameNode, index, MAX_RIGHT_FRAME_INDEX_LENGTH, ((ruleset*)tree)->rightFramePool, hash, valueOffset);
+    SET(rightFrameNode, 
+        state->betaState[index].rightFrameIndex, 
+        MAX_RIGHT_FRAME_INDEX_LENGTH, 
+        state->betaState[index].rightFramePool, 
+        hash, 
+        valueOffset);
     return RULES_OK;
 }
 
-unsigned int createRightFrame(void *tree, 
+unsigned int createRightFrame(stateNode *state,
+                              unsigned int index,  
                               unsigned int *valueOffset,
                               rightFrameNode **node) {
-    NEW(rightFrameNode, ((ruleset*)tree)->rightFramePool, *valueOffset);
-    *node = RIGHT_FRAME_NODE(tree, *valueOffset);
-
-    unsigned int offset = *valueOffset;
-    while (offset) {
-        rightFrameNode *value = RIGHT_FRAME_NODE(tree, offset);
-        printf("right %d, %d, %d\n", offset, value->prevOffset, value->nextOffset);  
-        offset =  value->nextOffset;
-    }
+    NEW(rightFrameNode, 
+        state->betaState[index].rightFramePool, 
+        *valueOffset);
+    *node = RIGHT_FRAME_NODE(state, index, *valueOffset);
     return RULES_OK;
 }
 
-unsigned int storeMessage(void *tree,
-                          char *sid,
+unsigned int storeMessage(stateNode *state,
                           char *mid,
                           jsonObject *message,
                           unsigned int *valueOffset) {
-    unsigned int hash = getHash(sid, mid);
-    NEW(messageNode, ((ruleset*)tree)->messagePool, *valueOffset);
-    SET(messageNode, ((ruleset*)tree)->messageIndex, MAX_MESSAGE_INDEX_LENGTH, ((ruleset*)tree)->messagePool, hash, *valueOffset);
-    messageNode *node = MESSAGE_NODE(tree, *valueOffset);
+    unsigned int hash = fnv1Hash32(mid, strlen(mid));
+    NEW(messageNode, state->messagePool, *valueOffset);
+    SET(messageNode, state->messageIndex, MAX_MESSAGE_INDEX_LENGTH, state->messagePool, hash, *valueOffset);
+    messageNode *node = MESSAGE_NODE(state, *valueOffset);
     memcpy(&node->jo, message, sizeof(jsonObject));
     unsigned int messageLength = (strlen(message->content) + 1) * sizeof(char);
     node->jo.content = malloc(messageLength);
@@ -255,12 +261,56 @@ unsigned int storeMessage(void *tree,
     memcpy(node->jo.content, message->content, messageLength);
     unsigned int currentOffset = *valueOffset;
     while (currentOffset) {
-        node = MESSAGE_NODE(tree, currentOffset);
+        node = MESSAGE_NODE(state, currentOffset);
         printf("stored %d, %d, %d, %s\n", currentOffset, node->prevOffset, node->nextOffset, node->jo.content);  
         currentOffset =  node->nextOffset;
     }
 
 
+    return RULES_OK;
+}
+
+unsigned int ensureStateNode(void *tree, 
+                             char *sid, 
+                             stateNode **state) {  
+    printf("ensure state\n");
+    unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
+    unsigned int nodeOffset;
+    GET(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, nodeOffset);
+    if (nodeOffset != UNDEFINED_HASH_OFFSET) {
+        *state = STATE_NODE(tree, nodeOffset); 
+    } else {
+        printf("new state\n");
+        NEW(stateNode, ((ruleset*)tree)->statePool, nodeOffset);
+        SET(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, nodeOffset);
+        *state = STATE_NODE(tree, nodeOffset); 
+
+        stateNode *node = *state;
+        unsigned int result = getBindingIndex(tree, sidHash, &node->bindingIndex);
+        if (result != RULES_OK) {
+            return result;
+        }
+
+        INIT(messageNode, node->messagePool, MAX_MESSAGE_NODES);
+        memset(node->messageIndex, 0, MAX_MESSAGE_INDEX_LENGTH * sizeof(unsigned int));
+        
+        node->betaState = malloc(((ruleset*)tree)->betaCount * sizeof(betaStateNode));
+        for (unsigned int i = 0; i < ((ruleset*)tree)->betaCount; ++i) {
+            betaStateNode *betaNode = &node->betaState[i];
+            INIT(leftFrameNode, betaNode->leftFramePool, MAX_LEFT_FRAME_NODES);
+            memset(betaNode->leftFrameIndex, 0, MAX_LEFT_FRAME_INDEX_LENGTH * sizeof(unsigned int));
+            
+            INIT(rightFrameNode, betaNode->rightFramePool, MAX_RIGHT_FRAME_NODES);
+            memset(betaNode->rightFrameIndex, 0, MAX_RIGHT_FRAME_INDEX_LENGTH * sizeof(unsigned int));
+        }
+
+        node->actionState = malloc(((ruleset*)tree)->actionCount * sizeof(actionStateNode));
+        for (unsigned int i = 0; i < ((ruleset*)tree)->actionCount; ++i) {
+            actionStateNode *actionNode = &node->actionState[i];
+            INIT(leftFrameNode, actionNode->resultPool, MAX_LEFT_FRAME_NODES);
+        }        
+    }
+    
     return RULES_OK;
 }
 
@@ -574,24 +624,6 @@ unsigned int constructObject(char *root,
 unsigned int resolveBinding(void *tree, 
                             char *sid, 
                             void **rulesBinding) {  
-    printf("resolveBinding\n");
-    unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
-    unsigned int nodeOffset;
-    GET(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, nodeOffset);
-    if (nodeOffset == UNDEFINED_HASH_OFFSET) {
-        printf("newNode\n");
-        NEW(stateNode, ((ruleset*)tree)->statePool, nodeOffset);
-        SET(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, nodeOffset);
-        stateNode *node = &((ruleset*)tree)->statePool.content[nodeOffset];
-        unsigned int result = getBindingIndex(tree, sidHash, &node->bindingIndex);
-        if (result != RULES_OK) {
-            return result;
-        }
-
-        bindingsList *list = ((ruleset*)tree)->bindingsList;
-        *rulesBinding = &list->bindings[node->bindingIndex];
-    }
-    
     return RULES_OK;
 }
 

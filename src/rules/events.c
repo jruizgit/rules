@@ -77,6 +77,7 @@ static unsigned int handleMessage(ruleset *tree,
                                   void **rulesBinding);
 
 static unsigned int reduceExpression(ruleset *tree,
+                                     stateNode *state, 
                                      expression *currentExpression,
                                      jsonObject *messageObject,
                                      messageFrame *messageContext,
@@ -278,6 +279,7 @@ static unsigned int reduceDouble(double left,
 }
 
 static unsigned int reduceOperand(ruleset *tree,
+                                  stateNode *state, 
                                   operand *sourceOperand, 
                                   jsonObject *messageObject,
                                   messageFrame *messageContext,
@@ -289,6 +291,7 @@ static unsigned int reduceOperand(ruleset *tree,
             {
                 expression *currentExpression = &tree->expressionPool[sourceOperand->value.expressionOffset];
                 return reduceExpression(tree, 
+                                        state,
                                         currentExpression,
                                         messageObject,
                                         messageContext,
@@ -297,7 +300,7 @@ static unsigned int reduceOperand(ruleset *tree,
         case JSON_IDENTIFIER:
             {
                 printf("reducing identifier\n");
-                unsigned int result = getMessageFromFrame(tree,
+                unsigned int result = getMessageFromFrame(state,
                                                           messageContext, 
                                                           sourceOperand->value.id.nameHash, 
                                                           &messageObject);
@@ -493,6 +496,7 @@ static unsigned int reduceProperties(unsigned char operator,
 }
 
 static unsigned int reduceExpression(ruleset *tree,
+                                     stateNode *state, 
                                      expression *currentExpression,
                                      jsonObject *messageObject,
                                      messageFrame *messageContext,
@@ -501,6 +505,7 @@ static unsigned int reduceExpression(ruleset *tree,
     jsonProperty leftValue;
     jsonProperty *leftProperty = &leftValue;
     result = reduceOperand(tree,
+                           state,
                            &currentExpression->left,
                            messageObject,
                            messageContext,
@@ -524,6 +529,7 @@ static unsigned int reduceExpression(ruleset *tree,
     jsonProperty rightValue;
     jsonProperty *rightProperty = &rightValue;
     result = reduceOperand(tree,
+                           state,
                            &currentExpression->right,
                            messageObject,
                            messageContext,
@@ -539,6 +545,7 @@ static unsigned int reduceExpression(ruleset *tree,
 }
 
 static unsigned int reduceExpressionSequence(ruleset *tree,
+                                             stateNode *state, 
                                              expressionSequence *exprs,
                                              unsigned short operator,
                                              jsonObject *messageObject,
@@ -567,6 +574,7 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
 
                 ++*i;
                 result = reduceExpressionSequence(tree,
+                                                  state,
                                                   exprs,
                                                   currentExpression->operator,
                                                   messageObject,
@@ -581,6 +589,7 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
             if (currentExpression->operator == OP_AND || currentExpression->operator == OP_OR) {
                 ++*i;
                 result = reduceExpressionSequence(tree,
+                                                  state,
                                                   exprs,
                                                   currentExpression->operator,
                                                   messageObject,
@@ -594,6 +603,7 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
                 
             } else {
                 unsigned int result = reduceExpression(tree,
+                                                       state,
                                                        currentExpression,
                                                        messageObject,
                                                        messageContext,
@@ -617,6 +627,7 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
 }
 
 static unsigned int isBetaMatch(ruleset *tree,
+                                stateNode *state, 
                                 beta *currentBeta, 
                                 jsonObject *messageObject,
                                 messageFrame *messageContext,
@@ -624,6 +635,7 @@ static unsigned int isBetaMatch(ruleset *tree,
     jsonProperty resultProperty;
     unsigned short i = 0;
     unsigned int result = reduceExpressionSequence(tree,
+                                                   state,
                                                    &currentBeta->expressionSequence,
                                                    OP_NOP,
                                                    messageObject,
@@ -655,6 +667,7 @@ static unsigned int isAlphaMatch(ruleset *tree,
 
     jsonProperty resultProperty;
     unsigned int result = reduceExpression(tree,
+                                           NULL,
                                            &currentAlpha->expression,
                                            messageObject,
                                            NULL,
@@ -680,7 +693,7 @@ static void freeCommands(char **commands,
 }
 
 static unsigned int handleAction(ruleset *tree, 
-                                 char *sid, 
+                                 stateNode *state, 
                                  node *node, 
                                  unsigned char actionType,
                                  leftFrameNode *frame) {
@@ -688,7 +701,7 @@ static unsigned int handleAction(ruleset *tree,
     printf("frame\n");
     for (int i = 0; i < MAX_MESSAGE_FRAMES; ++i) {
         if (frame->messages[i].hash) {
-            messageNode *node = MESSAGE_NODE(tree, frame->messages[i].messageNodeOffset);
+            messageNode *node = MESSAGE_NODE(state, frame->messages[i].messageNodeOffset);
             printf("    -> %s\n", node->jo.content);
         }
     }
@@ -696,18 +709,12 @@ static unsigned int handleAction(ruleset *tree,
 }
 
 static unsigned int handleBeta(ruleset *tree, 
-                               char *sid,
+                               stateNode *state,
                                char *mid,
                                jsonObject *messageObject,
+                               unsigned int currentMessageOffset,
                                node *betaNode,
-                               unsigned short actionType) {
-    unsigned int currentMessageOffset;
-    CHECK_RESULT(storeMessage(tree,
-                              sid,
-                              mid,
-                              messageObject,
-                              &currentMessageOffset));
-    
+                               unsigned short actionType) {    
     printf("handling beta %d\n", currentMessageOffset);
     node *actionNode = NULL;
     node *currentNode = betaNode;
@@ -722,36 +729,39 @@ static unsigned int handleBeta(ruleset *tree,
             if (!currentFrame) {
                 printf("expressions %d\n", currentNode->value.b.expressionSequence.length);
                 if (!currentNode->value.b.expressionSequence.length) {
-                    CHECK_RESULT(createLeftFrame(tree, 
+                    CHECK_RESULT(createLeftFrame(state,
+                                                 betaNode->value.b.index, 
                                                  &currentFrameOffset, 
                                                  &currentFrame));
                     printf("created left Frame %d\n", currentFrameOffset);
                 } else {
                     unsigned rightFrameOffset;
                     rightFrameNode *rightFrame;
-                    CHECK_RESULT(createRightFrame(tree, 
+                    CHECK_RESULT(createRightFrame(state,
+                                                  betaNode->value.b.index,
                                                   &rightFrameOffset, 
                                                   &rightFrame));
 
                     printf("created rightFrame %d, %d, %d\n", rightFrameOffset, rightFrame->prevOffset, rightFrame->nextOffset);
                     //TODO get real message hash
-                    unsigned int messageHash = getHash(sid, "1");
+                    unsigned int messageHash = fnv1Hash32("1", 1);
                     rightFrame->messageOffset = currentMessageOffset;
-                    CHECK_RESULT(setRightFrame(tree,
-                                               currentNode->value.b.rightFrameIndex,
+                    CHECK_RESULT(setRightFrame(state,
+                                               betaNode->value.b.index,
                                                messageHash,
                                                rightFrameOffset)); 
 
                     printf("set rightFrame %d, %d, %d\n", rightFrameOffset, rightFrame->prevOffset, rightFrame->nextOffset);
                     // Find frame for message
-                    CHECK_RESULT(getLeftFrame(tree,
-                                              currentNode->value.b.leftFrameIndex,
+                    CHECK_RESULT(getLeftFrame(state,
+                                              betaNode->value.b.index,
                                               messageHash,
                                               &currentFrame));
 
                     unsigned char match = 0;
                     while (!match) {
                         CHECK_RESULT(isBetaMatch(tree,
+                                                 state,
                                                  &currentNode->value.b,
                                                  messageObject,
                                                  currentFrame->messages,
@@ -763,7 +773,9 @@ static unsigned int handleBeta(ruleset *tree,
                                 return ERR_FRAME_NOT_FOUND;
                             }
 
-                            currentFrame = LEFT_FRAME_NODE(tree, currentFrameOffset);
+                            currentFrame = LEFT_FRAME_NODE(state, 
+                                                           betaNode->value.b.index, 
+                                                           currentFrameOffset);
                             if (currentFrame->hash != messageHash) {
                                 return ERR_FRAME_NOT_FOUND;
                             }
@@ -771,7 +783,8 @@ static unsigned int handleBeta(ruleset *tree,
 
                     }
 
-                    CHECK_RESULT(cloneLeftFrame(tree,
+                    CHECK_RESULT(cloneLeftFrame(state,
+                                                betaNode->value.b.index,
                                                 currentFrame,
                                                 &currentFrameOffset,
                                                 &currentFrame));
@@ -783,25 +796,26 @@ static unsigned int handleBeta(ruleset *tree,
 
             } else {
                 //TODO get real frame hash
-                unsigned int frameHash = getHash(sid, "1");
-                CHECK_RESULT(setLeftFrame(tree,
-                                          currentNode->value.b.leftFrameIndex,
+                unsigned int frameHash = fnv1Hash32("1", 1);
+                CHECK_RESULT(setLeftFrame(state,
+                                          betaNode->value.b.index,
                                           frameHash,
                                           currentFrameOffset));
 
                 // Find message for frame
                 rightFrameNode *rightFrame;
-                CHECK_RESULT(getRightFrame(tree,
-                                           currentNode->value.b.rightFrameIndex,
+                CHECK_RESULT(getRightFrame(state,
+                                           betaNode->value.b.index,
                                            frameHash,
                                            &rightFrame));
 
                 printf("got getRightFrame %d, %d, %d\n", rightFrame->messageOffset, rightFrame->prevOffset, rightFrame->nextOffset);
-                messageNode *rightMessage = MESSAGE_NODE(tree, rightFrame->messageOffset); 
+                messageNode *rightMessage = MESSAGE_NODE(state, rightFrame->messageOffset); 
                 printf("message content %s\n", rightMessage->jo.content);
                 unsigned char match = 0;
                 while (!match) {
                     CHECK_RESULT(isBetaMatch(tree,
+                                             state,
                                              &currentNode->value.b,
                                              &rightMessage->jo,
                                              currentFrame->messages,
@@ -813,16 +827,19 @@ static unsigned int handleBeta(ruleset *tree,
                             return ERR_FRAME_NOT_FOUND;
                         }
 
-                        rightFrame = RIGHT_FRAME_NODE(tree, rightFrameOffset); 
+                        rightFrame = RIGHT_FRAME_NODE(state,
+                                                      betaNode->value.b.index, 
+                                                      rightFrameOffset); 
                         if (rightFrame->hash != frameHash) {
                             return ERR_FRAME_NOT_FOUND;
                         }
 
-                        rightMessage = MESSAGE_NODE(tree, rightFrame->messageOffset);
+                        rightMessage = MESSAGE_NODE(state, rightFrame->messageOffset);
                     }
                 }                
 
-                CHECK_RESULT(cloneLeftFrame(tree,
+                CHECK_RESULT(cloneLeftFrame(state,
+                                            betaNode->value.b.index,
                                             currentFrame,
                                             &currentFrameOffset,
                                             &currentFrame));
@@ -838,7 +855,7 @@ static unsigned int handleBeta(ruleset *tree,
     }
 
     return handleAction(tree, 
-                        sid, 
+                        state, 
                         actionNode, 
                         actionType,
                         currentFrame);
@@ -846,11 +863,10 @@ static unsigned int handleBeta(ruleset *tree,
 
 
 static unsigned int handleAplhaArray(ruleset *tree,
-                                 char *sid,
-                                 jsonObject *messageObject,
-                                 jsonProperty *currentProperty,
-                                 alpha *arrayAlpha,
-                                 unsigned char *propertyMatch) {
+                                     jsonObject *messageObject,
+                                     jsonProperty *currentProperty,
+                                     alpha *arrayAlpha,
+                                     unsigned char *propertyMatch) {
     printf("handle alpha array\n");  
     unsigned int result = RULES_OK;
     if (currentProperty->type != JSON_ARRAY) {
@@ -931,11 +947,10 @@ static unsigned int handleAplhaArray(ruleset *tree,
                             if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
                                 // handleAplhaArray finds a valid path, thus use propertyMatch
                                 result = handleAplhaArray(tree, 
-                                                      sid, 
-                                                      messageObject,
-                                                      currentProperty, 
-                                                      &hashNode->value.a,
-                                                      propertyMatch);
+                                                          messageObject,
+                                                          currentProperty, 
+                                                          &hashNode->value.a,
+                                                          propertyMatch);
                             } else {
                                 result = isAlphaMatch(tree,
                                                       &hashNode->value.a,
@@ -980,24 +995,19 @@ static unsigned int handleAplhaArray(ruleset *tree,
     return (result == PARSE_END ? RULES_OK: result);
 }
 
-static unsigned int handleAlpha(ruleset *tree, 
-                                char *sid, 
+static unsigned int handleAlpha(ruleset *tree,
+                                char *sid,
                                 char *mid,
                                 jsonObject *jo,
                                 alpha *alphaNode, 
-                                unsigned char actionType,
-                                char **evalKeys,
-                                unsigned int *evalCount,
-                                char **addKeys,
-                                unsigned int *addCount,
-                                char **removeCommand,
-                                void **rulesBinding) { 
+                                unsigned char actionType) { 
     printf("handle alpha\n");                       
     unsigned short top = 1;
     unsigned int entry;
     alpha *stack[MAX_STACK_SIZE];
     stack[0] = alphaNode;
     alpha *currentAlpha;
+
     while (top) {
         --top;
         currentAlpha = stack[top];
@@ -1038,12 +1048,11 @@ static unsigned int handleAlpha(ruleset *tree,
                             unsigned char match = 0;
                             unsigned int mresult = RULES_OK;
                             if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
-                                mresult = handleAplhaArray(tree, 
-                                                       sid, 
-                                                       jo,
-                                                       currentProperty, 
-                                                       &hashNode->value.a,
-                                                       &match);
+                                mresult = handleAplhaArray(tree,
+                                                           jo,
+                                                           currentProperty, 
+                                                           &hashNode->value.a,
+                                                           &match);
                             } else {
                                 mresult = isAlphaMatch(tree, 
                                                        &hashNode->value.a,
@@ -1070,12 +1079,24 @@ static unsigned int handleAlpha(ruleset *tree,
         }
 
         if (currentAlpha->betaListOffset) {
+            stateNode *sidState;
+            CHECK_RESULT(ensureStateNode(tree, 
+                                         sid, 
+                                         &sidState));
+    
+            unsigned int currentMessageOffset;
+            CHECK_RESULT(storeMessage(sidState,
+                                      mid,
+                                      jo,
+                                      &currentMessageOffset));
+
             unsigned int *betaList = &tree->nextPool[currentAlpha->betaListOffset];
             for (unsigned int entry = 0; betaList[entry] != 0; ++entry) {
                 unsigned int bresult = handleBeta(tree, 
-                                                  sid, 
+                                                  sidState, 
                                                   mid,
                                                   jo,
+                                                  currentMessageOffset,
                                                   &tree->nodePool[betaList[entry]],  
                                                   actionType);
                 if (bresult != RULES_OK && bresult != ERR_FRAME_NOT_FOUND) {
@@ -1097,7 +1118,6 @@ static unsigned int handleMessageCore(ruleset *tree,
                                       void **rulesBinding) {
     printf("handle message core\n");
     unsigned int result;
-    char *storeCommand;
     jsonProperty *sidProperty = &jo->properties[jo->sidIndex];
     jsonProperty *midProperty = &jo->properties[jo->idIndex];
 
@@ -1126,44 +1146,17 @@ static unsigned int handleMessageCore(ruleset *tree,
     }
 
     mid[midProperty->valueLength] = '\0';
-    
-    if (*commandCount == MAX_COMMAND_COUNT) {
-        return ERR_MAX_COMMAND_COUNT;
-    }
 
     if (state) {
-        if (!*rulesBinding) {
-            result = resolveBinding(tree, sid, rulesBinding);
-            if (result != RULES_OK) {
-                return result;
-            }
-        }
-
-        result = formatStoreSession(*rulesBinding, sid, state, 0, &storeCommand);
-        if (result != RULES_OK) {
-            return result;
-        }
-
-        commands[*commandCount] = storeCommand;
-        ++*commandCount;
+        //store state here
     }
-    char *removeCommand = NULL;
-    char *addKeys[MAX_ADD_COUNT];
-    unsigned int addCount = 0;
-    char *evalKeys[MAX_EVAL_COUNT];
-    unsigned int evalCount = 0;
-    result = handleAlpha(tree, 
-                         sid, 
+
+    result = handleAlpha(tree,
+                         sid,
                          mid,
                          jo,
                          &tree->nodePool[NODE_M_OFFSET].value.a, 
-                         actionType, 
-                         evalKeys,
-                         &evalCount,
-                         addKeys,
-                         &addCount,
-                         &removeCommand,
-                         rulesBinding);
+                         actionType);
     if (result == RULES_OK) {
         
         if (!state) {            

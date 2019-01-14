@@ -31,9 +31,6 @@
 #define NODE_M_OFFSET 0
 
 #define MAX_STATE_INDEX_LENGTH 1024
-#define MAX_MESSAGE_INDEX_LENGTH 16384
-#define MAX_LEFT_FRAME_INDEX_LENGTH 1024
-#define MAX_RIGHT_FRAME_INDEX_LENGTH 128
 #define MAX_SEQUENCE_EXPRESSIONS 32
 
 typedef struct identifier {
@@ -86,9 +83,8 @@ typedef struct alpha {
 } alpha;
 
 typedef struct beta {
+    unsigned int index;
     expressionSequence expressionSequence;
-    unsigned int leftFrameIndex[MAX_LEFT_FRAME_INDEX_LENGTH];
-    unsigned int rightFrameIndex[MAX_RIGHT_FRAME_INDEX_LENGTH];
     unsigned int hash;
     unsigned int nextOffset;
     unsigned char not;
@@ -99,8 +95,6 @@ typedef struct action {
     unsigned short count;
     unsigned short cap;
     unsigned short priority;
-    unsigned int joinsOffset;
-    unsigned short joinsLength;
 } action;
 
 typedef struct node {
@@ -116,6 +110,7 @@ typedef struct node {
 typedef struct ruleset {
     unsigned int nameOffset;
     unsigned int actionCount;
+    unsigned int betaCount;
     void *bindingsList;
     
     node *nodePool;
@@ -135,14 +130,6 @@ typedef struct ruleset {
     
     pool statePool;
     unsigned int stateIndex[MAX_STATE_INDEX_LENGTH];
-    
-    pool messagePool;
-    unsigned int messageIndex[MAX_MESSAGE_INDEX_LENGTH];
-
-    pool leftFramePool;
-
-    pool rightFramePool;
-
 } ruleset;
 
 

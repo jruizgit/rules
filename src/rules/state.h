@@ -8,12 +8,17 @@
 #define UNDEFINED_HASH_OFFSET 0
 #define MAX_OBJECT_PROPERTIES 64
 #define MAX_MESSAGE_FRAMES 32
+#define MAX_MESSAGE_INDEX_LENGTH 16384
+#define MAX_LEFT_FRAME_INDEX_LENGTH 1024
+#define MAX_RIGHT_FRAME_INDEX_LENGTH 1024
 
-#define MESSAGE_NODE(tree, offset) &((messageNode *)((ruleset *)tree)->messagePool.content)[offset]
+#define MESSAGE_NODE(state, offset) &((messageNode *)state->messagePool.content)[offset]
 
-#define RIGHT_FRAME_NODE(tree, offset) &((rightFrameNode *)((ruleset *)tree)->rightFramePool.content)[offset]
+#define RIGHT_FRAME_NODE(state, index, offset) &((rightFrameNode *)state->betaState[index].rightFramePool.content)[offset]
 
-#define LEFT_FRAME_NODE(tree, offset) &((leftFrameNode *)((ruleset *)tree)->leftFramePool.content)[offset]
+#define LEFT_FRAME_NODE(state, index, offset) &((leftFrameNode *)state->betaState[index].leftFramePool.content)[offset]
+
+#define STATE_NODE(tree, offset) &((stateNode *)((ruleset *)tree)->statePool.content)[offset]
 
 typedef struct jsonProperty {
     unsigned int hash;
@@ -49,13 +54,6 @@ typedef struct messageNode {
     jsonObject jo;
 } messageNode;
 
-typedef struct stateNode {
-    unsigned int prevOffset;
-    unsigned int nextOffset;
-    unsigned int hash;
-    unsigned int bindingIndex;
-} stateNode;
-
 typedef struct messageFrame {
     unsigned int hash;
     unsigned int messageNodeOffset;
@@ -81,6 +79,31 @@ typedef struct pool {
     unsigned int contentLength;
 } pool;
 
+typedef struct actionStateNode {
+    pool resultPool;
+    unsigned short count;
+    unsigned short cap;
+} actionStateNode;
+
+typedef struct betaStateNode {
+    pool leftFramePool;
+    unsigned int leftFrameIndex[MAX_LEFT_FRAME_INDEX_LENGTH];
+    pool rightFramePool;
+    unsigned int rightFrameIndex[MAX_RIGHT_FRAME_INDEX_LENGTH];
+} betaStateNode;
+
+typedef struct stateNode {
+    unsigned int prevOffset;
+    unsigned int nextOffset;
+    unsigned int hash;
+    unsigned int bindingIndex;
+    pool messagePool;
+    unsigned int messageIndex[MAX_MESSAGE_INDEX_LENGTH];
+    betaStateNode *betaState;
+    actionStateNode *actionState; 
+} stateNode;
+
+
 unsigned int fnv1Hash32(char *str, unsigned int len);
 
 unsigned int getObjectProperty(jsonObject *jo, 
@@ -103,13 +126,7 @@ unsigned int getHash(char *sid, char *key);
 
 unsigned int initStatePool(void *tree);
 
-unsigned int initMessagePool(void *tree);
-
-unsigned int initLeftFramePool(void *tree);
-
-unsigned int initRightFramePool(void *tree);
-
-unsigned int getMessageFromFrame(void *tree,
+unsigned int getMessageFromFrame(stateNode *state,
                                  messageFrame *messages,
                                  unsigned int hash,
                                  jsonObject **message);
@@ -118,42 +135,49 @@ unsigned int setMessageInFrame(messageFrame *messages,
                                unsigned int hash, 
                                unsigned int messageNodeOffset);
 
-unsigned int getLeftFrame(void *tree, 
-                          unsigned int *index, 
+unsigned int getLeftFrame(stateNode *state,
+                          unsigned int index, 
                           unsigned int hash,
                           leftFrameNode **node);
 
-unsigned int setLeftFrame(void *tree, 
-                          unsigned int *index, 
+unsigned int setLeftFrame(stateNode *state,
+                          unsigned int index, 
                           unsigned int hash, 
                           unsigned int valueOffset);
 
-unsigned int createLeftFrame(void *tree, 
+unsigned int createLeftFrame(stateNode *state,
+                             unsigned int index, 
                              unsigned int *valueOffset,
                              leftFrameNode **node);
 
-unsigned int cloneLeftFrame(void *tree, 
+unsigned int cloneLeftFrame(stateNode *state,
+                            unsigned int index, 
                             leftFrameNode *oldNode,                        
                             unsigned int *newValueOffset,
                             leftFrameNode **newNode);
 
-unsigned int getRightFrame(void *tree, 
-                           unsigned int *index, 
+unsigned int getRightFrame(stateNode *state,
+                           unsigned int index, 
                            unsigned int hash,
                            rightFrameNode **node);
 
-unsigned int setRightFrame(void *tree, 
-                           unsigned int *index, 
+unsigned int setRightFrame(stateNode *state,
+                           unsigned int index,
                            unsigned int hash, 
                            unsigned int valueOffset);
 
-unsigned int createRightFrame(void *tree, 
+unsigned int createRightFrame(stateNode *state,
+                              unsigned int index,
                               unsigned int *valueOffset,
                               rightFrameNode **node);
 
-unsigned int storeMessage(void *tree,
-                          char *sid,
+unsigned int storeMessage(stateNode *state,
                           char *mid,
                           jsonObject *message,
                           unsigned int *valueOffset);
+
+unsigned int ensureStateNode(void *tree, 
+                             char *sid, 
+                             stateNode **state);
+
 
