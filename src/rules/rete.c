@@ -1492,7 +1492,7 @@ static void printBetaNode(ruleset *tree, node *betaNode, int level, unsigned int
         printf("    ");
     }
 
-    printf("-> beta: name %s, not %d, offset %u\n", &tree->stringPool[betaNode->nameOffset], betaNode->value.b.not, offset);
+    printf("-> beta: name %s, not %d, index %d, offset %u\n", &tree->stringPool[betaNode->nameOffset], betaNode->value.b.not, betaNode->value.b.index, offset);
     if (betaNode->value.b.expressionSequence.length != 0) {
         printExpressionSequence(tree, &betaNode->value.b.expressionSequence, level);
     }
@@ -1662,6 +1662,7 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     tree->expressionOffset = 0;
     tree->regexStateMachinePool = NULL;
     tree->regexStateMachineOffset = 0;
+    tree->betaCount = 0;
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));

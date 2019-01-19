@@ -7,7 +7,7 @@
 #include "net.h"
 
 #define MAX_STATE_NODES 8
-#define MAX_MESSAGE_NODES 2
+#define MAX_MESSAGE_NODES 16
 #define MAX_LEFT_FRAME_NODES 8
 #define MAX_RIGHT_FRAME_NODES 8
 
@@ -55,7 +55,6 @@
         ((type *)pool.content)[pool.contentLength].prevOffset = valueOffset; \
         pool.contentLength *= 2; \
         ((type *)pool.content)[pool.contentLength - 1].nextOffset = UNDEFINED_HASH_OFFSET; \
-        printf("new length %d\n", pool.contentLength); \
     } \
     ((type *)pool.content)[value->nextOffset].prevOffset = UNDEFINED_HASH_OFFSET; \
     pool.freeOffset = value->nextOffset; \
@@ -188,6 +187,21 @@ unsigned int createLeftFrame(stateNode *state,
     return RULES_OK;
 }
 
+unsigned int createActionFrame(stateNode *state,
+                               unsigned int index, 
+                               leftFrameNode *oldNode,                        
+                               unsigned int *newValueOffset,
+                               leftFrameNode **newNode) {
+    NEW(leftFrameNode, 
+        state->actionState[index].resultPool, 
+        *newValueOffset);
+    *newNode = LEFT_FRAME_NODE(state, index, *newValueOffset);
+    if (oldNode) {
+        memcpy((*newNode)->messages, oldNode->messages, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
+    }
+    return RULES_OK;
+}
+
 unsigned int cloneLeftFrame(stateNode *state,
                             unsigned int index, 
                             leftFrameNode *oldNode,                        
@@ -259,14 +273,6 @@ unsigned int storeMessage(stateNode *state,
         return ERR_OUT_OF_MEMORY;
     }
     memcpy(node->jo.content, message->content, messageLength);
-    unsigned int currentOffset = *valueOffset;
-    while (currentOffset) {
-        node = MESSAGE_NODE(state, currentOffset);
-        printf("stored %d, %d, %d, %s\n", currentOffset, node->prevOffset, node->nextOffset, node->jo.content);  
-        currentOffset =  node->nextOffset;
-    }
-
-
     return RULES_OK;
 }
 
@@ -283,14 +289,9 @@ unsigned int ensureStateNode(void *tree,
         printf("new state\n");
         NEW(stateNode, ((ruleset*)tree)->statePool, nodeOffset);
         SET(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, nodeOffset);
-        *state = STATE_NODE(tree, nodeOffset); 
-
-        stateNode *node = *state;
-        unsigned int result = getBindingIndex(tree, sidHash, &node->bindingIndex);
-        if (result != RULES_OK) {
-            return result;
-        }
-
+        stateNode *node = STATE_NODE(tree, nodeOffset); 
+    
+        CHECK_RESULT(getBindingIndex(tree, sidHash, &node->bindingIndex));
         INIT(messageNode, node->messagePool, MAX_MESSAGE_NODES);
         memset(node->messageIndex, 0, MAX_MESSAGE_INDEX_LENGTH * sizeof(unsigned int));
         
@@ -309,6 +310,8 @@ unsigned int ensureStateNode(void *tree,
             actionStateNode *actionNode = &node->actionState[i];
             INIT(leftFrameNode, actionNode->resultPool, MAX_LEFT_FRAME_NODES);
         }        
+
+        *state = node;
     }
     
     return RULES_OK;

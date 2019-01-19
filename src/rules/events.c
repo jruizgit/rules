@@ -47,12 +47,6 @@
 
 #define HASH_I 1622948014 //$i
 
-#define CHECK_RESULT(result) do { \
-    if (result != RULES_OK) { \
-        return result; \
-    } \
-} while(0)
-
 typedef struct actionContext {
     void *rulesBinding;
     redisReply *reply;
@@ -136,18 +130,17 @@ static unsigned int reduceBool(unsigned char left,
                                unsigned char op,
                                jsonProperty *targetProperty) {
     switch(op) {
+        case OP_DIV: 
+        case OP_SUB:
+            return ERR_OPERATION_NOT_SUPPORTED;
         case OP_ADD:
             targetProperty->type = JSON_BOOL;
             targetProperty->value.b = left & right;
             break;
-        case OP_SUB:
-            return ERR_OPERATION_NOT_SUPPORTED;
         case OP_MUL:
             targetProperty->type = JSON_BOOL;
             targetProperty->value.b = left ^ right;
             break;
-        case OP_DIV: 
-            return ERR_OPERATION_NOT_SUPPORTED;
         case OP_LT:
             targetProperty->type = JSON_BOOL;
             targetProperty->value.b = (left < right);
@@ -224,7 +217,6 @@ static unsigned int reduceInt(long left,
             break;
     }
 
-    printf("reduce int %d\n", targetProperty->type);
     return RULES_OK;
 }
 
@@ -299,7 +291,6 @@ static unsigned int reduceOperand(ruleset *tree,
             }
         case JSON_IDENTIFIER:
             {
-                printf("reducing identifier\n");
                 unsigned int result = getMessageFromFrame(state,
                                                           messageContext, 
                                                           sourceOperand->value.id.nameHash, 
@@ -311,8 +302,6 @@ static unsigned int reduceOperand(ruleset *tree,
                 // break omitted intentionally, continue to next case
             }
         case JSON_MESSAGE_IDENTIFIER:
-            printf("inspect message %s\n", messageObject->content);
-            printf("looking for message property %s\n", &tree->stringPool[sourceOperand->value.id.propertyNameOffset]);
             return getObjectProperty(messageObject,
                                      sourceOperand->value.id.propertyNameHash,
                                      targetProperty);
@@ -335,7 +324,6 @@ static unsigned int reduceOperand(ruleset *tree,
             return RULES_OK;
     }
 
-    printf("type not supported %d\n", sourceOperand->type);
     return ERR_OPERATION_NOT_SUPPORTED;
 }
 
@@ -537,7 +525,6 @@ static unsigned int reduceExpression(ruleset *tree,
     if (result != RULES_OK) {
         return result;
     }
-    printf("left property %d, operator %d, right property %d\n", leftProperty->value.i, currentExpression->operator, rightProperty->value.i);
     return reduceProperties(currentExpression->operator, 
                             leftProperty, 
                             rightProperty, 
@@ -555,8 +542,9 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
     unsigned int result = RULES_OK;
     while (*i < exprs->length) {
         expression *currentExpression = &exprs->expressions[*i];
-        printf("expression sequence %d\n", currentExpression->operator);
         if (currentExpression->operator == OP_END) {
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = 1;
             return RULES_OK;          
         } 
 
@@ -615,8 +603,6 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
                 if (targetProperty->type != JSON_BOOL) {
                     return ERR_OPERATION_NOT_SUPPORTED;
                 }
-
-                printf("reduced expression %d\n", targetProperty->value.b);
             }
         }
 
@@ -726,35 +712,40 @@ static unsigned int handleBeta(ruleset *tree,
             currentNode = NULL;
             actionNode = currentNode;
         } else {
+            node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
             if (!currentFrame) {
-                printf("expressions %d\n", currentNode->value.b.expressionSequence.length);
                 if (!currentNode->value.b.expressionSequence.length) {
-                    CHECK_RESULT(createLeftFrame(state,
-                                                 betaNode->value.b.index, 
-                                                 &currentFrameOffset, 
-                                                 &currentFrame));
-                    printf("created left Frame %d\n", currentFrameOffset);
+                    if (nextNode->type == NODE_ACTION) {
+                        CHECK_RESULT(createActionFrame(state,
+                                                       nextNode->value.c.index, 
+                                                       NULL,
+                                                       &currentFrameOffset, 
+                                                       &currentFrame));
+                    } else {
+                        CHECK_RESULT(createLeftFrame(state,
+                                                     nextNode->value.b.index, 
+                                                     &currentFrameOffset, 
+                                                     &currentFrame));
+                    }
                 } else {
                     unsigned rightFrameOffset;
                     rightFrameNode *rightFrame;
                     CHECK_RESULT(createRightFrame(state,
-                                                  betaNode->value.b.index,
+                                                  currentNode->value.b.index,
                                                   &rightFrameOffset, 
                                                   &rightFrame));
 
-                    printf("created rightFrame %d, %d, %d\n", rightFrameOffset, rightFrame->prevOffset, rightFrame->nextOffset);
                     //TODO get real message hash
                     unsigned int messageHash = fnv1Hash32("1", 1);
                     rightFrame->messageOffset = currentMessageOffset;
                     CHECK_RESULT(setRightFrame(state,
-                                               betaNode->value.b.index,
+                                               currentNode->value.b.index,
                                                messageHash,
                                                rightFrameOffset)); 
 
-                    printf("set rightFrame %d, %d, %d\n", rightFrameOffset, rightFrame->prevOffset, rightFrame->nextOffset);
                     // Find frame for message
                     CHECK_RESULT(getLeftFrame(state,
-                                              betaNode->value.b.index,
+                                              currentNode->value.b.index,
                                               messageHash,
                                               &currentFrame));
 
@@ -766,7 +757,6 @@ static unsigned int handleBeta(ruleset *tree,
                                                  messageObject,
                                                  currentFrame->messages,
                                                  &match));
-                        printf("first match %d\n", match);
                         if (!match) {
                             currentFrameOffset = currentFrame->nextOffset;
                             if (currentFrameOffset == UNDEFINED_HASH_OFFSET) {
@@ -783,11 +773,20 @@ static unsigned int handleBeta(ruleset *tree,
 
                     }
 
-                    CHECK_RESULT(cloneLeftFrame(state,
-                                                betaNode->value.b.index,
-                                                currentFrame,
-                                                &currentFrameOffset,
-                                                &currentFrame));
+                    if (nextNode->type == NODE_ACTION) {
+                        CHECK_RESULT(createActionFrame(state,
+                                                       nextNode->value.c.index,
+                                                       currentFrame,
+                                                       &currentFrameOffset,
+                                                       &currentFrame));
+                    } else {
+                        CHECK_RESULT(cloneLeftFrame(state,
+                                                    nextNode->value.b.index,
+                                                    currentFrame,
+                                                    &currentFrameOffset,
+                                                    &currentFrame));
+                    }
+                    
                 }
 
                 CHECK_RESULT(setMessageInFrame(currentFrame->messages,
@@ -798,20 +797,18 @@ static unsigned int handleBeta(ruleset *tree,
                 //TODO get real frame hash
                 unsigned int frameHash = fnv1Hash32("1", 1);
                 CHECK_RESULT(setLeftFrame(state,
-                                          betaNode->value.b.index,
+                                          currentNode->value.b.index,
                                           frameHash,
                                           currentFrameOffset));
 
                 // Find message for frame
                 rightFrameNode *rightFrame;
                 CHECK_RESULT(getRightFrame(state,
-                                           betaNode->value.b.index,
+                                           currentNode->value.b.index,
                                            frameHash,
                                            &rightFrame));
 
-                printf("got getRightFrame %d, %d, %d\n", rightFrame->messageOffset, rightFrame->prevOffset, rightFrame->nextOffset);
                 messageNode *rightMessage = MESSAGE_NODE(state, rightFrame->messageOffset); 
-                printf("message content %s\n", rightMessage->jo.content);
                 unsigned char match = 0;
                 while (!match) {
                     CHECK_RESULT(isBetaMatch(tree,
@@ -820,7 +817,6 @@ static unsigned int handleBeta(ruleset *tree,
                                              &rightMessage->jo,
                                              currentFrame->messages,
                                              &match));
-                    printf("second match %d\n", match);
                     if (!match) {
                         unsigned int rightFrameOffset = rightFrame->nextOffset;
                         if (rightFrameOffset == UNDEFINED_HASH_OFFSET) {
@@ -828,7 +824,7 @@ static unsigned int handleBeta(ruleset *tree,
                         }
 
                         rightFrame = RIGHT_FRAME_NODE(state,
-                                                      betaNode->value.b.index, 
+                                                      currentNode->value.b.index, 
                                                       rightFrameOffset); 
                         if (rightFrame->hash != frameHash) {
                             return ERR_FRAME_NOT_FOUND;
@@ -838,11 +834,19 @@ static unsigned int handleBeta(ruleset *tree,
                     }
                 }                
 
-                CHECK_RESULT(cloneLeftFrame(state,
-                                            betaNode->value.b.index,
-                                            currentFrame,
-                                            &currentFrameOffset,
-                                            &currentFrame));
+                if (nextNode->type == NODE_ACTION) {
+                    CHECK_RESULT(createActionFrame(state,
+                                                   nextNode->value.c.index,
+                                                   currentFrame,
+                                                   &currentFrameOffset,
+                                                   &currentFrame));
+                } else {
+                    CHECK_RESULT(cloneLeftFrame(state,
+                                                nextNode->value.b.index,
+                                                currentFrame,
+                                                &currentFrameOffset,
+                                                &currentFrame));
+                }
 
                 CHECK_RESULT(setMessageInFrame(currentFrame->messages,
                                                currentNode->value.b.hash,
@@ -946,16 +950,16 @@ static unsigned int handleAplhaArray(ruleset *tree,
                             unsigned char match = 0;
                             if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
                                 // handleAplhaArray finds a valid path, thus use propertyMatch
-                                result = handleAplhaArray(tree, 
-                                                          messageObject,
-                                                          currentProperty, 
-                                                          &hashNode->value.a,
-                                                          propertyMatch);
+                                CHECK_RESULT(handleAplhaArray(tree, 
+                                                              messageObject,
+                                                              currentProperty, 
+                                                              &hashNode->value.a,
+                                                              propertyMatch));
                             } else {
-                                result = isAlphaMatch(tree,
-                                                      &hashNode->value.a,
-                                                      messageObject,
-                                                      &match);
+                                CHECK_RESULT(isAlphaMatch(tree,
+                                                          &hashNode->value.a,
+                                                          messageObject,
+                                                          &match));
 
                                 if (match) {
                                     if (top == MAX_STACK_SIZE) {
@@ -965,10 +969,6 @@ static unsigned int handleAplhaArray(ruleset *tree,
                                     stack[top] = &hashNode->value.a; 
                                     ++top;
                                 }
-                            }
-
-                            if (result != RULES_OK) {
-                                return result;
                             }
                         }
                     }               
@@ -1007,6 +1007,8 @@ static unsigned int handleAlpha(ruleset *tree,
     alpha *stack[MAX_STACK_SIZE];
     stack[0] = alphaNode;
     alpha *currentAlpha;
+    unsigned int currentMessageOffset = UNDEFINED_HASH_OFFSET;
+    stateNode *sidState = NULL;
 
     while (top) {
         --top;
@@ -1046,22 +1048,17 @@ static unsigned int handleAlpha(ruleset *tree,
                             ++top;
                         } else {
                             unsigned char match = 0;
-                            unsigned int mresult = RULES_OK;
                             if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
-                                mresult = handleAplhaArray(tree,
-                                                           jo,
-                                                           currentProperty, 
-                                                           &hashNode->value.a,
-                                                           &match);
+                                CHECK_RESULT(handleAplhaArray(tree,
+                                                              jo,
+                                                              currentProperty, 
+                                                              &hashNode->value.a,
+                                                              &match));
                             } else {
-                                mresult = isAlphaMatch(tree, 
-                                                       &hashNode->value.a,
-                                                       jo, 
-                                                       &match);
-                            }
-
-                            if (mresult != RULES_OK){
-                                return mresult;
+                                CHECK_RESULT(isAlphaMatch(tree, 
+                                                          &hashNode->value.a,
+                                                          jo, 
+                                                          &match));
                             }
 
                             if (match) {
@@ -1079,16 +1076,18 @@ static unsigned int handleAlpha(ruleset *tree,
         }
 
         if (currentAlpha->betaListOffset) {
-            stateNode *sidState;
-            CHECK_RESULT(ensureStateNode(tree, 
-                                         sid, 
-                                         &sidState));
+            if (!sidState) {
+                CHECK_RESULT(ensureStateNode(tree, 
+                                             sid, 
+                                             &sidState));
+            }
     
-            unsigned int currentMessageOffset;
-            CHECK_RESULT(storeMessage(sidState,
-                                      mid,
-                                      jo,
-                                      &currentMessageOffset));
+            if (currentMessageOffset == UNDEFINED_HASH_OFFSET) {
+                CHECK_RESULT(storeMessage(sidState,
+                                          mid,
+                                          jo,
+                                          &currentMessageOffset));
+            }
 
             unsigned int *betaList = &tree->nextPool[currentAlpha->betaListOffset];
             for (unsigned int entry = 0; betaList[entry] != 0; ++entry) {
@@ -1116,7 +1115,6 @@ static unsigned int handleMessageCore(ruleset *tree,
                                       char **commands,
                                       unsigned int *commandCount,
                                       void **rulesBinding) {
-    printf("handle message core\n");
     unsigned int result;
     jsonProperty *sidProperty = &jo->properties[jo->sidIndex];
     jsonProperty *midProperty = &jo->properties[jo->idIndex];
@@ -1189,17 +1187,14 @@ static unsigned int handleMessage(ruleset *tree,
                                   void **rulesBinding) {
     char *next;
     jsonObject jo;
-    int result = constructObject(message,
+    CHECK_RESULT(constructObject(message,
                                  NULL, 
                                  NULL, 
                                  actionType == ACTION_ASSERT_FACT || 
                                  actionType == ACTION_RETRACT_FACT || 
                                  actionType == ACTION_REMOVE_FACT,
                                  &jo, 
-                                 &next);
-    if (result != RULES_OK) {
-        return result;
-    }
+                                 &next));
     
     return handleMessageCore(tree,
                             state, 
@@ -1299,15 +1294,13 @@ static unsigned int handleState(ruleset *tree,
 #else
     snprintf(stateMessage, sizeof(char)*(24 + stateLength - 1), "{\"$s\":1, %s", stateMessagePostfix);
 #endif
-    unsigned int result = handleMessage(tree, 
-                                        state,
-                                        stateMessage,  
-                                        ACTION_ASSERT_EVENT,
-                                        commands,
-                                        commandCount,
-                                        rulesBinding);
-
-    return result;
+    return handleMessage(tree, 
+                         state,
+                         stateMessage,  
+                         ACTION_ASSERT_EVENT,
+                         commands,
+                         commandCount,
+                         rulesBinding);
 }
 
 static unsigned int handleTimers(ruleset *tree, 

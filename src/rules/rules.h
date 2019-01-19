@@ -62,6 +62,12 @@
 
 #define MAX_HANDLES 131072
 
+#define CHECK_RESULT(result) do { \
+    if (result != RULES_OK) { \
+        return result; \
+    } \
+} while(0)
+
 #ifdef __cplusplus
 extern "C" {
 #endif

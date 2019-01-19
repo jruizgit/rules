@@ -171,6 +171,12 @@ unsigned int createRightFrame(stateNode *state,
                               unsigned int *valueOffset,
                               rightFrameNode **node);
 
+unsigned int createActionFrame(stateNode *state,
+                               unsigned int index, 
+                               leftFrameNode *oldNode,                        
+                               unsigned int *newValueOffset,
+                               leftFrameNode **newNode);
+
 unsigned int storeMessage(stateNode *state,
                           char *mid,
                           jsonObject *message,
