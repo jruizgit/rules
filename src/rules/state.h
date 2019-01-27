@@ -23,11 +23,8 @@
 typedef struct jsonProperty {
     unsigned int hash;
     unsigned char type;
-    unsigned short parentProperty;
     unsigned short valueOffset;
     unsigned short valueLength;
-    unsigned short nameOffset;
-    unsigned short nameLength;
     union {
         long i; 
         double d; 
@@ -39,7 +36,7 @@ typedef struct jsonProperty {
 typedef struct jsonObject {
     char *content;
     jsonProperty properties[MAX_OBJECT_PROPERTIES];
-    unsigned char propertyIndex[MAX_OBJECT_PROPERTIES];
+    unsigned short propertyIndex[MAX_OBJECT_PROPERTIES];
     unsigned char propertiesLength; 
     unsigned int idIndex; 
     unsigned int sidIndex;
@@ -56,6 +53,7 @@ typedef struct messageNode {
 
 typedef struct messageFrame {
     unsigned int hash;
+    unsigned int nameOffset;
     unsigned int messageNodeOffset;
 } messageFrame;
 
@@ -63,6 +61,8 @@ typedef struct leftFrameNode {
     unsigned int prevOffset;
     unsigned int nextOffset;
     unsigned int hash;
+    unsigned short messageCount;
+    unsigned short reverseIndex[MAX_MESSAGE_FRAMES];
     messageFrame messages[MAX_MESSAGE_FRAMES];
 } leftFrameNode;
 
@@ -110,6 +110,12 @@ unsigned int getObjectProperty(jsonObject *jo,
                                unsigned int hash, 
                                jsonProperty **property);
 
+unsigned int setObjectProperty(jsonObject *jo, 
+                               unsigned int hash, 
+                               unsigned char type, 
+                               unsigned short valueOffset, 
+                               unsigned short valueLength);
+
 unsigned int constructObject(char *root,
                              char *parentName, 
                              char *object,
@@ -131,7 +137,8 @@ unsigned int getMessageFromFrame(stateNode *state,
                                  unsigned int hash,
                                  jsonObject **message);
 
-unsigned int setMessageInFrame(messageFrame *messages,
+unsigned int setMessageInFrame(leftFrameNode *node,
+                               unsigned int nameOffset,
                                unsigned int hash, 
                                unsigned int messageNodeOffset);
 
@@ -146,11 +153,6 @@ unsigned int setLeftFrame(stateNode *state,
                           unsigned int valueOffset);
 
 unsigned int createLeftFrame(stateNode *state,
-                             unsigned int index, 
-                             unsigned int *valueOffset,
-                             leftFrameNode **node);
-
-unsigned int cloneLeftFrame(stateNode *state,
                             unsigned int index, 
                             leftFrameNode *oldNode,                        
                             unsigned int *newValueOffset,
@@ -184,6 +186,7 @@ unsigned int storeMessage(stateNode *state,
 
 unsigned int ensureStateNode(void *tree, 
                              char *sid, 
+                             unsigned char *isNew,
                              stateNode **state);
 
 

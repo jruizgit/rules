@@ -63,7 +63,6 @@ typedef struct jsonResult {
 } jsonResult;
 
 static unsigned int handleMessage(ruleset *tree,
-                                  char *state,
                                   char *message, 
                                   unsigned char actionType, 
                                   char **commands,
@@ -290,17 +289,11 @@ static unsigned int reduceOperand(ruleset *tree,
                                         *targetProperty);
             }
         case JSON_IDENTIFIER:
-            {
-                unsigned int result = getMessageFromFrame(state,
-                                                          messageContext, 
-                                                          sourceOperand->value.id.nameHash, 
-                                                          &messageObject);
-                if (result != RULES_OK) {
-                    return result;
-                }
-
-                // break omitted intentionally, continue to next case
-            }
+            CHECK_RESULT(getMessageFromFrame(state,
+                                             messageContext, 
+                                             sourceOperand->value.id.nameHash, 
+                                             &messageObject));
+            // break omitted intentionally, continue to next case
         case JSON_MESSAGE_IDENTIFIER:
             return getObjectProperty(messageObject,
                                      sourceOperand->value.id.propertyNameHash,
@@ -489,19 +482,15 @@ static unsigned int reduceExpression(ruleset *tree,
                                      jsonObject *messageObject,
                                      messageFrame *messageContext,
                                      jsonProperty *targetProperty) {
-    unsigned int result = RULES_OK;
     jsonProperty leftValue;
     jsonProperty *leftProperty = &leftValue;
-    result = reduceOperand(tree,
-                           state,
-                           &currentExpression->left,
-                           messageObject,
-                           messageContext,
-                           &leftProperty);
-    if (result != RULES_OK) {
-        return result;
-    }
-
+    CHECK_RESULT(reduceOperand(tree,
+                               state,
+                               &currentExpression->left,
+                               messageObject,
+                               messageContext,
+                               &leftProperty));
+    
     if (currentExpression->right.type == JSON_REGEX || currentExpression->right.type == JSON_REGEX) {
         targetProperty->type = JSON_BOOL;
         targetProperty->value.b = evaluateRegex(tree,
@@ -516,15 +505,13 @@ static unsigned int reduceExpression(ruleset *tree,
 
     jsonProperty rightValue;
     jsonProperty *rightProperty = &rightValue;
-    result = reduceOperand(tree,
-                           state,
-                           &currentExpression->right,
-                           messageObject,
-                           messageContext,
-                           &rightProperty);
-    if (result != RULES_OK) {
-        return result;
-    }
+    CHECK_RESULT(reduceOperand(tree,
+                               state,
+                               &currentExpression->right,
+                               messageObject,
+                               messageContext,
+                               &rightProperty));
+    
     return reduceProperties(currentExpression->operator, 
                             leftProperty, 
                             rightProperty, 
@@ -539,12 +526,11 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
                                              messageFrame *messageContext,
                                              unsigned short *i,
                                              jsonProperty *targetProperty) {
-    unsigned int result = RULES_OK;
+    targetProperty->type = JSON_BOOL;
+    targetProperty->value.b = 1;    
     while (*i < exprs->length) {
         expression *currentExpression = &exprs->expressions[*i];
         if (currentExpression->operator == OP_END) {
-            targetProperty->type = JSON_BOOL;
-            targetProperty->value.b = 1;
             return RULES_OK;          
         } 
 
@@ -561,45 +547,35 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
                 }
 
                 ++*i;
-                result = reduceExpressionSequence(tree,
-                                                  state,
-                                                  exprs,
-                                                  currentExpression->operator,
-                                                  messageObject,
-                                                  messageContext,
-                                                  i,
-                                                  &dummyProperty);
-                if (result != RULES_OK) {
-                    return result;
-                }
+                CHECK_RESULT(reduceExpressionSequence(tree,
+                                                      state,
+                                                      exprs,
+                                                      currentExpression->operator,
+                                                      messageObject,
+                                                      messageContext,
+                                                      i,
+                                                      &dummyProperty));
             }
         } else {
             if (currentExpression->operator == OP_AND || currentExpression->operator == OP_OR) {
                 ++*i;
-                result = reduceExpressionSequence(tree,
-                                                  state,
-                                                  exprs,
-                                                  currentExpression->operator,
-                                                  messageObject,
-                                                  messageContext,
-                                                  i,
-                                                  targetProperty);
-                if (result != RULES_OK) {
-                    return result;
-                }
+                CHECK_RESULT(reduceExpressionSequence(tree,
+                                                      state,
+                                                      exprs,
+                                                      currentExpression->operator,
+                                                      messageObject,
+                                                      messageContext,
+                                                      i,
+                                                      targetProperty));
             } else if (currentExpression->operator == OP_IALL || currentExpression->operator == OP_IANY) {
                 
             } else {
-                unsigned int result = reduceExpression(tree,
-                                                       state,
-                                                       currentExpression,
-                                                       messageObject,
-                                                       messageContext,
-                                                       targetProperty);
-                if (result != RULES_OK) {
-                    return result;
-                }
-
+                CHECK_RESULT(reduceExpression(tree,
+                                              state,
+                                              currentExpression,
+                                              messageObject,
+                                              messageContext,
+                                              targetProperty));
                 if (targetProperty->type != JSON_BOOL) {
                     return ERR_OPERATION_NOT_SUPPORTED;
                 }
@@ -620,17 +596,14 @@ static unsigned int isBetaMatch(ruleset *tree,
                                 unsigned char *propertyMatch) {
     jsonProperty resultProperty;
     unsigned short i = 0;
-    unsigned int result = reduceExpressionSequence(tree,
-                                                   state,
-                                                   &currentBeta->expressionSequence,
-                                                   OP_NOP,
-                                                   messageObject,
-                                                   messageContext,
-                                                   &i,
-                                                   &resultProperty);
-    if (result != RULES_OK) {
-        return result;
-    }
+    CHECK_RESULT(reduceExpressionSequence(tree,
+                                         state,
+                                         &currentBeta->expressionSequence,
+                                         OP_NOP,
+                                         messageObject,
+                                         messageContext,
+                                         &i,
+                                         &resultProperty));
 
     if (resultProperty.type != JSON_BOOL) {
         return ERR_OPERATION_NOT_SUPPORTED;
@@ -652,15 +625,12 @@ static unsigned int isAlphaMatch(ruleset *tree,
     }
 
     jsonProperty resultProperty;
-    unsigned int result = reduceExpression(tree,
-                                           NULL,
-                                           &currentAlpha->expression,
-                                           messageObject,
-                                           NULL,
-                                           &resultProperty);
-    if (result != RULES_OK) {
-        return result;
-    }
+    CHECK_RESULT(reduceExpression(tree,
+                                  NULL,
+                                  &currentAlpha->expression,
+                                  messageObject,
+                                  NULL,
+                                  &resultProperty));
 
     if (resultProperty.type != JSON_BOOL) {
         return ERR_OPERATION_NOT_SUPPORTED;
@@ -701,7 +671,7 @@ static unsigned int handleBeta(ruleset *tree,
                                unsigned int currentMessageOffset,
                                node *betaNode,
                                unsigned short actionType) {    
-    printf("handling beta %d\n", currentMessageOffset);
+    printf("handling beta %d message %d expressions %d\n", betaNode->value.b.index, currentMessageOffset, betaNode->value.b.expressionSequence.length);
     node *actionNode = NULL;
     node *currentNode = betaNode;
     leftFrameNode *currentFrame = NULL;
@@ -724,6 +694,7 @@ static unsigned int handleBeta(ruleset *tree,
                     } else {
                         CHECK_RESULT(createLeftFrame(state,
                                                      nextNode->value.b.index, 
+                                                     NULL,
                                                      &currentFrameOffset, 
                                                      &currentFrame));
                     }
@@ -780,7 +751,7 @@ static unsigned int handleBeta(ruleset *tree,
                                                        &currentFrameOffset,
                                                        &currentFrame));
                     } else {
-                        CHECK_RESULT(cloneLeftFrame(state,
+                        CHECK_RESULT(createLeftFrame(state,
                                                     nextNode->value.b.index,
                                                     currentFrame,
                                                     &currentFrameOffset,
@@ -789,7 +760,8 @@ static unsigned int handleBeta(ruleset *tree,
                     
                 }
 
-                CHECK_RESULT(setMessageInFrame(currentFrame->messages,
+                CHECK_RESULT(setMessageInFrame(currentFrame,
+                                               currentNode->nameOffset,
                                                currentNode->value.b.hash,
                                                currentMessageOffset));
 
@@ -841,14 +813,15 @@ static unsigned int handleBeta(ruleset *tree,
                                                    &currentFrameOffset,
                                                    &currentFrame));
                 } else {
-                    CHECK_RESULT(cloneLeftFrame(state,
+                    CHECK_RESULT(createLeftFrame(state,
                                                 nextNode->value.b.index,
                                                 currentFrame,
                                                 &currentFrameOffset,
                                                 &currentFrame));
                 }
 
-                CHECK_RESULT(setMessageInFrame(currentFrame->messages,
+                CHECK_RESULT(setMessageInFrame(currentFrame,
+                                               currentNode->nameOffset,
                                                currentNode->value.b.hash,
                                                currentMessageOffset));
 
@@ -891,24 +864,21 @@ static unsigned int handleAplhaArray(ruleset *tree,
         if (type == JSON_OBJECT) {
             char *next;
             jo.propertiesLength = 0;
-            result = constructObject(first,
-                                     "$i", 
-                                     NULL, 
-                                     0,
-                                     &jo, 
-                                     &next);
-            if (result != RULES_OK) {
-                return result;
-            }
+            CHECK_RESULT(constructObject(first,
+                                         "$i", 
+                                         NULL, 
+                                         0,
+                                         &jo, 
+                                         &next));
         } else {
+            memset(jo.propertyIndex, 0, MAX_OBJECT_PROPERTIES * sizeof(unsigned short));
+            jo.propertiesLength = 0;
             jo.content = first;
-            jo.propertiesLength = 1;
-            jo.properties[0].hash = HASH_I;
-            jo.properties[0].type = type;
-            jo.properties[0].valueOffset = 0;
-            jo.properties[0].valueLength = last - first;
-            // Property index offset by 1
-            jo.propertyIndex[HASH_I % MAX_OBJECT_PROPERTIES] = 1;
+            CHECK_RESULT(setObjectProperty(&jo, 
+                                           HASH_I, 
+                                           type, 
+                                           0, 
+                                           last - first));
         }
 
         while (top) {
@@ -996,9 +966,10 @@ static unsigned int handleAplhaArray(ruleset *tree,
 }
 
 static unsigned int handleAlpha(ruleset *tree,
-                                char *sid,
+                                stateNode *state,
                                 char *mid,
                                 jsonObject *jo,
+                                unsigned int currentMessageOffset,
                                 alpha *alphaNode, 
                                 unsigned char actionType) { 
     printf("handle alpha\n");                       
@@ -1007,9 +978,7 @@ static unsigned int handleAlpha(ruleset *tree,
     alpha *stack[MAX_STACK_SIZE];
     stack[0] = alphaNode;
     alpha *currentAlpha;
-    unsigned int currentMessageOffset = UNDEFINED_HASH_OFFSET;
-    stateNode *sidState = NULL;
-
+    
     while (top) {
         --top;
         currentAlpha = stack[top];
@@ -1076,23 +1045,10 @@ static unsigned int handleAlpha(ruleset *tree,
         }
 
         if (currentAlpha->betaListOffset) {
-            if (!sidState) {
-                CHECK_RESULT(ensureStateNode(tree, 
-                                             sid, 
-                                             &sidState));
-            }
-    
-            if (currentMessageOffset == UNDEFINED_HASH_OFFSET) {
-                CHECK_RESULT(storeMessage(sidState,
-                                          mid,
-                                          jo,
-                                          &currentMessageOffset));
-            }
-
             unsigned int *betaList = &tree->nextPool[currentAlpha->betaListOffset];
             for (unsigned int entry = 0; betaList[entry] != 0; ++entry) {
                 unsigned int bresult = handleBeta(tree, 
-                                                  sidState, 
+                                                  state, 
                                                   mid,
                                                   jo,
                                                   currentMessageOffset,
@@ -1109,16 +1065,18 @@ static unsigned int handleAlpha(ruleset *tree,
 }
 
 static unsigned int handleMessageCore(ruleset *tree,
-                                      char *state,
                                       jsonObject *jo, 
                                       unsigned char actionType,
                                       char **commands,
                                       unsigned int *commandCount,
                                       void **rulesBinding) {
     unsigned int result;
+    stateNode *sidState;
     jsonProperty *sidProperty = &jo->properties[jo->sidIndex];
     jsonProperty *midProperty = &jo->properties[jo->idIndex];
 
+    printf("handling message core %s, %u, %u\n", jo->content, sidProperty->valueOffset, sidProperty->valueLength);
+    
 #ifdef _WIN32
     char *sid = (char *)_alloca(sizeof(char)*(sidProperty->valueLength + 1));
 #else
@@ -1132,7 +1090,13 @@ static unsigned int handleMessageCore(ruleset *tree,
 
     sid[sidProperty->valueLength] = '\0';
     
-#ifdef _WIN32
+    unsigned char isNewState;
+    CHECK_RESULT(ensureStateNode(tree, 
+                                 sid,
+                                 &isNewState, 
+                                 &sidState));
+
+    #ifdef _WIN32
     char *mid = (char *)_alloca(sizeof(char)*(midProperty->valueLength + 1));
 #else
     char mid[midProperty->valueLength + 1];
@@ -1145,41 +1109,46 @@ static unsigned int handleMessageCore(ruleset *tree,
 
     mid[midProperty->valueLength] = '\0';
 
-    if (state) {
-        //store state here
-    }
+    unsigned int currentMessageOffset;
+    CHECK_RESULT(storeMessage(sidState,
+                              mid,
+                              jo,
+                              &currentMessageOffset));
 
     result = handleAlpha(tree,
-                         sid,
+                         sidState,
                          mid,
                          jo,
+                         currentMessageOffset,
                          &tree->nodePool[NODE_M_OFFSET].value.a, 
                          actionType);
-    if (result == RULES_OK) {
-        
-        if (!state) {            
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
+        if (isNewState) {      
 #ifdef _WIN32
-            char *stateMessage = (char *)_alloca(sizeof(char)*(36 + sidProperty->valueLength));
-            char *newState = (char *)_alloca(sizeof(char)*(12 + sidProperty->valueLength));
-            sprintf_s(stateMessage, sizeof(char)*(26 + sidProperty->valueLength), "{\"sid\":\"%s\", \"$s\":1}", sid);
-            sprintf_s(newState, sizeof(char)*(12 + sidProperty->valueLength), "{\"sid\":\"%s\"}", sid); 
+            char *stateMessage = (char *)_alloca(sizeof(char)*(50 + sidProperty->valueLength * 2));
+            sprintf_s(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"mid\":\"sid-%s\", \"$s\":1}", sid, sid);
 #else
-            char stateMessage[36 + sidProperty->valueLength];
-            char newState[12 + sidProperty->valueLength];
-            snprintf(stateMessage, sizeof(char)*(26 + sidProperty->valueLength), "{\"sid\":\"%s\", \"$s\":1}", sid);
-            snprintf(newState, sizeof(char)*(12 + sidProperty->valueLength), "{\"sid\":\"%s\"}", sid);
+            char stateMessage[50 + sidProperty->valueLength * 2];
+            snprintf(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"mid\":\"sid-%s\", \"$s\":1}", sid, sid);
 #endif
+            printf("asserting new state %s\n", stateMessage); 
 
+            unsigned int stateResult = handleMessage(tree,
+                                                     stateMessage,  
+                                                     ACTION_ASSERT_FACT,
+                                                     commands,
+                                                     commandCount,
+                                                     rulesBinding);
+            if (stateResult != RULES_OK && stateResult != ERR_EVENT_NOT_HANDLED) {
+                return stateResult;
+            }
         }
-
-        return RULES_OK;
     } 
 
     return result;
 }
 
 static unsigned int handleMessage(ruleset *tree,
-                                  char *state,
                                   char *message, 
                                   unsigned char actionType, 
                                   char **commands,
@@ -1196,13 +1165,12 @@ static unsigned int handleMessage(ruleset *tree,
                                  &jo, 
                                  &next));
     
-    return handleMessageCore(tree,
-                            state, 
-                            &jo,
-                            actionType,
-                            commands,
-                            commandCount,
-                            rulesBinding);
+    return handleMessageCore(tree, 
+                             &jo,
+                             actionType,
+                             commands,
+                             commandCount,
+                             rulesBinding);
 }
 
 static unsigned int handleMessages(ruleset *tree, 
@@ -1243,12 +1211,11 @@ static unsigned int handleMessages(ruleset *tree,
         lastTemp = *last;
         *last = '\0';
         result = handleMessageCore(tree,
-                                 NULL, 
-                                 &jo, 
-                                 actionType, 
-                                 commands,
-                                 commandCount,
-                                 rulesBinding);
+                                   &jo, 
+                                   actionType, 
+                                   commands,
+                                   commandCount,
+                                   rulesBinding);
         
         *last = lastTemp;
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
@@ -1266,41 +1233,6 @@ static unsigned int handleMessages(ruleset *tree,
     }
 
     return returnResult;
-}
-
-static unsigned int handleState(ruleset *tree, 
-                                char *state,
-                                char **commands,
-                                unsigned int *commandCount,
-                                void **rulesBinding) {
-    int stateLength = strlen(state);
-    if (stateLength < 2) {
-        return ERR_PARSE_OBJECT;
-    }
-
-    if (state[0] != '{') {
-        return ERR_PARSE_OBJECT;
-    }
-
-    char *stateMessagePostfix = state + 1;
-#ifdef _WIN32
-    char *stateMessage = (char *)_alloca(sizeof(char)*(24 + stateLength - 1));
-#else
-    char stateMessage[24 + stateLength - 1];
-#endif
-    
-#ifdef _WIN32
-    sprintf_s(stateMessage, sizeof(char)*(24 + stateLength - 1), "{\"$s\":1, %s", stateMessagePostfix);
-#else
-    snprintf(stateMessage, sizeof(char)*(24 + stateLength - 1), "{\"$s\":1, %s", stateMessagePostfix);
-#endif
-    return handleMessage(tree, 
-                         state,
-                         stateMessage,  
-                         ACTION_ASSERT_EVENT,
-                         commands,
-                         commandCount,
-                         rulesBinding);
 }
 
 static unsigned int handleTimers(ruleset *tree, 
@@ -1341,7 +1273,6 @@ static unsigned int handleTimers(ruleset *tree,
         commands[*commandCount] = command;
         ++*commandCount;
         result = handleMessage(tree, 
-                               NULL,
                                reply->element[i]->str + 2, 
                                action,
                                commands, 
@@ -1362,10 +1293,10 @@ static unsigned int startHandleMessage(ruleset *tree,
                                        unsigned char actionType,
                                        void **rulesBinding,
                                        unsigned int *replyCount) {
+    printf("startHandleMessage\n");
     char *commands[MAX_COMMAND_COUNT];
     unsigned int commandCount = 0;
     unsigned int result = handleMessage(tree, 
-                                        NULL,
                                         message, 
                                         actionType, 
                                         commands,
@@ -1381,17 +1312,18 @@ static unsigned int startHandleMessage(ruleset *tree,
         return batchResult;
     }
 
+    printf("done\n");
     return result;
 }
 
 static unsigned int executeHandleMessage(ruleset *tree, 
                                          char *message, 
                                          unsigned char actionType) {
+    printf("executeHandleMessage\n");
     char *commands[MAX_COMMAND_COUNT];
     unsigned int commandCount = 0;
     void *rulesBinding = NULL;
     unsigned int result = handleMessage(tree, 
-                                        NULL,
                                         message, 
                                         actionType, 
                                         commands,
@@ -1407,6 +1339,7 @@ static unsigned int executeHandleMessage(ruleset *tree,
         return batchResult;
     }
 
+    printf("done\n");
     return result;
 }
 
@@ -1590,11 +1523,12 @@ unsigned int assertState(unsigned int handle, char *sid, char *state) {
     unsigned int commandCount = 0;
     void *rulesBinding = NULL;
 
-    unsigned int result = handleState(tree, 
-                                      state, 
-                                      commands,
-                                      &commandCount,
-                                      &rulesBinding);
+    unsigned int result = handleMessage(tree, 
+                                        state, 
+                                        ACTION_ASSERT_FACT,
+                                        commands,
+                                        &commandCount,
+                                        &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         freeCommands(commands, commandCount);
         return result;
@@ -1640,24 +1574,7 @@ unsigned int startAction(unsigned int handle,
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    redisReply *reply;
-    void *rulesBinding;
-    unsigned int result = peekAction(tree, &rulesBinding, &reply);
-    if (result != RULES_OK) {
-        return result;
-    }
 
-    *state = reply->element[1]->str;
-    *messages = reply->element[2]->str;
-    actionContext *context = malloc(sizeof(actionContext));
-    if (!context) {
-        return ERR_OUT_OF_MEMORY;
-    }
-    
-    context->reply = reply;
-    context->rulesBinding = rulesBinding;
-    *actionHandle = context;
-    *actionBinding = rulesBinding;
     return RULES_OK;
 }
 
@@ -1672,11 +1589,12 @@ unsigned int startUpdateState(unsigned int handle,
     char *commands[MAX_COMMAND_COUNT];
     unsigned int result = RULES_OK;
     unsigned int commandCount = 0;
-    result = handleState(tree, 
-                         state,
-                         commands,
-                         &commandCount,
-                         rulesBinding);
+    result = handleMessage(tree, 
+                           state,
+                           ACTION_ASSERT_FACT,
+                           commands,
+                           &commandCount,
+                           rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         //reply object should be freed by the app during abandonAction
         freeCommands(commands, commandCount);
@@ -1709,11 +1627,12 @@ unsigned int completeAction(unsigned int handle,
     }
 
     ++commandCount;
-    result = handleState(tree, 
-                         state,
-                         commands,
-                         &commandCount,
-                         &rulesBinding);
+    result = handleMessage(tree, 
+                           state,
+                           ACTION_ASSERT_FACT,
+                           commands,
+                           &commandCount,
+                           &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         //reply object should be freed by the app during abandonAction
         freeCommands(commands, commandCount);

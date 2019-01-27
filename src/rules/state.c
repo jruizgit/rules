@@ -118,6 +118,7 @@ unsigned int getMessageFromFrame(stateNode *state,
     }
 
     if (messageNodeOffset == UNDEFINED_HASH_OFFSET) {
+        printf("%d, %d, %d\n", hash, messages[index].hash, size);
         return ERR_MESSAGE_NOT_FOUND;
     }        
 
@@ -126,20 +127,24 @@ unsigned int getMessageFromFrame(stateNode *state,
     return RULES_OK;
 }
 
-unsigned int setMessageInFrame(messageFrame *messages,
+unsigned int setMessageInFrame(leftFrameNode *node,
+                               unsigned int nameOffset,
                                unsigned int hash, 
                                unsigned int messageNodeOffset) {
     unsigned short size = 0;
     unsigned short index = hash % MAX_MESSAGE_FRAMES;
-    while (messages[index].hash) {
+    while (node->messages[index].hash) {
         index = (index + 1) % MAX_MESSAGE_FRAMES;
         ++size;
         if (size == MAX_MESSAGE_FRAMES) {
             return ERR_MAX_MESSAGES_IN_FRAME;
         }
     }
-    messages[index].hash = hash;
-    messages[index].messageNodeOffset = messageNodeOffset;
+    node->messages[index].nameOffset = nameOffset;
+    node->messages[index].hash = hash;
+    node->messages[index].messageNodeOffset = messageNodeOffset;
+    node->reverseIndex[node->messageCount] = index;
+    ++node->messageCount;
     return RULES_OK;   
 }
 
@@ -175,18 +180,6 @@ unsigned int setLeftFrame(stateNode *state,
     return RULES_OK;
 }
 
-unsigned int createLeftFrame(stateNode *state,
-                             unsigned int index, 
-                             unsigned int *valueOffset,
-                             leftFrameNode **node) {
-    NEW(leftFrameNode, 
-        state->betaState[index].leftFramePool, 
-        *valueOffset);
-    *node = LEFT_FRAME_NODE(state, index, *valueOffset);
-    memset((*node)->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
-    return RULES_OK;
-}
-
 unsigned int createActionFrame(stateNode *state,
                                unsigned int index, 
                                leftFrameNode *oldNode,                        
@@ -195,14 +188,21 @@ unsigned int createActionFrame(stateNode *state,
     NEW(leftFrameNode, 
         state->actionState[index].resultPool, 
         *newValueOffset);
-    *newNode = LEFT_FRAME_NODE(state, index, *newValueOffset);
-    if (oldNode) {
-        memcpy((*newNode)->messages, oldNode->messages, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
-    }
+    leftFrameNode *targetNode = LEFT_FRAME_NODE(state, index, *newValueOffset);
+    if (!oldNode) {
+        memset(targetNode->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
+        memset(targetNode->reverseIndex, 0, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
+        targetNode->messageCount = 0;
+    } else {
+        memcpy(targetNode->messages, oldNode->messages, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
+        memcpy(targetNode->reverseIndex, oldNode->reverseIndex, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
+        targetNode->messageCount = oldNode->messageCount;
+    } 
+    *newNode = targetNode;
     return RULES_OK;
 }
 
-unsigned int cloneLeftFrame(stateNode *state,
+unsigned int createLeftFrame(stateNode *state,
                             unsigned int index, 
                             leftFrameNode *oldNode,                        
                             unsigned int *newValueOffset,
@@ -210,8 +210,17 @@ unsigned int cloneLeftFrame(stateNode *state,
     NEW(leftFrameNode, 
         state->betaState[index].leftFramePool, 
         *newValueOffset);
-    *newNode = LEFT_FRAME_NODE(state, index, *newValueOffset);
-    memcpy((*newNode)->messages, oldNode->messages, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
+    leftFrameNode *targetNode = LEFT_FRAME_NODE(state, index, *newValueOffset);
+    if (!oldNode) {
+        memset(targetNode->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
+        memset(targetNode->reverseIndex, 0, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
+        targetNode->messageCount = 0;
+    } else {
+        memcpy(targetNode->messages, oldNode->messages, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
+        memcpy(targetNode->reverseIndex, oldNode->reverseIndex, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
+        targetNode->messageCount = oldNode->messageCount;
+    } 
+    *newNode = targetNode;
     return RULES_OK;
 }
 
@@ -278,15 +287,18 @@ unsigned int storeMessage(stateNode *state,
 
 unsigned int ensureStateNode(void *tree, 
                              char *sid, 
+                             unsigned char *isNew,
                              stateNode **state) {  
-    printf("ensure state\n");
+    printf("ensuring state %s\n", sid);
     unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
     unsigned int nodeOffset;
     GET(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, nodeOffset);
     if (nodeOffset != UNDEFINED_HASH_OFFSET) {
+        *isNew = 0;
         *state = STATE_NODE(tree, nodeOffset); 
     } else {
-        printf("new state\n");
+        printf("adding new state %s\n", sid);
+        *isNew = 1;
         NEW(stateNode, ((ruleset*)tree)->statePool, nodeOffset);
         SET(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, nodeOffset);
         stateNode *node = STATE_NODE(tree, nodeOffset); 
@@ -366,11 +378,11 @@ static void calculateId(jsonObject *jo) {
     unsigned long long hash = FNV_64_OFFSET_BASIS;
     for (unsigned short i = 0; i < jo->propertiesLength; ++i) {
         jsonProperty *property = properties[i];
-        for (unsigned short ii = 0; ii < property->nameLength; ++ii) {
-            hash ^= jo->content[property->nameOffset + ii];
-            hash *= FNV_64_PRIME;
-        }
 
+        //TODO: is this valid?
+        hash ^= property->hash;
+        hash *= FNV_64_PRIME;
+    
         unsigned short valueLength = property->valueLength;
         if (property->type != JSON_STRING) {
             ++valueLength;
@@ -399,9 +411,9 @@ static unsigned int fixupIds(jsonObject *jo, char generateId) {
         property = &jo->properties[jo->sidIndex];
         if (property->type != JSON_STRING) {
             ++property->valueLength;
+            property->value.s = jo->content + property->valueOffset;
+            property->type = JSON_STRING;
         }
-
-        property->type = JSON_STRING;
     } else {
         property = &jo->properties[jo->propertiesLength];
         jo->sidIndex = jo->propertiesLength;
@@ -414,8 +426,6 @@ static unsigned int fixupIds(jsonObject *jo, char generateId) {
         property->hash = HASH_SID;
         property->valueOffset = 0;
         property->valueLength = 1;
-        property->nameLength = 0;
-        property->nameOffset = 0;
         property->type = JSON_STRING;
     } 
 
@@ -424,9 +434,9 @@ static unsigned int fixupIds(jsonObject *jo, char generateId) {
         property = &jo->properties[jo->idIndex];
         if (property->type != JSON_STRING) {
             ++property->valueLength;
+            property->value.s = jo->content + property->valueOffset;
+            property->type = JSON_STRING;
         }
-
-        property->type = JSON_STRING;
     } else {
         property = &jo->properties[jo->propertiesLength];
         jo->idIndex = jo->propertiesLength;
@@ -439,8 +449,6 @@ static unsigned int fixupIds(jsonObject *jo, char generateId) {
         property->hash = HASH_ID;
         property->valueOffset = 0;
         property->valueLength = 0;
-        property->nameLength = 0;
-        property->nameOffset = 0;
         property->type = JSON_STRING;
         if (generateId) {
             calculateId(jo);
@@ -450,21 +458,85 @@ static unsigned int fixupIds(jsonObject *jo, char generateId) {
     return RULES_OK;
 }
 
-unsigned int getObjectProperty(jsonObject *jo, unsigned int hash, jsonProperty **property) {
-    unsigned int candidate = hash % MAX_OBJECT_PROPERTIES;
-    for (unsigned short i = 0; i < MAX_OBJECT_PROPERTIES; ++i) {
-        unsigned char index = jo->propertyIndex[(candidate + i) % MAX_OBJECT_PROPERTIES];
-        if (index == 0) {
-            break;
-        }
-
-        // Property index offset by 1
-        if (jo->properties[index - 1].hash == hash) {
-            *property = &jo->properties[index - 1];   
+unsigned int getObjectProperty(jsonObject *jo, 
+                               unsigned int hash, 
+                               jsonProperty **property) {
+    unsigned short size = 0;
+    unsigned short index = hash % MAX_OBJECT_PROPERTIES;
+    while (jo->propertyIndex[index] && size < MAX_OBJECT_PROPERTIES) {
+        unsigned short subIndex = jo->propertyIndex[index] - 1;
+        if (jo->properties[subIndex].hash == hash) {
+            *property = &jo->properties[subIndex];
             return RULES_OK;
         }
+
+        ++size;
+        index = (index + 1) % MAX_OBJECT_PROPERTIES;
     }
+
     return ERR_PROPERTY_NOT_FOUND;
+}
+
+unsigned int setObjectProperty(jsonObject *jo, 
+                               unsigned int hash, 
+                               unsigned char type, 
+                               unsigned short valueOffset, 
+                               unsigned short valueLength) {
+
+    jsonProperty *property = &jo->properties[jo->propertiesLength]; 
+    ++jo->propertiesLength;
+    if (jo->propertiesLength == MAX_OBJECT_PROPERTIES) {
+        return ERR_EVENT_MAX_PROPERTIES;
+    }
+
+    unsigned int candidate = hash % MAX_OBJECT_PROPERTIES;
+    while (jo->propertyIndex[candidate] != 0) {
+        candidate = candidate + 1 % MAX_OBJECT_PROPERTIES;
+    }
+
+    // Index intentionally offset by 1 to enable getObject 
+    jo->propertyIndex[candidate] = jo->propertiesLength;
+    if (hash == HASH_ID) {
+        jo->idIndex = jo->propertiesLength - 1;
+    } else if (hash == HASH_SID) {
+        jo->sidIndex = jo->propertiesLength - 1;
+    }
+    
+    property->hash = hash;
+    property->valueOffset = valueOffset;
+    property->valueLength = valueLength;
+    property->type = type;
+    
+    char *first = jo->content + property->valueOffset;
+    char temp;
+    switch(type) {
+        case JSON_INT:
+            temp = first[property->valueLength];
+            first[property->valueLength] = '\0';
+            property->value.i = atol(first);
+            first[property->valueLength] = temp;
+            break;
+        case JSON_DOUBLE:
+            temp = first[property->valueLength];
+            first[property->valueLength] = '\0';
+            property->value.d = atof(first);
+            first[property->valueLength] = temp;
+            break;
+        case JSON_BOOL:
+            if (property->valueLength == 4 && strncmp("true", first, 4) == 0) {
+                property->value.b = 1;
+            } else {
+                property->value.b = 0;
+            }
+
+            break;
+        case JSON_STRING:
+            property->value.s = first;
+            property->valueLength = property->valueLength - 1;
+            break;
+    }
+
+    return RULES_OK;
 }
 
 unsigned int constructObject(char *root,
@@ -477,7 +549,6 @@ unsigned int constructObject(char *root,
     char *lastName;
     char *first;
     char *last;
-    char temp;
     unsigned char type;
     unsigned int hash;
     int parentNameLength;
@@ -489,7 +560,7 @@ unsigned int constructObject(char *root,
         jo->sidIndex = UNDEFINED_INDEX;
         jo->propertiesLength = 0;
         jo->content = root;
-        memset(jo->propertyIndex, 0, MAX_OBJECT_PROPERTIES * sizeof(unsigned char));
+        memset(jo->propertyIndex, 0, MAX_OBJECT_PROPERTIES * sizeof(unsigned short));
     }
 
     object = (object ? object : root);
@@ -500,69 +571,15 @@ unsigned int constructObject(char *root,
             return result;
         }
 
-        jsonProperty *property = NULL;
-        if (type != JSON_OBJECT) {
-            unsigned int candidate = hash % MAX_OBJECT_PROPERTIES;
-            while (jo->propertyIndex[candidate] != 0) {
-                candidate = (candidate + 1) % MAX_OBJECT_PROPERTIES;
-            }
-
-            // Property index offset by 1
-            jo->propertyIndex[candidate] = jo->propertiesLength + 1;
-            property = &jo->properties[jo->propertiesLength]; 
-            ++jo->propertiesLength;
-            if (jo->propertiesLength == MAX_OBJECT_PROPERTIES) {
-                return ERR_EVENT_MAX_PROPERTIES;
-            } 
-
-            if (!parentName) {
-                if (hash == HASH_ID) {
-                    jo->idIndex = candidate;
-                } else if (hash == HASH_SID) {
-                    jo->sidIndex = candidate;
-                }
-            }
-
-            property->valueOffset = first - root;
-            property->valueLength = last - first + 1;
-            property->type = type;
-
-            switch(type) {
-                case JSON_INT:
-                    temp = first[property->valueLength];
-                    first[property->valueLength] = '\0';
-                    property->value.i = atol(first);
-                    first[property->valueLength] = temp;
-                    break;
-                case JSON_DOUBLE:
-                    temp = first[property->valueLength];
-                    first[property->valueLength] = '\0';
-                    property->value.d = atof(first);
-                    first[property->valueLength] = temp;
-                    break;
-                case JSON_BOOL:
-                    if (property->valueLength == 4 && strncmp("true", first, 4) == 0) {
-                        property->value.b = 1;
-                    } else {
-                        property->value.b = 0;
-                    }
-
-                    break;
-                case JSON_STRING:
-                    property->value.s = first;
-                    property->valueLength = property->valueLength - 1;
-                    break;
-            }
-
-        }
-        
         if (!parentName) {
-            int nameLength = lastName - firstName;
             if (type != JSON_OBJECT) {
-                property->nameOffset = firstName - root;
-                property->nameLength = nameLength;
-                property->hash = hash;
-            } else {            
+                CHECK_RESULT(setObjectProperty(jo,
+                                               hash,
+                                               type,
+                                               first - root,
+                                               last - first + 1));
+            } else {   
+                int nameLength = lastName - firstName;         
 #ifdef _WIN32
                 char *newParent = (char *)_alloca(sizeof(char)*(nameLength + 1));
 #else
@@ -570,15 +587,12 @@ unsigned int constructObject(char *root,
 #endif
                 strncpy(newParent, firstName, nameLength);
                 newParent[nameLength] = '\0';
-                result = constructObject(root,
-                                         newParent, 
-                                         first,
-                                         0, 
-                                         jo,
-                                         next);
-                if (result != RULES_OK) {
-                    return result;
-                }
+                CHECK_RESULT(constructObject(root,
+                                             newParent, 
+                                             first,
+                                             0, 
+                                             jo,
+                                             next));
             }
         } else {
             int nameLength = lastName - firstName;
@@ -593,20 +607,19 @@ unsigned int constructObject(char *root,
             strncpy(&fullName[parentNameLength + 1], firstName, nameLength);
             fullName[fullNameLength] = '\0';
             if (type != JSON_OBJECT) {
-                property->nameOffset = firstName - root;
-                property->nameLength = nameLength;
-                property->hash = fnv1Hash32(fullName, fullNameLength);
+                CHECK_RESULT(setObjectProperty(jo,
+                                               fnv1Hash32(fullName, fullNameLength),
+                                               type,
+                                               first - root,
+                                               last - first + 1));
             } else {
 
-                result = constructObject(root,
-                                         fullName, 
-                                         first,
-                                         0, 
-                                         jo, 
-                                         next);
-                if (result != RULES_OK) {
-                    return result;
-                }
+                CHECK_RESULT(constructObject(root,
+                                             fullName, 
+                                             first,
+                                             0, 
+                                             jo, 
+                                             next));
             }
         }
         
@@ -615,10 +628,7 @@ unsigned int constructObject(char *root,
     }
  
     if (!parentName) {
-        int idResult = fixupIds(jo, generateId);
-        if (idResult != RULES_OK) {
-            return idResult;
-        }
+        CHECK_RESULT(fixupIds(jo, generateId));
     }
 
     return (result == PARSE_END ? RULES_OK: result);
