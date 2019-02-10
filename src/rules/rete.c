@@ -1565,19 +1565,7 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         
         // tree->stringPool can change after storing strings
         // need to resolve namespace every time it is used.
-        char *namespace = &tree->stringPool[tree->nameOffset];
-        int namespaceLength = strlen(namespace); 
-#ifdef _WIN32
-		char *runtimeActionName = (char *)_alloca(sizeof(char)*(namespaceLength + lastName - firstName + 2));
-#else
-		char runtimeActionName[namespaceLength + lastName - firstName + 2];
-#endif
-        
-        strncpy(runtimeActionName, firstName, lastName - firstName);
-        runtimeActionName[lastName - firstName] = '!';
-        strncpy(&runtimeActionName[lastName - firstName + 1], namespace, namespaceLength);
-        runtimeActionName[namespaceLength + lastName - firstName + 1] = '\0';
-        result = storeString(tree, runtimeActionName, &ruleAction->nameOffset, namespaceLength + lastName - firstName + 1);
+        result = storeString(tree, firstName, &ruleAction->nameOffset, lastName - firstName);
         if (result != RULES_OK) {
             return result;
         }
@@ -1665,7 +1653,9 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     tree->betaCount = 0;
     tree->actionCount = 0;
     tree->bindingsList = NULL;
+    tree->currentStateIndex = 0;
     memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
+    memset(tree->reverseStateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
     initStatePool(tree);
     
     result = storeString(tree, name, &tree->nameOffset, strlen(name));

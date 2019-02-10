@@ -67,6 +67,7 @@ static unsigned int handleMessage(ruleset *tree,
                                   unsigned char actionType, 
                                   char **commands,
                                   unsigned int *commandCount,
+                                  unsigned int *messageOffset,
                                   void **rulesBinding);
 
 static unsigned int reduceExpression(ruleset *tree,
@@ -687,13 +688,15 @@ static unsigned int handleBeta(ruleset *tree,
                 if (!currentNode->value.b.expressionSequence.length) {
                     if (nextNode->type == NODE_ACTION) {
                         CHECK_RESULT(createActionFrame(state,
-                                                       nextNode->value.c.index, 
+                                                       nextNode->value.c.index,
+                                                       nextNode->nameOffset, 
                                                        NULL,
                                                        &currentFrameOffset, 
                                                        &currentFrame));
                     } else {
                         CHECK_RESULT(createLeftFrame(state,
                                                      nextNode->value.b.index, 
+                                                     nextNode->nameOffset,
                                                      NULL,
                                                      &currentFrameOffset, 
                                                      &currentFrame));
@@ -747,12 +750,14 @@ static unsigned int handleBeta(ruleset *tree,
                     if (nextNode->type == NODE_ACTION) {
                         CHECK_RESULT(createActionFrame(state,
                                                        nextNode->value.c.index,
+                                                       nextNode->nameOffset,
                                                        currentFrame,
                                                        &currentFrameOffset,
                                                        &currentFrame));
                     } else {
                         CHECK_RESULT(createLeftFrame(state,
                                                     nextNode->value.b.index,
+                                                    nextNode->nameOffset,
                                                     currentFrame,
                                                     &currentFrameOffset,
                                                     &currentFrame));
@@ -809,12 +814,14 @@ static unsigned int handleBeta(ruleset *tree,
                 if (nextNode->type == NODE_ACTION) {
                     CHECK_RESULT(createActionFrame(state,
                                                    nextNode->value.c.index,
+                                                   nextNode->nameOffset,
                                                    currentFrame,
                                                    &currentFrameOffset,
                                                    &currentFrame));
                 } else {
                     CHECK_RESULT(createLeftFrame(state,
                                                 nextNode->value.b.index,
+                                                nextNode->nameOffset,
                                                 currentFrame,
                                                 &currentFrameOffset,
                                                 &currentFrame));
@@ -1069,6 +1076,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                                       unsigned char actionType,
                                       char **commands,
                                       unsigned int *commandCount,
+                                      unsigned int *messageOffset,
                                       void **rulesBinding) {
     unsigned int result;
     stateNode *sidState;
@@ -1109,17 +1117,16 @@ static unsigned int handleMessageCore(ruleset *tree,
 
     mid[midProperty->valueLength] = '\0';
 
-    unsigned int currentMessageOffset;
     CHECK_RESULT(storeMessage(sidState,
                               mid,
                               jo,
-                              &currentMessageOffset));
+                              messageOffset));
 
     result = handleAlpha(tree,
                          sidState,
                          mid,
                          jo,
-                         currentMessageOffset,
+                         *messageOffset,
                          &tree->nodePool[NODE_M_OFFSET].value.a, 
                          actionType);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
@@ -1133,15 +1140,20 @@ static unsigned int handleMessageCore(ruleset *tree,
 #endif
             printf("asserting new state %s\n", stateMessage); 
 
+            unsigned int stateMessageOffset;
             unsigned int stateResult = handleMessage(tree,
                                                      stateMessage,  
                                                      ACTION_ASSERT_FACT,
                                                      commands,
                                                      commandCount,
+                                                     &stateMessageOffset,
                                                      rulesBinding);
             if (stateResult != RULES_OK && stateResult != ERR_EVENT_NOT_HANDLED) {
                 return stateResult;
             }
+
+            sidState->factOffset = stateMessageOffset;
+
         }
     } 
 
@@ -1153,6 +1165,7 @@ static unsigned int handleMessage(ruleset *tree,
                                   unsigned char actionType, 
                                   char **commands,
                                   unsigned int *commandCount,
+                                  unsigned int *messageOffset,
                                   void **rulesBinding) {
     char *next;
     jsonObject jo;
@@ -1170,6 +1183,7 @@ static unsigned int handleMessage(ruleset *tree,
                              actionType,
                              commands,
                              commandCount,
+                             messageOffset,
                              rulesBinding);
 }
 
@@ -1181,6 +1195,7 @@ static unsigned int handleMessages(ruleset *tree,
                                    void **rulesBinding) {
     unsigned int result;
     unsigned int returnResult = RULES_OK;
+    unsigned int messageOffset;
     jsonObject jo;
 
     char *first = messages;
@@ -1215,6 +1230,7 @@ static unsigned int handleMessages(ruleset *tree,
                                    actionType, 
                                    commands,
                                    commandCount,
+                                   &messageOffset,
                                    rulesBinding);
         
         *last = lastTemp;
@@ -1272,11 +1288,13 @@ static unsigned int handleTimers(ruleset *tree,
 
         commands[*commandCount] = command;
         ++*commandCount;
+        unsigned int messageOffset;
         result = handleMessage(tree, 
                                reply->element[i]->str + 2, 
                                action,
                                commands, 
                                commandCount, 
+                               &messageOffset,
                                rulesBinding);
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
             freeReplyObject(reply);
@@ -1296,11 +1314,13 @@ static unsigned int startHandleMessage(ruleset *tree,
     printf("startHandleMessage\n");
     char *commands[MAX_COMMAND_COUNT];
     unsigned int commandCount = 0;
+    unsigned int messageOffset;
     unsigned int result = handleMessage(tree, 
                                         message, 
                                         actionType, 
                                         commands,
                                         &commandCount,
+                                        &messageOffset,
                                         rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         freeCommands(commands, commandCount);
@@ -1323,11 +1343,13 @@ static unsigned int executeHandleMessage(ruleset *tree,
     char *commands[MAX_COMMAND_COUNT];
     unsigned int commandCount = 0;
     void *rulesBinding = NULL;
+    unsigned int messageOffset;
     unsigned int result = handleMessage(tree, 
                                         message, 
                                         actionType, 
                                         commands,
                                         &commandCount,
+                                        &messageOffset,
                                         &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         freeCommands(commands, commandCount);
@@ -1522,12 +1544,13 @@ unsigned int assertState(unsigned int handle, char *sid, char *state) {
     char *commands[MAX_COMMAND_COUNT];
     unsigned int commandCount = 0;
     void *rulesBinding = NULL;
-
+    unsigned int messageOffset;
     unsigned int result = handleMessage(tree, 
                                         state, 
                                         ACTION_ASSERT_FACT,
                                         commands,
                                         &commandCount,
+                                        &messageOffset,
                                         &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         freeCommands(commands, commandCount);
@@ -1567,13 +1590,24 @@ unsigned int assertTimers(unsigned int handle) {
 }
 
 unsigned int startAction(unsigned int handle, 
-                         char **state, 
+                         char **stateFact, 
                          char **messages, 
                          void **actionHandle,
                          void **actionBinding) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
+    
+    actionContext *context = malloc(sizeof(actionContext));
+    if (!context) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    
+    *actionHandle = context;
+    *actionBinding = NULL;
 
+    CHECK_RESULT(getNextResult(tree, stateFact, messages));
+
+    printf("starting action %s, %s\n", *stateFact, *messages);
 
     return RULES_OK;
 }
@@ -1589,11 +1623,13 @@ unsigned int startUpdateState(unsigned int handle,
     char *commands[MAX_COMMAND_COUNT];
     unsigned int result = RULES_OK;
     unsigned int commandCount = 0;
+    unsigned int messageOffset;
     result = handleMessage(tree, 
                            state,
                            ACTION_ASSERT_FACT,
                            commands,
                            &commandCount,
+                           &messageOffset,
                            rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         //reply object should be freed by the app during abandonAction
@@ -1627,11 +1663,13 @@ unsigned int completeAction(unsigned int handle,
     }
 
     ++commandCount;
+    unsigned int messageOffset;
     result = handleMessage(tree, 
                            state,
                            ACTION_ASSERT_FACT,
                            commands,
                            &commandCount,
+                           &messageOffset,
                            &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         //reply object should be freed by the app during abandonAction

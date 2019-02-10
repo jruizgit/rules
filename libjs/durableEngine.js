@@ -570,6 +570,7 @@ exports = module.exports = durableEngine = function () {
                         complete(null, true);
                         return;
                     } else { 
+                        console.log(result[0]);
                         state = JSON.parse(result[0]);
                         resultContainer = {'message': JSON.parse(result[1])};
                         actionHandle = result[2];

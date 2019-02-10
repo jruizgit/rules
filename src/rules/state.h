@@ -18,6 +18,8 @@
 
 #define LEFT_FRAME_NODE(state, index, offset) &((leftFrameNode *)state->betaState[index].leftFramePool.content)[offset]
 
+#define ACTION_FRAME_NODE(state, index, offset) &((leftFrameNode *)state->actionState[index].resultPool.content)[offset]
+
 #define STATE_NODE(tree, offset) &((stateNode *)((ruleset *)tree)->statePool.content)[offset]
 
 typedef struct jsonProperty {
@@ -60,6 +62,7 @@ typedef struct messageFrame {
 typedef struct leftFrameNode {
     unsigned int prevOffset;
     unsigned int nextOffset;
+    unsigned int nameOffset;
     unsigned int hash;
     unsigned short messageCount;
     unsigned short reverseIndex[MAX_MESSAGE_FRAMES];
@@ -77,10 +80,12 @@ typedef struct pool {
     void *content;
     unsigned int freeOffset;
     unsigned int contentLength;
+    unsigned int count;
 } pool;
 
 typedef struct actionStateNode {
     pool resultPool;
+    unsigned int firstOffset;
     unsigned short count;
     unsigned short cap;
 } actionStateNode;
@@ -97,6 +102,7 @@ typedef struct stateNode {
     unsigned int nextOffset;
     unsigned int hash;
     unsigned int bindingIndex;
+    unsigned int factOffset;
     pool messagePool;
     unsigned int messageIndex[MAX_MESSAGE_INDEX_LENGTH];
     betaStateNode *betaState;
@@ -154,6 +160,7 @@ unsigned int setLeftFrame(stateNode *state,
 
 unsigned int createLeftFrame(stateNode *state,
                             unsigned int index, 
+                            unsigned int nameOffset,
                             leftFrameNode *oldNode,                        
                             unsigned int *newValueOffset,
                             leftFrameNode **newNode);
@@ -174,7 +181,8 @@ unsigned int createRightFrame(stateNode *state,
                               rightFrameNode **node);
 
 unsigned int createActionFrame(stateNode *state,
-                               unsigned int index, 
+                               unsigned int index,
+                               unsigned int nameOffset, 
                                leftFrameNode *oldNode,                        
                                unsigned int *newValueOffset,
                                leftFrameNode **newNode);
@@ -188,5 +196,10 @@ unsigned int ensureStateNode(void *tree,
                              char *sid, 
                              unsigned char *isNew,
                              stateNode **state);
+
+unsigned int getNextResult(void *tree, 
+                           char **stateFact, 
+                           char **messages);
+
 
 

@@ -131,7 +131,7 @@ typedef struct ruleset {
     pool statePool;
     unsigned int stateIndex[MAX_STATE_INDEX_LENGTH];
     unsigned int reverseStateIndex[MAX_STATE_INDEX_LENGTH];
-    unsigned int currentIndex;
+    unsigned int currentStateIndex;
 } ruleset;
 
 

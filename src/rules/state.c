@@ -25,6 +25,7 @@
     ((type *)pool.content)[length - 1].nextOffset = UNDEFINED_HASH_OFFSET; \
     ((type *)pool.content)[0].prevOffset = UNDEFINED_HASH_OFFSET; \
     pool.freeOffset = 1; \
+    pool.count = 0; \
 } while(0)
 
 #define GET(type, index, max, pool, nodeHash, valueOffset) do { \
@@ -60,6 +61,7 @@
     pool.freeOffset = value->nextOffset; \
     value->nextOffset = UNDEFINED_HASH_OFFSET; \
     value->prevOffset = UNDEFINED_HASH_OFFSET; \
+    ++pool.count; \
 } while(0)
 
 #define SET(type, index, max, pool, nodeHash, valueOffset)  do { \
@@ -118,7 +120,6 @@ unsigned int getMessageFromFrame(stateNode *state,
     }
 
     if (messageNodeOffset == UNDEFINED_HASH_OFFSET) {
-        printf("%d, %d, %d\n", hash, messages[index].hash, size);
         return ERR_MESSAGE_NOT_FOUND;
     }        
 
@@ -182,13 +183,16 @@ unsigned int setLeftFrame(stateNode *state,
 
 unsigned int createActionFrame(stateNode *state,
                                unsigned int index, 
+                               unsigned int nameOffset,
                                leftFrameNode *oldNode,                        
                                unsigned int *newValueOffset,
                                leftFrameNode **newNode) {
+
+    actionStateNode *actionNode = &state->actionState[index];
     NEW(leftFrameNode, 
-        state->actionState[index].resultPool, 
+        actionNode->resultPool, 
         *newValueOffset);
-    leftFrameNode *targetNode = LEFT_FRAME_NODE(state, index, *newValueOffset);
+    leftFrameNode *targetNode = ACTION_FRAME_NODE(state, index, *newValueOffset);
     if (!oldNode) {
         memset(targetNode->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
         memset(targetNode->reverseIndex, 0, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
@@ -198,12 +202,22 @@ unsigned int createActionFrame(stateNode *state,
         memcpy(targetNode->reverseIndex, oldNode->reverseIndex, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
         targetNode->messageCount = oldNode->messageCount;
     } 
+    targetNode->nameOffset = nameOffset;
+
+    if (actionNode->firstOffset != UNDEFINED_HASH_OFFSET) {
+        leftFrameNode *nextNode = ACTION_FRAME_NODE(state, index, actionNode->firstOffset);
+        nextNode->prevOffset = *newValueOffset;
+    }
+    targetNode->nextOffset = actionNode->firstOffset;
+    actionNode->firstOffset = *newValueOffset;
+    
     *newNode = targetNode;
     return RULES_OK;
 }
 
 unsigned int createLeftFrame(stateNode *state,
                             unsigned int index, 
+                            unsigned int nameOffset,
                             leftFrameNode *oldNode,                        
                             unsigned int *newValueOffset,
                             leftFrameNode **newNode) {
@@ -220,6 +234,8 @@ unsigned int createLeftFrame(stateNode *state,
         memcpy(targetNode->reverseIndex, oldNode->reverseIndex, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
         targetNode->messageCount = oldNode->messageCount;
     } 
+    targetNode->nameOffset = nameOffset;
+    
     *newNode = targetNode;
     return RULES_OK;
 }
@@ -289,18 +305,18 @@ unsigned int ensureStateNode(void *tree,
                              char *sid, 
                              unsigned char *isNew,
                              stateNode **state) {  
-    printf("ensuring state %s\n", sid);
     unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
     unsigned int nodeOffset;
-    GET(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, nodeOffset);
+    ruleset *rulesetTree = (ruleset*)tree;
+    GET(stateNode, rulesetTree->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, nodeOffset);
     if (nodeOffset != UNDEFINED_HASH_OFFSET) {
         *isNew = 0;
         *state = STATE_NODE(tree, nodeOffset); 
     } else {
-        printf("adding new state %s\n", sid);
         *isNew = 1;
-        NEW(stateNode, ((ruleset*)tree)->statePool, nodeOffset);
-        SET(stateNode, ((ruleset*)tree)->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, nodeOffset);
+        NEW(stateNode, rulesetTree->statePool, nodeOffset);
+        SET(stateNode, rulesetTree->stateIndex, MAX_STATE_INDEX_LENGTH, rulesetTree->statePool, sidHash, nodeOffset);
+        rulesetTree->reverseStateIndex[rulesetTree->statePool.count - 1] = nodeOffset;
         stateNode *node = STATE_NODE(tree, nodeOffset); 
     
         CHECK_RESULT(getBindingIndex(tree, sidHash, &node->bindingIndex));
@@ -320,13 +336,136 @@ unsigned int ensureStateNode(void *tree,
         node->actionState = malloc(((ruleset*)tree)->actionCount * sizeof(actionStateNode));
         for (unsigned int i = 0; i < ((ruleset*)tree)->actionCount; ++i) {
             actionStateNode *actionNode = &node->actionState[i];
+            actionNode->firstOffset = UNDEFINED_HASH_OFFSET;
             INIT(leftFrameNode, actionNode->resultPool, MAX_LEFT_FRAME_NODES);
         }        
 
+        node->factOffset = UNDEFINED_HASH_OFFSET;
         *state = node;
     }
     
     return RULES_OK;
+}
+
+static unsigned int getResultFrameLength(ruleset *tree, 
+                                         stateNode *state, 
+                                         leftFrameNode *frame) {
+    unsigned int resultLength = 2;
+    char *actionName = &tree->stringPool[frame->nameOffset];
+    resultLength += strlen(actionName) + 5;
+    for (int i = 0; i < frame->messageCount; ++i) {
+        messageFrame *currentFrame = &frame->messages[frame->reverseIndex[i]]; 
+        messageNode *currentNode = MESSAGE_NODE(state, currentFrame->messageNodeOffset);
+        char *name = &tree->stringPool[currentFrame->nameOffset];
+        char *value = currentNode->jo.content;
+        if (i < (frame->messageCount -1)) {
+            resultLength += strlen(name) + strlen(value) + 4;
+        } else {
+            resultLength += strlen(name) + strlen(value) + 3;
+        }
+    }
+
+    return resultLength;
+}
+
+static void serializeResultFrame(ruleset *tree, 
+                                 stateNode *state, 
+                                 leftFrameNode *frame, 
+                                 char *resultMessage) {
+    char *actionName = &tree->stringPool[frame->nameOffset];
+    unsigned int tupleLength = strlen(actionName) + 6;
+    #ifdef _WIN32
+        sprintf_s(resultMessage, tupleLength, "{\"%s\":{", actionName);
+    #else
+        snprintf(resultMessage, tupleLength, "{\"%s\":{", actionName);
+    #endif
+    resultMessage += (tupleLength - 1); 
+
+    for (int i = 0; i < frame->messageCount; ++i) {
+        messageFrame *currentFrame = &frame->messages[frame->reverseIndex[i]]; 
+        messageNode *currentNode = MESSAGE_NODE(state, currentFrame->messageNodeOffset);
+        char *name = &tree->stringPool[currentFrame->nameOffset];
+        char *value = currentNode->jo.content;
+        if (i < (frame->messageCount -1)) {
+            tupleLength = strlen(name) + strlen(value) + 5;
+            #ifdef _WIN32
+                sprintf_s(resultMessage, tupleLength, "\"%s\":%s,", name, value);
+            #else
+                snprintf(resultMessage, tupleLength, "\"%s\":%s,", name, value);
+            #endif
+        } else {
+            tupleLength = strlen(name) + strlen(value) + 4;
+            #ifdef _WIN32
+                sprintf_s(resultMessage, tupleLength, "\"%s\":%s", name, value);
+            #else
+                snprintf(resultMessage, tupleLength, "\"%s\":%s", name, value);
+            #endif
+        }
+
+        resultMessage += (tupleLength - 1); 
+    }
+
+    resultMessage[0] = '}';
+    resultMessage[1] = '}';
+}
+
+static unsigned int getSerializedResult(ruleset *tree, 
+                                        stateNode *state, 
+                                        actionStateNode *actionNode, 
+                                        char **result) {
+    leftFrameNode *resultFrame = &((leftFrameNode *)actionNode->resultPool.content)[actionNode->firstOffset];
+    unsigned int resultLength = getResultFrameLength(tree, 
+                                                     state, 
+                                                     resultFrame) + 1;
+    *result = malloc(resultLength * sizeof(char));
+    if (!*result) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    char *first = *result;
+    first[resultLength - 1] = 0;
+    serializeResultFrame(tree, 
+                         state, 
+                         resultFrame, 
+                         first);
+    return RULES_OK;
+}
+
+unsigned int getNextResult(void *tree, 
+                           char **stateFact, 
+                           char **messages) {
+    unsigned int count = 0;
+    ruleset *rulesetTree = (ruleset*)tree;
+    *messages = NULL;
+    while (count < rulesetTree->statePool.count && !*messages) {
+        unsigned int nodeOffset = rulesetTree->reverseStateIndex[rulesetTree->currentStateIndex];
+        stateNode *state = STATE_NODE(tree, nodeOffset); 
+        for (unsigned int index = 0; index < rulesetTree->actionCount; ++index) {
+            actionStateNode *actionNode = &state->actionState[index];
+            if (actionNode->resultPool.contentLength) {
+                CHECK_RESULT(getSerializedResult(tree, 
+                                                 state, 
+                                                 actionNode, 
+                                                 messages));
+
+                messageNode *stateFactNode = MESSAGE_NODE(state, state->factOffset);
+                unsigned int stateFactLength = strlen(stateFactNode->jo.content) + 1;
+                *stateFact = malloc(stateFactLength * sizeof(char));
+                if (!*stateFact) {
+                    return ERR_OUT_OF_MEMORY;
+                }
+                memcpy(*stateFact, stateFactNode->jo.content, stateFactLength);
+            
+                return RULES_OK;
+            }
+        }
+
+        rulesetTree->currentStateIndex = (rulesetTree->currentStateIndex + 1) % rulesetTree->statePool.contentLength;
+        ++count;
+    }
+
+
+    return ERR_NO_ACTION_AVAILABLE;
 }
 
 static void insertSortProperties(jsonObject *jo, jsonProperty **properties) {

@@ -199,7 +199,7 @@ unsigned int assertState(unsigned int handle,
                          char *state);
 
 unsigned int startAction(unsigned int handle, 
-                         char **state, 
+                         char **stateFact, 
                          char **messages, 
                          void **actionHandle,
                          void **actionBinding);
