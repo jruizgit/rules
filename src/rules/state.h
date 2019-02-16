@@ -11,6 +11,11 @@
 #define MAX_MESSAGE_INDEX_LENGTH 16384
 #define MAX_LEFT_FRAME_INDEX_LENGTH 1024
 #define MAX_RIGHT_FRAME_INDEX_LENGTH 1024
+#define MAX_FRAME_LOCATIONS 128
+
+#define LEFT_FRAME 0
+#define RIGHT_FRAME 1
+#define ACTION_FRAME 2
 
 #define MESSAGE_NODE(state, offset) &((messageNode *)state->messagePool.content)[offset]
 
@@ -46,10 +51,18 @@ typedef struct jsonObject {
     char idBuffer[ID_BUFFER_LENGTH];
 } jsonObject;
 
+typedef struct frameLocation {
+  unsigned char frameType;
+  unsigned int nodeIndex;
+  unsigned int frameOffset;
+} frameLocation;
+
 typedef struct messageNode {
     unsigned int prevOffset;
     unsigned int nextOffset;
     unsigned int hash;
+    unsigned short locationCount;
+    frameLocation locations[MAX_FRAME_LOCATIONS];
     jsonObject jo;
 } messageNode;
 
@@ -138,6 +151,10 @@ unsigned int getHash(char *sid, char *key);
 
 unsigned int initStatePool(void *tree);
 
+unsigned int appendFrameLocation(stateNode *state,
+                                 frameLocation location,
+                                 unsigned int messageNodeOffset);
+
 unsigned int getMessageFromFrame(stateNode *state,
                                  messageFrame *messages,
                                  unsigned int hash,
@@ -154,16 +171,15 @@ unsigned int getLeftFrame(stateNode *state,
                           leftFrameNode **node);
 
 unsigned int setLeftFrame(stateNode *state,
-                          unsigned int index, 
                           unsigned int hash, 
-                          unsigned int valueOffset);
+                          frameLocation location);
 
 unsigned int createLeftFrame(stateNode *state,
                             unsigned int index, 
                             unsigned int nameOffset,
                             leftFrameNode *oldNode,                        
-                            unsigned int *newValueOffset,
-                            leftFrameNode **newNode);
+                            leftFrameNode **newNode,
+                            frameLocation *newLocation);
 
 unsigned int getRightFrame(stateNode *state,
                            unsigned int index, 
@@ -171,21 +187,20 @@ unsigned int getRightFrame(stateNode *state,
                            rightFrameNode **node);
 
 unsigned int setRightFrame(stateNode *state,
-                           unsigned int index,
                            unsigned int hash, 
-                           unsigned int valueOffset);
+                           frameLocation location);
 
 unsigned int createRightFrame(stateNode *state,
                               unsigned int index,
-                              unsigned int *valueOffset,
-                              rightFrameNode **node);
+                              rightFrameNode **node,
+                              frameLocation *location);
 
 unsigned int createActionFrame(stateNode *state,
                                unsigned int index,
                                unsigned int nameOffset, 
                                leftFrameNode *oldNode,                        
-                               unsigned int *newValueOffset,
-                               leftFrameNode **newNode);
+                               leftFrameNode **newNode,
+                               frameLocation *newLocation);
 
 unsigned int storeMessage(stateNode *state,
                           char *mid,

@@ -104,6 +104,21 @@ unsigned int initStatePool(void *tree) {
     return RULES_OK;
 }
 
+unsigned int appendFrameLocation(stateNode *state,
+                                 frameLocation location,
+                                 unsigned int messageNodeOffset) { 
+    messageNode *currentNode = MESSAGE_NODE(state, messageNodeOffset);
+    if (currentNode->locationCount == MAX_FRAME_LOCATIONS) {
+        return ERR_MAX_FRAME_LOCATIONS;
+    }
+    currentNode->locations[currentNode->locationCount].frameType = location.frameType;
+    currentNode->locations[currentNode->locationCount].nodeIndex = location.nodeIndex;
+    currentNode->locations[currentNode->locationCount].frameOffset = location.frameOffset;
+    ++currentNode->locationCount;
+
+    return RULES_OK;
+}
+
 unsigned int getMessageFromFrame(stateNode *state,
                                  messageFrame *messages,
                                  unsigned int hash,
@@ -169,15 +184,14 @@ unsigned int getLeftFrame(stateNode *state,
 }
 
 unsigned int setLeftFrame(stateNode *state, 
-                          unsigned int index, 
                           unsigned int hash, 
-                          unsigned int valueOffset) {
+                          frameLocation location) {
     SET(leftFrameNode, 
-        state->betaState[index].leftFrameIndex, 
+        state->betaState[location.nodeIndex].leftFrameIndex, 
         MAX_LEFT_FRAME_INDEX_LENGTH, 
-        state->betaState[index].leftFramePool, 
+        state->betaState[location.nodeIndex].leftFramePool, 
         hash, 
-        valueOffset);
+        location.frameOffset);
     return RULES_OK;
 }
 
@@ -185,14 +199,15 @@ unsigned int createActionFrame(stateNode *state,
                                unsigned int index, 
                                unsigned int nameOffset,
                                leftFrameNode *oldNode,                        
-                               unsigned int *newValueOffset,
-                               leftFrameNode **newNode) {
+                               leftFrameNode **newNode,
+                               frameLocation *newLocation) {
 
+    unsigned int newValueOffset;
     actionStateNode *actionNode = &state->actionState[index];
     NEW(leftFrameNode, 
         actionNode->resultPool, 
-        *newValueOffset);
-    leftFrameNode *targetNode = ACTION_FRAME_NODE(state, index, *newValueOffset);
+        newValueOffset);
+    leftFrameNode *targetNode = ACTION_FRAME_NODE(state, index, newValueOffset);
     if (!oldNode) {
         memset(targetNode->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
         memset(targetNode->reverseIndex, 0, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
@@ -206,10 +221,14 @@ unsigned int createActionFrame(stateNode *state,
 
     if (actionNode->firstOffset != UNDEFINED_HASH_OFFSET) {
         leftFrameNode *nextNode = ACTION_FRAME_NODE(state, index, actionNode->firstOffset);
-        nextNode->prevOffset = *newValueOffset;
+        nextNode->prevOffset = newValueOffset;
     }
     targetNode->nextOffset = actionNode->firstOffset;
-    actionNode->firstOffset = *newValueOffset;
+    actionNode->firstOffset = newValueOffset;
+
+    newLocation->frameType = ACTION_FRAME;
+    newLocation->nodeIndex = index;
+    newLocation->frameOffset = newValueOffset;
     
     *newNode = targetNode;
     return RULES_OK;
@@ -219,12 +238,13 @@ unsigned int createLeftFrame(stateNode *state,
                             unsigned int index, 
                             unsigned int nameOffset,
                             leftFrameNode *oldNode,                        
-                            unsigned int *newValueOffset,
-                            leftFrameNode **newNode) {
+                            leftFrameNode **newNode,
+                            frameLocation *newLocation) {
+    unsigned int newValueOffset;
     NEW(leftFrameNode, 
         state->betaState[index].leftFramePool, 
-        *newValueOffset);
-    leftFrameNode *targetNode = LEFT_FRAME_NODE(state, index, *newValueOffset);
+        newValueOffset);
+    leftFrameNode *targetNode = LEFT_FRAME_NODE(state, index, newValueOffset);
     if (!oldNode) {
         memset(targetNode->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
         memset(targetNode->reverseIndex, 0, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
@@ -236,6 +256,10 @@ unsigned int createLeftFrame(stateNode *state,
     } 
     targetNode->nameOffset = nameOffset;
     
+    newLocation->frameType = LEFT_FRAME;
+    newLocation->nodeIndex = index;
+    newLocation->frameOffset = newValueOffset;
+
     *newNode = targetNode;
     return RULES_OK;
 }
@@ -260,26 +284,31 @@ unsigned int getRightFrame(stateNode *state,
 }
 
 unsigned int setRightFrame(stateNode *state,
-                           unsigned int index, 
                            unsigned int hash, 
-                           unsigned int valueOffset) {
+                           frameLocation location) {
     SET(rightFrameNode, 
-        state->betaState[index].rightFrameIndex, 
+        state->betaState[location.nodeIndex].rightFrameIndex, 
         MAX_RIGHT_FRAME_INDEX_LENGTH, 
-        state->betaState[index].rightFramePool, 
+        state->betaState[location.nodeIndex].rightFramePool, 
         hash, 
-        valueOffset);
+        location.frameOffset);
     return RULES_OK;
 }
 
 unsigned int createRightFrame(stateNode *state,
                               unsigned int index,  
-                              unsigned int *valueOffset,
-                              rightFrameNode **node) {
+                              rightFrameNode **node,
+                              frameLocation *location) {
+    unsigned int valueOffset;
     NEW(rightFrameNode, 
         state->betaState[index].rightFramePool, 
-        *valueOffset);
-    *node = RIGHT_FRAME_NODE(state, index, *valueOffset);
+        valueOffset);
+    *node = RIGHT_FRAME_NODE(state, index, valueOffset);
+
+    location->frameType = RIGHT_FRAME;
+    location->nodeIndex = index;
+    location->frameOffset = valueOffset;
+
     return RULES_OK;
 }
 
@@ -291,6 +320,7 @@ unsigned int storeMessage(stateNode *state,
     NEW(messageNode, state->messagePool, *valueOffset);
     SET(messageNode, state->messageIndex, MAX_MESSAGE_INDEX_LENGTH, state->messagePool, hash, *valueOffset);
     messageNode *node = MESSAGE_NODE(state, *valueOffset);
+    node->locationCount = 0;
     memcpy(&node->jo, message, sizeof(jsonObject));
     unsigned int messageLength = (strlen(message->content) + 1) * sizeof(char);
     node->jo.content = malloc(messageLength);
