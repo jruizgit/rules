@@ -850,6 +850,8 @@ static unsigned int handleBeta(ruleset *tree,
         }
     }
 
+    CHECK_RESULT(setActionFrame(state, currentFrameLocation));
+
     return handleAction(tree, 
                         state, 
                         actionNode, 
@@ -1081,6 +1083,47 @@ static unsigned int handleAlpha(ruleset *tree,
     }
 
     return ERR_EVENT_NOT_HANDLED;
+}
+
+static unsigned int handleDeleteMessage(stateNode *state,
+                                        unsigned int messageOffset) {
+    messageNode *node = MESSAGE_NODE(state, messageOffset);
+    for (unsigned int i = 0; i < node->locationCount; ++i) {
+        leftFrameNode *frame = NULL;
+
+        switch(node->locations[i].frameType) {
+            case LEFT_FRAME:
+                frame = LEFT_FRAME_NODE(state, 
+                                        node->locations[i].nodeIndex,
+                                        node->locations[i].frameOffset);
+                
+                CHECK_RESULT(deleteLeftFrame(state, node->locations[i]));
+                break;
+            case ACTION_FRAME:
+                frame = ACTION_FRAME_NODE(state, 
+                                          node->locations[i].nodeIndex,
+                                          node->locations[i].frameOffset);
+
+                CHECK_RESULT(deleteActionFrame(state, node->locations[i]));
+                break;
+            case RIGHT_FRAME:
+                CHECK_RESULT(deleteRightFrame(state, node->locations[i]));
+                break;
+        }
+
+        if (frame != NULL) {
+            for (int i = 0; i < frame->messageCount; ++i) {
+                messageFrame *currentFrame = &frame->messages[frame->reverseIndex[i]]; 
+                CHECK_RESULT(deleteLocationFromMessage(state,
+                                                       currentFrame->messageNodeOffset,
+                                                       node->locations[i]));
+            }
+        }
+    }
+
+    CHECK_RESULT(deleteMessage(state, messageOffset));
+
+    return RULES_OK;
 }
 
 static unsigned int handleMessageCore(ruleset *tree,
@@ -1601,29 +1644,6 @@ unsigned int assertTimers(unsigned int handle) {
     return RULES_OK;
 }
 
-unsigned int startAction(unsigned int handle, 
-                         char **stateFact, 
-                         char **messages, 
-                         void **actionHandle,
-                         void **actionBinding) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-    
-    actionContext *context = malloc(sizeof(actionContext));
-    if (!context) {
-        return ERR_OUT_OF_MEMORY;
-    }
-    
-    *actionHandle = context;
-    *actionBinding = NULL;
-
-    CHECK_RESULT(getNextResult(tree, stateFact, messages));
-
-    printf("starting action %s, %s\n", *stateFact, *messages);
-
-    return RULES_OK;
-}
-
 unsigned int startUpdateState(unsigned int handle, 
                               void *actionHandle, 
                               char *state,
@@ -1652,6 +1672,58 @@ unsigned int startUpdateState(unsigned int handle,
     result = startNonBlockingBatch(*rulesBinding, commands, commandCount, replyCount);
     return result;
 
+}
+
+unsigned int startAction(unsigned int handle, 
+                         char **stateFact, 
+                         char **messages, 
+                         void **actionHandle,
+                         void **actionBinding) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+    
+    actionContext *context = malloc(sizeof(actionContext));
+    if (!context) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    
+    *actionHandle = context;
+    *actionBinding = NULL;
+    unsigned int actionIndex;
+    actionStateNode *resultAction;
+    stateNode *resultState;
+
+    CHECK_RESULT(getNextResult(tree,
+                               &resultState, 
+                               &actionIndex,
+                               &resultAction));
+
+    CHECK_RESULT(serializeResult(tree, 
+                                 resultState, 
+                                 resultAction, 
+                                 messages));
+
+
+    CHECK_RESULT(serializeState(resultState, 
+                                stateFact));    
+            
+
+    leftFrameNode *resultFrame = RESULT_FRAME(resultAction, resultAction->resultIndex[0]);
+    for (int i = 0; i < resultFrame->messageCount; ++i) {
+        messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
+        CHECK_RESULT(handleDeleteMessage(resultState, 
+                                         currentMessageFrame->messageNodeOffset));
+    }    
+
+    frameLocation resultLocation;
+    resultLocation.frameType = ACTION_FRAME;
+    resultLocation.nodeIndex = actionIndex;
+    resultLocation.frameOffset = resultAction->resultIndex[0];
+    CHECK_RESULT(deleteActionFrame(resultState, resultLocation));
+
+    printf("starting action %s, %s\n", *stateFact, *messages);
+
+    return RULES_OK;
 }
 
 unsigned int completeAction(unsigned int handle, 

@@ -25,7 +25,10 @@
 
 #define ACTION_FRAME_NODE(state, index, offset) &((leftFrameNode *)state->actionState[index].resultPool.content)[offset]
 
+#define RESULT_FRAME(actionNode, offset) &((leftFrameNode *)actionNode->resultPool.content)[offset];
+
 #define STATE_NODE(tree, offset) &((stateNode *)((ruleset *)tree)->statePool.content)[offset]
+
 
 typedef struct jsonProperty {
     unsigned int hash;
@@ -98,7 +101,7 @@ typedef struct pool {
 
 typedef struct actionStateNode {
     pool resultPool;
-    unsigned int firstOffset;
+    unsigned int resultIndex[1];
     unsigned short count;
     unsigned short cap;
 } actionStateNode;
@@ -174,6 +177,10 @@ unsigned int setLeftFrame(stateNode *state,
                           unsigned int hash, 
                           frameLocation location);
 
+
+unsigned int deleteLeftFrame(stateNode *state,
+                             frameLocation location);
+
 unsigned int createLeftFrame(stateNode *state,
                             unsigned int index, 
                             unsigned int nameOffset,
@@ -190,10 +197,20 @@ unsigned int setRightFrame(stateNode *state,
                            unsigned int hash, 
                            frameLocation location);
 
+unsigned int deleteRightFrame(stateNode *state,
+                              frameLocation location);
+
 unsigned int createRightFrame(stateNode *state,
                               unsigned int index,
                               rightFrameNode **node,
                               frameLocation *location);
+
+unsigned int setActionFrame(stateNode *state, 
+                            frameLocation location);
+
+
+unsigned int deleteActionFrame(stateNode *state,
+                               frameLocation location);
 
 unsigned int createActionFrame(stateNode *state,
                                unsigned int index,
@@ -201,6 +218,13 @@ unsigned int createActionFrame(stateNode *state,
                                leftFrameNode *oldNode,                        
                                leftFrameNode **newNode,
                                frameLocation *newLocation);
+
+unsigned int deleteLocationFromMessage(stateNode *state,
+                                       unsigned int messageNodeOffset,
+                                       frameLocation location);
+
+unsigned int deleteMessage(stateNode *state,
+                           unsigned int messageNodeOffset);
 
 unsigned int storeMessage(stateNode *state,
                           char *mid,
@@ -212,9 +236,18 @@ unsigned int ensureStateNode(void *tree,
                              unsigned char *isNew,
                              stateNode **state);
 
+unsigned int serializeResult(void *tree, 
+                             stateNode *state, 
+                             actionStateNode *actionNode, 
+                             char **result);
+
+unsigned int serializeState(stateNode *state, 
+                            char **stateFact);
+
 unsigned int getNextResult(void *tree, 
-                           char **stateFact, 
-                           char **messages);
+                           stateNode **resultState, 
+                           unsigned int *actionIndex,
+                           actionStateNode **resultAction);
 
 
 

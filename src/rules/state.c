@@ -75,7 +75,26 @@
     } \
 } while(0)
 
-#define DELETE(type, index, max, pool, hash) do { \
+#define DELETE(type, index, max, pool, valueOffset) do { \
+    type *frame = &((type *)pool.content)[valueOffset]; \
+    if (frame->prevOffset == UNDEFINED_HASH_OFFSET) { \
+        index[frame->hash % max] = frame->nextOffset; \
+    } else { \
+        type *prevFrame = &((type *)pool.content)[frame->prevOffset]; \
+        prevFrame->nextOffset = frame->nextOffset; \
+    } \
+    if (frame->nextOffset != UNDEFINED_HASH_OFFSET) { \
+        type *nextFrame = &((type *)pool.content)[frame->nextOffset]; \
+        nextFrame->prevOffset = frame->prevOffset; \
+    } \
+    frame->nextOffset = pool.freeOffset; \
+    frame->prevOffset = UNDEFINED_HASH_OFFSET; \
+    if (pool.freeOffset != UNDEFINED_HASH_OFFSET) { \
+        type *freeFrame = &((type *)pool.content)[pool.freeOffset]; \
+        freeFrame->prevOffset = valueOffset; \
+    } \
+    pool.freeOffset = valueOffset; \
+    --pool.count; \
 } while (0)
 
 unsigned int fnv1Hash32(char *str, unsigned int length) {
@@ -195,42 +214,13 @@ unsigned int setLeftFrame(stateNode *state,
     return RULES_OK;
 }
 
-unsigned int createActionFrame(stateNode *state,
-                               unsigned int index, 
-                               unsigned int nameOffset,
-                               leftFrameNode *oldNode,                        
-                               leftFrameNode **newNode,
-                               frameLocation *newLocation) {
-
-    unsigned int newValueOffset;
-    actionStateNode *actionNode = &state->actionState[index];
-    NEW(leftFrameNode, 
-        actionNode->resultPool, 
-        newValueOffset);
-    leftFrameNode *targetNode = ACTION_FRAME_NODE(state, index, newValueOffset);
-    if (!oldNode) {
-        memset(targetNode->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
-        memset(targetNode->reverseIndex, 0, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
-        targetNode->messageCount = 0;
-    } else {
-        memcpy(targetNode->messages, oldNode->messages, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
-        memcpy(targetNode->reverseIndex, oldNode->reverseIndex, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
-        targetNode->messageCount = oldNode->messageCount;
-    } 
-    targetNode->nameOffset = nameOffset;
-
-    if (actionNode->firstOffset != UNDEFINED_HASH_OFFSET) {
-        leftFrameNode *nextNode = ACTION_FRAME_NODE(state, index, actionNode->firstOffset);
-        nextNode->prevOffset = newValueOffset;
-    }
-    targetNode->nextOffset = actionNode->firstOffset;
-    actionNode->firstOffset = newValueOffset;
-
-    newLocation->frameType = ACTION_FRAME;
-    newLocation->nodeIndex = index;
-    newLocation->frameOffset = newValueOffset;
-    
-    *newNode = targetNode;
+unsigned int deleteLeftFrame(stateNode *state,
+                             frameLocation location) {
+    DELETE(leftFrameNode,
+           state->betaState[location.nodeIndex].leftFrameIndex, 
+           MAX_LEFT_FRAME_INDEX_LENGTH,
+           state->betaState[location.nodeIndex].leftFramePool,
+           location.frameOffset);
     return RULES_OK;
 }
 
@@ -260,6 +250,59 @@ unsigned int createLeftFrame(stateNode *state,
     newLocation->nodeIndex = index;
     newLocation->frameOffset = newValueOffset;
 
+    *newNode = targetNode;
+    return RULES_OK;
+}
+
+unsigned int setActionFrame(stateNode *state, 
+                            frameLocation location) {
+    SET(leftFrameNode, 
+        state->actionState[location.nodeIndex].resultIndex, 
+        MAX_LEFT_FRAME_INDEX_LENGTH, 
+        state->actionState[location.nodeIndex].resultPool, 
+        0, 
+        location.frameOffset);
+    return RULES_OK;
+}
+
+unsigned int deleteActionFrame(stateNode *state,
+                               frameLocation location) {
+    DELETE(leftFrameNode,
+           state->actionState[location.nodeIndex].resultIndex, 
+           MAX_LEFT_FRAME_INDEX_LENGTH,
+           state->actionState[location.nodeIndex].resultPool,
+           location.frameOffset);
+    return RULES_OK;
+}
+
+unsigned int createActionFrame(stateNode *state,
+                               unsigned int index, 
+                               unsigned int nameOffset,
+                               leftFrameNode *oldNode,                        
+                               leftFrameNode **newNode,
+                               frameLocation *newLocation) {
+
+    unsigned int newValueOffset;
+    actionStateNode *actionNode = &state->actionState[index];
+    NEW(leftFrameNode, 
+        actionNode->resultPool, 
+        newValueOffset);
+    leftFrameNode *targetNode = ACTION_FRAME_NODE(state, index, newValueOffset);
+    if (!oldNode) {
+        memset(targetNode->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
+        memset(targetNode->reverseIndex, 0, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
+        targetNode->messageCount = 0;
+    } else {
+        memcpy(targetNode->messages, oldNode->messages, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
+        memcpy(targetNode->reverseIndex, oldNode->reverseIndex, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
+        targetNode->messageCount = oldNode->messageCount;
+    } 
+    targetNode->nameOffset = nameOffset;
+
+    newLocation->frameType = ACTION_FRAME;
+    newLocation->nodeIndex = index;
+    newLocation->frameOffset = newValueOffset;
+    
     *newNode = targetNode;
     return RULES_OK;
 }
@@ -295,6 +338,16 @@ unsigned int setRightFrame(stateNode *state,
     return RULES_OK;
 }
 
+unsigned int deleteRightFrame(stateNode *state,
+                              frameLocation location) {
+    DELETE(rightFrameNode,
+           state->betaState[location.nodeIndex].rightFrameIndex, 
+           MAX_RIGHT_FRAME_INDEX_LENGTH,
+           state->betaState[location.nodeIndex].rightFramePool,
+           location.frameOffset);
+    return RULES_OK;
+}
+
 unsigned int createRightFrame(stateNode *state,
                               unsigned int index,  
                               rightFrameNode **node,
@@ -309,6 +362,37 @@ unsigned int createRightFrame(stateNode *state,
     location->nodeIndex = index;
     location->frameOffset = valueOffset;
 
+    return RULES_OK;
+}
+
+unsigned int deleteLocationFromMessage(stateNode *state,
+                                       unsigned int messageNodeOffset,
+                                       frameLocation location) {
+
+    messageNode *message = MESSAGE_NODE(state, messageNodeOffset);
+
+    for (unsigned short i = 0; i < message->locationCount; ++i) {
+        if (message->locations[i].frameType == location.frameType &&
+            message->locations[i].nodeIndex == location.nodeIndex &&
+            message->locations[i].frameOffset == location.frameOffset) {
+
+            --message->locationCount;
+            memcpy(&message->locations[i], 
+                   &message->locations[i + 1], 
+                   (message->locationCount - i) * sizeof(frameLocation));
+        }
+    }
+
+    return RULES_OK;
+}
+
+unsigned int deleteMessage(stateNode *state,
+                           unsigned int messageNodeOffset) {
+    DELETE(messageNode,
+           state->messageIndex, 
+           MAX_MESSAGE_NODES,
+           state->messagePool,
+           messageNodeOffset);
     return RULES_OK;
 }
 
@@ -366,7 +450,7 @@ unsigned int ensureStateNode(void *tree,
         node->actionState = malloc(((ruleset*)tree)->actionCount * sizeof(actionStateNode));
         for (unsigned int i = 0; i < ((ruleset*)tree)->actionCount; ++i) {
             actionStateNode *actionNode = &node->actionState[i];
-            actionNode->firstOffset = UNDEFINED_HASH_OFFSET;
+            actionNode->resultIndex[0] = UNDEFINED_HASH_OFFSET;
             INIT(leftFrameNode, actionNode->resultPool, MAX_LEFT_FRAME_NODES);
         }        
 
@@ -439,11 +523,11 @@ static void serializeResultFrame(ruleset *tree,
     resultMessage[1] = '}';
 }
 
-static unsigned int getSerializedResult(ruleset *tree, 
-                                        stateNode *state, 
-                                        actionStateNode *actionNode, 
-                                        char **result) {
-    leftFrameNode *resultFrame = &((leftFrameNode *)actionNode->resultPool.content)[actionNode->firstOffset];
+unsigned int serializeResult(void *tree, 
+                             stateNode *state, 
+                             actionStateNode *actionNode, 
+                             char **result) {
+    leftFrameNode *resultFrame = RESULT_FRAME(actionNode, actionNode->resultIndex[0]);
     unsigned int resultLength = getResultFrameLength(tree, 
                                                      state, 
                                                      resultFrame) + 1;
@@ -461,39 +545,44 @@ static unsigned int getSerializedResult(ruleset *tree,
     return RULES_OK;
 }
 
+unsigned int serializeState(stateNode *state, 
+                            char **stateFact) {
+
+    messageNode *stateFactNode = MESSAGE_NODE(state, state->factOffset);
+    unsigned int stateFactLength = strlen(stateFactNode->jo.content) + 1;
+    *stateFact = malloc(stateFactLength * sizeof(char));
+    if (!*stateFact) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    memcpy(*stateFact, stateFactNode->jo.content, stateFactLength);
+
+    return RULES_OK;
+}
+
+
 unsigned int getNextResult(void *tree, 
-                           char **stateFact, 
-                           char **messages) {
+                           stateNode **resultState, 
+                           unsigned int *actionIndex,
+                           actionStateNode **resultAction) {
     unsigned int count = 0;
     ruleset *rulesetTree = (ruleset*)tree;
-    *messages = NULL;
-    while (count < rulesetTree->statePool.count && !*messages) {
+    *resultAction = NULL;
+    while (count < rulesetTree->statePool.count && !*resultAction) {
         unsigned int nodeOffset = rulesetTree->reverseStateIndex[rulesetTree->currentStateIndex];
         stateNode *state = STATE_NODE(tree, nodeOffset); 
         for (unsigned int index = 0; index < rulesetTree->actionCount; ++index) {
             actionStateNode *actionNode = &state->actionState[index];
-            if (actionNode->resultPool.contentLength) {
-                CHECK_RESULT(getSerializedResult(tree, 
-                                                 state, 
-                                                 actionNode, 
-                                                 messages));
-
-                messageNode *stateFactNode = MESSAGE_NODE(state, state->factOffset);
-                unsigned int stateFactLength = strlen(stateFactNode->jo.content) + 1;
-                *stateFact = malloc(stateFactLength * sizeof(char));
-                if (!*stateFact) {
-                    return ERR_OUT_OF_MEMORY;
-                }
-                memcpy(*stateFact, stateFactNode->jo.content, stateFactLength);
-            
+            if (actionNode->resultPool.count) {
+                *resultState = state;
+                *resultAction = actionNode;
+                *actionIndex = index;
                 return RULES_OK;
             }
         }
 
-        rulesetTree->currentStateIndex = (rulesetTree->currentStateIndex + 1) % rulesetTree->statePool.contentLength;
+        rulesetTree->currentStateIndex = (rulesetTree->currentStateIndex + 1) % rulesetTree->statePool.count;
         ++count;
     }
-
 
     return ERR_NO_ACTION_AVAILABLE;
 }
