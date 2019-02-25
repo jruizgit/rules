@@ -1814,7 +1814,7 @@ unsigned int completeAndStartAction(unsigned int handle,
     free(context->stateFact);
     free(context);
     printf("done completing and starting action\n");
-    return RULES_OK;
+    return ERR_NO_ACTION_AVAILABLE;
 }
 
 unsigned int abandonAction(unsigned int handle, void *actionHandle) {
