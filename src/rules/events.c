@@ -48,8 +48,10 @@
 #define HASH_I 1622948014 //$i
 
 typedef struct actionContext {
-    void *rulesBinding;
-    redisReply *reply;
+    stateNode *resultState;
+    actionStateNode *resultAction;
+    char *messages;
+    char *stateFact;
 } actionContext;
 
 typedef struct jsonResult {
@@ -1088,6 +1090,13 @@ static unsigned int handleAlpha(ruleset *tree,
 static unsigned int handleDeleteMessage(stateNode *state,
                                         unsigned int messageOffset) {
     messageNode *node = MESSAGE_NODE(state, messageOffset);
+    unsigned int result = deleteMessage(state, messageOffset);
+    if (result == ERR_NODE_DELETED) {
+        return RULES_OK;
+    } else if (result != RULES_OK) {
+        return result;
+    }
+
     for (unsigned int i = 0; i < node->locationCount; ++i) {
         leftFrameNode *frame = NULL;
 
@@ -1097,17 +1106,29 @@ static unsigned int handleDeleteMessage(stateNode *state,
                                         node->locations[i].nodeIndex,
                                         node->locations[i].frameOffset);
                 
-                CHECK_RESULT(deleteLeftFrame(state, node->locations[i]));
+                result = deleteLeftFrame(state, node->locations[i]);
+                if (result != RULES_OK && result != ERR_NODE_DELETED) {
+                    return result;
+                }
+
                 break;
             case ACTION_FRAME:
                 frame = ACTION_FRAME_NODE(state, 
                                           node->locations[i].nodeIndex,
                                           node->locations[i].frameOffset);
 
-                CHECK_RESULT(deleteActionFrame(state, node->locations[i]));
+                result = deleteActionFrame(state, node->locations[i]);
+                if (result != RULES_OK && result != ERR_NODE_DELETED) {
+                    return result;
+                }
+
                 break;
             case RIGHT_FRAME:
-                CHECK_RESULT(deleteRightFrame(state, node->locations[i]));
+                result = deleteRightFrame(state, node->locations[i]);
+                if (result != RULES_OK && result != ERR_NODE_DELETED) {
+                    return result;
+                }
+
                 break;
         }
 
@@ -1120,8 +1141,6 @@ static unsigned int handleDeleteMessage(stateNode *state,
             }
         }
     }
-
-    CHECK_RESULT(deleteMessage(state, messageOffset));
 
     return RULES_OK;
 }
@@ -1670,6 +1689,10 @@ unsigned int startUpdateState(unsigned int handle,
     }
 
     result = startNonBlockingBatch(*rulesBinding, commands, commandCount, replyCount);
+
+    //TODO: Durable store
+    *replyCount = 1;
+    *rulesBinding = 1;
     return result;
 
 }
@@ -1682,20 +1705,13 @@ unsigned int startAction(unsigned int handle,
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
     
-    actionContext *context = malloc(sizeof(actionContext));
-    if (!context) {
-        return ERR_OUT_OF_MEMORY;
-    }
-    
-    *actionHandle = context;
-    *actionBinding = NULL;
-    unsigned int actionIndex;
+    unsigned int actionStateIndex;
     actionStateNode *resultAction;
     stateNode *resultState;
 
     CHECK_RESULT(getNextResult(tree,
                                &resultState, 
-                               &actionIndex,
+                               &actionStateIndex,
                                &resultAction));
 
     CHECK_RESULT(serializeResult(tree, 
@@ -1706,21 +1722,22 @@ unsigned int startAction(unsigned int handle,
 
     CHECK_RESULT(serializeState(resultState, 
                                 stateFact));    
-            
+    
 
-    leftFrameNode *resultFrame = RESULT_FRAME(resultAction, resultAction->resultIndex[0]);
-    for (int i = 0; i < resultFrame->messageCount; ++i) {
-        messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
-        CHECK_RESULT(handleDeleteMessage(resultState, 
-                                         currentMessageFrame->messageNodeOffset));
-    }    
+    actionContext *context = malloc(sizeof(actionContext));
+    if (!context) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    
+    *actionHandle = context;
+    *actionBinding = NULL;
+    context->resultState = resultState;
+    context->resultAction = resultAction;
+    context->messages = *messages;
+    context->stateFact = *stateFact;
 
-    frameLocation resultLocation;
-    resultLocation.frameType = ACTION_FRAME;
-    resultLocation.nodeIndex = actionIndex;
-    resultLocation.frameOffset = resultAction->resultIndex[0];
-    CHECK_RESULT(deleteActionFrame(resultState, resultLocation));
-
+    //TODO: Durable store
+    *actionBinding = 1;
     printf("starting action %s, %s\n", *stateFact, *messages);
 
     return RULES_OK;
@@ -1729,32 +1746,32 @@ unsigned int startAction(unsigned int handle,
 unsigned int completeAction(unsigned int handle, 
                             void *actionHandle, 
                             char *state) {
+
+    printf("completing action\n");
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
-
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
     actionContext *context = (actionContext*)actionHandle;
-    redisReply *reply = context->reply;
-    void *rulesBinding = context->rulesBinding;
-    
-    unsigned int result = formatRemoveAction(rulesBinding, 
-                                             reply->element[0]->str, 
-                                             &commands[commandCount]);
-    if (result != RULES_OK) {
-        //reply object should be freed by the app during abandonAction
-        return result;
+
+    leftFrameNode *resultFrame = RESULT_FRAME(context->resultAction, 
+                                              context->resultAction->resultIndex[0]);
+    for (int i = 0; i < resultFrame->messageCount; ++i) {
+        messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
+        CHECK_RESULT(handleDeleteMessage(context->resultState, 
+                                         currentMessageFrame->messageNodeOffset));
     }
 
-    ++commandCount;
+    
+    char *commands[MAX_COMMAND_COUNT];
+    unsigned int commandCount = 0;
+    void *rulesBinding = NULL;
     unsigned int messageOffset;
-    result = handleMessage(tree, 
-                           state,
-                           ACTION_ASSERT_FACT,
-                           commands,
-                           &commandCount,
-                           &messageOffset,
-                           &rulesBinding);
+    unsigned int result = handleMessage(tree, 
+                                        state,
+                                        ACTION_ASSERT_FACT,
+                                        commands,
+                                        &commandCount,
+                                        &messageOffset,
+                                        &rulesBinding);
     if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
         //reply object should be freed by the app during abandonAction
         freeCommands(commands, commandCount);
@@ -1767,8 +1784,11 @@ unsigned int completeAction(unsigned int handle,
         return result;
     }
 
-    freeReplyObject(reply);
-    free(actionHandle);
+
+    free(context->messages);
+    free(context->stateFact);
+    free(context);
+    printf("completed action\n");
     return RULES_OK;
 }
 
@@ -1776,62 +1796,34 @@ unsigned int completeAndStartAction(unsigned int handle,
                                     unsigned int expectedReplies,
                                     void *actionHandle, 
                                     char **messages) {
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
+    printf("completing and starting action\n");
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
     actionContext *context = (actionContext*)actionHandle;
-    redisReply *reply = context->reply;
-    void *rulesBinding = context->rulesBinding;
-    
-    unsigned int result = formatRemoveAction(rulesBinding, 
-                                             reply->element[0]->str, 
-                                             &commands[commandCount]);
-    if (result != RULES_OK) {
-        //reply object should be freed by the app during abandonAction
-        return result;
+
+    leftFrameNode *resultFrame = RESULT_FRAME(context->resultAction, 
+                                              context->resultAction->resultIndex[0]);
+    for (int i = 0; i < resultFrame->messageCount; ++i) {
+        messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
+        CHECK_RESULT(handleDeleteMessage(context->resultState, 
+                                         currentMessageFrame->messageNodeOffset));
     }
 
-    ++commandCount;
-    if (commandCount == MAX_COMMAND_COUNT) {
-        //reply object should be freed by the app during abandonAction
-        freeCommands(commands, commandCount);
-        return ERR_MAX_COMMAND_COUNT;
-    }
-
-    result = formatPeekAction(rulesBinding, 
-                              reply->element[0]->str,
-                              &commands[commandCount]);
-    if (result != RULES_OK) {
-        //reply object should be freed by the app during abandonAction
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    ++commandCount;
-    redisReply *newReply;
-    result = executeBatchWithReply(rulesBinding, 
-                                   expectedReplies, 
-                                   commands, 
-                                   commandCount, 
-                                   &newReply);  
-    if (result != RULES_OK && result != ERR_EVENT_OBSERVED) {
-        //reply object should be freed by the app during abandonAction
-        return result;
-    }
-    
-    freeReplyObject(reply);
-    if (newReply == NULL) {
-        free(actionHandle);
-        return ERR_NO_ACTION_AVAILABLE;
-    }
-
-    *messages = newReply->element[1]->str;
-    context->reply = newReply;
+    *messages = NULL;
+    free(context->messages);
+    free(context->stateFact);
+    free(context);
+    printf("done completing and starting action\n");
     return RULES_OK;
 }
 
 unsigned int abandonAction(unsigned int handle, void *actionHandle) {
-    freeReplyObject(((actionContext*)actionHandle)->reply);
-    free(actionHandle);
+    printf("abandoning action\n");
+
+    actionContext *context = (actionContext*)actionHandle;
+    free(context->messages);
+    free(context->stateFact);
+    free(context);
     return RULES_OK;
 }
 

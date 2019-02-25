@@ -64,6 +64,7 @@ typedef struct messageNode {
     unsigned int prevOffset;
     unsigned int nextOffset;
     unsigned int hash;
+    unsigned char isActive;
     unsigned short locationCount;
     frameLocation locations[MAX_FRAME_LOCATIONS];
     jsonObject jo;
@@ -80,6 +81,7 @@ typedef struct leftFrameNode {
     unsigned int nextOffset;
     unsigned int nameOffset;
     unsigned int hash;
+    unsigned char isActive;
     unsigned short messageCount;
     unsigned short reverseIndex[MAX_MESSAGE_FRAMES];
     messageFrame messages[MAX_MESSAGE_FRAMES];
@@ -89,6 +91,7 @@ typedef struct rightFrameNode {
     unsigned int prevOffset;
     unsigned int nextOffset;
     unsigned int hash;
+    unsigned char isActive;
     unsigned int messageOffset;
 } rightFrameNode;
 
@@ -117,6 +120,7 @@ typedef struct stateNode {
     unsigned int prevOffset;
     unsigned int nextOffset;
     unsigned int hash;
+    unsigned char isActive;
     unsigned int bindingIndex;
     unsigned int factOffset;
     pool messagePool;

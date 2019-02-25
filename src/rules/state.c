@@ -19,6 +19,7 @@
     } \
     pool.contentLength = length; \
     for (unsigned int i = 0; i < length; ++ i) { \
+        ((type *)pool.content)[i].isActive = 0; \
         ((type *)pool.content)[i].nextOffset = i + 1; \
         ((type *)pool.content)[i].prevOffset = i - 1; \
     } \
@@ -49,6 +50,7 @@
             return ERR_OUT_OF_MEMORY; \
         } \
         for (unsigned int i = pool.contentLength; i < pool.contentLength * 2; ++ i) { \
+            ((type *)pool.content)[i].isActive = 0; \
             ((type *)pool.content)[i].nextOffset = i + 1; \
             ((type *)pool.content)[i].prevOffset = i - 1; \
         } \
@@ -61,6 +63,7 @@
     pool.freeOffset = value->nextOffset; \
     value->nextOffset = UNDEFINED_HASH_OFFSET; \
     value->prevOffset = UNDEFINED_HASH_OFFSET; \
+    value->isActive = 1; \
     ++pool.count; \
 } while(0)
 
@@ -76,22 +79,26 @@
 } while(0)
 
 #define DELETE(type, index, max, pool, valueOffset) do { \
-    type *frame = &((type *)pool.content)[valueOffset]; \
-    if (frame->prevOffset == UNDEFINED_HASH_OFFSET) { \
-        index[frame->hash % max] = frame->nextOffset; \
+    type *value = &((type *)pool.content)[valueOffset]; \
+    if (!value->isActive) { \
+        return ERR_NODE_DELETED; \
+    } \
+    if (value->prevOffset == UNDEFINED_HASH_OFFSET) { \
+        index[value->hash % max] = value->nextOffset; \
     } else { \
-        type *prevFrame = &((type *)pool.content)[frame->prevOffset]; \
-        prevFrame->nextOffset = frame->nextOffset; \
+        type *prevValue = &((type *)pool.content)[value->prevOffset]; \
+        prevValue->nextOffset = value->nextOffset; \
     } \
-    if (frame->nextOffset != UNDEFINED_HASH_OFFSET) { \
-        type *nextFrame = &((type *)pool.content)[frame->nextOffset]; \
-        nextFrame->prevOffset = frame->prevOffset; \
+    if (value->nextOffset != UNDEFINED_HASH_OFFSET) { \
+        type *nextValue = &((type *)pool.content)[value->nextOffset]; \
+        nextValue->prevOffset = value->prevOffset; \
     } \
-    frame->nextOffset = pool.freeOffset; \
-    frame->prevOffset = UNDEFINED_HASH_OFFSET; \
+    value->nextOffset = pool.freeOffset; \
+    value->prevOffset = UNDEFINED_HASH_OFFSET; \
+    value->isActive = 0; \
     if (pool.freeOffset != UNDEFINED_HASH_OFFSET) { \
-        type *freeFrame = &((type *)pool.content)[pool.freeOffset]; \
-        freeFrame->prevOffset = valueOffset; \
+        type *freeValue = &((type *)pool.content)[pool.freeOffset]; \
+        freeValue->prevOffset = valueOffset; \
     } \
     pool.freeOffset = valueOffset; \
     --pool.count; \
@@ -216,6 +223,7 @@ unsigned int setLeftFrame(stateNode *state,
 
 unsigned int deleteLeftFrame(stateNode *state,
                              frameLocation location) {
+    printf("deleting left frame index %d, offset %d\n", location.nodeIndex, location.frameOffset);
     DELETE(leftFrameNode,
            state->betaState[location.nodeIndex].leftFrameIndex, 
            MAX_LEFT_FRAME_INDEX_LENGTH,
@@ -223,6 +231,28 @@ unsigned int deleteLeftFrame(stateNode *state,
            location.frameOffset);
     return RULES_OK;
 }
+
+static unsigned int copyLeftFrame(stateNode *state,
+                          leftFrameNode *oldNode, 
+                          leftFrameNode *targetNode, 
+                          frameLocation newLocation) {
+    if (!oldNode) {
+        memset(targetNode->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
+        memset(targetNode->reverseIndex, 0, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
+        targetNode->messageCount = 0;
+    } else {
+        memcpy(targetNode->messages, oldNode->messages, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
+        memcpy(targetNode->reverseIndex, oldNode->reverseIndex, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
+        targetNode->messageCount = oldNode->messageCount;
+        for (unsigned short i = 0; i < targetNode->messageCount; ++i) {
+            CHECK_RESULT(appendFrameLocation(state,
+                                             newLocation, 
+                                             targetNode->messages[targetNode->reverseIndex[i]].messageNodeOffset));
+        }
+    } 
+
+    return RULES_OK;
+} 
 
 unsigned int createLeftFrame(stateNode *state,
                             unsigned int index, 
@@ -234,22 +264,18 @@ unsigned int createLeftFrame(stateNode *state,
     NEW(leftFrameNode, 
         state->betaState[index].leftFramePool, 
         newValueOffset);
-    leftFrameNode *targetNode = LEFT_FRAME_NODE(state, index, newValueOffset);
-    if (!oldNode) {
-        memset(targetNode->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
-        memset(targetNode->reverseIndex, 0, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
-        targetNode->messageCount = 0;
-    } else {
-        memcpy(targetNode->messages, oldNode->messages, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
-        memcpy(targetNode->reverseIndex, oldNode->reverseIndex, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
-        targetNode->messageCount = oldNode->messageCount;
-    } 
-    targetNode->nameOffset = nameOffset;
     
+    leftFrameNode *targetNode = LEFT_FRAME_NODE(state, index, newValueOffset);
     newLocation->frameType = LEFT_FRAME;
     newLocation->nodeIndex = index;
     newLocation->frameOffset = newValueOffset;
-
+    targetNode->nameOffset = nameOffset;
+    
+    CHECK_RESULT(copyLeftFrame(state,
+                               oldNode, 
+                               targetNode, 
+                               *newLocation));
+    
     *newNode = targetNode;
     return RULES_OK;
 }
@@ -267,6 +293,7 @@ unsigned int setActionFrame(stateNode *state,
 
 unsigned int deleteActionFrame(stateNode *state,
                                frameLocation location) {
+    printf("deleting action frame index %d, offset %d\n", location.nodeIndex, location.frameOffset);
     DELETE(leftFrameNode,
            state->actionState[location.nodeIndex].resultIndex, 
            MAX_LEFT_FRAME_INDEX_LENGTH,
@@ -288,20 +315,15 @@ unsigned int createActionFrame(stateNode *state,
         actionNode->resultPool, 
         newValueOffset);
     leftFrameNode *targetNode = ACTION_FRAME_NODE(state, index, newValueOffset);
-    if (!oldNode) {
-        memset(targetNode->messages, 0, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
-        memset(targetNode->reverseIndex, 0, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
-        targetNode->messageCount = 0;
-    } else {
-        memcpy(targetNode->messages, oldNode->messages, MAX_MESSAGE_FRAMES * sizeof(messageFrame));
-        memcpy(targetNode->reverseIndex, oldNode->reverseIndex, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
-        targetNode->messageCount = oldNode->messageCount;
-    } 
-    targetNode->nameOffset = nameOffset;
-
     newLocation->frameType = ACTION_FRAME;
     newLocation->nodeIndex = index;
     newLocation->frameOffset = newValueOffset;
+    targetNode->nameOffset = nameOffset;
+
+    CHECK_RESULT(copyLeftFrame(state,
+                               oldNode, 
+                               targetNode, 
+                               *newLocation));
     
     *newNode = targetNode;
     return RULES_OK;
@@ -339,7 +361,8 @@ unsigned int setRightFrame(stateNode *state,
 }
 
 unsigned int deleteRightFrame(stateNode *state,
-                              frameLocation location) {
+                              frameLocation location) { 
+    printf("deleting right frame index %d, offset %d\n", location.nodeIndex, location.frameOffset);
     DELETE(rightFrameNode,
            state->betaState[location.nodeIndex].rightFrameIndex, 
            MAX_RIGHT_FRAME_INDEX_LENGTH,
@@ -388,6 +411,8 @@ unsigned int deleteLocationFromMessage(stateNode *state,
 
 unsigned int deleteMessage(stateNode *state,
                            unsigned int messageNodeOffset) {
+    printf("deleting message %d\n", messageNodeOffset);
+
     DELETE(messageNode,
            state->messageIndex, 
            MAX_MESSAGE_NODES,
