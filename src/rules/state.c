@@ -223,7 +223,6 @@ unsigned int setLeftFrame(stateNode *state,
 
 unsigned int deleteLeftFrame(stateNode *state,
                              frameLocation location) {
-    printf("deleting left frame index %d, offset %d\n", location.nodeIndex, location.frameOffset);
     DELETE(leftFrameNode,
            state->betaState[location.nodeIndex].leftFrameIndex, 
            MAX_LEFT_FRAME_INDEX_LENGTH,
@@ -293,7 +292,6 @@ unsigned int setActionFrame(stateNode *state,
 
 unsigned int deleteActionFrame(stateNode *state,
                                frameLocation location) {
-    printf("deleting action frame index %d, offset %d\n", location.nodeIndex, location.frameOffset);
     DELETE(leftFrameNode,
            state->actionState[location.nodeIndex].resultIndex, 
            MAX_LEFT_FRAME_INDEX_LENGTH,
@@ -362,7 +360,6 @@ unsigned int setRightFrame(stateNode *state,
 
 unsigned int deleteRightFrame(stateNode *state,
                               frameLocation location) { 
-    printf("deleting right frame index %d, offset %d\n", location.nodeIndex, location.frameOffset);
     DELETE(rightFrameNode,
            state->betaState[location.nodeIndex].rightFrameIndex, 
            MAX_RIGHT_FRAME_INDEX_LENGTH,
@@ -411,8 +408,6 @@ unsigned int deleteLocationFromMessage(stateNode *state,
 
 unsigned int deleteMessage(stateNode *state,
                            unsigned int messageNodeOffset) {
-    printf("deleting message %d\n", messageNodeOffset);
-
     DELETE(messageNode,
            state->messageIndex, 
            MAX_MESSAGE_NODES,

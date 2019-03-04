@@ -613,7 +613,6 @@ static unsigned int isBetaMatch(ruleset *tree,
     }
 
     *propertyMatch = resultProperty.value.b;
-    printf("isBetaMatch %d\n", *propertyMatch);
     return RULES_OK;
 }
 
@@ -640,7 +639,6 @@ static unsigned int isAlphaMatch(ruleset *tree,
     }
 
     *propertyMatch = resultProperty.value.b;
-    printf("isAlphaMatch %d\n", *propertyMatch);
     return RULES_OK;
 }
 
@@ -682,7 +680,6 @@ static unsigned int handleBeta(ruleset *tree,
                                jsonObject *messageObject,
                                unsigned int currentMessageOffset,
                                node *betaNode) {    
-    printf("handling beta %d message %d expressions %d\n", betaNode->value.b.index, currentMessageOffset, betaNode->value.b.expressionSequence.length);
     node *actionNode = NULL;
     node *currentNode = betaNode;
     leftFrameNode *currentFrame = NULL;
@@ -890,7 +887,6 @@ static unsigned int handleAplhaArray(ruleset *tree,
                                      jsonProperty *currentProperty,
                                      alpha *arrayAlpha,
                                      unsigned char *propertyMatch) {
-    printf("handle alpha array\n");  
     unsigned int result = RULES_OK;
     if (currentProperty->type != JSON_ARRAY) {
         return RULES_OK;
@@ -1017,7 +1013,6 @@ static unsigned int handleAlpha(ruleset *tree,
                                 jsonObject *jo,
                                 unsigned int currentMessageOffset,
                                 alpha *alphaNode) { 
-    printf("handle alpha\n");                       
     unsigned short top = 1;
     unsigned int entry;
     alpha *stack[MAX_STACK_SIZE];
@@ -1177,8 +1172,6 @@ static unsigned int handleMessageCore(ruleset *tree,
     jsonProperty *sidProperty = &jo->properties[jo->sidIndex];
     jsonProperty *midProperty = &jo->properties[jo->idIndex];
 
-    printf("handling message core %s, %u, %u\n", jo->content, sidProperty->valueOffset, sidProperty->valueLength);
-    
 #ifdef _WIN32
     char *sid = (char *)_alloca(sizeof(char)*(sidProperty->valueLength + 1));
 #else
@@ -1242,8 +1235,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                 char stateMessage[50 + sidProperty->valueLength * 2];
                 snprintf(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"mid\":\"sid-%s\", \"$s\":1}", sid, sid);
     #endif
-                printf("asserting new state %s\n", stateMessage); 
-
+                
                 unsigned int stateMessageOffset;
                 unsigned int stateResult = handleMessage(tree,
                                                          stateMessage,  
@@ -1419,7 +1411,6 @@ static unsigned int startHandleMessage(ruleset *tree,
                                        unsigned char actionType,
                                        void **rulesBinding,
                                        unsigned int *replyCount) {
-    printf("startHandleMessage\n");
     char *commands[MAX_COMMAND_COUNT];
     unsigned int commandCount = 0;
     unsigned int messageOffset;
@@ -1440,14 +1431,12 @@ static unsigned int startHandleMessage(ruleset *tree,
         return batchResult;
     }
 
-    printf("done\n");
     return result;
 }
 
 static unsigned int executeHandleMessage(ruleset *tree, 
                                          char *message, 
                                          unsigned char actionType) {
-    printf("executeHandleMessage\n");
     char *commands[MAX_COMMAND_COUNT];
     unsigned int commandCount = 0;
     void *rulesBinding = NULL;
@@ -1469,7 +1458,6 @@ static unsigned int executeHandleMessage(ruleset *tree,
         return batchResult;
     }
 
-    printf("done\n");
     return result;
 }
 
@@ -1772,8 +1760,7 @@ unsigned int startAction(unsigned int handle,
 
     //TODO: Durable store
     *actionBinding = 1;
-    printf("starting action %s, %s\n", *stateFact, *messages);
-
+    
     return RULES_OK;
 }
 
@@ -1781,7 +1768,6 @@ unsigned int completeAction(unsigned int handle,
                             void *actionHandle, 
                             char *state) {
 
-    printf("completing action\n");
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
     actionContext *context = (actionContext*)actionHandle;
@@ -1822,7 +1808,6 @@ unsigned int completeAction(unsigned int handle,
     free(context->messages);
     free(context->stateFact);
     free(context);
-    printf("completed action\n");
     return RULES_OK;
 }
 
@@ -1830,7 +1815,6 @@ unsigned int completeAndStartAction(unsigned int handle,
                                     unsigned int expectedReplies,
                                     void *actionHandle, 
                                     char **messages) {
-    printf("completing and starting action\n");
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
     actionContext *context = (actionContext*)actionHandle;
@@ -1851,13 +1835,10 @@ unsigned int completeAndStartAction(unsigned int handle,
     free(context->messages);
     free(context->stateFact);
     free(context);
-    printf("done completing and starting action\n");
     return ERR_NO_ACTION_AVAILABLE;
 }
 
 unsigned int abandonAction(unsigned int handle, void *actionHandle) {
-    printf("abandoning action\n");
-
     actionContext *context = (actionContext*)actionHandle;
     free(context->messages);
     free(context->stateFact);

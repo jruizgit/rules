@@ -1592,9 +1592,11 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
             readNextValue(last, &first, &last, &type);
-            result = createBeta(tree, first, distinct, actionOffset);        
-            if (result != RULES_OK) {
-                return result;
+            if (hash == HASH_ANY || hash == HASH_ALL) {
+                result = createBeta(tree, first, distinct, actionOffset);        
+                if (result != RULES_OK) {
+                    return result;
+                }
             }
             
             result = readNextName(last, &first, &last, &hash);
