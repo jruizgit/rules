@@ -70,7 +70,6 @@ typedef struct expressionSequence {
     unsigned int nameOffset;
     unsigned int aliasOffset;
     unsigned short length;
-    unsigned char distinct;
     unsigned char not;
     expression expressions[MAX_SEQUENCE_EXPRESSIONS];
 } expressionSequence;
@@ -88,6 +87,7 @@ typedef struct beta {
     unsigned int hash;
     unsigned int nextOffset;
     unsigned char not;
+    unsigned char distinct;
 } beta;
 
 typedef struct action {

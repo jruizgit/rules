@@ -666,6 +666,16 @@ static unsigned int handleAction(ruleset *tree,
     return RULES_OK;
 }
 
+static unsigned char isDistinct(leftFrameNode *currentFrame, unsigned int currentMessageOffset) {
+    for (unsigned short i = 0; i < currentFrame->messageCount; ++i) {
+        if (currentFrame->messages[currentFrame->reverseIndex[i]].messageNodeOffset == currentMessageOffset) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 static unsigned int handleBeta(ruleset *tree, 
                                stateNode *state,
                                char *mid,
@@ -735,6 +745,14 @@ static unsigned int handleBeta(ruleset *tree,
                                                  messageObject,
                                                  oldFrame->messages,
                                                  &match));
+                        if (match) {
+                            if (currentNode->value.b.distinct && 
+                                !isDistinct(oldFrame, currentMessageOffset)) {
+                                match = 0;
+                            }
+                
+                        }
+
                         if (!match) {
                             unsigned int oldFrameOffset = oldFrame->nextOffset;
                             if (oldFrameOffset == UNDEFINED_HASH_OFFSET) {
@@ -778,7 +796,6 @@ static unsigned int handleBeta(ruleset *tree,
                                                  currentFrameLocation,
                                                  currentMessageOffset));
 
-
             } else {
                 //TODO get real frame hash
                 unsigned int frameHash = fnv1Hash32("1", 1);
@@ -802,6 +819,15 @@ static unsigned int handleBeta(ruleset *tree,
                                              &rightMessage->jo,
                                              currentFrame->messages,
                                              &match));
+
+                    if (match) {
+                        if (currentNode->value.b.distinct && 
+                            !isDistinct(currentFrame, currentMessageOffset)) {
+                            match = 0;
+                        }
+            
+                    }
+                    
                     if (!match) {
                         unsigned int rightFrameOffset = rightFrame->nextOffset;
                         if (rightFrameOffset == UNDEFINED_HASH_OFFSET) {
@@ -1814,7 +1840,7 @@ unsigned int completeAndStartAction(unsigned int handle,
     for (int i = 0; i < resultFrame->messageCount; ++i) {
         messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
         messageNode *node = MESSAGE_NODE(context->resultState, currentMessageFrame->messageNodeOffset);
-        
+
         if (node->messageType == MESSAGE_TYPE_EVENT) {
             CHECK_RESULT(handleDeleteMessage(context->resultState, 
                                              currentMessageFrame->messageNodeOffset));

@@ -1257,6 +1257,7 @@ static unsigned int createBeta(ruleset *tree,
         newBeta->type = NODE_BETA_CONNECTOR;
         newBeta->value.b.nextOffset = nextOffset;
         newBeta->value.b.not = (operator == OP_NOT) ? 1 : 0;
+        newBeta->value.b.distinct = (distinct != 0) ? 1 : 0;
         newBeta->value.b.hash = hash;
         newBeta->value.b.index = tree->betaCount;
         ++tree->betaCount;
@@ -1270,7 +1271,6 @@ static unsigned int createBeta(ruleset *tree,
         newBeta->value.b.expressionSequence.aliasOffset = stringOffset;
         newBeta->value.b.expressionSequence.not = (operator == OP_NOT) ? 1 : 0;
         newBeta->value.b.expressionSequence.length = 0;
-        newBeta->value.b.expressionSequence.distinct = (distinct != 0) ? 1 : 0;
         if (operator == OP_NOP || operator == OP_NOT) {
             unsigned int resultOffset = NODE_M_OFFSET;
             readNextValue(last, &first, &last, &type);
@@ -1420,12 +1420,7 @@ static void printExpressionSequence(ruleset *tree, expressionSequence *exprs, in
                 printf("%s compare_array(message[\"%s\"], ", comp, leftProperty);
 
             } else {
-                if (exprs->distinct) {
-                    printf("distinct(frame, message) and compare_array(message[\"%s\"], ", leftProperty);
-                } else {
-                    printf("compare_array(message[\"%s\"], ", leftProperty);
-                }
-    
+                printf("compare_array(message[\"%s\"], ", leftProperty);
                 first = 0;   
             }
 
@@ -1459,11 +1454,7 @@ static void printExpressionSequence(ruleset *tree, expressionSequence *exprs, in
             if (!first) {
                 printf(" %s message[\"%s\"] %s ", comp, leftProperty, op);
             } else {
-                if (exprs->distinct) {
-                    printf("distinct(frame, message) and message[\"%s\"] %s ", leftProperty, op);
-                } else {
-                    printf("message[\"%s\"] %s ", leftProperty, op);
-                }
+                printf("message[\"%s\"] %s ", leftProperty, op);
     
                 first = 0;   
             }
@@ -1492,7 +1483,7 @@ static void printBetaNode(ruleset *tree, node *betaNode, int level, unsigned int
         printf("    ");
     }
 
-    printf("-> beta: name %s, not %d, index %d, offset %u\n", &tree->stringPool[betaNode->nameOffset], betaNode->value.b.not, betaNode->value.b.index, offset);
+    printf("-> beta: name %s, not %d, distinct %d, index %d, offset %u\n", &tree->stringPool[betaNode->nameOffset], betaNode->value.b.not, betaNode->value.b.distinct, betaNode->value.b.index, offset);
     if (betaNode->value.b.expressionSequence.length != 0) {
         printExpressionSequence(tree, &betaNode->value.b.expressionSequence, level);
     }
