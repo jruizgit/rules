@@ -421,13 +421,38 @@ unsigned int deleteMessage(stateNode *state,
     return RULES_OK;
 }
 
+unsigned int getMessage(stateNode *state,
+                        char *mid,
+                        unsigned int *valueOffset) {
+    unsigned int hash = fnv1Hash32(mid, strlen(mid));
+
+    GET(messageNode, 
+        state->messageIndex, 
+        MAX_MESSAGE_INDEX_LENGTH, 
+        state->messagePool, 
+        hash, 
+        *valueOffset);
+
+    return RULES_OK;
+}
+
 unsigned int storeMessage(stateNode *state,
                           char *mid,
                           jsonObject *message,
+                          unsigned char messageType,
                           unsigned int *valueOffset) {
     unsigned int hash = fnv1Hash32(mid, strlen(mid));
-    NEW(messageNode, state->messagePool, *valueOffset);
-    SET(messageNode, state->messageIndex, MAX_MESSAGE_INDEX_LENGTH, state->messagePool, hash, *valueOffset);
+
+    NEW(messageNode, 
+        state->messagePool, 
+        *valueOffset);
+
+    SET(messageNode, 
+        state->messageIndex, 
+        MAX_MESSAGE_INDEX_LENGTH, 
+        state->messagePool, hash, 
+        *valueOffset);
+
     messageNode *node = MESSAGE_NODE(state, *valueOffset);
     node->locationCount = 0;
     memcpy(&node->jo, message, sizeof(jsonObject));
@@ -437,6 +462,7 @@ unsigned int storeMessage(stateNode *state,
         return ERR_OUT_OF_MEMORY;
     }
     memcpy(node->jo.content, message->content, messageLength);
+    node->messageType = messageType;
     return RULES_OK;
 }
 

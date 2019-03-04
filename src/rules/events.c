@@ -653,8 +653,7 @@ static void freeCommands(char **commands,
 
 static unsigned int handleAction(ruleset *tree, 
                                  stateNode *state, 
-                                 node *node, 
-                                 unsigned char actionType,
+                                 node *node,
                                  leftFrameNode *frame) {
     printf("handle action %s\n", &tree->stringPool[node->nameOffset]);
     printf("frame\n");
@@ -672,8 +671,7 @@ static unsigned int handleBeta(ruleset *tree,
                                char *mid,
                                jsonObject *messageObject,
                                unsigned int currentMessageOffset,
-                               node *betaNode,
-                               unsigned short actionType) {    
+                               node *betaNode) {    
     printf("handling beta %d message %d expressions %d\n", betaNode->value.b.index, currentMessageOffset, betaNode->value.b.expressionSequence.length);
     node *actionNode = NULL;
     node *currentNode = betaNode;
@@ -856,8 +854,7 @@ static unsigned int handleBeta(ruleset *tree,
 
     return handleAction(tree, 
                         state, 
-                        actionNode, 
-                        actionType,
+                        actionNode,
                         currentFrame);
 }
 
@@ -993,8 +990,7 @@ static unsigned int handleAlpha(ruleset *tree,
                                 char *mid,
                                 jsonObject *jo,
                                 unsigned int currentMessageOffset,
-                                alpha *alphaNode, 
-                                unsigned char actionType) { 
+                                alpha *alphaNode) { 
     printf("handle alpha\n");                       
     unsigned short top = 1;
     unsigned int entry;
@@ -1075,8 +1071,7 @@ static unsigned int handleAlpha(ruleset *tree,
                                                   mid,
                                                   jo,
                                                   currentMessageOffset,
-                                                  &tree->nodePool[betaList[entry]],  
-                                                  actionType);
+                                                  &tree->nodePool[betaList[entry]]);
                 if (bresult != RULES_OK && bresult != ERR_FRAME_NOT_FOUND) {
                     return bresult;
                 }
@@ -1152,7 +1147,6 @@ static unsigned int handleMessageCore(ruleset *tree,
                                       unsigned int *commandCount,
                                       unsigned int *messageOffset,
                                       void **rulesBinding) {
-    unsigned int result;
     stateNode *sidState;
     jsonProperty *sidProperty = &jo->properties[jo->sidIndex];
     jsonProperty *midProperty = &jo->properties[jo->idIndex];
@@ -1171,12 +1165,6 @@ static unsigned int handleMessageCore(ruleset *tree,
     }
 
     sid[sidProperty->valueLength] = '\0';
-    
-    unsigned char isNewState;
-    CHECK_RESULT(ensureStateNode(tree, 
-                                 sid,
-                                 &isNewState, 
-                                 &sidState));
 
     #ifdef _WIN32
     char *mid = (char *)_alloca(sizeof(char)*(midProperty->valueLength + 1));
@@ -1191,47 +1179,67 @@ static unsigned int handleMessageCore(ruleset *tree,
 
     mid[midProperty->valueLength] = '\0';
 
-    CHECK_RESULT(storeMessage(sidState,
-                              mid,
-                              jo,
-                              messageOffset));
+    unsigned char isNewState;
+    CHECK_RESULT(ensureStateNode(tree, 
+                                 sid,
+                                 &isNewState, 
+                                 &sidState));
 
-    result = handleAlpha(tree,
-                         sidState,
-                         mid,
-                         jo,
-                         *messageOffset,
-                         &tree->nodePool[NODE_M_OFFSET].value.a, 
-                         actionType);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-        if (isNewState) {      
-#ifdef _WIN32
-            char *stateMessage = (char *)_alloca(sizeof(char)*(50 + sidProperty->valueLength * 2));
-            sprintf_s(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"mid\":\"sid-%s\", \"$s\":1}", sid, sid);
-#else
-            char stateMessage[50 + sidProperty->valueLength * 2];
-            snprintf(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"mid\":\"sid-%s\", \"$s\":1}", sid, sid);
-#endif
-            printf("asserting new state %s\n", stateMessage); 
+    if (actionType == ACTION_RETRACT_FACT) {
+        CHECK_RESULT(getMessage(sidState,
+                                mid,
+                                messageOffset));
 
-            unsigned int stateMessageOffset;
-            unsigned int stateResult = handleMessage(tree,
-                                                     stateMessage,  
-                                                     ACTION_ASSERT_FACT,
-                                                     commands,
-                                                     commandCount,
-                                                     &stateMessageOffset,
-                                                     rulesBinding);
-            if (stateResult != RULES_OK && stateResult != ERR_EVENT_NOT_HANDLED) {
-                return stateResult;
+        CHECK_RESULT(handleDeleteMessage(sidState,
+                                         *messageOffset));
+
+    } else {
+
+        CHECK_RESULT(storeMessage(sidState,
+                                  mid,
+                                  jo,
+                                  (actionType == ACTION_ASSERT_FACT ? MESSAGE_TYPE_FACT : MESSAGE_TYPE_EVENT),
+                                  messageOffset));
+
+        unsigned int result = handleAlpha(tree,
+                                          sidState,
+                                          mid,
+                                          jo,
+                                          *messageOffset,
+                                          &tree->nodePool[NODE_M_OFFSET].value.a);
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
+            if (isNewState) {      
+    #ifdef _WIN32
+                char *stateMessage = (char *)_alloca(sizeof(char)*(50 + sidProperty->valueLength * 2));
+                sprintf_s(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"mid\":\"sid-%s\", \"$s\":1}", sid, sid);
+    #else
+                char stateMessage[50 + sidProperty->valueLength * 2];
+                snprintf(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"mid\":\"sid-%s\", \"$s\":1}", sid, sid);
+    #endif
+                printf("asserting new state %s\n", stateMessage); 
+
+                unsigned int stateMessageOffset;
+                unsigned int stateResult = handleMessage(tree,
+                                                         stateMessage,  
+                                                         MESSAGE_TYPE_FACT,
+                                                         commands,
+                                                         commandCount,
+                                                         &stateMessageOffset,
+                                                         rulesBinding);
+                if (stateResult != RULES_OK && stateResult != ERR_EVENT_NOT_HANDLED) {
+                    return stateResult;
+                }
+
+                sidState->factOffset = stateMessageOffset;
+
             }
-
-            sidState->factOffset = stateMessageOffset;
-
         }
+
+        return result;
     } 
 
-    return result;
+    return RULES_OK;
+
 }
 
 static unsigned int handleMessage(ruleset *tree,
@@ -1805,8 +1813,12 @@ unsigned int completeAndStartAction(unsigned int handle,
                                               context->resultAction->resultIndex[0]);
     for (int i = 0; i < resultFrame->messageCount; ++i) {
         messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
-        CHECK_RESULT(handleDeleteMessage(context->resultState, 
-                                         currentMessageFrame->messageNodeOffset));
+        messageNode *node = MESSAGE_NODE(context->resultState, currentMessageFrame->messageNodeOffset);
+        
+        if (node->messageType == MESSAGE_TYPE_EVENT) {
+            CHECK_RESULT(handleDeleteMessage(context->resultState, 
+                                             currentMessageFrame->messageNodeOffset));
+        }
     }
 
     *messages = NULL;

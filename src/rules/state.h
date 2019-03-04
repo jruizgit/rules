@@ -5,6 +5,9 @@
 #define SID_BUFFER_LENGTH 2
 #define ID_BUFFER_LENGTH 22
 
+#define MESSAGE_TYPE_EVENT 0
+#define MESSAGE_TYPE_FACT 1
+
 #define UNDEFINED_HASH_OFFSET 0
 #define MAX_OBJECT_PROPERTIES 64
 #define MAX_MESSAGE_FRAMES 32
@@ -16,6 +19,7 @@
 #define LEFT_FRAME 0
 #define RIGHT_FRAME 1
 #define ACTION_FRAME 2
+
 
 #define MESSAGE_NODE(state, offset) &((messageNode *)state->messagePool.content)[offset]
 
@@ -65,6 +69,7 @@ typedef struct messageNode {
     unsigned int nextOffset;
     unsigned int hash;
     unsigned char isActive;
+    unsigned char messageType;
     unsigned short locationCount;
     frameLocation locations[MAX_FRAME_LOCATIONS];
     jsonObject jo;
@@ -230,9 +235,15 @@ unsigned int deleteLocationFromMessage(stateNode *state,
 unsigned int deleteMessage(stateNode *state,
                            unsigned int messageNodeOffset);
 
+
+unsigned int getMessage(stateNode *state,
+                        char *mid,
+                        unsigned int *valueOffset);
+
 unsigned int storeMessage(stateNode *state,
                           char *mid,
                           jsonObject *message,
+                          unsigned char messageType,
                           unsigned int *valueOffset);
 
 unsigned int ensureStateNode(void *tree, 
