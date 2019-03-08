@@ -105,7 +105,7 @@ with ruleset('test'):
 run_all()
 ```
 ### Facts
-Facts represent the data that defines a knowledge base. After facts are asserted as JSON objects. Facts are stored until they are retracted. When a fact satisfies a rule antecedent, the rule consequent is executed.
+Facts represent the data that defines a knowledge base. Facts are asserted as JSON objects and are stored until they are retracted. When a fact satisfies a rule antecedent, the rule consequent is executed.
 
 ```python
 from durable.lang import *
@@ -180,9 +180,9 @@ Events can be posted using the http API. When the example above is listening, ru
 <sub>`Fraud detected -> US, CA`</sub>  
 <sub>`Fraud detected -> CA, US`</sub>  
 
-*The reason is because both facts satisfy the first condition m.t == 'purchase' and each fact satisfies the second condition m.location != c.first.location in relation to the facts which satisfied the first.*  
+*In the example both facts satisfy the first condition m.t == 'purchase' and each fact satisfies the second condition m.location != c.first.location in relation to the facts which satisfied the first.*  
 
-*Given that, you might be wondering why post behaves differently: the reason is because an event is an ephemeral fact, as soon as it is scheduled to be dispatched, it is retracted. When using post in the example above, by the time the second pair is calculated the events have already been retracted.*  
+*Given that, you might be wondering why post behaves differently: this is due to an event being an ephemeral fact. As soon as a fact is scheduled to be dispatched, it is retracted. When using post in the example above, by the time the second pair is calculated the events have already been retracted.*  
 
 *And why is the difference between events and facts important? Retracting events before dispatch reduces the number of combinations to be calculated for dispatch. Thus, processing events is much more efficient (orders of magnitude faster in some cases).*  
 
@@ -437,7 +437,7 @@ run_all()
 ### Correlated Sequence
 Rules can be used to efficiently evaluate sequences of correlated events or facts. The fraud detection rule in the example below shows a pattern of three events: the second event amount being more than 200% the first event amount and the third event amount greater than the average of the other two.  
 
-By default a correlated sequences capture distinct messages. In the example below the second event satisfies the second and the third condition, however the event will be captured only for the second condition. Use the `distinct` attribute to disable distinct event or fact correlation.
+By default a correlated sequence captures distinct messages. In the example below the second event satisfies the second and the third condition, however the event will be captured only for the second condition. Use the `distinct` attribute to disable distinct event or fact correlation.
 
 The `when_all` annotation expresses a sequence of events or facts. The `<<` operator is used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  
 
@@ -467,7 +467,7 @@ run_all()
 [top](reference.md#table-of-contents)  
 
 ### Choice of Sequences
-durable_rules allows expressing and efficiently evaluating richer events sequences In the example below any of the two event\fact sequences will trigger an action. 
+durable_rules allows expressing and efficiently evaluating richer event sequences In the example below each of the two event\fact sequences will trigger an action. 
 
 The following two functions can be used and combined to define richer event sequences:  
 * all: a set of event or fact patterns. All of them are required to match to trigger an action.  
@@ -501,7 +501,7 @@ run_all()
 ### Lack of Information
 In some cases lack of information is meaningful. The `none` function can be used in rules with correlated sequences to evaluate the lack of information.  
 
-*Note: the `none` function requires information to reason about lack of information. That is, it will not trigger any actions if no events or facts have been registered in the corresponding rule.*
+*Note: the `none` function requires information to reason about a lack of information. That is, it will not trigger any actions if no events or facts have been registered in the corresponding rule.*
 
 ```python
 from durable.lang import *
@@ -590,7 +590,7 @@ run_all()
 
 ### Facts and Events as rvalues
 
-Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
+Aside from scalars (strings, numbers and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
 
 ```python
 from durable.lang import *
@@ -736,7 +736,7 @@ run_all()
 ```
 [top](reference.md#table-of-contents)  
 ### Unhandled Exceptions  
-When exceptions are not handled by actions, they are stored in the context state. This enables writing exception handling rules.
+When exceptions are not handled by actions, they are stored in the context state. This enables writing exception-handling rules.
 
 ```python
 from durable.lang import *
@@ -904,7 +904,7 @@ run_all()
 ```
 [top](reference.md#table-of-contents)
 ### Flowchart
-A flowchart is another way of organizing a ruleset flow. In a flowchart each stage represents an action to be executed. So (unlike the statechart state), when applied to the context state, it results in a transition to another stage.  
+A flowchart is another way of organizing a ruleset flow. In a flowchart each stage represents an action to be executed. So (unlike the statechart state) when applied to the context state it results in a transition to another stage.  
 
 Flowchart rules:  
 * A flowchart can have one or more stages.  
@@ -962,7 +962,7 @@ run_all()
 ```
 [top](reference.md#table-of-contents)  
 ### Timers
-Events can be scheduled with timers. A timeout condition can be included in the rule antecedent. By default a timeuot is triggered as an event (observed only once). Timeouts can also be triggered as facts by 'manual reset' timers, the timers can be reset during action execution (see last example). 
+Events can be scheduled with timers. A timeout condition can be included in the rule antecedent. By default a timeuot is triggered as an event (observed only once). Timeouts can also be triggered as facts by 'manual reset' timers and the timers can be reset during action execution (see last example). 
 
 * start_timer: starts a timer with the name and duration specified (manual_reset is optional).
 * reset_timer: resets a 'manual reset' timer.
@@ -999,7 +999,7 @@ with ruleset('timer'):
 run_all()
 ```
 
-The example below uses a timer to detect higher event rate:  
+The example below uses a timer to detect a higher event rate:  
 
 ```python
 from durable.lang import *
