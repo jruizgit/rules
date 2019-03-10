@@ -110,12 +110,12 @@ var d = require('../libjs/durable');
 // });
 
 
-// d.ruleset('expense0', function() {
-//     whenAll: m.subject == 'approve' || m.subject == 'ok'
-//     run: console.log('expense0 Approved')
-    
-//     whenStart: post('expense0', { subject: 'approve' })
-// });
+d.ruleset('expense0', function() {
+    whenAll: m.subject == 'approve' || m.subject == 'ok'
+    run: console.log('expense0 Approved');
+
+    whenStart: post('expense0', { subject: 'approve' })
+});
 
 // d.ruleset('match', function() {
 //     whenAll: m.url.matches('(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*') 

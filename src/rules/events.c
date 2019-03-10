@@ -85,13 +85,8 @@ static unsigned int reduceString(char *left,
                                  unsigned short rightLength,
                                  unsigned char op,
                                  jsonProperty *targetProperty) {
-    char rightTemp = right[rightLength];
-    right[rightLength] = '\0';        
-    char leftTemp = left[leftLength];
-    left[leftLength] = '\0';
-    int result = strcmp(left, right);
-    right[rightLength] = rightTemp;
-    left[leftLength] = leftTemp;
+    int length = (leftLength < rightLength ? leftLength: rightLength);
+    int result = strncmp(left, right, length);
     switch(op) {
         case OP_ADD:
         case OP_SUB:
@@ -493,7 +488,7 @@ static unsigned int reduceExpression(ruleset *tree,
                                messageObject,
                                messageContext,
                                &leftProperty));
-    
+
     if (currentExpression->right.type == JSON_REGEX || currentExpression->right.type == JSON_REGEX) {
         targetProperty->type = JSON_BOOL;
         targetProperty->value.b = evaluateRegex(tree,
@@ -514,7 +509,7 @@ static unsigned int reduceExpression(ruleset *tree,
                                messageObject,
                                messageContext,
                                &rightProperty));
-    
+
     return reduceProperties(currentExpression->operator, 
                             leftProperty, 
                             rightProperty, 
@@ -597,6 +592,7 @@ static unsigned int isBetaMatch(ruleset *tree,
                                 jsonObject *messageObject,
                                 messageFrame *messageContext,
                                 unsigned char *propertyMatch) {
+    printf("isBetaMatch\n");
     jsonProperty resultProperty;
     unsigned short i = 0;
     CHECK_RESULT(reduceExpressionSequence(tree,
@@ -679,7 +675,7 @@ static unsigned int handleBeta(ruleset *tree,
                                char *mid,
                                jsonObject *messageObject,
                                unsigned int currentMessageOffset,
-                               node *betaNode) {    
+                               node *betaNode) { 
     node *actionNode = NULL;
     node *currentNode = betaNode;
     leftFrameNode *currentFrame = NULL;
@@ -692,7 +688,11 @@ static unsigned int handleBeta(ruleset *tree,
         } else {
             node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
             if (!currentFrame) {
-                if (!currentNode->value.b.expressionSequence.length) {
+                if (!currentNode->value.b.expressionSequence.length ||
+                    (currentNode->value.b.expressionSequence.length == 2 && 
+                    (currentNode->value.b.expressionSequence.expressions[0].operator == OP_AND ||
+                    currentNode->value.b.expressionSequence.expressions[0].operator == OP_OR))) {
+
                     if (nextNode->type == NODE_ACTION) {
                         CHECK_RESULT(createActionFrame(state,
                                                        nextNode->value.c.index,

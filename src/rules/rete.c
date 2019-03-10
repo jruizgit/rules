@@ -41,7 +41,8 @@
 
 #define MAX_ACTIONS 4096
 
-#define GET_EXPRESSION(exprs, expr) do { \
+#define GET_EXPRESSION(tree, betaOffset, expr) do { \
+    expressionSequence *exprs = &tree->nodePool[betaOffset].value.b.expressionSequence; \
     expr = &exprs->expressions[exprs->length]; \
     ++exprs->length; \
     if (exprs->length == MAX_SEQUENCE_EXPRESSIONS) { \
@@ -49,7 +50,8 @@
     } \
 } while(0)
 
-#define APPEND_EXPRESSION(exprs, op) do { \
+#define APPEND_EXPRESSION(tree, betaOffset, op) do { \
+    expressionSequence *exprs = &tree->nodePool[betaOffset].value.b.expressionSequence; \
     exprs->expressions[exprs->length].operator = op; \
     ++exprs->length; \
     if (exprs->length == MAX_SEQUENCE_EXPRESSIONS) { \
@@ -123,7 +125,6 @@ static unsigned int storeExpression(ruleset *tree,
 static unsigned int storeNode(ruleset *tree, 
                               node **newNode, 
                               unsigned int *nodeOffset) {
-
     if (!tree->nodePool) {
         tree->nodePool = malloc(sizeof(node));
         if (!tree->nodePool) {
@@ -307,11 +308,11 @@ static unsigned int copyValue(ruleset *tree,
         case JSON_REGEX:
         case JSON_IREGEX:
             leftLength = last - first;
-            result = storeString(tree, first, &right->value.regex.stringOffset, leftLength);
-            if (result != RULES_OK) {
-                return result;
-            }
-
+            CHECK_RESULT(storeString(tree, 
+                                     first, 
+                                     &right->value.regex.stringOffset, 
+                                     leftLength));
+            
             result = compileRegex(tree, 
                                   first, 
                                   last,
@@ -401,7 +402,7 @@ static unsigned int validateSetting(unsigned int settingHash, char *rule, unsign
                 return ERR_UNEXPECTED_TYPE;
             }
 
-            return PARSE_OK;
+            return RULES_OK;
         }
 
         result = readNextName(last, &first, &last, &hash);
@@ -414,12 +415,11 @@ static unsigned int validateIdentifier(char *rule, unsigned char *identifierType
     char *first;
     char *last;
     unsigned int hash;
-    unsigned int result;
-
-    result = readNextName(rule, &first, &last, &hash);
-    if (result != PARSE_OK) {
-        return result;
-    }
+    
+    CHECK_PARSE_RESULT(readNextName(rule, 
+                                    &first, 
+                                    &last, 
+                                    &hash));
 
     *identifierType = JSON_IDENTIFIER;
 
@@ -427,12 +427,12 @@ static unsigned int validateIdentifier(char *rule, unsigned char *identifierType
          *identifierType = JSON_MESSAGE_IDENTIFIER;
     }
 
-    result = readNextString(last, &first, &last, &hash);
-    if (result != PARSE_OK) {
-        return result;
-    }        
+    CHECK_PARSE_RESULT(readNextString(last, 
+                                      &first, 
+                                      &last, 
+                                      &hash));
 
-    return PARSE_OK;
+    return RULES_OK;
 }
 
 static unsigned int validateExpression(char *rule, unsigned char *expressionType) {
@@ -460,16 +460,14 @@ static unsigned int validateExpression(char *rule, unsigned char *expressionType
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
             unsigned char newExpressionType = 0;
-            result = readNextValue(last, &first, &last, &type);
-            if (result != PARSE_OK) {
-                return result;
-            }
-
+            CHECK_PARSE_RESULT(readNextValue(last, 
+                                             &first, 
+                                             &last, 
+                                             &type));
+            
             if (type == JSON_OBJECT) {
-                result = validateExpression(first, &newExpressionType);
-                if (result != PARSE_OK) {
-                    return result;
-                }
+                CHECK_RESULT(validateExpression(first, 
+                                                &newExpressionType));
             }
 
             if (newExpressionType == JSON_IDENTIFIER || newExpressionType == JSON_EXPRESSION) {
@@ -496,7 +494,7 @@ static unsigned int validateExpression(char *rule, unsigned char *expressionType
         }
     }
 
-    return PARSE_OK;
+    return RULES_OK;
 }
 
 
@@ -557,10 +555,7 @@ static unsigned int validateExpressionSequence(char *rule) {
 
             result = readNextArrayValue(first, &first, &last, &type);
             while (result == PARSE_OK) {
-                result = validateExpressionSequence(first);
-                if (result != PARSE_OK) {
-                    return result;
-                }
+                CHECK_RESULT(validateExpressionSequence(first));
 
                 result = readNextArrayValue(last, &first, &last, &type);   
             }
@@ -572,26 +567,26 @@ static unsigned int validateExpressionSequence(char *rule) {
         operator = OP_EQ;
         first = rule;
     } else {
-        result = readNextValue(last, &first, &last, &type);
-        if (result != PARSE_OK) {
-            return result;
-        }
+        CHECK_PARSE_RESULT(readNextValue(last, 
+                                         &first, 
+                                         &last, 
+                                         &type));
         if (type != JSON_OBJECT) {
             return ERR_UNEXPECTED_TYPE;
         }
     }
     
-    result = readNextName(first, &first, &last, &hash);
-    if (result != PARSE_OK) {
-        return result;
-    }
-
+    CHECK_PARSE_RESULT(readNextName(first, 
+                                    &first, 
+                                    &last, 
+                                    &hash));
+    
     // Validating expressionSequence rValue
-    result = readNextValue(last, &first, &last, &type);
-    if (result != PARSE_OK) {
-        return result;
-    }
-
+    CHECK_PARSE_RESULT(readNextValue(last, 
+                                     &first, 
+                                     &last, 
+                                     &type));
+    
     if (operator == OP_IALL || operator == OP_IANY) {
         result = validateExpressionSequence(first);
         return result;
@@ -602,10 +597,8 @@ static unsigned int validateExpressionSequence(char *rule) {
             return ERR_UNEXPECTED_TYPE; 
         }  
 
-        result = validateRegex(first, last);
-        if (result != PARSE_OK) {
-            return result;
-        }
+        CHECK_RESULT(validateRegex(first, 
+                                   last));
     }
 
     if (type == JSON_ARRAY) {
@@ -614,13 +607,11 @@ static unsigned int validateExpressionSequence(char *rule) {
 
     if (type == JSON_OBJECT) {
         unsigned char expressionType = 0;
-        result = validateExpression(first, &expressionType);
-        if (result != PARSE_OK) {
-            return result;
-        }
+        CHECK_RESULT(validateExpression(first, 
+                                        &expressionType));
     }
 
-    return PARSE_OK;
+    return RULES_OK;
 }
 
 static unsigned int validateAlgebra(char *rule) {
@@ -630,9 +621,16 @@ static unsigned int validateAlgebra(char *rule) {
     unsigned int hash;
     unsigned char type;
     unsigned char reenter = 0;
-    unsigned int result = readNextArrayValue(rule, &first, &lastArrayValue, &type);
+    unsigned int result = readNextArrayValue(rule, 
+                                             &first, 
+                                             &lastArrayValue, 
+                                             &type);
     while (result == PARSE_OK) {
-        result = readNextName(first, &first, &last, &hash);
+        result = readNextName(first, 
+                              &first, 
+                              &last, 
+                              &hash);
+
         unsigned int nameLength = last - first; 
         if (nameLength >= 4) {
             if (!strncmp("$all", last - 4, 4)) {
@@ -650,10 +648,10 @@ static unsigned int validateAlgebra(char *rule) {
             } 
         } 
         
-        result = readNextValue(last, &first, &last, &type);
-        if (result != PARSE_OK) {
-            return result;
-        }
+        CHECK_PARSE_RESULT(readNextValue(last, 
+                                         &first, 
+                                         &last, 
+                                         &type));
         
         if (!reenter) {
             result = validateExpressionSequence(first);
@@ -663,11 +661,14 @@ static unsigned int validateAlgebra(char *rule) {
             reenter = 0;
         }
 
-        if (result != PARSE_OK) {
+        if (result != RULES_OK) {
             return result;
         }
 
-        result = readNextArrayValue(lastArrayValue, &first, &lastArrayValue, &type);
+        result = readNextArrayValue(lastArrayValue, 
+                                    &first, 
+                                    &lastArrayValue, 
+                                    &type);
     }
 
     return (result == PARSE_END ? PARSE_OK: result);
@@ -682,22 +683,30 @@ static unsigned int validateRuleset(char *rules) {
     unsigned char type;
     unsigned int hash;
     unsigned int result;
-    result = readNextName(rules, &firstName, &lastName, &hash);
+    result = readNextName(rules, 
+                          &firstName, 
+                          &lastName, 
+                          &hash);
+
     while (result == PARSE_OK) {
-        result = readNextValue(lastName, &first, &lastRuleValue, &type);
-        if (result != PARSE_OK) {
-            return result;
-        }
+        CHECK_PARSE_RESULT(readNextValue(lastName, 
+                                         &first, 
+                                         &lastRuleValue, 
+                                         &type));
         if (type != JSON_OBJECT) {
             return ERR_UNEXPECTED_TYPE;
         }
 
-        unsigned int countResult = validateSetting(HASH_COUNT, first, JSON_INT);
+        unsigned int countResult = validateSetting(HASH_COUNT, 
+                                                   first, 
+                                                   JSON_INT);
         if (countResult != PARSE_OK && countResult != ERR_SETTING_NOT_FOUND) {
             return countResult;
         }
 
-        unsigned int capResult = validateSetting(HASH_CAP, first, JSON_INT);
+        unsigned int capResult = validateSetting(HASH_CAP, 
+                                                 first, 
+                                                 JSON_INT);
         if (capResult != PARSE_OK && capResult != ERR_SETTING_NOT_FOUND) {
             return capResult;
         }
@@ -706,22 +715,26 @@ static unsigned int validateRuleset(char *rules) {
             return ERR_UNEXPECTED_NAME;
         }
 
-        result = validateSetting(HASH_PRI, first, JSON_INT);
+        result = validateSetting(HASH_PRI, 
+                                 first, 
+                                 JSON_INT);
         if (result != PARSE_OK && result != ERR_SETTING_NOT_FOUND) {
             return result;
         }
 
-        result = validateSetting(HASH_DIST, first, JSON_INT);
+        result = validateSetting(HASH_DIST, 
+                                 first, 
+                                 JSON_INT);
         if (result != PARSE_OK && result != ERR_SETTING_NOT_FOUND) {
             return result;
         }
 
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
-            result = readNextValue(last, &first, &last, &type);
-            if (result != PARSE_OK) {
-                return result;
-            }
+            CHECK_PARSE_RESULT(readNextValue(last, 
+                                             &first, 
+                                             &last, 
+                                             &type));
             
             if (hash == HASH_ALL || hash == HASH_ANY) {
                 result = validateAlgebra(first);
@@ -744,16 +757,13 @@ static unsigned int validateRuleset(char *rules) {
 static unsigned int linkAlpha(ruleset *tree, 
                               unsigned int parentOffset, 
                               unsigned int nextOffset) {
-    unsigned int result;
     unsigned int entry;
     node *parentAlpha = &tree->nodePool[parentOffset];
     node *nextNode = &tree->nodePool[nextOffset];
     if (nextNode->type != NODE_ALPHA) {
-        result = ensureBetaList(tree, parentAlpha);
-        if (result != RULES_OK) {
-            return result;
-        }
-
+        CHECK_RESULT(ensureBetaList(tree, 
+                                    parentAlpha));
+        
         unsigned int *parentBetaList = &tree->nextPool[parentAlpha->value.a.betaListOffset];
         for (entry = 0; parentBetaList[entry] != 0; ++entry) {
             if (entry == BETA_LIST_LENGTH) {
@@ -763,11 +773,9 @@ static unsigned int linkAlpha(ruleset *tree,
 
         parentBetaList[entry] = nextOffset;
     } else if (nextNode->value.a.expression.operator == OP_NEX) {
-        result = ensureNextList(tree, parentAlpha);
-        if (result != RULES_OK) {
-            return result;
-        }
-
+        CHECK_RESULT(ensureNextList(tree, 
+                                    parentAlpha));
+        
         unsigned int *parentNextList = &tree->nextPool[parentAlpha->value.a.nextListOffset];
         unsigned int entry;
         for (entry = 0; parentNextList[entry] != 0; ++entry) {
@@ -778,11 +786,9 @@ static unsigned int linkAlpha(ruleset *tree,
 
         parentNextList[entry] = nextOffset;
     } else {
-        result = ensureNextHashset(tree, parentAlpha);
-        if (result != RULES_OK) {
-            return result;
-        }
-
+        CHECK_RESULT(ensureNextHashset(tree, 
+                                       parentAlpha));
+        
         unsigned int *parentNext = &tree->nextPool[parentAlpha->value.a.nextOffset];
         unsigned int hash = nextNode->value.a.expression.left.value.id.propertyNameHash;
         for (entry = hash & HASH_MASK; parentNext[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
@@ -801,27 +807,29 @@ static unsigned int readIdentifier(ruleset *tree, char *rule, unsigned char *exp
     char *first;
     char *last;
     unsigned int hash;
-    unsigned int result;
     *expressionType = JSON_IDENTIFIER;    
     id->nameOffset = 0;
     readNextName(rule, &first, &last, &hash);
     id->nameHash = hash;
-    result = storeString(tree, first, &id->nameOffset, last - first); 
-    if (result != RULES_OK) {
-        return result;
-    }  
-
+    CHECK_RESULT(storeString(tree, 
+                             first, 
+                             &id->nameOffset, 
+                             last - first)); 
+    
     if (hash == HASH_M) {
         *expressionType = JSON_MESSAGE_IDENTIFIER;
     }
 
-    readNextString(last, &first, &last, &hash);
+    CHECK_PARSE_RESULT(readNextString(last, 
+                                      &first, 
+                                      &last, 
+                                      &hash));
     id->propertyNameHash = hash;
-    result = storeString(tree, first, &id->propertyNameOffset, last - first);
-    if (result != RULES_OK) {
-        return result;
-    } 
-
+    CHECK_RESULT(storeString(tree, 
+                             first, 
+                             &id->propertyNameOffset, 
+                             last - first));
+    
     return RULES_OK;
 }
 
@@ -833,7 +841,10 @@ static unsigned int readExpression(ruleset *tree, char *rule, unsigned char *exp
     unsigned int hash;
     unsigned int result;
     
-    readNextName(rule, &first, &last, &hash);
+    CHECK_PARSE_RESULT(readNextName(rule, 
+                                    &first, 
+                                    &last, 
+                                    &hash));
     switch (hash) {
         case HASH_ADD:
             operator = OP_ADD;
@@ -850,30 +861,37 @@ static unsigned int readExpression(ruleset *tree, char *rule, unsigned char *exp
     }
 
     if (operator == OP_NOP) {
-        result = readIdentifier(tree, rule, expressionType, id);
-        if (result != RULES_OK) {
-            return result;
-        }
+        CHECK_RESULT(readIdentifier(tree, 
+                                    rule, 
+                                    expressionType, 
+                                    id));
     } else {
         expression *newExpression = NULL;
-        result = storeExpression(tree, &newExpression, expressionOffset);
-        if (result != RULES_OK) {
-            return result;
-        }
-
+        CHECK_RESULT(storeExpression(tree, 
+                                     &newExpression, 
+                                     expressionOffset));
+        
         *expressionType = JSON_EXPRESSION;  
         newExpression->operator = operator;
-        readNextValue(last, &first, &last, &type);
+        CHECK_PARSE_RESULT(readNextValue(last, 
+                                         &first, 
+                                         &last, 
+                                         &type));
+
         result = readNextName(first, &first, &last, &hash);
         while (result == PARSE_OK) {
             unsigned int newExpressionOffset = 0;
             identifier newRef;
-            readNextValue(last, &first, &last, &type);
+            CHECK_PARSE_RESULT(readNextValue(last, 
+                                             &first, 
+                                             &last, 
+                                             &type));
             if (type == JSON_OBJECT) {
-                result = readExpression(tree, first, &type, &newExpressionOffset, &newRef);
-                if (result != RULES_OK) {
-                    return result;
-                }
+                CHECK_RESULT(readExpression(tree, 
+                                            first, 
+                                            &type, 
+                                            &newExpressionOffset, 
+                                            &newRef));
             }
             
             if (type == JSON_IDENTIFIER || type == JSON_EXPRESSION) {
@@ -906,7 +924,7 @@ static unsigned int findAlpha(ruleset *tree,
                               unsigned int parentOffset, 
                               unsigned char operator, 
                               char *rule,
-                              expressionSequence *exprs, 
+                              unsigned int betaOffset, 
                               unsigned int *resultOffset) {
     char *first;
     char *last;
@@ -916,16 +934,24 @@ static unsigned int findAlpha(ruleset *tree,
     unsigned int entry;
     unsigned int hash;
     unsigned int expressionOffset;
-    unsigned int result;
     identifier id;
     
-    readNextName(rule, &firstName, &lastName, &hash);
-    readNextValue(lastName, &first, &last, &type);
+    CHECK_PARSE_RESULT(readNextName(rule, 
+                                    &firstName, 
+                                    &lastName, 
+                                    &hash));
+
+    CHECK_PARSE_RESULT(readNextValue(lastName, 
+                                     &first, 
+                                     &last, 
+                                     &type));
+
     if (type == JSON_OBJECT && operator != OP_IALL && operator != OP_IANY) {
-        result = readExpression(tree, first, &type, &expressionOffset, &id);
-        if (result != RULES_OK) {
-            return result;
-        }
+        CHECK_RESULT(readExpression(tree, 
+                                    first, 
+                                    &type, 
+                                    &expressionOffset, 
+                                    &id));
     }
 
     node *parent = &tree->nodePool[parentOffset];
@@ -963,17 +989,16 @@ static unsigned int findAlpha(ruleset *tree,
     }
 
     unsigned int stringOffset;
-    result = storeString(tree, firstName, &stringOffset, lastName - firstName);
-    if (result != RULES_OK) {
-        return result;
-    }
-
+    CHECK_RESULT(storeString(tree, 
+                             firstName, 
+                             &stringOffset, 
+                             lastName - firstName));
+    
     node *newAlpha;
-    result = storeAlpha(tree, &newAlpha, resultOffset);
-    if (result != RULES_OK) {
-        return result;
-    }
-
+    CHECK_RESULT(storeAlpha(tree, 
+                            &newAlpha, 
+                            resultOffset));
+    
     newAlpha->nameOffset = stringOffset;
     newAlpha->type = NODE_ALPHA;
     newAlpha->value.a.expression.left.type = JSON_MESSAGE_IDENTIFIER;
@@ -993,14 +1018,19 @@ static unsigned int findAlpha(ruleset *tree,
     if (operator == OP_IANY || operator == OP_IALL) {
         newAlpha->value.a.expression.right.type = JSON_NIL;
     } else {
-        result = copyValue(tree, &newAlpha->value.a.expression.right, first, last, expressionOffset, &id, type);
-        if (result != RULES_OK) {
-            return result;
-        }
+        CHECK_RESULT(copyValue(tree, 
+                               &newAlpha->value.a.expression.right, 
+                               first, 
+                               last,
+                               expressionOffset, 
+                               &id, 
+                               type));
 
         if (type == JSON_IDENTIFIER || type == JSON_EXPRESSION) {
             expression *expr;
-            GET_EXPRESSION(exprs, expr);
+            GET_EXPRESSION(tree, 
+                           betaOffset, 
+                           expr);
             copyExpression(&newAlpha->value.a.expression, expr);
         } 
     }
@@ -1008,15 +1038,21 @@ static unsigned int findAlpha(ruleset *tree,
     return linkAlpha(tree, parentOffset, *resultOffset);
 }
 
-static void getSetting(unsigned int settingHash, char *rule, unsigned short *value) {
+static unsigned int getSetting(unsigned int settingHash, char *rule, unsigned short *value) {
     char *first;
     char *last;
     char temp;
     unsigned int hash;
     unsigned char type;
-    unsigned int result = readNextName(rule, &first, &last, &hash);
+    unsigned int result = readNextName(rule, 
+                                       &first, 
+                                       &last, 
+                                       &hash);
     while (result == PARSE_OK) {
-        readNextValue(last, &first, &last, &type);
+        CHECK_PARSE_RESULT(readNextValue(last, 
+                                         &first, 
+                                         &last, 
+                                         &type));
         if (hash == settingHash) {
             temp = first[last - first + 1];
             first[last - first + 1] = '\0';
@@ -1024,18 +1060,22 @@ static void getSetting(unsigned int settingHash, char *rule, unsigned short *val
             first[last - first + 1] = temp;
             break;   
         }
-        result = readNextName(last, &first, &last, &hash);
+        result = readNextName(last, 
+                              &first, 
+                              &last, 
+                              &hash);
     }
+
+    return RULES_OK;
 }
 
 static unsigned int createForwardAlpha(ruleset *tree,
                                        unsigned int *newOffset) {
     node *newAlpha;
-    unsigned int result = storeAlpha(tree, &newAlpha, newOffset);
-    if (result != RULES_OK) {
-        return result;
-    }
-
+    CHECK_RESULT(storeAlpha(tree, 
+                            &newAlpha, 
+                            newOffset));
+    
     newAlpha->nameOffset = 0;
     newAlpha->type = NODE_ALPHA;
     newAlpha->value.a.expression.left.type = JSON_MESSAGE_IDENTIFIER;
@@ -1050,7 +1090,7 @@ static unsigned int createForwardAlpha(ruleset *tree,
 
 static unsigned int createAlpha(ruleset *tree, 
                                 char *rule, 
-                                expressionSequence *exprs,
+                                unsigned int betaOffset,
                                 unsigned int nextOffset,
                                 unsigned int *newOffset) {
     char *first;
@@ -1060,7 +1100,10 @@ static unsigned int createAlpha(ruleset *tree,
     unsigned int hash;
     unsigned int result;
     unsigned int parentOffset = *newOffset;
-    readNextName(rule, &first, &last, &hash);
+    CHECK_PARSE_RESULT(readNextName(rule, 
+                                    &first, 
+                                    &last, 
+                                    &hash));
     switch (hash) {
         case HASH_EQ:
             operator = OP_EQ;
@@ -1099,55 +1142,83 @@ static unsigned int createAlpha(ruleset *tree,
             operator = OP_LTE;
             break;
         case HASH_AND:
-            APPEND_EXPRESSION(exprs, OP_AND);
-            readNextValue(last, &first, &last, &type);
+            APPEND_EXPRESSION(tree, 
+                              betaOffset, 
+                              OP_AND);
+
+            CHECK_PARSE_RESULT(readNextValue(last, 
+                                             &first, 
+                                             &last, 
+                                             &type));
+
             unsigned int previousOffset = 0;
             unsigned int resultOffset = parentOffset;
-            result = readNextArrayValue(first, &first, &last, &type);
+            result = readNextArrayValue(first, 
+                                        &first, 
+                                        &last, 
+                                        &type);
             while (result == PARSE_OK) {
-                result = createAlpha(tree, first, exprs, 0, &resultOffset);
-                if (result != RULES_OK) {
-                    return result;
-                }
-
+                CHECK_RESULT(createAlpha(tree, 
+                                         first, 
+                                         betaOffset, 
+                                         0, 
+                                         &resultOffset));
+                
                 previousOffset = resultOffset;
-                result = readNextArrayValue(last, &first, &last, &type);   
+                result = readNextArrayValue(last, 
+                                            &first, 
+                                            &last, 
+                                            &type);   
             }
             *newOffset = previousOffset;
 
-            APPEND_EXPRESSION(exprs, OP_END);
+            APPEND_EXPRESSION(tree, 
+                              betaOffset, 
+                              OP_END);
             if (nextOffset != 0) {
-                return linkAlpha(tree, previousOffset, nextOffset);
+                return linkAlpha(tree, 
+                                 previousOffset, 
+                                 nextOffset);
             }
 
             return RULES_OK;
         case HASH_OR:
-            APPEND_EXPRESSION(exprs, OP_OR);
-            result = createForwardAlpha(tree, newOffset);
-            if (result != RULES_OK) {
-                return result;
-            }
+            APPEND_EXPRESSION(tree, betaOffset, OP_OR);
+            CHECK_RESULT(createForwardAlpha(tree, 
+                                            newOffset));
+            
+            CHECK_PARSE_RESULT(readNextValue(last, 
+                                             &first, 
+                                             &last, 
+                                             &type));
 
-            readNextValue(last, &first, &last, &type);
             result = readNextArrayValue(first, &first, &last, &type);
             while (result == PARSE_OK) {
                 unsigned int single_offset = parentOffset;
-                result = createAlpha(tree, first, exprs, 0, &single_offset);
-                if (result != RULES_OK) {
-                    return result;
-                }
+                CHECK_RESULT(createAlpha(tree, 
+                                         first, 
+                                         betaOffset, 
+                                         0, 
+                                         &single_offset));
 
-                result = linkAlpha(tree, single_offset, *newOffset);
-                if (result != RULES_OK) {
-                    return result;
-                }
+                CHECK_RESULT(linkAlpha(tree,
+                                       single_offset, 
+                                       *newOffset));
+                
 
-                result = readNextArrayValue(last, &first, &last, &type);   
+                result = readNextArrayValue(last, 
+                                            &first, 
+                                            &last, 
+                                            &type);   
             }
 
-            APPEND_EXPRESSION(exprs, OP_END);
+            APPEND_EXPRESSION(tree, 
+                              betaOffset, 
+                              OP_END);
             if (nextOffset != 0) {
-                return linkAlpha(tree, *newOffset, nextOffset);
+                return linkAlpha(tree, 
+                                 *newOffset, 
+                                 nextOffset);
             }
 
             return RULES_OK;
@@ -1157,56 +1228,86 @@ static unsigned int createAlpha(ruleset *tree,
         operator = OP_EQ;
         first = rule;
     } else {
-        readNextValue(last, &first, &last, &type);
+        CHECK_PARSE_RESULT(readNextValue(last, 
+                                         &first, 
+                                         &last, 
+                                         &type));
     }
     
     if (operator == OP_IANY || operator == OP_IALL) {
-        unsigned int result = findAlpha(tree, parentOffset, operator, first, exprs, newOffset);
-        if (result != RULES_OK) {
-            return result;
-        }   
-
+        CHECK_RESULT(findAlpha(tree, 
+                               parentOffset, 
+                               operator, 
+                               first, 
+                               betaOffset, 
+                               newOffset));
+        
         unsigned int inner_offset = *newOffset;
-        readNextName(first, &first, &last, &hash);
-        readNextValue(last, &first, &last, &type);
-        result = createAlpha(tree, first, exprs, nextOffset, &inner_offset);
-        if (result != RULES_OK) {
-            return result;
-        }
+        CHECK_PARSE_RESULT(readNextName(first, 
+                                        &first, 
+                                        &last, 
+                                        &hash));
 
+        CHECK_PARSE_RESULT(readNextValue(last, 
+                                         &first, 
+                                         &last, 
+                                         &type));
+        
+        CHECK_RESULT(createAlpha(tree, 
+                                 first, 
+                                 betaOffset, 
+                                 nextOffset, 
+                                 &inner_offset));
+        
         node *newAlpha = &tree->nodePool[inner_offset];
         if (newAlpha->value.a.expression.right.type != JSON_IDENTIFIER && newAlpha->value.a.expression.right.type != JSON_EXPRESSION) {
-            return linkAlpha(tree, *newOffset, nextOffset);
+            return linkAlpha(tree, 
+                            *newOffset, 
+                            nextOffset);
         } else {
             // Functions that can execute in client or backend should follow this pattern
             node *oldAlpha = &tree->nodePool[*newOffset];
             expression *newExpression = NULL;
             unsigned int expressionOffset = 0;
-            result = storeExpression(tree, &newExpression, &expressionOffset);
-            if (result != RULES_OK) {
-                return result;
-            }
-
+            CHECK_RESULT(storeExpression(tree, 
+                                         &newExpression, 
+                                         &expressionOffset));
+            
             oldAlpha->value.a.expression.right.type = JSON_EXPRESSION;
             oldAlpha->value.a.expression.right.value.expressionOffset = expressionOffset;
             copyExpression(&newAlpha->value.a.expression, newExpression);
 
             expression *betaExpression;
-            GET_EXPRESSION(exprs, betaExpression);
+            GET_EXPRESSION(tree, 
+                           betaOffset, 
+                           betaExpression);
+
             copyExpression(newExpression, betaExpression);
-            return linkAlpha(tree, *newOffset, nextOffset);
+
+            return linkAlpha(tree, 
+                             *newOffset, 
+                             nextOffset);
         }
     }
 
     if (nextOffset == 0) {
-        return findAlpha(tree, parentOffset, operator, first, exprs, newOffset);
+        return findAlpha(tree, 
+                         parentOffset, 
+                         operator, 
+                         first, 
+                         betaOffset, 
+                         newOffset);
     } else {
-        unsigned int result = findAlpha(tree, parentOffset, operator, first, exprs, newOffset);
-        if (result != RULES_OK) {
-            return result;
-        }
-
-        return linkAlpha(tree, *newOffset, nextOffset);
+        CHECK_RESULT(findAlpha(tree, 
+                               parentOffset, 
+                               operator, 
+                               first, 
+                               betaOffset, 
+                               newOffset));
+        
+        return linkAlpha(tree, 
+                         *newOffset, 
+                         nextOffset);
     }
 }
 
@@ -1220,7 +1321,10 @@ static unsigned int createBeta(ruleset *tree,
     unsigned int hash;
     unsigned int previousOffset = 0;
     unsigned char type; 
-    unsigned int result = readNextArrayValue(rule, &first, &lastArrayValue, &type);
+    unsigned int result = readNextArrayValue(rule, 
+                                             &first, 
+                                             &lastArrayValue, 
+                                             &type);
     while (result == PARSE_OK) {
         readNextName(first, &first, &last, &hash);
         unsigned int nameLength = last - first; 
@@ -1241,18 +1345,17 @@ static unsigned int createBeta(ruleset *tree,
         }        
         
         unsigned int stringOffset;
-        result = storeString(tree, first, &stringOffset, nameLength);
-        if (result != RULES_OK) {
-            return result;
-        }
-
+        CHECK_RESULT(storeString(tree, 
+                                 first, 
+                                 &stringOffset, 
+                                 nameLength));
+        
         node *newBeta;
         unsigned int betaOffset;
-        result = storeNode(tree, &newBeta, &betaOffset);
-        if (result != RULES_OK) {
-            return result;
-        }
-
+        CHECK_RESULT(storeNode(tree, 
+                               &newBeta, 
+                               &betaOffset));
+        
         newBeta->nameOffset = stringOffset;
         newBeta->type = NODE_BETA_CONNECTOR;
         newBeta->value.b.nextOffset = nextOffset;
@@ -1273,19 +1376,33 @@ static unsigned int createBeta(ruleset *tree,
         newBeta->value.b.expressionSequence.length = 0;
         if (operator == OP_NOP || operator == OP_NOT) {
             unsigned int resultOffset = NODE_M_OFFSET;
-            readNextValue(last, &first, &last, &type);
-            result = createAlpha(tree, first, &newBeta->value.b.expressionSequence, betaOffset, &resultOffset);
+            CHECK_PARSE_RESULT(readNextValue(last, 
+                                             &first, 
+                                             &last, 
+                                             &type));
+            CHECK_RESULT(createAlpha(tree, 
+                                     first, 
+                                     betaOffset, 
+                                     betaOffset, 
+                                     &resultOffset));
+            
         }
         else {
-            readNextValue(last, &first, &last, &type);
-            result = createBeta(tree, first, distinct, betaOffset);
+            CHECK_PARSE_RESULT(readNextValue(last, 
+                                             &first, 
+                                             &last, 
+                                             &type));
+
+            CHECK_RESULT(createBeta(tree, 
+                                    first, 
+                                    distinct, 
+                                    betaOffset));
         }
 
-        if (result != RULES_OK) {
-            return result;
-        }
-
-        result = readNextArrayValue(lastArrayValue, &first, &lastArrayValue, &type);
+        result = readNextArrayValue(lastArrayValue, 
+                                    &first, 
+                                    &lastArrayValue, 
+                                    &type);
     }
 
     return (result == PARSE_END ? RULES_OK: result);
@@ -1360,7 +1477,6 @@ static void printExpressionSequence(ruleset *tree, expressionSequence *exprs, in
     char *compStack[32];
     unsigned char compTop = 0;
     unsigned char first = 1;
-    
     for (unsigned short i = 0; i < exprs->length; ++i) {
         expression *currentExpression = &exprs->expressions[i];
         if (currentExpression->operator == OP_AND || currentExpression->operator == OP_OR) {
@@ -1535,15 +1651,17 @@ static unsigned int createTree(ruleset *tree, char *rules) {
     char *lastName;
     unsigned char type;
     unsigned int hash;
-    unsigned int result = readNextName(rules, &firstName, &lastName, &hash);
+    unsigned int result = readNextName(rules, 
+                                       &firstName, 
+                                       &lastName, 
+                                       &hash);
     node *ruleActions[MAX_ACTIONS];
     while (result == PARSE_OK) {
         node *ruleAction;
         unsigned int actionOffset;
-        result = storeNode(tree, &ruleAction, &actionOffset);
-        if (result != RULES_OK) {
-            return result;
-        }
+        CHECK_RESULT(storeNode(tree, 
+                               &ruleAction, 
+                               &actionOffset));
         
         if (tree->actionCount == MAX_ACTIONS) {
             return ERR_RULE_LIMIT_EXCEEDED;
@@ -1556,18 +1674,30 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         
         // tree->stringPool can change after storing strings
         // need to resolve namespace every time it is used.
-        result = storeString(tree, firstName, &ruleAction->nameOffset, lastName - firstName);
-        if (result != RULES_OK) {
-            return result;
-        }
-
-        readNextValue(lastName, &first, &lastRuleValue, &type);
+        CHECK_RESULT(storeString(tree, 
+                                 firstName, 
+                                 &ruleAction->nameOffset, 
+                                 lastName - firstName));
+        
+        CHECK_PARSE_RESULT(readNextValue(lastName, 
+                                         &first, 
+                                         &lastRuleValue, 
+                                         &type));
         ruleAction->value.c.priority = 0;
         ruleAction->value.c.count = 0;
         ruleAction->value.c.cap = 0;
-        getSetting(HASH_PRI, first, &ruleAction->value.c.priority);
-        getSetting(HASH_COUNT, first, &ruleAction->value.c.count);
-        getSetting(HASH_CAP, first, &ruleAction->value.c.cap);
+        CHECK_RESULT(getSetting(HASH_PRI, 
+                                first, 
+                                &ruleAction->value.c.priority));
+
+        CHECK_RESULT(getSetting(HASH_COUNT, 
+                                first, 
+                                &ruleAction->value.c.count));
+
+        CHECK_RESULT(getSetting(HASH_CAP, 
+                                first, 
+                                &ruleAction->value.c.cap));
+
         if (!ruleAction->value.c.count && !ruleAction->value.c.cap) {
             ruleAction->value.c.count = 1;
         }
@@ -1588,25 +1718,43 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         }
 
         unsigned short distinct = 1;
-        getSetting(HASH_DIST, first, &distinct);
-        result = readNextName(first, &first, &last, &hash);
+        CHECK_RESULT(getSetting(HASH_DIST, 
+                                first, 
+                                &distinct));
+
+        result = readNextName(first, 
+                              &first, 
+                              &last, 
+                              &hash);
         while (result == PARSE_OK) {
-            readNextValue(last, &first, &last, &type);
+            CHECK_PARSE_RESULT(readNextValue(last, 
+                                             &first, 
+                                             &last, 
+                                             &type));
             if (hash == HASH_ANY || hash == HASH_ALL) {
-                result = createBeta(tree, first, distinct, actionOffset);        
-                if (result != RULES_OK) {
-                    return result;
-                }
+                CHECK_RESULT(createBeta(tree, 
+                                        first, 
+                                        distinct, 
+                                        actionOffset));        
             }
             
-            result = readNextName(last, &first, &last, &hash);
+            result = readNextName(last, 
+                                  &first, 
+                                  &last, 
+                                  &hash);
         }
 
-        result = readNextName(lastRuleValue, &firstName, &lastName, &hash);
+        result = readNextName(lastRuleValue, 
+                              &firstName, 
+                              &lastName, 
+                              &hash);
     }
 
 #ifdef _PRINT
-    printAlphaNode(tree, &tree->nodePool[NODE_M_OFFSET], 0, NODE_M_OFFSET);
+    printAlphaNode(tree, 
+                   &tree->nodePool[NODE_M_OFFSET], 
+                   0, 
+                   NODE_M_OFFSET);
 #endif
 
     return RULES_OK;
@@ -1651,21 +1799,20 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     memset(tree->reverseStateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
     initStatePool(tree);
     
-    result = storeString(tree, name, &tree->nameOffset, strlen(name));
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    result = storeString(tree, "m", &stringOffset, 1);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    result = storeAlpha(tree, &newNode, &nodeOffset);
-    if (result != RULES_OK) {
-        return result;
-    }
-
+    CHECK_RESULT(storeString(tree, 
+                             name, 
+                             &tree->nameOffset, 
+                             strlen(name)));
+    
+    CHECK_RESULT(storeString(tree, 
+                             "m", 
+                             &stringOffset, 
+                             1));
+    
+    CHECK_RESULT(storeAlpha(tree, 
+                            &newNode, 
+                            &nodeOffset));
+    
     newNode->nameOffset = stringOffset;
     newNode->type = NODE_ALPHA;
     newNode->value.a.expression.operator = OP_TYPE;
@@ -1713,11 +1860,11 @@ unsigned int createClient(unsigned int *handle, char *name) {
     memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
     initStatePool(tree);
     
-    unsigned int result = storeString(tree, name, &tree->nameOffset, strlen(name));
-    if (result != RULES_OK) {
-        return result;
-    }
-
+    CHECK_RESULT(storeString(tree, 
+                             name, 
+                             &tree->nameOffset, 
+                             strlen(name)));
+    
     CREATE_HANDLE(tree, handle);
     return RULES_OK;
 }

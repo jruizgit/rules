@@ -23,6 +23,12 @@
 #define FNV_64_OFFSET_BASIS 0xcbf29ce484222325
 #define FNV_64_PRIME 1099511628211
 
+#define CHECK_PARSE_RESULT(result) do { \
+    if (result != PARSE_OK) { \
+        return result; \
+    } \
+} while(0)
+
 unsigned int readNextName(char *start, char **first, char **last, unsigned int *hash);
 unsigned int readNextValue(char *start, char **first, char **last, unsigned char *type);
 unsigned int readNextArrayValue(char *start, char **first, char **last, unsigned char *type);

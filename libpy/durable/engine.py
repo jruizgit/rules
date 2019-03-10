@@ -973,9 +973,6 @@ class Host(object):
     def delete_state(self, ruleset_name, sid):
         self.get_ruleset(ruleset_name).delete_state(sid)
 
-    def get_ruleset_state(self, ruleset_name):
-        return self.get_ruleset(ruleset_name).get_ruleset_state(sid)
-
     def post_batch(self, ruleset_name, messages):
         return self.get_ruleset(ruleset_name).assert_events(messages)
 

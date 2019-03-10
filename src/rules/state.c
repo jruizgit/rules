@@ -431,11 +431,33 @@ unsigned int getMessage(stateNode *state,
     return RULES_OK;
 }
 
+static unsigned int copyMessage(jsonObject *targetMessage,
+                                jsonObject *sourceMessage) {
+    memcpy(targetMessage, sourceMessage, sizeof(jsonObject));
+    unsigned int messageLength = (strlen(sourceMessage->content) + 1) * sizeof(char);
+    targetMessage->content = malloc(messageLength);
+    if (!targetMessage->content) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    memcpy(targetMessage->content, sourceMessage->content, messageLength);
+    
+    for (unsigned int i = 0; i < targetMessage->propertiesLength; ++i) {
+        if (targetMessage->properties[i].type == JSON_STRING &&
+            targetMessage->properties[i].hash != HASH_SID && 
+            targetMessage->properties[i].hash != HASH_ID) {
+            targetMessage->properties[i].value.s = targetMessage->content + targetMessage->properties[i].valueOffset;
+        }
+    }
+
+    return RULES_OK;
+}
+
 unsigned int storeMessage(stateNode *state,
                           char *mid,
                           jsonObject *message,
                           unsigned char messageType,
                           unsigned int *valueOffset) {
+    
     unsigned int hash = fnv1Hash32(mid, strlen(mid));
 
     NEW(messageNode, 
@@ -450,15 +472,8 @@ unsigned int storeMessage(stateNode *state,
 
     messageNode *node = MESSAGE_NODE(state, *valueOffset);
     node->locationCount = 0;
-    memcpy(&node->jo, message, sizeof(jsonObject));
-    unsigned int messageLength = (strlen(message->content) + 1) * sizeof(char);
-    node->jo.content = malloc(messageLength);
-    if (!node->jo.content) {
-        return ERR_OUT_OF_MEMORY;
-    }
-    memcpy(node->jo.content, message->content, messageLength);
     node->messageType = messageType;
-    return RULES_OK;
+    return copyMessage(&node->jo, message);
 }
 
 unsigned int ensureStateNode(void *tree, 
@@ -786,7 +801,6 @@ unsigned int setObjectProperty(jsonObject *jo,
                                unsigned char type, 
                                unsigned short valueOffset, 
                                unsigned short valueLength) {
-
     jsonProperty *property = &jo->properties[jo->propertiesLength]; 
     ++jo->propertiesLength;
     if (jo->propertiesLength == MAX_OBJECT_PROPERTIES) {
