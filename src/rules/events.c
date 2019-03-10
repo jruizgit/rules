@@ -49,7 +49,7 @@
 
 typedef struct actionContext {
     stateNode *resultState;
-    actionStateNode *resultAction;
+    unsigned int actionStateIndex;
     char *messages;
     char *stateFact;
 } actionContext;
@@ -489,7 +489,7 @@ static unsigned int reduceExpression(ruleset *tree,
                                messageContext,
                                &leftProperty));
 
-    if (currentExpression->right.type == JSON_REGEX || currentExpression->right.type == JSON_REGEX) {
+    if (currentExpression->right.type == JSON_REGEX || currentExpression->right.type == JSON_IREGEX) {
         targetProperty->type = JSON_BOOL;
         targetProperty->value.b = evaluateRegex(tree,
                                                 leftProperty->value.s, 
@@ -1754,7 +1754,7 @@ unsigned int startAction(unsigned int handle,
     *actionHandle = context;
     *actionBinding = NULL;
     context->resultState = resultState;
-    context->resultAction = resultAction;
+    context->actionStateIndex = actionStateIndex;
     context->messages = *messages;
     context->stateFact = *stateFact;
 
@@ -1764,6 +1764,43 @@ unsigned int startAction(unsigned int handle,
     return RULES_OK;
 }
 
+static unsigned int deleteCurrentAction(stateNode *state,
+                                        unsigned int actionStateIndex) {
+
+    actionStateNode *resultStateNode = &state->actionState[actionStateIndex];
+    unsigned int resultFrameOffset = resultStateNode->resultIndex[0];
+    leftFrameNode *resultFrame = RESULT_FRAME(resultStateNode, 
+                                              resultFrameOffset);
+    for (int i = 0; i < resultFrame->messageCount; ++i) {
+        messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
+        messageNode *currentMessageNode = MESSAGE_NODE(state, 
+                                                       currentMessageFrame->messageNodeOffset);
+
+        if (currentMessageNode->messageType == MESSAGE_TYPE_EVENT) {
+            CHECK_RESULT(handleDeleteMessage(state, 
+                                             currentMessageFrame->messageNodeOffset));
+        }
+    }
+
+    frameLocation location;
+    location.frameOffset = resultFrameOffset;
+    location.frameType = ACTION_FRAME;
+    location.nodeIndex = actionStateIndex;
+    unsigned int result = deleteActionFrame(state,
+                                            location);
+    if (result != RULES_OK && result != ERR_NODE_DELETED) {
+        return result;
+    }
+
+    return RULES_OK;
+}
+
+static void freeActionContext(actionContext *context) {
+    free(context->messages);
+    free(context->stateFact);
+    free(context);
+}
+
 unsigned int completeAction(unsigned int handle, 
                             void *actionHandle, 
                             char *state) {
@@ -1771,15 +1808,8 @@ unsigned int completeAction(unsigned int handle,
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
     actionContext *context = (actionContext*)actionHandle;
-
-    leftFrameNode *resultFrame = RESULT_FRAME(context->resultAction, 
-                                              context->resultAction->resultIndex[0]);
-    for (int i = 0; i < resultFrame->messageCount; ++i) {
-        messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
-        CHECK_RESULT(handleDeleteMessage(context->resultState, 
-                                         currentMessageFrame->messageNodeOffset));
-    }
-
+    CHECK_RESULT(deleteCurrentAction(context->resultState, 
+                                     context->actionStateIndex));
     
     char *commands[MAX_COMMAND_COUNT];
     unsigned int commandCount = 0;
@@ -1805,9 +1835,7 @@ unsigned int completeAction(unsigned int handle,
     }
 
 
-    free(context->messages);
-    free(context->stateFact);
-    free(context);
+    freeActionContext(context);
     return RULES_OK;
 }
 
@@ -1819,17 +1847,8 @@ unsigned int completeAndStartAction(unsigned int handle,
     RESOLVE_HANDLE(handle, &tree);
     actionContext *context = (actionContext*)actionHandle;
 
-    leftFrameNode *resultFrame = RESULT_FRAME(context->resultAction, 
-                                              context->resultAction->resultIndex[0]);
-    for (int i = 0; i < resultFrame->messageCount; ++i) {
-        messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
-        messageNode *node = MESSAGE_NODE(context->resultState, currentMessageFrame->messageNodeOffset);
-
-        if (node->messageType == MESSAGE_TYPE_EVENT) {
-            CHECK_RESULT(handleDeleteMessage(context->resultState, 
-                                             currentMessageFrame->messageNodeOffset));
-        }
-    }
+    CHECK_RESULT(deleteCurrentAction(context->resultState, 
+                                     context->actionStateIndex));
 
     *messages = NULL;
     free(context->messages);
@@ -1840,9 +1859,7 @@ unsigned int completeAndStartAction(unsigned int handle,
 
 unsigned int abandonAction(unsigned int handle, void *actionHandle) {
     actionContext *context = (actionContext*)actionHandle;
-    free(context->messages);
-    free(context->stateFact);
-    free(context);
+    freeActionContext(context);
     return RULES_OK;
 }
 
