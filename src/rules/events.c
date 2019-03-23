@@ -645,6 +645,16 @@ static void freeCommands(char **commands,
     }
 }
 
+static unsigned char isDistinct(leftFrameNode *currentFrame, unsigned int currentMessageOffset) {
+    for (unsigned short i = 0; i < currentFrame->messageCount; ++i) {
+        if (currentFrame->messages[currentFrame->reverseIndex[i]].messageNodeOffset == currentMessageOffset) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 static unsigned int handleAction(ruleset *tree, 
                                  stateNode *state, 
                                  node *node,
@@ -660,225 +670,266 @@ static unsigned int handleAction(ruleset *tree,
     return RULES_OK;
 }
 
-static unsigned char isDistinct(leftFrameNode *currentFrame, unsigned int currentMessageOffset) {
-    for (unsigned short i = 0; i < currentFrame->messageCount; ++i) {
-        if (currentFrame->messages[currentFrame->reverseIndex[i]].messageNodeOffset == currentMessageOffset) {
-            return 0;
-        }
-    }
 
-    return 1;
-}
-
-static unsigned int handleBeta(ruleset *tree, 
-                               stateNode *state,
-                               char *mid,
-                               jsonObject *messageObject,
-                               unsigned int currentMessageOffset,
-                               node *betaNode) { 
-    node *actionNode = NULL;
-    node *currentNode = betaNode;
-    leftFrameNode *currentFrame = NULL;
+static unsigned int handleBetaFrame(ruleset *tree, 
+                                    stateNode *state,
+                                    unsigned int oldMessageOffset,
+                                    node *oldNode,
+                                    node *currentNode,
+                                    leftFrameNode *currentFrame) {
     frameLocation currentFrameLocation;
 
-    while (currentNode != NULL) {
-        if (currentNode->type == NODE_ACTION) {
-            currentNode = NULL;
-            actionNode = currentNode;
-        } else {
-            node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
-            if (!currentFrame) {
-                if (!currentNode->value.b.expressionSequence.length ||
-                    (currentNode->value.b.expressionSequence.length == 2 && 
-                    (currentNode->value.b.expressionSequence.expressions[0].operator == OP_AND ||
-                    currentNode->value.b.expressionSequence.expressions[0].operator == OP_OR))) {
-
-                    if (nextNode->type == NODE_ACTION) {
-                        CHECK_RESULT(createActionFrame(state,
-                                                       nextNode->value.c.index,
-                                                       nextNode->nameOffset, 
-                                                       NULL,
-                                                       &currentFrame,
-                                                       &currentFrameLocation));
-                    } else {
-                        CHECK_RESULT(createLeftFrame(state,
-                                                     nextNode->value.b.index, 
-                                                     nextNode->nameOffset,
-                                                     NULL,
-                                                     &currentFrame,
-                                                     &currentFrameLocation));
-                    }
-                } else {
-                    frameLocation rightFrameLocation;
-                    rightFrameNode *rightFrame;
-                    CHECK_RESULT(createRightFrame(state,
-                                                  currentNode->value.b.index,
-                                                  &rightFrame,
-                                                  &rightFrameLocation));
-
-                    //TODO get real message hash
-                    unsigned int messageHash = fnv1Hash32("1", 1);
-                    rightFrame->messageOffset = currentMessageOffset;
-                    CHECK_RESULT(appendFrameLocation(state,
-                                                     rightFrameLocation,
-                                                     currentMessageOffset));
-
-                    CHECK_RESULT(setRightFrame(state,
-                                               messageHash,
-                                               rightFrameLocation)); 
-
-                    // Find frame for message
-                    leftFrameNode *oldFrame = NULL;
-                    CHECK_RESULT(getLeftFrame(state,
-                                              currentNode->value.b.index,
-                                              messageHash,
-                                              &oldFrame));
-
-                    unsigned char match = 0;
-                    while (!match) {
-                        CHECK_RESULT(isBetaMatch(tree,
-                                                 state,
-                                                 &currentNode->value.b,
-                                                 messageObject,
-                                                 oldFrame->messages,
-                                                 &match));
-                        if (match) {
-                            if (currentNode->value.b.distinct && 
-                                !isDistinct(oldFrame, currentMessageOffset)) {
-                                match = 0;
-                            }
-                
-                        }
-
-                        if (!match) {
-                            unsigned int oldFrameOffset = oldFrame->nextOffset;
-                            if (oldFrameOffset == UNDEFINED_HASH_OFFSET) {
-                                return ERR_FRAME_NOT_FOUND;
-                            }
-
-                            oldFrame = LEFT_FRAME_NODE(state, 
-                                                       betaNode->value.b.index, 
-                                                       oldFrameOffset);
-                            if (oldFrame->hash != messageHash) {
-                                return ERR_FRAME_NOT_FOUND;
-                            }
-                        }
-
-                    }
-
-                    if (nextNode->type == NODE_ACTION) {
-                        CHECK_RESULT(createActionFrame(state,
-                                                       nextNode->value.c.index,
-                                                       nextNode->nameOffset,
-                                                       oldFrame,
-                                                       &currentFrame,
-                                                       &currentFrameLocation));
-                    } else {
-                        CHECK_RESULT(createLeftFrame(state,
-                                                    nextNode->value.b.index,
-                                                    nextNode->nameOffset,
-                                                    oldFrame,
-                                                    &currentFrame,
-                                                    &currentFrameLocation));
-                    }
-                    
-                }
-
-                CHECK_RESULT(setMessageInFrame(currentFrame,
-                                               currentNode->nameOffset,
-                                               currentNode->value.b.hash,
-                                               currentMessageOffset));
-
-                CHECK_RESULT(appendFrameLocation(state,
-                                                 currentFrameLocation,
-                                                 currentMessageOffset));
-
-            } else {
-                //TODO get real frame hash
-                unsigned int frameHash = fnv1Hash32("1", 1);
-                CHECK_RESULT(setLeftFrame(state,
-                                          frameHash,
-                                          currentFrameLocation));
-
-                // Find message for frame
-                rightFrameNode *rightFrame;
-                CHECK_RESULT(getRightFrame(state,
-                                           currentNode->value.b.index,
-                                           frameHash,
-                                           &rightFrame));
-
-                messageNode *rightMessage = MESSAGE_NODE(state, rightFrame->messageOffset); 
-                unsigned char match = 0;
-                while (!match) {
-                    CHECK_RESULT(isBetaMatch(tree,
-                                             state,
-                                             &currentNode->value.b,
-                                             &rightMessage->jo,
-                                             currentFrame->messages,
-                                             &match));
-
-                    if (match) {
-                        if (currentNode->value.b.distinct && 
-                            !isDistinct(currentFrame, currentMessageOffset)) {
-                            match = 0;
-                        }
-            
-                    }
-                    
-                    if (!match) {
-                        unsigned int rightFrameOffset = rightFrame->nextOffset;
-                        if (rightFrameOffset == UNDEFINED_HASH_OFFSET) {
-                            return ERR_FRAME_NOT_FOUND;
-                        }
-
-                        rightFrame = RIGHT_FRAME_NODE(state,
-                                                      currentNode->value.b.index, 
-                                                      rightFrameOffset); 
-                        if (rightFrame->hash != frameHash) {
-                            return ERR_FRAME_NOT_FOUND;
-                        }
-
-                        rightMessage = MESSAGE_NODE(state, rightFrame->messageOffset);
-                    }
-                }                
-
-                if (nextNode->type == NODE_ACTION) {
-                    CHECK_RESULT(createActionFrame(state,
-                                                   nextNode->value.c.index,
-                                                   nextNode->nameOffset,
-                                                   currentFrame,
-                                                   &currentFrame,
-                                                   &currentFrameLocation));
-                } else {
-                    CHECK_RESULT(createLeftFrame(state,
-                                                 nextNode->value.b.index,
-                                                 nextNode->nameOffset,
-                                                 currentFrame,
-                                                 &currentFrame,
-                                                 &currentFrameLocation));
-                }
-
-                CHECK_RESULT(setMessageInFrame(currentFrame,
-                                               currentNode->nameOffset,
-                                               currentNode->value.b.hash,
-                                               currentMessageOffset));
-
-                CHECK_RESULT(appendFrameLocation(state,
-                                                 currentFrameLocation,
-                                                 currentMessageOffset));
-
-            }
-
-            currentNode = &tree->nodePool[currentNode->value.b.nextOffset];
-        }
+    if (currentNode->type == NODE_ACTION) {
+        CHECK_RESULT(createActionFrame(state,
+                                       currentNode->value.c.index,
+                                       currentNode->nameOffset,
+                                       currentFrame,
+                                       &currentFrame,
+                                       &currentFrameLocation));
+    } else {
+        CHECK_RESULT(createLeftFrame(state,
+                                     currentNode->value.b.index,
+                                     currentNode->nameOffset,
+                                     currentFrame,
+                                     &currentFrame,
+                                     &currentFrameLocation));
     }
 
-    CHECK_RESULT(setActionFrame(state, currentFrameLocation));
+    if (oldMessageOffset != UNDEFINED_HASH_OFFSET) {
+        CHECK_RESULT(setMessageInFrame(currentFrame,
+                                       oldNode->nameOffset,
+                                       oldNode->value.b.hash,
+                                       oldMessageOffset));
 
-    return handleAction(tree, 
-                        state, 
-                        actionNode,
-                        currentFrame);
+        CHECK_RESULT(appendFrameLocation(state,
+                                         currentFrameLocation,
+                                         oldMessageOffset));  
+    }
+
+    if (currentNode->type == NODE_ACTION) {
+        CHECK_RESULT(setActionFrame(state, 
+                                    currentFrameLocation));
+
+        return handleAction(tree, 
+                            state, 
+                            currentNode,
+                            currentFrame);
+    }
+
+    //TODO get real frame hash
+    unsigned int frameHash = fnv1Hash32("1", 1);
+    CHECK_RESULT(setLeftFrame(state,
+                              frameHash,
+                              currentFrameLocation));
+
+    node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
+    if (currentNode->value.b.not) {
+        // Apply filter to frame and clone old closure
+        rightFrameNode *rightFrame;
+        unsigned int result = getRightFrame(state,
+                                            currentNode->value.b.index,
+                                            frameHash,
+                                            &rightFrame);
+        if (result != ERR_FRAME_NOT_FOUND && result != RULES_OK) {
+            return result;
+        }
+
+        if (result == RULES_OK) {
+            messageNode *rightMessage = MESSAGE_NODE(state, rightFrame->messageOffset); 
+            while (rightMessage) {
+                unsigned char match = 0;
+                CHECK_RESULT(isBetaMatch(tree,
+                                         state,
+                                         &currentNode->value.b,
+                                         &rightMessage->jo,
+                                         currentFrame->messages,
+                                         &match));
+                if (match) {
+                    if (!currentNode->value.b.distinct || 
+                        isDistinct(currentFrame, rightFrame->messageOffset)) {
+                        return ERR_FRAME_NOT_FOUND;
+                    }
+                }
+                
+                rightMessage = NULL;
+                unsigned int rightFrameOffset = rightFrame->nextOffset;
+                if (rightFrameOffset != UNDEFINED_HASH_OFFSET) {
+                    rightFrame = RIGHT_FRAME_NODE(state,
+                                                  currentNode->value.b.index, 
+                                                  rightFrameOffset); 
+                    if (rightFrame->hash == frameHash) {
+                        rightMessage = MESSAGE_NODE(state, rightFrame->messageOffset);
+                    }
+                }
+            }   
+        }
+
+        return handleBetaFrame(tree,
+                               state, 
+                               UNDEFINED_HASH_OFFSET,
+                               currentNode,
+                               nextNode,
+                               currentFrame);
+
+    } else {
+        // Find message for frame and add it to a new closure
+        rightFrameNode *rightFrame;
+        CHECK_RESULT(getRightFrame(state,
+                                   currentNode->value.b.index,
+                                   frameHash,
+                                   &rightFrame));
+
+        messageNode *rightMessage = MESSAGE_NODE(state, rightFrame->messageOffset); 
+        while (rightMessage) {
+            unsigned char match = 0;
+            CHECK_RESULT(isBetaMatch(tree,
+                                     state,
+                                     &currentNode->value.b,
+                                     &rightMessage->jo,
+                                     currentFrame->messages,
+                                     &match));
+
+            if (match && (!currentNode->value.b.distinct || isDistinct(currentFrame, rightFrame->messageOffset))) {
+                unsigned int result = handleBetaFrame(tree,
+                                                      state, 
+                                                      rightFrame->messageOffset,
+                                                      currentNode,
+                                                      nextNode,
+                                                      currentFrame);
+
+                if (result != ERR_FRAME_NOT_FOUND && result != RULES_OK) {
+                    return result;
+                }
+            }
+            
+
+            rightMessage = NULL;
+            unsigned int rightFrameOffset = rightFrame->nextOffset;
+            while (rightFrameOffset != UNDEFINED_HASH_OFFSET) {
+                rightFrame = RIGHT_FRAME_NODE(state,
+                                              currentNode->value.b.index, 
+                                              rightFrameOffset); 
+                if (rightFrame->hash != frameHash) {
+                    rightFrameOffset = rightFrame->nextOffset;
+                } else {
+                    rightMessage = MESSAGE_NODE(state, rightFrame->messageOffset);
+                    rightFrameOffset = UNDEFINED_HASH_OFFSET;
+                }
+            }
+        }                
+    }
+
+    return RULES_OK;
+}
+
+static unsigned int handleBetaMessage(ruleset *tree, 
+                                      stateNode *state,
+                                      node *betaNode,
+                                      jsonObject *messageObject,
+                                      unsigned int currentMessageOffset) { 
+    node *currentNode = betaNode;
+    node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
+
+    // if a message matches a "none" expression
+    if (currentNode->value.b.not) {
+        frameLocation rightFrameLocation;
+        rightFrameNode *rightFrame;
+        CHECK_RESULT(createRightFrame(state,
+                                      currentNode->value.b.index,
+                                      &rightFrame,
+                                      &rightFrameLocation));
+
+        //TODO get real message hash
+        unsigned int messageHash = fnv1Hash32("1", 1);
+        rightFrame->messageOffset = currentMessageOffset;
+        CHECK_RESULT(appendFrameLocation(state,
+                                         rightFrameLocation,
+                                         currentMessageOffset));
+
+        CHECK_RESULT(setRightFrame(state,
+                                   messageHash,
+                                   rightFrameLocation)); 
+
+        return RULES_OK;
+    } 
+
+    // if message matches the first expression in the sequence
+    if (currentNode->value.b.isFirst) {
+        return handleBetaFrame(tree,
+                               state,
+                               currentMessageOffset,
+                               currentNode, 
+                               nextNode,
+                               NULL);
+
+    // message matches any subsequent expression
+    } else {
+        frameLocation rightFrameLocation;
+        rightFrameNode *rightFrame;
+        CHECK_RESULT(createRightFrame(state,
+                                      currentNode->value.b.index,
+                                      &rightFrame,
+                                      &rightFrameLocation));
+
+        //TODO get real message hash
+        unsigned int messageHash = fnv1Hash32("1", 1);
+        rightFrame->messageOffset = currentMessageOffset;
+        CHECK_RESULT(appendFrameLocation(state,
+                                         rightFrameLocation,
+                                         currentMessageOffset));
+
+        CHECK_RESULT(setRightFrame(state,
+                                   messageHash,
+                                   rightFrameLocation)); 
+
+
+        // Find frame for message
+        leftFrameNode *currentFrame = NULL;
+        CHECK_RESULT(getLeftFrame(state,
+                                  currentNode->value.b.index,
+                                  messageHash,
+                                  &currentFrame));
+
+        while (currentFrame) {
+            unsigned char match = 0;
+            CHECK_RESULT(isBetaMatch(tree,
+                                     state,
+                                     &currentNode->value.b,
+                                     messageObject,
+                                     currentFrame->messages,
+                                     &match));
+
+            if (match && (!currentNode->value.b.distinct || isDistinct(currentFrame, currentMessageOffset))) {
+                unsigned int result = handleBetaFrame(tree,
+                                                      state, 
+                                                      currentMessageOffset,
+                                                      currentNode,
+                                                      nextNode,
+                                                      currentFrame);
+
+                if (result != ERR_FRAME_NOT_FOUND && result != RULES_OK) {
+                    return result;
+                }
+            }
+
+            unsigned int currentFrameOffset = currentFrame->nextOffset;
+            currentFrame = NULL;
+            while (currentFrameOffset != UNDEFINED_HASH_OFFSET) {
+                currentFrame = LEFT_FRAME_NODE(state, 
+                                               betaNode->value.b.index, 
+                                               currentFrameOffset);
+                if (currentFrame->hash != messageHash) {
+                    currentFrameOffset = currentFrame->nextOffset;
+                    currentFrame = NULL;
+                } else {
+                    currentFrameOffset = UNDEFINED_HASH_OFFSET;
+                }   
+            }
+        }
+
+    }
+
+    return RULES_OK;
 }
 
 
@@ -1087,12 +1138,11 @@ static unsigned int handleAlpha(ruleset *tree,
         if (currentAlpha->betaListOffset) {
             unsigned int *betaList = &tree->nextPool[currentAlpha->betaListOffset];
             for (unsigned int entry = 0; betaList[entry] != 0; ++entry) {
-                unsigned int bresult = handleBeta(tree, 
-                                                  state, 
-                                                  mid,
-                                                  jo,
-                                                  currentMessageOffset,
-                                                  &tree->nodePool[betaList[entry]]);
+                unsigned int bresult = handleBetaMessage(tree, 
+                                                         state, 
+                                                         &tree->nodePool[betaList[entry]],
+                                                         jo,
+                                                         currentMessageOffset);
                 if (bresult != RULES_OK && bresult != ERR_FRAME_NOT_FOUND) {
                     return bresult;
                 }

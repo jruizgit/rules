@@ -88,6 +88,7 @@ typedef struct beta {
     unsigned int nextOffset;
     unsigned char not;
     unsigned char distinct;
+    unsigned char isFirst;
 } beta;
 
 typedef struct action {

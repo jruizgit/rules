@@ -1365,9 +1365,13 @@ static unsigned int createBeta(ruleset *tree,
         newBeta->value.b.index = tree->betaCount;
         ++tree->betaCount;
         
-        if (previousOffset != 0) {
+        if (previousOffset == 0) {
+            newBeta->value.b.isFirst = 1;
+        } else {
+            newBeta->value.b.isFirst = 0;
             tree->nodePool[previousOffset].value.b.nextOffset = betaOffset;
-        }
+        } 
+
         previousOffset = betaOffset;
 
         newBeta->value.b.expressionSequence.nameOffset = stringOffset;

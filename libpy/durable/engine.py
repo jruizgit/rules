@@ -335,7 +335,8 @@ class Promise(object):
             try:
                 self._func(c) 
             except BaseException as error:
-                c.s.exception = 'exception caught {0}'.format(str(error))
+                t, v, tb = sys.exc_info()
+                c.s.exception = 'exception caught {0}, traceback {1}'.format(str(error), traceback.format_tb(tb))
             except:
                 c.s.exception = 'unknown exception'
                
@@ -364,8 +365,8 @@ class Promise(object):
                     self._timer.daemon = True     
                     self._timer.start()
             except BaseException as error:
-                c.s.exception = 'exception caught {0}'.format(str(error))
-                complete(None)
+                t, v, tb = sys.exc_info()
+                c.s.exception = 'exception caught {0}, traceback {1}'.format(str(error), traceback.format_tb(tb))
             except:
                 c.s.exception = 'unknown exception'
                 complete(None)
