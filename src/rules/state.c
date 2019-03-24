@@ -193,6 +193,7 @@ unsigned int setMessageInFrame(leftFrameNode *node,
 unsigned int getLeftFrame(stateNode *state,
                           unsigned int index, 
                           unsigned int hash, 
+                          frameLocation *location,
                           leftFrameNode **node) {
     unsigned int valueOffset;
     GET(leftFrameNode, 
@@ -206,6 +207,11 @@ unsigned int getLeftFrame(stateNode *state,
     }
 
     *node = LEFT_FRAME_NODE(state, index, valueOffset);
+    if (location) {
+        location->frameType = LEFT_FRAME;
+        location->nodeIndex = index;
+        location->frameOffset = valueOffset;
+    }
     return RULES_OK;
 }
 
@@ -254,21 +260,20 @@ static unsigned int copyLeftFrame(stateNode *state,
 } 
 
 unsigned int createLeftFrame(stateNode *state,
-                            unsigned int index, 
-                            unsigned int nameOffset,
-                            leftFrameNode *oldNode,                        
-                            leftFrameNode **newNode,
-                            frameLocation *newLocation) {
+                             node *reteNode,
+                             leftFrameNode *oldNode,                        
+                             leftFrameNode **newNode,
+                             frameLocation *newLocation) {
     unsigned int newValueOffset;
     NEW(leftFrameNode, 
-        state->betaState[index].leftFramePool, 
+        state->betaState[reteNode->value.b.index].leftFramePool, 
         newValueOffset);
     
-    leftFrameNode *targetNode = LEFT_FRAME_NODE(state, index, newValueOffset);
+    leftFrameNode *targetNode = LEFT_FRAME_NODE(state, reteNode->value.b.index, newValueOffset);
     newLocation->frameType = LEFT_FRAME;
-    newLocation->nodeIndex = index;
+    newLocation->nodeIndex = reteNode->value.b.index;
     newLocation->frameOffset = newValueOffset;
-    targetNode->nameOffset = nameOffset;
+    targetNode->nameOffset = reteNode->nameOffset;
     
     CHECK_RESULT(copyLeftFrame(state,
                                oldNode, 
@@ -276,6 +281,22 @@ unsigned int createLeftFrame(stateNode *state,
                                *newLocation));
     
     *newNode = targetNode;
+    state->betaState[reteNode->value.b.index].reteNode = reteNode;
+    return RULES_OK;
+}
+
+unsigned int getActionFrame(stateNode *state,
+                            unsigned int index, 
+                            frameLocation *resultLocation,
+                            leftFrameNode **resultNode) {
+    actionStateNode *resultStateNode = &state->actionState[index];
+    unsigned int resultFrameOffset = resultStateNode->resultIndex[0];
+    *resultNode = RESULT_FRAME(resultStateNode, resultFrameOffset);
+    if (resultLocation) {
+        resultLocation->frameType = ACTION_FRAME;
+        resultLocation->nodeIndex = index;
+        resultLocation->frameOffset = resultFrameOffset;
+    }
     return RULES_OK;
 }
 
@@ -301,22 +322,21 @@ unsigned int deleteActionFrame(stateNode *state,
 }
 
 unsigned int createActionFrame(stateNode *state,
-                               unsigned int index, 
-                               unsigned int nameOffset,
+                               node *reteNode,
                                leftFrameNode *oldNode,                        
                                leftFrameNode **newNode,
                                frameLocation *newLocation) {
 
     unsigned int newValueOffset;
-    actionStateNode *actionNode = &state->actionState[index];
+    actionStateNode *actionNode = &state->actionState[reteNode->value.c.index];
     NEW(leftFrameNode, 
         actionNode->resultPool, 
         newValueOffset);
-    leftFrameNode *targetNode = ACTION_FRAME_NODE(state, index, newValueOffset);
+    leftFrameNode *targetNode = ACTION_FRAME_NODE(state, reteNode->value.c.index, newValueOffset);
     newLocation->frameType = ACTION_FRAME;
-    newLocation->nodeIndex = index;
+    newLocation->nodeIndex = reteNode->value.c.index;
     newLocation->frameOffset = newValueOffset;
-    targetNode->nameOffset = nameOffset;
+    targetNode->nameOffset = reteNode->nameOffset;
 
     CHECK_RESULT(copyLeftFrame(state,
                                oldNode, 
@@ -324,6 +344,7 @@ unsigned int createActionFrame(stateNode *state,
                                *newLocation));
     
     *newNode = targetNode;
+    state->betaState[reteNode->value.c.index].reteNode = reteNode;
     return RULES_OK;
 }
 
@@ -369,19 +390,20 @@ unsigned int deleteRightFrame(stateNode *state,
 }
 
 unsigned int createRightFrame(stateNode *state,
-                              unsigned int index,  
+                              node *reteNode,
                               rightFrameNode **node,
                               frameLocation *location) {
     unsigned int valueOffset;
     NEW(rightFrameNode, 
-        state->betaState[index].rightFramePool, 
+        state->betaState[reteNode->value.b.index].rightFramePool, 
         valueOffset);
-    *node = RIGHT_FRAME_NODE(state, index, valueOffset);
+    *node = RIGHT_FRAME_NODE(state, reteNode->value.b.index, valueOffset);
 
     location->frameType = RIGHT_FRAME;
-    location->nodeIndex = index;
+    location->nodeIndex = reteNode->value.b.index;
     location->frameOffset = valueOffset;
 
+    state->betaState[reteNode->value.b.index].reteNode = reteNode;
     return RULES_OK;
 }
 

@@ -33,6 +33,8 @@
 
 #define STATE_NODE(tree, offset) &((stateNode *)((ruleset *)tree)->statePool.content)[offset]
 
+// defined in rete.h
+struct node;
 
 typedef struct jsonProperty {
     unsigned int hash;
@@ -115,6 +117,7 @@ typedef struct actionStateNode {
 } actionStateNode;
 
 typedef struct betaStateNode {
+    struct node *reteNode;
     pool leftFramePool;
     unsigned int leftFrameIndex[MAX_LEFT_FRAME_INDEX_LENGTH];
     pool rightFramePool;
@@ -180,6 +183,7 @@ unsigned int setMessageInFrame(leftFrameNode *node,
 unsigned int getLeftFrame(stateNode *state,
                           unsigned int index, 
                           unsigned int hash,
+                          frameLocation *location,
                           leftFrameNode **node);
 
 unsigned int setLeftFrame(stateNode *state,
@@ -191,11 +195,10 @@ unsigned int deleteLeftFrame(stateNode *state,
                              frameLocation location);
 
 unsigned int createLeftFrame(stateNode *state,
-                            unsigned int index, 
-                            unsigned int nameOffset,
-                            leftFrameNode *oldNode,                        
-                            leftFrameNode **newNode,
-                            frameLocation *newLocation);
+                             struct node *reteNode,
+                             leftFrameNode *oldNode,                        
+                             leftFrameNode **newNode,
+                             frameLocation *newLocation);
 
 unsigned int getRightFrame(stateNode *state,
                            unsigned int index, 
@@ -210,9 +213,14 @@ unsigned int deleteRightFrame(stateNode *state,
                               frameLocation location);
 
 unsigned int createRightFrame(stateNode *state,
-                              unsigned int index,
+                              struct node *reteNode,
                               rightFrameNode **node,
                               frameLocation *location);
+
+unsigned int getActionFrame(stateNode *state,
+                            unsigned int index, 
+                            frameLocation *resultLocation,
+                            leftFrameNode **resultNode);
 
 unsigned int setActionFrame(stateNode *state, 
                             frameLocation location);
@@ -222,8 +230,7 @@ unsigned int deleteActionFrame(stateNode *state,
                                frameLocation location);
 
 unsigned int createActionFrame(stateNode *state,
-                               unsigned int index,
-                               unsigned int nameOffset, 
+                               struct node *reteNode,
                                leftFrameNode *oldNode,                        
                                leftFrameNode **newNode,
                                frameLocation *newLocation);

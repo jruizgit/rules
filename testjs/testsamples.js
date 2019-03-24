@@ -1,30 +1,30 @@
 'use strict';
 var d = require('../libjs/durable');
 
-// d.ruleset('test', function() {
-//     // antecedent
-//     whenAll: m.subject == 'World'
-//     // consequent
-//     run: console.log('Hello ' + m.subject)
+d.ruleset('test', function() {
+    // antecedent
+    whenAll: m.subject == 'World'
+    // consequent
+    run: console.log('Hello ' + m.subject)
 
-//     whenStart: {
-//         post('test', {subject: 'World'});
-//     }
-// });
+    whenStart: {
+        post('test', {subject: 'World'});
+    }
+});
 
-// d.ruleset('risk0', function() {
-//     whenAll: {
-//         first = m.t == 'purchase'
-//         second = m.location != first.location
-//     }
+d.ruleset('risk0', function() {
+    whenAll: {
+        first = m.t == 'purchase'
+        second = m.location != first.location
+    }
 
-//     run: console.log('fraud detected ->' + first.location + ', ' + second.location)
+    run: console.log('fraud detected ->' + first.location + ', ' + second.location)
    
-//     whenStart: {
-//         post('risk0', {t: 'purchase', location: 'US'});
-//         post('risk0', {t: 'purchase', location: 'CA'});
-//     }
-// });
+    whenStart: {
+        post('risk0', {t: 'purchase', location: 'US'});
+        post('risk0', {t: 'purchase', location: 'CA'});
+    }
+});
 
 d.ruleset('indistinct', function() {
     whenAll: {
@@ -40,86 +40,120 @@ d.ruleset('indistinct', function() {
     }
 
     whenStart: {
-        host.post('indistinct', {amount: 50});
         host.post('indistinct', {amount: 200});
-        host.post('indistinct', {amount: 251});
+        host.post('indistinct', {amount: 500});
+        host.post('indistinct', {amount: 1000});
     }
 });
 
-// d.ruleset('distinct', function() {
-//     whenAll: {
-//         first = m.amount > 10
-//         second = m.amount > first.amount * 2
-//         third = m.amount > (first.amount + second.amount) / 2
-//     }
-//     run: {
-//         console.log('distinct detected -> ' + first.amount);
-//         console.log('               -> ' + second.amount);
-//         console.log('               -> ' + third.amount);
-//     }
+d.ruleset('distinct', function() {
+    whenAll: {
+        first = m.amount > 10
+        second = m.amount > first.amount * 2
+        third = m.amount > (first.amount + second.amount) / 2
+    }
+    run: {
+        console.log('distinct detected -> ' + first.amount);
+        console.log('               -> ' + second.amount);
+        console.log('               -> ' + third.amount);
+    }
 
-//     whenStart: {
-//         host.post('distinct', {amount: 50});
-//         host.post('distinct', {amount: 200});
-//         host.post('distinct', {amount: 251});
-//     }
-// });
+    whenStart: {
+        host.post('distinct', {amount: 50});
+        host.post('distinct', {amount: 200});
+        host.post('distinct', {amount: 251});
+    }
+});
 
-// d.ruleset('expense0', function() {
-//     whenAll: m.subject == 'approve' || m.subject == 'ok'
-//     run: console.log('expense0 Approved');
+d.ruleset('expense0', function() {
+    whenAll: m.subject == 'approve' || m.subject == 'ok'
+    run: console.log('expense0 Approved');
 
-//     whenStart: post('expense0', { subject: 'approve' })
-// });
+    whenStart: post('expense0', { subject: 'approve' })
+});
 
-// d.ruleset('match', function() {
-//     whenAll: m.url.matches('(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*') 
-//     run: console.log('match url ' + m.url)
+d.ruleset('match', function() {
+    whenAll: m.url.matches('(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*') 
+    run: console.log('match url ' + m.url)
         
-//     whenStart: {
-//         post('match', {url: 'https://github.com'});
-//         post('match', {url: 'http://github.com/jruizgit/rul!es'});
-//         post('match', {url: 'https://github.com/jruizgit/rules/reference.md'});
-//         post('match', {url: '//rules'});
-//         post('match', {url: 'https://github.c/jruizgit/rules'});
-//     }
-// });
+    whenStart: {
+        post('match', {url: 'https://github.com'});
+        post('match', {url: 'http://github.com/jruizgit/rul!es'});
+        post('match', {url: 'https://github.com/jruizgit/rules/reference.md'});
+        post('match', {url: '//rules'});
+        post('match', {url: 'https://github.c/jruizgit/rules'});
+    }
+});
 
-// d.ruleset('strings', function() {
-//     whenAll: m.subject.matches('hello.*')
-//     run: console.log('string starts with hello: ' + m.subject)
+d.ruleset('strings', function() {
+    whenAll: m.subject.matches('hello.*')
+    run: console.log('string starts with hello: ' + m.subject)
 
-//     whenAll: m.subject.imatches('.*hello')
-//     run: console.log('string ends with hello: ' + m.subject)
+    whenAll: m.subject.imatches('.*hello')
+    run: console.log('string ends with hello: ' + m.subject)
 
-//     whenAll: m.subject.imatches('.*hello.*')
-//     run: console.log('string contains hello (case insensitive): ' + m.subject)
+    whenAll: m.subject.imatches('.*hello.*')
+    run: console.log('string contains hello (case insensitive): ' + m.subject)
 
-//     whenStart: {
-//         assert('strings', { subject: 'HELLO world' });
-//         assert('strings', { subject: 'world hello' });
-//         assert('strings', { subject: 'hello hi' });
-//         assert('strings', { subject: 'has Hello string' });
-//         assert('strings', { subject: 'does not match' });
-//     }
-// });
+    whenStart: {
+        assert('strings', { subject: 'HELLO world' });
+        assert('strings', { subject: 'world hello' });
+        assert('strings', { subject: 'hello hi' });
+        assert('strings', { subject: 'has Hello string' });
+        assert('strings', { subject: 'does not match' });
+    }
+});
 
+d.ruleset('risk2_0', function() {
+    whenAll: {
+        first = m.t == 'deposit'
+        none(m.t == 'balance')
+        third = m.t == 'withrawal'
+        fourth = m.t == 'chargeback'
+    }
+    run: console.log('risk2_0 fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
 
-// d.ruleset('risk2', function() {
-//     whenAll: {
-//         first = m.t == 'deposit'
-//         third = m.t == 'withrawal'
-//         fourth = m.t == 'chargeback'
-//     }
-//     run: console.log('fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
+    whenStart: {
+        assert('risk2_0', {t: 'deposit'});
+        assert('risk2_0', {t: 'withrawal'});
+        assert('risk2_0', {t: 'chargeback'});
+    }
+});
 
-//     whenStart: {
-//         post('risk2', {t: 'deposit'});
-//         post('risk2', {t: 'withrawal'});
-//         post('risk2', {t: 'chargeback'});
-//     }
-// });
+d.ruleset('risk2_1', function() {
+    whenAll: {
+        first = m.t == 'deposit'
+        none(m.t == 'balance')
+        third = m.t == 'withrawal'
+        fourth = m.t == 'chargeback'
+    }
+    run: console.log('risk2_1 fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
 
+    whenStart: {
+        assert('risk2_1', {t: 'balance'});
+        assert('risk2_1', {t: 'deposit'});
+        assert('risk2_1', {t: 'withrawal'});
+        assert('risk2_1', {t: 'chargeback'});
+        retract('risk2_1', {t: 'balance'});
+    }
+});
+
+d.ruleset('risk2_2', function() {
+    whenAll: {
+        first = m.t == 'deposit'
+        none(m.t == 'balance')
+        third = m.t == 'withrawal'
+        fourth = m.t == 'chargeback'
+    }
+    run: console.log('risk2_2 fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
+
+    whenStart: {
+        assert('risk2_2', {t: 'deposit'});
+        assert('risk2_2', {t: 'withrawal'});
+        assert('risk2_2', {t: 'chargeback'});
+        assert('risk2_2', {t: 'balance'});    
+    }
+});
 
 // d.ruleset('expense1', function() {
 //     whenAny: {

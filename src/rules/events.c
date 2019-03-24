@@ -592,7 +592,6 @@ static unsigned int isBetaMatch(ruleset *tree,
                                 jsonObject *messageObject,
                                 messageFrame *messageContext,
                                 unsigned char *propertyMatch) {
-    printf("isBetaMatch\n");
     jsonProperty resultProperty;
     unsigned short i = 0;
     CHECK_RESULT(reduceExpressionSequence(tree,
@@ -681,15 +680,13 @@ static unsigned int handleBetaFrame(ruleset *tree,
 
     if (currentNode->type == NODE_ACTION) {
         CHECK_RESULT(createActionFrame(state,
-                                       currentNode->value.c.index,
-                                       currentNode->nameOffset,
+                                       currentNode,
                                        currentFrame,
                                        &currentFrame,
                                        &currentFrameLocation));
     } else {
         CHECK_RESULT(createLeftFrame(state,
-                                     currentNode->value.b.index,
-                                     currentNode->nameOffset,
+                                     currentNode,
                                      currentFrame,
                                      &currentFrame,
                                      &currentFrameLocation));
@@ -772,7 +769,7 @@ static unsigned int handleBetaFrame(ruleset *tree,
                                currentFrame);
 
     } else {
-        // Find message for frame and add it to a new closure
+        // Find all messages for frame 
         rightFrameNode *rightFrame;
         CHECK_RESULT(getRightFrame(state,
                                    currentNode->value.b.index,
@@ -822,73 +819,135 @@ static unsigned int handleBetaFrame(ruleset *tree,
     return RULES_OK;
 }
 
-static unsigned int handleBetaMessage(ruleset *tree, 
-                                      stateNode *state,
-                                      node *betaNode,
-                                      jsonObject *messageObject,
-                                      unsigned int currentMessageOffset) { 
-    node *currentNode = betaNode;
-    node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
-
-    // if a message matches a "none" expression
-    if (currentNode->value.b.not) {
-        frameLocation rightFrameLocation;
-        rightFrameNode *rightFrame;
-        CHECK_RESULT(createRightFrame(state,
-                                      currentNode->value.b.index,
-                                      &rightFrame,
-                                      &rightFrameLocation));
-
-        //TODO get real message hash
-        unsigned int messageHash = fnv1Hash32("1", 1);
-        rightFrame->messageOffset = currentMessageOffset;
-        CHECK_RESULT(appendFrameLocation(state,
-                                         rightFrameLocation,
-                                         currentMessageOffset));
-
-        CHECK_RESULT(setRightFrame(state,
-                                   messageHash,
-                                   rightFrameLocation)); 
-
+static unsigned int handleDeleteMessage(ruleset *tree,
+                                        stateNode *state,
+                                        unsigned int messageOffset) {
+    
+    messageNode *message = MESSAGE_NODE(state, messageOffset);
+    unsigned int result = deleteMessage(state, messageOffset);
+    if (result == ERR_NODE_DELETED) {
         return RULES_OK;
-    } 
+    } else if (result != RULES_OK) {
+        return result;
+    }
 
-    // if message matches the first expression in the sequence
-    if (currentNode->value.b.isFirst) {
-        return handleBetaFrame(tree,
-                               state,
-                               currentMessageOffset,
-                               currentNode, 
-                               nextNode,
-                               NULL);
+    for (unsigned int i = 0; i < message->locationCount; ++i) {
+        leftFrameNode *frame = NULL;
+        switch(message->locations[i].frameType) {
+            case LEFT_FRAME:
+                frame = LEFT_FRAME_NODE(state, 
+                                        message->locations[i].nodeIndex,
+                                        message->locations[i].frameOffset);
+                
+                result = deleteLeftFrame(state, message->locations[i]);
+                break;
+            case ACTION_FRAME:
+                frame = ACTION_FRAME_NODE(state, 
+                                          message->locations[i].nodeIndex,
+                                          message->locations[i].frameOffset);
 
-    // message matches any subsequent expression
-    } else {
-        frameLocation rightFrameLocation;
-        rightFrameNode *rightFrame;
-        CHECK_RESULT(createRightFrame(state,
-                                      currentNode->value.b.index,
-                                      &rightFrame,
-                                      &rightFrameLocation));
+                result = deleteActionFrame(state, message->locations[i]);
+                break;
+            case RIGHT_FRAME:
+                result = deleteRightFrame(state, message->locations[i]);
+                break;
+        }
 
-        //TODO get real message hash
-        unsigned int messageHash = fnv1Hash32("1", 1);
-        rightFrame->messageOffset = currentMessageOffset;
-        CHECK_RESULT(appendFrameLocation(state,
-                                         rightFrameLocation,
-                                         currentMessageOffset));
+        if (result != RULES_OK && result != ERR_NODE_DELETED) {
+            return result;
+        }
 
-        CHECK_RESULT(setRightFrame(state,
-                                   messageHash,
-                                   rightFrameLocation)); 
+        if (message->locations[i].frameType != RIGHT_FRAME) {
+            if (frame != NULL) {
+                for (int i = 0; i < frame->messageCount; ++i) {
+                    messageFrame *currentFrame = &frame->messages[frame->reverseIndex[i]]; 
+                    CHECK_RESULT(deleteLocationFromMessage(state,
+                                                           currentFrame->messageNodeOffset,
+                                                           message->locations[i]));
+                }
+            }
+        } else {
+            node *currentNode = state->betaState[message->locations[i].nodeIndex].reteNode;
+            if (currentNode->value.b.not) {
+                //TODO get real message hash
+                unsigned int messageHash = fnv1Hash32("1", 1);
+                node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
 
+                // Find all frames for message
+                leftFrameNode *currentFrame = NULL;
+                CHECK_RESULT(getLeftFrame(state,
+                                          currentNode->value.b.index,
+                                          messageHash,
+                                          NULL,
+                                          &currentFrame));
 
-        // Find frame for message
+                while (currentFrame) {
+                    unsigned char match = 0;
+                    CHECK_RESULT(isBetaMatch(tree,
+                                             state,
+                                             &currentNode->value.b,
+                                             &message->jo,
+                                             currentFrame->messages,
+                                             &match));
+
+                    if (match && (!currentNode->value.b.distinct || isDistinct(currentFrame, messageOffset))) {
+                        unsigned int result = handleBetaFrame(tree,
+                                                              state, 
+                                                              UNDEFINED_HASH_OFFSET,
+                                                              currentNode,
+                                                              nextNode,
+                                                              currentFrame);
+
+                        if (result != ERR_FRAME_NOT_FOUND && result != RULES_OK) {
+                            return result;
+                        }
+                    }
+
+                    unsigned int currentFrameOffset = currentFrame->nextOffset;
+                    currentFrame = NULL;
+                    while (currentFrameOffset != UNDEFINED_HASH_OFFSET) {
+                        currentFrame = LEFT_FRAME_NODE(state, 
+                                                       currentNode->value.b.index, 
+                                                       currentFrameOffset);
+                        if (currentFrame->hash != messageHash) {
+                            currentFrameOffset = currentFrame->nextOffset;
+                            currentFrame = NULL;
+                        } else {
+                            currentFrameOffset = UNDEFINED_HASH_OFFSET;
+                        }   
+                    }
+                }
+            }
+        }
+    }
+
+    return RULES_OK;
+}
+
+static unsigned int handleFilterFrames(ruleset *tree, 
+                                       stateNode *state,
+                                       node *currentNode,
+                                       jsonObject *messageObject,
+                                       unsigned int currentMessageOffset,
+                                       unsigned int messageHash) { 
+
+    node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
+    while (nextNode) {
+        // Find all frames for message
         leftFrameNode *currentFrame = NULL;
-        CHECK_RESULT(getLeftFrame(state,
-                                  currentNode->value.b.index,
-                                  messageHash,
-                                  &currentFrame));
+        frameLocation location;
+        if (nextNode->type == NODE_ACTION) {
+            CHECK_RESULT(getActionFrame(state,
+                                        nextNode->value.c.index,
+                                        &location,
+                                        &currentFrame));
+        } else {
+            CHECK_RESULT(getLeftFrame(state,
+                                      nextNode->value.b.index,
+                                      messageHash,
+                                      &location,
+                                      &currentFrame));
+        }
 
         while (currentFrame) {
             unsigned char match = 0;
@@ -899,37 +958,152 @@ static unsigned int handleBetaMessage(ruleset *tree,
                                      currentFrame->messages,
                                      &match));
 
-            if (match && (!currentNode->value.b.distinct || isDistinct(currentFrame, currentMessageOffset))) {
-                unsigned int result = handleBetaFrame(tree,
-                                                      state, 
-                                                      currentMessageOffset,
-                                                      currentNode,
-                                                      nextNode,
-                                                      currentFrame);
-
-                if (result != ERR_FRAME_NOT_FOUND && result != RULES_OK) {
-                    return result;
+            if (match) {
+                unsigned int result = RULES_OK;
+                if (nextNode->type == NODE_ACTION) {
+                    result = deleteActionFrame(state, location);
                 }
+                else if (!nextNode->value.b.distinct || isDistinct(currentFrame, currentMessageOffset)) {
+                    result = deleteLeftFrame(state, location);
+                }
+
+                if (result != RULES_OK && result != ERR_NODE_DELETED) {
+                    return result;
+                }  
             }
 
-            unsigned int currentFrameOffset = currentFrame->nextOffset;
+            location.frameOffset = currentFrame->nextOffset;
             currentFrame = NULL;
-            while (currentFrameOffset != UNDEFINED_HASH_OFFSET) {
+            while (location.frameOffset != UNDEFINED_HASH_OFFSET) {
                 currentFrame = LEFT_FRAME_NODE(state, 
-                                               betaNode->value.b.index, 
-                                               currentFrameOffset);
+                                               location.nodeIndex, 
+                                               location.frameOffset);
+    
                 if (currentFrame->hash != messageHash) {
-                    currentFrameOffset = currentFrame->nextOffset;
+                    location.frameOffset = currentFrame->nextOffset;
                     currentFrame = NULL;
                 } else {
-                    currentFrameOffset = UNDEFINED_HASH_OFFSET;
+                    location.frameOffset = UNDEFINED_HASH_OFFSET;
                 }   
             }
-        }
+        }            
 
+
+        if (nextNode->type == NODE_ACTION) {
+            nextNode = NULL;
+        } else {
+            nextNode = &tree->nodePool[nextNode->value.b.nextOffset];
+        }
     }
 
     return RULES_OK;
+}
+
+static unsigned int handleMatchFrames(ruleset *tree, 
+                                      stateNode *state,
+                                      node *currentNode,
+                                      jsonObject *messageObject,
+                                      unsigned int currentMessageOffset,
+                                      unsigned int messageHash) { 
+    // Find frames for message
+    leftFrameNode *currentFrame = NULL;
+    node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
+    CHECK_RESULT(getLeftFrame(state,
+                              currentNode->value.b.index,
+                              messageHash,
+                              NULL,
+                              &currentFrame));
+
+    while (currentFrame) {
+        unsigned char match = 0;
+        CHECK_RESULT(isBetaMatch(tree,
+                                 state,
+                                 &currentNode->value.b,
+                                 messageObject,
+                                 currentFrame->messages,
+                                 &match));
+
+        if (match && (!currentNode->value.b.distinct || isDistinct(currentFrame, currentMessageOffset))) {
+            unsigned int result = handleBetaFrame(tree,
+                                                  state, 
+                                                  currentMessageOffset,
+                                                  currentNode,
+                                                  nextNode,
+                                                  currentFrame);
+
+            if (result != ERR_FRAME_NOT_FOUND && result != RULES_OK) {
+                return result;
+            }
+        }
+
+        unsigned int currentFrameOffset = currentFrame->nextOffset;
+        currentFrame = NULL;
+        while (currentFrameOffset != UNDEFINED_HASH_OFFSET) {
+            currentFrame = LEFT_FRAME_NODE(state, 
+                                           currentNode->value.b.index, 
+                                           currentFrameOffset);
+            if (currentFrame->hash != messageHash) {
+                currentFrameOffset = currentFrame->nextOffset;
+                currentFrame = NULL;
+            } else {
+                currentFrameOffset = UNDEFINED_HASH_OFFSET;
+            }   
+        }
+    }
+
+    return RULES_OK;
+}
+
+static unsigned int handleBetaMessage(ruleset *tree, 
+                                      stateNode *state,
+                                      node *betaNode,
+                                      jsonObject *messageObject,
+                                      unsigned int currentMessageOffset) { 
+    
+    if (betaNode->value.b.isFirst && !betaNode->value.b.not) {
+        node *nextNode = &tree->nodePool[betaNode->value.b.nextOffset];
+        return handleBetaFrame(tree,
+                               state,
+                               currentMessageOffset,
+                               betaNode, 
+                               nextNode,
+                               NULL);
+    }
+
+    frameLocation rightFrameLocation;
+    rightFrameNode *rightFrame;
+
+    CHECK_RESULT(createRightFrame(state,
+                                  betaNode,
+                                  &rightFrame,
+                                  &rightFrameLocation));
+
+    //TODO get real message hash
+    unsigned int messageHash = fnv1Hash32("1", 1);
+    rightFrame->messageOffset = currentMessageOffset;
+    CHECK_RESULT(appendFrameLocation(state,
+                                     rightFrameLocation,
+                                     currentMessageOffset));
+
+    CHECK_RESULT(setRightFrame(state,
+                               messageHash,
+                               rightFrameLocation)); 
+
+    if (betaNode->value.b.not) {
+        return handleFilterFrames(tree,
+                                  state,
+                                  betaNode,
+                                  messageObject,
+                                  currentMessageOffset,
+                                  messageHash);
+    } 
+
+    return handleMatchFrames(tree,
+                             state,
+                             betaNode,
+                             messageObject,
+                             currentMessageOffset,
+                             messageHash);
 }
 
 
@@ -1153,64 +1327,6 @@ static unsigned int handleAlpha(ruleset *tree,
     return ERR_EVENT_NOT_HANDLED;
 }
 
-static unsigned int handleDeleteMessage(stateNode *state,
-                                        unsigned int messageOffset) {
-    messageNode *node = MESSAGE_NODE(state, messageOffset);
-    unsigned int result = deleteMessage(state, messageOffset);
-    if (result == ERR_NODE_DELETED) {
-        return RULES_OK;
-    } else if (result != RULES_OK) {
-        return result;
-    }
-
-    for (unsigned int i = 0; i < node->locationCount; ++i) {
-        leftFrameNode *frame = NULL;
-
-        switch(node->locations[i].frameType) {
-            case LEFT_FRAME:
-                frame = LEFT_FRAME_NODE(state, 
-                                        node->locations[i].nodeIndex,
-                                        node->locations[i].frameOffset);
-                
-                result = deleteLeftFrame(state, node->locations[i]);
-                if (result != RULES_OK && result != ERR_NODE_DELETED) {
-                    return result;
-                }
-
-                break;
-            case ACTION_FRAME:
-                frame = ACTION_FRAME_NODE(state, 
-                                          node->locations[i].nodeIndex,
-                                          node->locations[i].frameOffset);
-
-                result = deleteActionFrame(state, node->locations[i]);
-                if (result != RULES_OK && result != ERR_NODE_DELETED) {
-                    return result;
-                }
-
-                break;
-            case RIGHT_FRAME:
-                result = deleteRightFrame(state, node->locations[i]);
-                if (result != RULES_OK && result != ERR_NODE_DELETED) {
-                    return result;
-                }
-
-                break;
-        }
-
-        if (frame != NULL) {
-            for (int i = 0; i < frame->messageCount; ++i) {
-                messageFrame *currentFrame = &frame->messages[frame->reverseIndex[i]]; 
-                CHECK_RESULT(deleteLocationFromMessage(state,
-                                                       currentFrame->messageNodeOffset,
-                                                       node->locations[i]));
-            }
-        }
-    }
-
-    return RULES_OK;
-}
-
 static unsigned int handleMessageCore(ruleset *tree,
                                       jsonObject *jo, 
                                       unsigned char actionType,
@@ -1254,12 +1370,13 @@ static unsigned int handleMessageCore(ruleset *tree,
                                  &isNewState, 
                                  &sidState));
 
-    if (actionType == ACTION_RETRACT_FACT) {
+    if (actionType == ACTION_RETRACT_FACT || actionType == ACTION_RETRACT_EVENT) {
         CHECK_RESULT(getMessage(sidState,
                                 mid,
                                 messageOffset));
 
-        CHECK_RESULT(handleDeleteMessage(sidState,
+        CHECK_RESULT(handleDeleteMessage(tree,
+                                         sidState,
                                          *messageOffset));
 
     } else {
@@ -1323,8 +1440,7 @@ static unsigned int handleMessage(ruleset *tree,
                                  NULL, 
                                  NULL, 
                                  actionType == ACTION_ASSERT_FACT || 
-                                 actionType == ACTION_RETRACT_FACT || 
-                                 actionType == ACTION_REMOVE_FACT,
+                                 actionType == ACTION_RETRACT_FACT,
                                  &jo, 
                                  &next));
     
@@ -1360,8 +1476,7 @@ static unsigned int handleMessages(ruleset *tree,
                            NULL, 
                            NULL, 
                            actionType == ACTION_ASSERT_FACT || 
-                           actionType == ACTION_RETRACT_FACT || 
-                           actionType == ACTION_REMOVE_FACT,
+                           actionType == ACTION_RETRACT_FACT,
                            &jo,
                            &last) == RULES_OK) {
 
@@ -1610,7 +1725,7 @@ unsigned int retractEvent(unsigned int handle, char *message) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    return executeHandleMessage(tree, message, ACTION_REMOVE_EVENT);
+    return executeHandleMessage(tree, message, ACTION_RETRACT_EVENT);
 }
 
 unsigned int startAssertFact(unsigned int handle, 
@@ -1652,7 +1767,7 @@ unsigned int retractFact(unsigned int handle, char *message) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    return executeHandleMessage(tree, message, ACTION_REMOVE_FACT);
+    return executeHandleMessage(tree, message, ACTION_RETRACT_FACT);
 }
 
 unsigned int startRetractFact(unsigned int handle, 
@@ -1662,7 +1777,7 @@ unsigned int startRetractFact(unsigned int handle,
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    return startHandleMessage(tree, message, ACTION_REMOVE_FACT, rulesBinding, replyCount);
+    return startHandleMessage(tree, message, ACTION_RETRACT_FACT, rulesBinding, replyCount);
 }
 
 unsigned int retractFacts(unsigned int handle, 
@@ -1670,7 +1785,7 @@ unsigned int retractFacts(unsigned int handle,
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    return executeHandleMessages(tree, messages, ACTION_REMOVE_FACT);
+    return executeHandleMessages(tree, messages, ACTION_RETRACT_FACT);
 }
 
 unsigned int startRetractFacts(unsigned int handle, 
@@ -1680,7 +1795,7 @@ unsigned int startRetractFacts(unsigned int handle,
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    return startHandleMessages(tree, messages, ACTION_REMOVE_FACT, rulesBinding, replyCount);
+    return startHandleMessages(tree, messages, ACTION_RETRACT_FACT, rulesBinding, replyCount);
 }
 
 unsigned int assertState(unsigned int handle, char *sid, char *state) {
@@ -1814,30 +1929,29 @@ unsigned int startAction(unsigned int handle,
     return RULES_OK;
 }
 
-static unsigned int deleteCurrentAction(stateNode *state,
+static unsigned int deleteCurrentAction(ruleset *tree,
+                                        stateNode *state,
                                         unsigned int actionStateIndex) {
+    leftFrameNode *resultFrame;
+    frameLocation resultLocation;
+    CHECK_RESULT(getActionFrame(state,
+                                actionStateIndex,
+                                &resultLocation,
+                                &resultFrame));
 
-    actionStateNode *resultStateNode = &state->actionState[actionStateIndex];
-    unsigned int resultFrameOffset = resultStateNode->resultIndex[0];
-    leftFrameNode *resultFrame = RESULT_FRAME(resultStateNode, 
-                                              resultFrameOffset);
     for (int i = 0; i < resultFrame->messageCount; ++i) {
         messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
         messageNode *currentMessageNode = MESSAGE_NODE(state, 
                                                        currentMessageFrame->messageNodeOffset);
 
         if (currentMessageNode->messageType == MESSAGE_TYPE_EVENT) {
-            CHECK_RESULT(handleDeleteMessage(state, 
+            CHECK_RESULT(handleDeleteMessage(tree,
+                                             state, 
                                              currentMessageFrame->messageNodeOffset));
         }
     }
 
-    frameLocation location;
-    location.frameOffset = resultFrameOffset;
-    location.frameType = ACTION_FRAME;
-    location.nodeIndex = actionStateIndex;
-    unsigned int result = deleteActionFrame(state,
-                                            location);
+    unsigned int result = deleteActionFrame(state, resultLocation);
     if (result != RULES_OK && result != ERR_NODE_DELETED) {
         return result;
     }
@@ -1858,7 +1972,8 @@ unsigned int completeAction(unsigned int handle,
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
     actionContext *context = (actionContext*)actionHandle;
-    CHECK_RESULT(deleteCurrentAction(context->resultState, 
+    CHECK_RESULT(deleteCurrentAction(tree,
+                                     context->resultState, 
                                      context->actionStateIndex));
     
     char *commands[MAX_COMMAND_COUNT];
@@ -1897,7 +2012,8 @@ unsigned int completeAndStartAction(unsigned int handle,
     RESOLVE_HANDLE(handle, &tree);
     actionContext *context = (actionContext*)actionHandle;
 
-    CHECK_RESULT(deleteCurrentAction(context->resultState, 
+    CHECK_RESULT(deleteCurrentAction(tree,
+                                     context->resultState, 
                                      context->actionStateIndex));
 
     *messages = NULL;
