@@ -155,6 +155,29 @@ d.ruleset('risk2_2', function() {
     }
 });
 
+d.ruleset('expense2', function() {
+    whenAll: m.amount < 100
+    count: 3
+    run: console.log('expense2 approved ' + JSON.stringify(m));
+
+    whenAll: {
+        expense = m.amount >= 100
+        approval = m.review == true
+    }
+    cap: 2
+    run: console.log('expense2 rejected ' + JSON.stringify(m));
+
+    whenStart: {
+        postBatch('expense2', { amount: 10 },
+                             { amount: 20 },
+                             { amount: 100 },
+                             { amount: 30 },
+                             { amount: 200 },
+                             { amount: 400 });
+        assert('expense2', { review: true })
+    }
+});
+
 // d.ruleset('expense1', function() {
 //     whenAny: {
 //         whenAll: {
@@ -226,28 +249,6 @@ d.ruleset('risk2_2', function() {
 //     whenStart: patchState('flow0', {state: 'start'})
 // });
 
-// d.ruleset('expense2', function() {
-//     whenAll: m.amount < 100
-//     count: 3
-//     run: console.log('expense2 approved ' + JSON.stringify(m));
-
-//     whenAll: {
-//         expense = m.amount >= 100
-//         approval = m.review == true
-//     }
-//     cap: 2
-//     run: console.log('expense2 rejected ' + JSON.stringify(m));
-
-//     whenStart: {
-//         postBatch('expense2', { amount: 10 },
-//                              { amount: 20 },
-//                              { amount: 100 },
-//                              { amount: 30 },
-//                              { amount: 200 },
-//                              { amount: 400 });
-//         assert('expense2', { review: true })
-//     }
-// });
     
 // d.ruleset('flow1', function() {
 //     whenAll: s.state == 'first'

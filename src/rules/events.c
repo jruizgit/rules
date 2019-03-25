@@ -658,14 +658,14 @@ static unsigned int handleAction(ruleset *tree,
                                  stateNode *state, 
                                  node *node,
                                  leftFrameNode *frame) {
-    printf("handle action %s\n", &tree->stringPool[node->nameOffset]);
-    printf("frame\n");
-    for (int i = 0; i < MAX_MESSAGE_FRAMES; ++i) {
-        if (frame->messages[i].hash) {
-            messageNode *node = MESSAGE_NODE(state, frame->messages[i].messageNodeOffset);
-            printf("    -> %s\n", node->jo.content);
-        }
-    }
+    // printf("handle action %s\n", &tree->stringPool[node->nameOffset]);
+    // printf("frame\n");
+    // for (int i = 0; i < MAX_MESSAGE_FRAMES; ++i) {
+    //     if (frame->messages[i].hash) {
+    //         messageNode *node = MESSAGE_NODE(state, frame->messages[i].messageNodeOffset);
+    //         printf("    -> %s\n", node->jo.content);
+    //     }
+    // }
     return RULES_OK;
 }
 
@@ -1932,28 +1932,41 @@ unsigned int startAction(unsigned int handle,
 static unsigned int deleteCurrentAction(ruleset *tree,
                                         stateNode *state,
                                         unsigned int actionStateIndex) {
-    leftFrameNode *resultFrame;
-    frameLocation resultLocation;
-    CHECK_RESULT(getActionFrame(state,
-                                actionStateIndex,
-                                &resultLocation,
-                                &resultFrame));
 
-    for (int i = 0; i < resultFrame->messageCount; ++i) {
-        messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
-        messageNode *currentMessageNode = MESSAGE_NODE(state, 
-                                                       currentMessageFrame->messageNodeOffset);
-
-        if (currentMessageNode->messageType == MESSAGE_TYPE_EVENT) {
-            CHECK_RESULT(handleDeleteMessage(tree,
-                                             state, 
-                                             currentMessageFrame->messageNodeOffset));
-        }
+    unsigned int count;
+    actionStateNode *actionNode = &state->actionState[actionStateIndex];
+    if (actionNode->reteNode->value.c.count) {
+        count = actionNode->reteNode->value.c.count;
+    } else {
+        count = (actionNode->reteNode->value.c.cap > actionNode->resultPool.count ? 
+                 actionNode->resultPool.count : 
+                 actionNode->reteNode->value.c.cap);
     }
 
-    unsigned int result = deleteActionFrame(state, resultLocation);
-    if (result != RULES_OK && result != ERR_NODE_DELETED) {
-        return result;
+    for (unsigned int currentCount = 0; currentCount < count; ++currentCount) {
+        leftFrameNode *resultFrame;
+        frameLocation resultLocation;    
+        CHECK_RESULT(getActionFrame(state,
+                                    actionStateIndex,
+                                    &resultLocation,
+                                    &resultFrame));
+
+        for (int i = 0; i < resultFrame->messageCount; ++i) {
+            messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
+            messageNode *currentMessageNode = MESSAGE_NODE(state, 
+                                                           currentMessageFrame->messageNodeOffset);
+
+            if (currentMessageNode->messageType == MESSAGE_TYPE_EVENT) {
+                CHECK_RESULT(handleDeleteMessage(tree,
+                                                 state, 
+                                                 currentMessageFrame->messageNodeOffset));
+            }
+        }
+
+        unsigned int result = deleteActionFrame(state, resultLocation);
+        if (result != RULES_OK && result != ERR_NODE_DELETED) {
+            return result;
+        }
     }
 
     return RULES_OK;

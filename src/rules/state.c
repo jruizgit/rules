@@ -344,7 +344,7 @@ unsigned int createActionFrame(stateNode *state,
                                *newLocation));
     
     *newNode = targetNode;
-    state->betaState[reteNode->value.c.index].reteNode = reteNode;
+    state->actionState[reteNode->value.c.index].reteNode = reteNode;
     return RULES_OK;
 }
 
@@ -548,8 +548,6 @@ static unsigned int getResultFrameLength(ruleset *tree,
                                          stateNode *state, 
                                          leftFrameNode *frame) {
     unsigned int resultLength = 2;
-    char *actionName = &tree->stringPool[frame->nameOffset];
-    resultLength += strlen(actionName) + 5;
     for (int i = 0; i < frame->messageCount; ++i) {
         messageFrame *currentFrame = &frame->messages[frame->reverseIndex[i]]; 
         messageNode *currentNode = MESSAGE_NODE(state, currentFrame->messageNodeOffset);
@@ -568,17 +566,13 @@ static unsigned int getResultFrameLength(ruleset *tree,
 static void serializeResultFrame(ruleset *tree, 
                                  stateNode *state, 
                                  leftFrameNode *frame, 
-                                 char *resultMessage) {
-    char *actionName = &tree->stringPool[frame->nameOffset];
-    unsigned int tupleLength = strlen(actionName) + 6;
-    #ifdef _WIN32
-        sprintf_s(resultMessage, tupleLength, "{\"%s\":{", actionName);
-    #else
-        snprintf(resultMessage, tupleLength, "{\"%s\":{", actionName);
-    #endif
-    resultMessage += (tupleLength - 1); 
-
+                                 char *first,
+                                 char **last) {
+    
+    first[0] = '{'; 
+    ++first;
     for (int i = 0; i < frame->messageCount; ++i) {
+        unsigned int tupleLength;
         messageFrame *currentFrame = &frame->messages[frame->reverseIndex[i]]; 
         messageNode *currentNode = MESSAGE_NODE(state, currentFrame->messageNodeOffset);
         char *name = &tree->stringPool[currentFrame->nameOffset];
@@ -586,45 +580,122 @@ static void serializeResultFrame(ruleset *tree,
         if (i < (frame->messageCount -1)) {
             tupleLength = strlen(name) + strlen(value) + 5;
             #ifdef _WIN32
-                sprintf_s(resultMessage, tupleLength, "\"%s\":%s,", name, value);
+                sprintf_s(first, tupleLength, "\"%s\":%s,", name, value);
             #else
-                snprintf(resultMessage, tupleLength, "\"%s\":%s,", name, value);
+                snprintf(first, tupleLength, "\"%s\":%s,", name, value);
             #endif
         } else {
             tupleLength = strlen(name) + strlen(value) + 4;
             #ifdef _WIN32
-                sprintf_s(resultMessage, tupleLength, "\"%s\":%s", name, value);
+                sprintf_s(first, tupleLength, "\"%s\":%s", name, value);
             #else
-                snprintf(resultMessage, tupleLength, "\"%s\":%s", name, value);
+                snprintf(first, tupleLength, "\"%s\":%s", name, value);
             #endif
         }
 
-        resultMessage += (tupleLength - 1); 
+        first += (tupleLength - 1); 
     }
 
-    resultMessage[0] = '}';
-    resultMessage[1] = '}';
+    first[0] = '}';
+    *last = first + 1;
 }
 
 unsigned int serializeResult(void *tree, 
                              stateNode *state, 
                              actionStateNode *actionNode, 
                              char **result) {
-    leftFrameNode *resultFrame = RESULT_FRAME(actionNode, actionNode->resultIndex[0]);
-    unsigned int resultLength = getResultFrameLength(tree, 
-                                                     state, 
-                                                     resultFrame) + 1;
-    *result = malloc(resultLength * sizeof(char));
-    if (!*result) {
-        return ERR_OUT_OF_MEMORY;
+    unsigned int count;
+    if (actionNode->reteNode->value.c.count) {
+        count = actionNode->reteNode->value.c.count;
+    } else {
+        count = (actionNode->reteNode->value.c.cap > actionNode->resultPool.count ? 
+                 actionNode->resultPool.count : 
+                 actionNode->reteNode->value.c.cap);
     }
 
-    char *first = *result;
-    first[resultLength - 1] = 0;
-    serializeResultFrame(tree, 
-                         state, 
-                         resultFrame, 
-                         first);
+    if (actionNode->reteNode->value.c.count && count == 1) {
+        leftFrameNode *resultFrame = RESULT_FRAME(actionNode, actionNode->resultIndex[0]);
+        char *actionName = &((ruleset *)tree)->stringPool[resultFrame->nameOffset];
+        unsigned int resultLength = strlen(actionName) + 6 + getResultFrameLength(tree, 
+                                                                                  state, 
+                                                                                  resultFrame);
+        *result = malloc(resultLength * sizeof(char));
+        if (!*result) {
+            return ERR_OUT_OF_MEMORY;
+        }
+
+        char *first = *result;
+        // +1 to leave space for the 0 character
+        unsigned int tupleLength = strlen(actionName) + 5;
+#ifdef _WIN32
+        sprintf_s(first, tupleLength, "{\"%s\":", actionName);
+#else
+        snprintf(first, tupleLength, "{\"%s\":", actionName);
+#endif
+        first += tupleLength - 1;
+
+        char *last;
+        serializeResultFrame(tree, 
+                             state, 
+                             resultFrame, 
+                             first,
+                             &last);
+        last[0] = '}';
+        last[1] = 0;
+    } else {
+        leftFrameNode *resultFrame = RESULT_FRAME(actionNode, actionNode->resultIndex[0]);
+        char *actionName = &((ruleset *)tree)->stringPool[resultFrame->nameOffset];
+        unsigned int resultLength = strlen(actionName) + 8;
+        for (unsigned int currentCount = 0; currentCount < count; ++currentCount) {
+            resultLength += 1 + getResultFrameLength(tree, 
+                                                     state, 
+                                                     resultFrame);
+
+            if (resultFrame->nextOffset != UNDEFINED_HASH_OFFSET) {
+                resultFrame = RESULT_FRAME(actionNode, resultFrame->nextOffset);
+            }
+        }
+
+        *result = malloc(resultLength * sizeof(char));
+        if (!*result) {
+            return ERR_OUT_OF_MEMORY;
+        }
+
+        char *first = *result;
+        // +1 to leave space for the 0 character
+        unsigned int tupleLength = strlen(actionName) + 5;
+#ifdef _WIN32
+        sprintf_s(first, tupleLength, "{\"%s\":", actionName);
+#else
+        snprintf(first, tupleLength, "{\"%s\":", actionName);
+#endif
+        first[tupleLength - 1] = '[';
+        first += tupleLength ;
+
+        char *last;
+        resultFrame = RESULT_FRAME(actionNode, actionNode->resultIndex[0]);
+        for (unsigned int currentCount = 0; currentCount < count; ++currentCount) {
+            serializeResultFrame(tree, 
+                                 state, 
+                                 resultFrame, 
+                                 first,
+                                 &last);
+
+            if (resultFrame->nextOffset != UNDEFINED_HASH_OFFSET) {
+                resultFrame = RESULT_FRAME(actionNode, resultFrame->nextOffset);
+            }
+
+            if (currentCount < count - 1) {
+                last[0] = ',';
+                first = last + 1;
+            }
+        }
+
+        last[0] = ']';
+        last[1] = '}';
+        last[2] = 0;
+    }
+
     return RULES_OK;
 }
 
@@ -655,7 +726,8 @@ unsigned int getNextResult(void *tree,
         stateNode *state = STATE_NODE(tree, nodeOffset); 
         for (unsigned int index = 0; index < rulesetTree->actionCount; ++index) {
             actionStateNode *actionNode = &state->actionState[index];
-            if (actionNode->resultPool.count) {
+            if ((actionNode->reteNode->value.c.cap && actionNode->resultPool.count) ||
+                (actionNode->reteNode->value.c.count && actionNode->resultPool.count >= actionNode->reteNode->value.c.count)) {
                 *resultState = state;
                 *resultAction = actionNode;
                 *actionIndex = index;
