@@ -137,6 +137,7 @@ unsigned int registerTimer(void *rulesBinding,
                            char *timer);
 
 unsigned int removeTimer(void *rulesBinding, 
+                         char *sid, 
                          char *timerName);
 
 unsigned int registerMessage(void *rulesBinding, 

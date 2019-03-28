@@ -533,11 +533,14 @@ static unsigned int loadRemoveTimerCommand(ruleset *tree, binding *rulesBinding)
     char *lua = NULL;
     if (asprintf(&lua,
 "local timer_key = \"%s!t\"\n"
-"local timer_name = ARGV[1]\n"
+"local sid = ARGV[1]\n"
+"local timer_name = ARGV[2]\n"
 "local res = redis.call(\"zrange\", timer_key, 0, -1)\n"
 "for i = 1, #res, 1 do\n"
 "    if string.find(res[i], \"\\\"%%$t\\\"%%s*:%%s*\\\"\" .. timer_name .. \"\\\"\") then\n"
-"        redis.call(\"zrem\", timer_key, res[i])\n"
+"        if string.find(res[i], \"\\\"sid\\\"%%s*:%%s*\\\"\" .. sid .. \"\\\"\") then\n"
+"            redis.call(\"zrem\", timer_key, res[i])\n"
+"        end\n"
 "    end\n"
 "end\n"
 "return 0\n", name)  == -1) {
@@ -3124,12 +3127,13 @@ unsigned int registerTimer(void *rulesBinding, unsigned int duration, char asser
     return RULES_OK;
 }
 
-unsigned int removeTimer(void *rulesBinding, char *timerName) {
+unsigned int removeTimer(void *rulesBinding, char *sid, char *timerName) {
     binding *currentBinding = (binding*)rulesBinding;
     redisContext *reContext = currentBinding->reContext;   
     int result = redisAppendCommand(reContext, 
-                                    "evalsha %s 0 %s", 
+                                    "evalsha %s 0 %s %s", 
                                     currentBinding->removeTimerHash,
+                                    sid,
                                     timerName); 
     VERIFY(result, "removeTimer");  
     return RULES_OK;

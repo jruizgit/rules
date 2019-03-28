@@ -2081,7 +2081,7 @@ unsigned int cancelTimer(unsigned int handle, char *sid, char *timerName) {
         return result;
     }
 
-    return removeTimer(rulesBinding, timerName);
+    return removeTimer(rulesBinding, sid, timerName);
 }
 
 unsigned int renewActionLease(unsigned int handle, char *sid) {
