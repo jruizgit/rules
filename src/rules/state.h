@@ -125,17 +125,25 @@ typedef struct betaStateNode {
     unsigned int rightFrameIndex[MAX_RIGHT_FRAME_INDEX_LENGTH];
 } betaStateNode;
 
+typedef struct actionContext {
+    unsigned int actionStateIndex;
+    char *messages;
+    char *stateFact;
+} actionContext;
+
 typedef struct stateNode {
+    unsigned int offset;
     unsigned int prevOffset;
     unsigned int nextOffset;
+    unsigned int factOffset;
     unsigned int hash;
     unsigned char isActive;
     unsigned int bindingIndex;
-    unsigned int factOffset;
     pool messagePool;
     unsigned int messageIndex[MAX_MESSAGE_INDEX_LENGTH];
     betaStateNode *betaState;
     actionStateNode *actionState; 
+    actionContext context;
 } stateNode;
 
 
@@ -267,9 +275,12 @@ unsigned int serializeResult(void *tree,
 unsigned int serializeState(stateNode *state, 
                             char **stateFact);
 
+unsigned int getNextResultInState(void *tree, 
+                                  stateNode *state, 
+                                  actionStateNode **resultAction);
+
 unsigned int getNextResult(void *tree, 
                            stateNode **resultState, 
-                           unsigned int *actionIndex,
                            actionStateNode **resultAction);
 
 

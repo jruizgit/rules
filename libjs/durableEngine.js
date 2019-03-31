@@ -497,8 +497,9 @@ exports = module.exports = durableEngine = function () {
             return r.retractFacts(handle, JSON.stringify(facts));
         };
 
-        that.assertState = function (state) {
-            return r.assertState(handle, state.sid, JSON.stringify(state));
+        that.updateState = function (state) {
+            state['$s'] = 1;
+            return r.updateState(handle, state.sid, JSON.stringify(state));
         };
 
         that.startTimer = function (sid, timer, timerDuration, manualReset) {
@@ -555,14 +556,12 @@ exports = module.exports = durableEngine = function () {
 
         that.dispatch = function (complete, asyncResult) {
             var state = null;
-            var actionHandle = null;
-            var actionBinding = null;
+            var stateOffset = null;
             var resultContainer = {};
             if (asyncResult) {
                 state = asyncResult[0];
                 resultContainer = {'message': JSON.parse(asyncResult[1])};
-                actionHandle = asyncResult[2];
-                actionBinding = asyncResult[3];
+                stateOffset = asyncResult[2];
             } else {
                 try {
                     var result = r.startAction(handle);
@@ -572,8 +571,7 @@ exports = module.exports = durableEngine = function () {
                     } else { 
                         state = JSON.parse(result[0]);
                         resultContainer = {'message': JSON.parse(result[1])};
-                        actionHandle = result[2];
-                        actionBinding = result[3];
+                        stateOffset = result[2];
                     }
                 } catch (reason) {
                     complete(reason);
@@ -593,7 +591,7 @@ exports = module.exports = durableEngine = function () {
                     resultContainer['async'] = null;
                 }
 
-                var c = closure(host, state, message, actionHandle, name);
+                var c = closure(host, state, message, stateOffset, name);
                 actions[actionName].run(c, function (err, c) {
                     if (err) {
                         r.abandonAction(handle, c.getHandle());
@@ -616,8 +614,8 @@ exports = module.exports = durableEngine = function () {
                             try {
                                 var rulesetName;
                                 var facts;
-                                var bindingReplies;
-                                var binding = 0;
+                                var stateReplies;
+                                var currentStateOffset = 0;
                                 var replies = 0;
                                 var pending = {};
                                 
@@ -658,75 +656,78 @@ exports = module.exports = durableEngine = function () {
                                 }
 
                                 var retractFacts = c.getRetract();
-                                pending[actionBinding] = 0;
+                                pending[stateOffset] = 0;
                                 for (rulesetName in retractFacts) {
                                     facts = retractFacts[rulesetName];
                                     if (facts.length == 1) {
-                                        bindingReplies = host.startRetract(rulesetName, facts[0]);
+                                        stateReplies = host.startRetract(rulesetName, facts[0]);
                                     } else {
-                                        bindingReplies = host.startRetractFacts(rulesetName, facts);
+                                        stateReplies = host.startRetractFacts(rulesetName, facts);
                                     }
-                                    binding = bindingReplies[0];
-                                    replies = bindingReplies[1];
+                                    currentStateOffset = stateReplies[0];
+                                    replies = stateReplies[1];
 
-                                    if (pending[binding]) {
-                                        pending[binding] = pending[binding] + replies;
+                                    if (pending[currentStateOffset]) {
+                                        pending[currentStateOffset] = pending[currentStateOffset] + replies;
                                     } else {
-                                        pending[binding] = replies;
+                                        pending[currentStateOffset] = replies;
                                     }
                                 }
                                 var assertFacts = c.getFacts();
                                 for (rulesetName in assertFacts) {
                                     facts = assertFacts[rulesetName];
                                     if (facts.length == 1) {
-                                        bindingReplies = host.startAssert(rulesetName, facts[0]);
+                                        stateReplies = host.startAssert(rulesetName, facts[0]);
                                     } else {
-                                        bindingReplies = host.startAssertFacts(rulesetName, facts);
+                                        stateReplies = host.startAssertFacts(rulesetName, facts);
                                     }
-                                    binding = bindingReplies[0];
-                                    replies = bindingReplies[1];
+                                    currentStateOffset = stateReplies[0];
+                                    replies = stateReplies[1];
 
-                                    if (pending[binding]) {
-                                        pending[binding] = pending[binding] + replies;
+                                    if (pending[currentStateOffset]) {
+                                        pending[currentStateOffset] = pending[currentStateOffset] + replies;
                                     } else {
-                                        pending[binding] = replies;
+                                        pending[currentStateOffset] = replies;
                                     }
                                 }
                                 var postEvents = c.getEvents();
                                 for (rulesetName in postEvents) {
                                     var events = postEvents[rulesetName];
                                     if (events.length == 1) {
-                                        bindingReplies = host.startPost(rulesetName, events[0]);
+                                        stateReplies = host.startPost(rulesetName, events[0]);
                                     } else {
-                                        bindingReplies = host.startPostBatch(rulesetName, events);
+                                        stateReplies = host.startPostBatch(rulesetName, events);
                                     }
-                                    binding = bindingReplies[0];
-                                    replies = bindingReplies[1];
-                                    if (pending[binding]) {
-                                        pending[binding] = pending[binding] + replies;
+                                    currentStateOffset = stateReplies[0];
+                                    replies = stateReplies[1];
+
+                                    if (pending[currentStateOffset]) {
+                                        pending[currentStateOffset] = pending[currentStateOffset] + replies;
                                     } else {
-                                        pending[binding] = replies;
+                                        pending[currentStateOffset] = replies;
                                     }
                                 }
-                                bindingReplies = r.startUpdateState(handle, c.getHandle(), JSON.stringify(c.s));
-                                binding = bindingReplies[0];
-                                replies = bindingReplies[1];
-                                if (pending[binding]) {
-                                    pending[binding] = pending[binding] + replies;
+                                stateReplies = r.startUpdateState(handle, JSON.stringify(c.s));
+                                currentStateOffset = stateReplies[0];
+                                replies = stateReplies[1];
+
+                                if (pending[currentStateOffset]) {
+                                    pending[currentStateOffset] = pending[currentStateOffset] + replies;
                                 } else {
-                                    pending[binding] = replies;
+                                    pending[currentStateOffset] = replies;
                                 }
-                                for (binding in pending) {
-                                    replies = pending[binding];
-                                    binding = parseInt(binding);
-                                    if (binding) {
-                                        if (binding != actionBinding) {
-                                            r.complete(binding, replies);
+
+                                for (currentStateOffset in pending) {
+                                    replies = pending[currentStateOffset];
+                                    currentStateOffset = parseInt(currentStateOffset);
+                                    if (currentStateOffset) {
+                                        if (currentStateOffset != stateOffset) {
+                                            r.complete(currentStateOffset, replies);
                                         } else {
                                             var newResult = r.completeAndStartAction(handle, replies, c.getHandle());
                                             if (newResult) {
                                                 if (resultContainer['async']) {
-                                                    that.dispatch(function (e) {}, [state, newResult, actionHandle, actionBinding]);
+                                                    that.dispatch(function (e) {}, [state, newResult, stateOffset]);
                                                 } else {
                                                     resultContainer['message'] = JSON.parse(newResult);
                                                 }
@@ -1270,7 +1271,7 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.patchState = function (rulesetName, state) {
-            return that.getRuleset(rulesetName).assertState(state);
+            return that.getRuleset(rulesetName).updateState(state);
         };
 
         that.renewActionLease = function (rulesetName, sid) {

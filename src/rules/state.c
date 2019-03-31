@@ -515,6 +515,7 @@ unsigned int ensureStateNode(void *tree,
         SET(stateNode, rulesetTree->stateIndex, MAX_STATE_INDEX_LENGTH, rulesetTree->statePool, sidHash, nodeOffset);
         rulesetTree->reverseStateIndex[rulesetTree->statePool.count - 1] = nodeOffset;
         stateNode *node = STATE_NODE(tree, nodeOffset); 
+        node->offset = nodeOffset;
     
         CHECK_RESULT(getBindingIndex(tree, sidHash, &node->bindingIndex));
         INIT(messageNode, node->messagePool, MAX_MESSAGE_NODES);
@@ -713,28 +714,41 @@ unsigned int serializeState(stateNode *state,
     return RULES_OK;
 }
 
+unsigned int getNextResultInState(void *tree, 
+                                  stateNode *state, 
+                                  actionStateNode **resultAction) {
+
+    ruleset *rulesetTree = (ruleset*)tree;
+    *resultAction = NULL;
+    for (unsigned int index = 0; index < rulesetTree->actionCount; ++index) {
+        actionStateNode *actionNode = &state->actionState[index];
+        if ((actionNode->reteNode->value.c.cap && actionNode->resultPool.count) ||
+            (actionNode->reteNode->value.c.count && actionNode->resultPool.count >= actionNode->reteNode->value.c.count)) {
+            *resultAction = actionNode;
+            state->context.actionStateIndex = index;
+            return RULES_OK;
+        }
+    }
+
+    return ERR_NO_ACTION_AVAILABLE;
+}
 
 unsigned int getNextResult(void *tree, 
                            stateNode **resultState, 
-                           unsigned int *actionIndex,
                            actionStateNode **resultAction) {
     unsigned int count = 0;
     ruleset *rulesetTree = (ruleset*)tree;
     *resultAction = NULL;
     while (count < rulesetTree->statePool.count && !*resultAction) {
         unsigned int nodeOffset = rulesetTree->reverseStateIndex[rulesetTree->currentStateIndex];
-        stateNode *state = STATE_NODE(tree, nodeOffset); 
-        for (unsigned int index = 0; index < rulesetTree->actionCount; ++index) {
-            actionStateNode *actionNode = &state->actionState[index];
-            if ((actionNode->reteNode->value.c.cap && actionNode->resultPool.count) ||
-                (actionNode->reteNode->value.c.count && actionNode->resultPool.count >= actionNode->reteNode->value.c.count)) {
-                *resultState = state;
-                *resultAction = actionNode;
-                *actionIndex = index;
-                return RULES_OK;
-            }
+        *resultState = STATE_NODE(tree, nodeOffset); 
+        unsigned int result = getNextResultInState(tree,
+                                                   *resultState,
+                                                   resultAction);
+        if (result != ERR_NO_ACTION_AVAILABLE) {
+            return result;
         }
-
+        
         rulesetTree->currentStateIndex = (rulesetTree->currentStateIndex + 1) % rulesetTree->statePool.count;
         ++count;
     }
@@ -1087,19 +1101,21 @@ unsigned int deleteState(unsigned int handle, char *sid) {
     if (!sid) {
         sid = "0";
     }
-
-    void *rulesBinding = NULL;
-    unsigned int result = resolveBinding(tree, sid, &rulesBinding);
-    if (result != RULES_OK) {
-      return result;
-    }
-
     unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
-    result = deleteSession(tree, rulesBinding, sid, sidHash);
-    if (result != RULES_OK) {
-      return result;
-    }
+    unsigned int nodeOffset;
 
-    DELETE(stateNode, tree->stateIndex, MAX_STATE_INDEX_LENGTH, tree->statePool, sidHash);
+    GET(stateNode, 
+        tree->stateIndex, 
+        MAX_STATE_INDEX_LENGTH, 
+        ((ruleset*)tree)->statePool, 
+        sidHash, 
+        nodeOffset);
+
+    DELETE(stateNode, 
+           tree->stateIndex, 
+           MAX_STATE_INDEX_LENGTH, 
+           tree->statePool, 
+           nodeOffset);
+
     return RULES_OK;
 }

@@ -178,6 +178,29 @@ d.ruleset('expense2', function() {
     }
 });
 
+d.ruleset('flow0', function() {
+    whenAll: s.state == 'start'
+    run: {
+        s.state = 'next';
+        console.log('flow0 start');
+    }
+
+    whenAll: s.state == 'next'
+    run: {
+        s.state = 'last';
+        console.log('flow0 next');
+    }
+
+    whenAll: s.state == 'last'
+    run: {
+        s.state = 'end';
+        console.log('flow0 last');
+        deleteState();
+    }
+
+    whenStart: patchState('flow0', {state: 'start'})
+});
+
 // d.ruleset('expense1', function() {
 //     whenAny: {
 //         whenAll: {
@@ -226,28 +249,7 @@ d.ruleset('expense2', function() {
 //     }
 // });
 
-// d.ruleset('flow0', function() {
-//     whenAll: s.state == 'start'
-//     run: {
-//         s.state = 'next';
-//         console.log('flow0 start');
-//     }
 
-//     whenAll: s.state == 'next'
-//     run: {
-//         s.state = 'last';
-//         console.log('flow0 next');
-//     }
-
-//     whenAll: s.state == 'last'
-//     run: {
-//         s.state = 'end';
-//         console.log('flow0 last');
-//         deleteState();
-//     }
-
-//     whenStart: patchState('flow0', {state: 'start'})
-// });
 
     
 // d.ruleset('flow1', function() {

@@ -160,7 +160,7 @@ void jsComplete(const FunctionCallbackInfo<v8::Value>& args) {
     } else if (!args[0]->IsNumber() || !args[1]->IsNumber()) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
-        unsigned int result = complete((void *)args[0]->IntegerValue(),
+        unsigned int result = complete(args[0]->IntegerValue(),
                                        args[1]->IntegerValue());
         if (result != RULES_OK) {
             char *message = NULL;
@@ -183,14 +183,14 @@ void jsStartAssertEvent(const FunctionCallbackInfo<v8::Value>& args) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int replyCount;
-        void *rulesBinding = NULL;
+        unsigned int stateOffset;
         unsigned int result = startAssertEvent(args[0]->IntegerValue(),
                                                TO_STRING(args[1]),
-                                               &rulesBinding,
+                                               &stateOffset,
                                                &replyCount);
         if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, (long long)rulesBinding));
+            array->Set(0, Number::New(isolate, (long long)stateOffset));
             array->Set(1, Number::New(isolate, (long long)replyCount));
             args.GetReturnValue().Set(array);
         } else {
@@ -262,15 +262,15 @@ void jsStartAssertEvents(const FunctionCallbackInfo<v8::Value>& args) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int replyCount;
-        void *rulesBinding = NULL;
+        unsigned int stateOffset;
         unsigned int *results = NULL;
         unsigned int result = startAssertEvents(args[0]->IntegerValue(), 
                                                 TO_STRING(args[1]),
-                                                &rulesBinding,
+                                                &stateOffset,
                                                 &replyCount);
         if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, (long long)rulesBinding));
+            array->Set(0, Number::New(isolate, (long long)stateOffset));
             array->Set(1, Number::New(isolate, (long long)replyCount));
             args.GetReturnValue().Set(array);
         } else {
@@ -350,14 +350,14 @@ void jsStartAssertFact(const FunctionCallbackInfo<v8::Value>& args) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int replyCount;
-        void *rulesBinding = NULL;
+        unsigned int stateOffset;
         unsigned int result = startAssertFact(args[0]->IntegerValue(),
                                                TO_STRING(args[1]),
-                                               &rulesBinding,
+                                               &stateOffset,
                                                &replyCount);
         if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, (long long)rulesBinding));
+            array->Set(0, Number::New(isolate, (long long)stateOffset));
             array->Set(1, Number::New(isolate, (long long)replyCount));
             args.GetReturnValue().Set(array);
         } else {
@@ -429,15 +429,15 @@ void jsStartAssertFacts(const FunctionCallbackInfo<v8::Value>& args) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int replyCount;
-        void *rulesBinding = NULL;
+        unsigned int stateOffset;
         unsigned int *results = NULL;
         unsigned int result = startAssertFacts(args[0]->IntegerValue(), 
                                                TO_STRING(args[1]),
-                                               &rulesBinding,
+                                               &stateOffset,
                                                &replyCount);
         if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, (long long)rulesBinding));
+            array->Set(0, Number::New(isolate, (long long)stateOffset));
             array->Set(1, Number::New(isolate, (long long)replyCount));
             args.GetReturnValue().Set(array);
         } else {
@@ -492,14 +492,14 @@ void jsStartRetractFact(const FunctionCallbackInfo<v8::Value>& args) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int replyCount;
-        void *rulesBinding = NULL;
+        unsigned int stateOffset;
         unsigned int result = startRetractFact(args[0]->IntegerValue(),
                                                TO_STRING(args[1]),
-                                               &rulesBinding,
+                                               &stateOffset,
                                                &replyCount);
         if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, (long long)rulesBinding));
+            array->Set(0, Number::New(isolate, (long long)stateOffset));
             array->Set(1, Number::New(isolate, (long long)replyCount));
             args.GetReturnValue().Set(array);
         } else {
@@ -571,15 +571,15 @@ void jsStartRetractFacts(const FunctionCallbackInfo<v8::Value>& args) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int replyCount;
-        void *rulesBinding = NULL;
+        unsigned int stateOffset;
         unsigned int *results = NULL;
         unsigned int result = startRetractFacts(args[0]->IntegerValue(), 
                                                 TO_STRING(args[1]), 
-                                                &rulesBinding,
+                                                &stateOffset,
                                                 &replyCount);
         if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, (long long)rulesBinding));
+            array->Set(0, Number::New(isolate, (long long)stateOffset));
             array->Set(1, Number::New(isolate, (long long)replyCount));
             args.GetReturnValue().Set(array);
         } else {
@@ -625,7 +625,7 @@ void jsRetractFacts(const FunctionCallbackInfo<Value>& args) {
     }
 }
 
-void jsAssertState(const FunctionCallbackInfo<Value>& args) {
+void jsUpdateState(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 3) {
@@ -633,7 +633,7 @@ void jsAssertState(const FunctionCallbackInfo<Value>& args) {
     } else if (!args[0]->IsNumber() || !args[2]->IsString()) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
-        unsigned int result = assertState(args[0]->IntegerValue(),
+        unsigned int result = updateState(args[0]->IntegerValue(),
                                           TO_STRING(args[1]),
                                           TO_STRING(args[2]));
         
@@ -653,22 +653,21 @@ void jsAssertState(const FunctionCallbackInfo<Value>& args) {
 void jsStartUpdateState(const FunctionCallbackInfo<v8::Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
-    if (args.Length() < 3) {
+    if (args.Length() < 2) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[1]->IsNumber() || !args[2]->IsString()) {
+    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int replyCount;
-        void *rulesBinding = NULL;
+        unsigned int stateOffset;
         unsigned int result = startUpdateState(args[0]->IntegerValue(),
-                                               (void *)args[1]->IntegerValue(),
-                                               TO_STRING(args[2]),
-                                               &rulesBinding,
+                                               TO_STRING(args[1]),
+                                               &stateOffset,
                                                &replyCount);
         
         if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, (long long)rulesBinding));
+            array->Set(0, Number::New(isolate, (long long)stateOffset));
             array->Set(1, Number::New(isolate, (long long)replyCount));
             args.GetReturnValue().Set(array);
         } else {
@@ -692,19 +691,16 @@ void jsStartAction(const FunctionCallbackInfo<Value>& args) {
     } else {
         char *session;
         char *messages;
-        void *actionHandle;
-        void *actionBinding;
+        unsigned int stateOffset;
         unsigned int result = startAction(args[0]->IntegerValue(), 
                                           &session, 
                                           &messages, 
-                                          &actionHandle,
-                                          &actionBinding); 
+                                          &stateOffset); 
         if (result == RULES_OK) {
             Handle<Array> array = Array::New(isolate, 4);
             array->Set(0, String::NewFromUtf8(isolate, session));
             array->Set(1, String::NewFromUtf8(isolate, messages));
-            array->Set(2, Number::New(isolate, (long long)actionHandle));
-            array->Set(3, Number::New(isolate, (long long)actionBinding));
+            array->Set(2, Number::New(isolate, (long long)stateOffset));
             args.GetReturnValue().Set(array);
         } else if (result != ERR_NO_ACTION_AVAILABLE) {
             char *message = NULL;
@@ -728,36 +724,13 @@ void jsCompleteAndStartAction(const FunctionCallbackInfo<v8::Value>& args) {
         char *messages = NULL;
         unsigned int result = completeAndStartAction(args[0]->IntegerValue(),
                                                      args[1]->IntegerValue(),
-                                                     (void *)args[2]->IntegerValue(),
+                                                     args[2]->IntegerValue(),
                                                      &messages);
         if (result == RULES_OK) {
             args.GetReturnValue().Set(String::NewFromUtf8(isolate, messages));
         } else if (result != ERR_NO_ACTION_AVAILABLE) {
             char *message = NULL;
             if (asprintf(&message, "Could not complete and start action, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
-            } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-            }
-        } 
-    }
-}
-
-void jsCompleteAction(const FunctionCallbackInfo<Value>& args) {
-    Isolate* isolate;
-    isolate = args.GetIsolate();
-    if (args.Length() < 3) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[1]->IsNumber() || !args[2]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
-    } else {
-        unsigned int result = completeAction(args[0]->IntegerValue(),
-                                            (void *)args[1]->IntegerValue(),
-                                            TO_STRING(args[2]));
-        
-        if (result != RULES_OK) {
-            char *message = NULL;
-            if (asprintf(&message, "Could not complete action, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
@@ -775,7 +748,7 @@ void jsAbandonAction(const FunctionCallbackInfo<Value>& args) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int result = abandonAction(args[0]->IntegerValue(),
-                                            (void *)args[1]->IntegerValue());
+                                            args[1]->IntegerValue());
         
         if (result != RULES_OK) {
             char *message = NULL;
@@ -1055,17 +1028,14 @@ void init(Handle<Object> exports) {
     exports->Set(String::NewFromUtf8(isolate, "assertTimers", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsAssertTimers)->GetFunction());
 
-    exports->Set(String::NewFromUtf8(isolate, "assertState", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsAssertState)->GetFunction());
+    exports->Set(String::NewFromUtf8(isolate, "updateState", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsUpdateState)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "startUpdateState", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsStartUpdateState)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "startAction", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsStartAction)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "completeAction", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsCompleteAction)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "completeAndStartAction", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsCompleteAndStartAction)->GetFunction());

@@ -15,8 +15,7 @@
 #define ACTION_ASSERT_EVENT 2
 #define ACTION_RETRACT_FACT 3
 #define ACTION_RETRACT_EVENT 4
-#define ACTION_ADD_FACT 5
-#define ACTION_ADD_EVENT 6
+#define ACTION_UPDATE_STATE 5
 
 typedef char functionHash[HASH_LENGTH + 1];
 

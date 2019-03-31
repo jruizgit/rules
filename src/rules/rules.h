@@ -136,7 +136,7 @@ unsigned int bindRuleset(unsigned int handle,
                          char *password,
                          unsigned char db);
 
-unsigned int complete(void *rulesBinding, 
+unsigned int complete(unsigned int stateOffset, 
                       unsigned int replyCount);
 
 unsigned int assertEvent(unsigned int handle, 
@@ -144,7 +144,7 @@ unsigned int assertEvent(unsigned int handle,
 
 unsigned int startAssertEvent(unsigned int handle, 
                              char *message, 
-                             void **rulesBinding, 
+                             unsigned int *stateOffset, 
                              unsigned int *replyCount);
 
 unsigned int assertEvents(unsigned int handle, 
@@ -152,7 +152,7 @@ unsigned int assertEvents(unsigned int handle,
 
 unsigned int startAssertEvents(unsigned int handle, 
                               char *messages, 
-                              void **rulesBinding, 
+                              unsigned int *stateOffset, 
                               unsigned int *replyCount);
 
 unsigned int retractEvent(unsigned int handle, 
@@ -160,7 +160,7 @@ unsigned int retractEvent(unsigned int handle,
 
 unsigned int startAssertFact(unsigned int handle, 
                              char *message, 
-                             void **rulesBinding, 
+                             unsigned int *stateOffset, 
                              unsigned int *replyCount);
 
 unsigned int assertFact(unsigned int handle, 
@@ -168,7 +168,7 @@ unsigned int assertFact(unsigned int handle,
 
 unsigned int startAssertFacts(unsigned int handle, 
                               char *messages, 
-                              void **rulesBinding, 
+                              unsigned int *stateOffset, 
                               unsigned int *replyCount);
 
 unsigned int assertFacts(unsigned int handle, 
@@ -179,44 +179,38 @@ unsigned int retractFact(unsigned int handle,
 
 unsigned int startRetractFact(unsigned int handle, 
                              char *message, 
-                             void **rulesBinding, 
+                             unsigned int *stateOffset, 
                              unsigned int *replyCount);
 
 unsigned int retractFacts(unsigned int handle, 
                           char *messages);
 
 unsigned int startRetractFacts(unsigned int handle, 
-                              char *messages, 
-                              void **rulesBinding, 
-                              unsigned int *replyCount);
+                               char *messages, 
+                               unsigned int *stateOffset, 
+                               unsigned int *replyCount);
 
-unsigned int startUpdateState(unsigned int handle, 
-                              void *actionHandle, 
-                              char *state,
-                              void **rulesBinding,
-                              unsigned int *replyCount);
-
-unsigned int assertState(unsigned int handle,
+unsigned int updateState(unsigned int handle,
                          char *sid, 
                          char *state);
+
+unsigned int startUpdateState(unsigned int handle, 
+                              char *state,
+                              unsigned int *stateOffset,
+                              unsigned int *replyCount);
 
 unsigned int startAction(unsigned int handle, 
                          char **stateFact, 
                          char **messages, 
-                         void **actionHandle,
-                         void **actionBinding);
-
-unsigned int completeAction(unsigned int handle, 
-                            void *actionHandle, 
-                            char *state);
+                         unsigned int *stateOffset);
 
 unsigned int completeAndStartAction(unsigned int handle, 
                                     unsigned int expectedReplies,
-                                    void *actionHandle, 
+                                    unsigned int stateOffset, 
                                     char **messages);
 
 unsigned int abandonAction(unsigned int handle, 
-                           void *actionHandle);
+                           unsigned int stateOffset);
 
 unsigned int startTimer(unsigned int handle, 
                         char *sid, 
