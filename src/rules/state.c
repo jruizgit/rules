@@ -432,7 +432,7 @@ unsigned int deleteMessage(stateNode *state,
                            unsigned int messageNodeOffset) {
     DELETE(messageNode,
            state->messageIndex, 
-           MAX_MESSAGE_NODES,
+           MAX_MESSAGE_INDEX_LENGTH,
            state->messagePool,
            messageNodeOffset);
     return RULES_OK;
@@ -441,6 +441,7 @@ unsigned int deleteMessage(stateNode *state,
 unsigned int getMessage(stateNode *state,
                         char *mid,
                         unsigned int *valueOffset) {
+    *valueOffset = UNDEFINED_HASH_OFFSET;
     unsigned int hash = fnv1Hash32(mid, strlen(mid));
 
     GET(messageNode, 
@@ -479,8 +480,19 @@ unsigned int storeMessage(stateNode *state,
                           jsonObject *message,
                           unsigned char messageType,
                           unsigned int *valueOffset) {
-    
     unsigned int hash = fnv1Hash32(mid, strlen(mid));
+    *valueOffset = UNDEFINED_HASH_OFFSET;
+
+    GET(messageNode, 
+        state->messageIndex, 
+        MAX_MESSAGE_INDEX_LENGTH, 
+        state->messagePool, 
+        hash, 
+        *valueOffset);
+
+    if (*valueOffset != UNDEFINED_HASH_OFFSET) {
+        return ERR_EVENT_OBSERVED;
+    }
 
     NEW(messageNode, 
         state->messagePool, 
@@ -524,6 +536,8 @@ unsigned int ensureStateNode(void *tree,
         node->betaState = malloc(((ruleset*)tree)->betaCount * sizeof(betaStateNode));
         for (unsigned int i = 0; i < ((ruleset*)tree)->betaCount; ++i) {
             betaStateNode *betaNode = &node->betaState[i];
+            betaNode->reteNode = NULL;
+
             INIT(leftFrameNode, betaNode->leftFramePool, MAX_LEFT_FRAME_NODES);
             memset(betaNode->leftFrameIndex, 0, MAX_LEFT_FRAME_INDEX_LENGTH * sizeof(unsigned int));
             
@@ -534,6 +548,8 @@ unsigned int ensureStateNode(void *tree,
         node->actionState = malloc(((ruleset*)tree)->actionCount * sizeof(actionStateNode));
         for (unsigned int i = 0; i < ((ruleset*)tree)->actionCount; ++i) {
             actionStateNode *actionNode = &node->actionState[i];
+            actionNode->reteNode = NULL;
+            
             actionNode->resultIndex[0] = UNDEFINED_HASH_OFFSET;
             INIT(leftFrameNode, actionNode->resultPool, MAX_LEFT_FRAME_NODES);
         }        
@@ -722,11 +738,13 @@ unsigned int getNextResultInState(void *tree,
     *resultAction = NULL;
     for (unsigned int index = 0; index < rulesetTree->actionCount; ++index) {
         actionStateNode *actionNode = &state->actionState[index];
-        if ((actionNode->reteNode->value.c.cap && actionNode->resultPool.count) ||
-            (actionNode->reteNode->value.c.count && actionNode->resultPool.count >= actionNode->reteNode->value.c.count)) {
-            *resultAction = actionNode;
-            state->context.actionStateIndex = index;
-            return RULES_OK;
+        if (actionNode->reteNode) {
+            if ((actionNode->reteNode->value.c.cap && actionNode->resultPool.count) ||
+                (actionNode->reteNode->value.c.count && actionNode->resultPool.count >= actionNode->reteNode->value.c.count)) {
+                *resultAction = actionNode;
+                state->context.actionStateIndex = index;
+                return RULES_OK;
+            }
         }
     }
 
@@ -805,19 +823,23 @@ static void calculateId(jsonObject *jo) {
     unsigned long long hash = FNV_64_OFFSET_BASIS;
     for (unsigned short i = 0; i < jo->propertiesLength; ++i) {
         jsonProperty *property = properties[i];
-
-        //TODO: is this valid?
-        hash ^= property->hash;
-        hash *= FNV_64_PRIME;
-    
-        unsigned short valueLength = property->valueLength;
-        if (property->type != JSON_STRING) {
-            ++valueLength;
-        }
-
-        for (unsigned short ii = 0; ii < valueLength; ++ii) {
-            hash ^= jo->content[property->valueOffset + ii];
+        if (property->hash != HASH_ID) {
+            hash ^= property->hash;
             hash *= FNV_64_PRIME;
+        
+            unsigned short valueLength = property->valueLength;
+            if (property->type == JSON_STRING) {
+                // Using value.s to cover generated sid
+                for (unsigned short ii = 0; ii < valueLength; ++ii) {
+                    hash ^= property->value.s[ii];
+                    hash *= FNV_64_PRIME;
+                }
+            } else {
+                for (unsigned short ii = 0; ii < valueLength; ++ii) {
+                    hash ^= jo->content[property->valueOffset + ii];
+                    hash *= FNV_64_PRIME;
+                }
+            }
         }
     }
 
@@ -853,6 +875,7 @@ static unsigned int fixupIds(jsonObject *jo, char generateId) {
         property->hash = HASH_SID;
         property->valueOffset = 0;
         property->valueLength = 1;
+        property->value.s = jo->sidBuffer;
         property->type = JSON_STRING;
     } 
 

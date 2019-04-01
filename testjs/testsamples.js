@@ -1,205 +1,425 @@
 'use strict';
 var d = require('../libjs/durable');
 
-d.ruleset('test', function() {
-    // antecedent
-    whenAll: m.subject == 'World'
-    // consequent
-    run: console.log('Hello ' + m.subject)
+// d.ruleset('test', function() {
+//     // antecedent
+//     whenAll: m.subject == 'World'
+//     // consequent
+//     run: console.log('Hello ' + m.subject)
 
-    whenStart: {
-        post('test', {subject: 'World'});
-    }
-});
+//     whenStart: {
+//         post('test', {subject: 'World'});
+//     }
+// });
 
-d.ruleset('risk0', function() {
-    whenAll: {
-        first = m.t == 'purchase'
-        second = m.location != first.location
-    }
+// d.ruleset('risk0', function() {
+//     whenAll: {
+//         first = m.t == 'purchase'
+//         second = m.location != first.location
+//     }
 
-    run: console.log('fraud detected ->' + first.location + ', ' + second.location)
+//     run: console.log('fraud detected ->' + first.location + ', ' + second.location)
    
-    whenStart: {
-        post('risk0', {t: 'purchase', location: 'US'});
-        post('risk0', {t: 'purchase', location: 'CA'});
-    }
-});
+//     whenStart: {
+//         post('risk0', {t: 'purchase', location: 'US'});
+//         post('risk0', {t: 'purchase', location: 'CA'});
+//     }
+// });
 
-d.ruleset('indistinct', function() {
-    whenAll: {
-        first = m.amount > 10
-        second = m.amount > first.amount * 2
-        third = m.amount > (first.amount + second.amount) / 2
-    }
-    distinct: false
-    run: {
-        console.log('indistinct detected -> ' + first.amount);
-        console.log('               -> ' + second.amount);
-        console.log('               -> ' + third.amount);
-    }
+// d.ruleset('indistinct', function() {
+//     whenAll: {
+//         first = m.amount > 10
+//         second = m.amount > first.amount * 2
+//         third = m.amount > (first.amount + second.amount) / 2
+//     }
+//     distinct: false
+//     run: {
+//         console.log('indistinct detected -> ' + first.amount);
+//         console.log('               -> ' + second.amount);
+//         console.log('               -> ' + third.amount);
+//     }
 
-    whenStart: {
-        host.post('indistinct', {amount: 200});
-        host.post('indistinct', {amount: 500});
-        host.post('indistinct', {amount: 1000});
-    }
-});
+//     whenStart: {
+//         host.post('indistinct', {amount: 200});
+//         host.post('indistinct', {amount: 500});
+//         host.post('indistinct', {amount: 1000});
+//     }
+// });
 
-d.ruleset('distinct', function() {
-    whenAll: {
-        first = m.amount > 10
-        second = m.amount > first.amount * 2
-        third = m.amount > (first.amount + second.amount) / 2
-    }
-    run: {
-        console.log('distinct detected -> ' + first.amount);
-        console.log('               -> ' + second.amount);
-        console.log('               -> ' + third.amount);
-    }
+// d.ruleset('distinct', function() {
+//     whenAll: {
+//         first = m.amount > 10
+//         second = m.amount > first.amount * 2
+//         third = m.amount > (first.amount + second.amount) / 2
+//     }
+//     run: {
+//         console.log('distinct detected -> ' + first.amount);
+//         console.log('               -> ' + second.amount);
+//         console.log('               -> ' + third.amount);
+//     }
 
-    whenStart: {
-        host.post('distinct', {amount: 50});
-        host.post('distinct', {amount: 200});
-        host.post('distinct', {amount: 251});
-    }
-});
+//     whenStart: {
+//         host.post('distinct', {amount: 50});
+//         host.post('distinct', {amount: 200});
+//         host.post('distinct', {amount: 251});
+//     }
+// });
 
-d.ruleset('expense0', function() {
-    whenAll: m.subject == 'approve' || m.subject == 'ok'
-    run: console.log('expense0 Approved');
+// d.ruleset('expense0', function() {
+//     whenAll: m.subject == 'approve' || m.subject == 'ok'
+//     run: console.log('expense0 Approved');
 
-    whenStart: post('expense0', { subject: 'approve' })
-});
+//     whenStart: post('expense0', { subject: 'approve' })
+// });
 
-d.ruleset('match', function() {
-    whenAll: m.url.matches('(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*') 
-    run: console.log('match url ' + m.url)
+// d.ruleset('match', function() {
+//     whenAll: m.url.matches('(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*') 
+//     run: console.log('match url ' + m.url)
         
+//     whenStart: {
+//         post('match', {url: 'https://github.com'});
+//         post('match', {url: 'http://github.com/jruizgit/rul!es'});
+//         post('match', {url: 'https://github.com/jruizgit/rules/reference.md'});
+//         post('match', {url: '//rules'});
+//         post('match', {url: 'https://github.c/jruizgit/rules'});
+//     }
+// });
+
+// d.ruleset('strings', function() {
+//     whenAll: m.subject.matches('hello.*')
+//     run: console.log('string starts with hello: ' + m.subject)
+
+//     whenAll: m.subject.imatches('.*hello')
+//     run: console.log('string ends with hello: ' + m.subject)
+
+//     whenAll: m.subject.imatches('.*hello.*')
+//     run: console.log('string contains hello (case insensitive): ' + m.subject)
+
+//     whenStart: {
+//         assert('strings', { subject: 'HELLO world' });
+//         assert('strings', { subject: 'world hello' });
+//         assert('strings', { subject: 'hello hi' });
+//         assert('strings', { subject: 'has Hello string' });
+//         assert('strings', { subject: 'does not match' });
+//     }
+// });
+
+// d.ruleset('risk2_0', function() {
+//     whenAll: {
+//         first = m.t == 'deposit'
+//         none(m.t == 'balance')
+//         third = m.t == 'withrawal'
+//         fourth = m.t == 'chargeback'
+//     }
+//     run: console.log('risk2_0 fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
+
+//     whenStart: {
+//         assert('risk2_0', {t: 'deposit'});
+//         assert('risk2_0', {t: 'withrawal'});
+//         assert('risk2_0', {t: 'chargeback'});
+//     }
+// });
+
+// d.ruleset('risk2_1', function() {
+//     whenAll: {
+//         first = m.t == 'deposit'
+//         none(m.t == 'balance')
+//         third = m.t == 'withrawal'
+//         fourth = m.t == 'chargeback'
+//     }
+//     run: console.log('risk2_1 fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
+
+//     whenStart: {
+//         assert('risk2_1', {t: 'balance'});
+//         assert('risk2_1', {t: 'deposit'});
+//         assert('risk2_1', {t: 'withrawal'});
+//         assert('risk2_1', {t: 'chargeback'});
+//         retract('risk2_1', {t: 'balance'});
+//     }
+// });
+
+// d.ruleset('risk2_2', function() {
+//     whenAll: {
+//         first = m.t == 'deposit'
+//         none(m.t == 'balance')
+//         third = m.t == 'withrawal'
+//         fourth = m.t == 'chargeback'
+//     }
+//     run: console.log('risk2_2 fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
+
+//     whenStart: {
+//         assert('risk2_2', {t: 'deposit'});
+//         assert('risk2_2', {t: 'withrawal'});
+//         assert('risk2_2', {t: 'chargeback'});
+//         assert('risk2_2', {t: 'balance'});    
+//     }
+// });
+
+// d.ruleset('expense2', function() {
+//     whenAll: m.amount < 100
+//     count: 3
+//     run: console.log('expense2 approved ' + JSON.stringify(m));
+
+//     whenAll: {
+//         expense = m.amount >= 100
+//         approval = m.review == true
+//     }
+//     cap: 2
+//     run: console.log('expense2 rejected ' + JSON.stringify(m));
+
+//     whenStart: {
+//         postBatch('expense2', { amount: 10 },
+//                              { amount: 20 },
+//                              { amount: 100 },
+//                              { amount: 30 },
+//                              { amount: 200 },
+//                              { amount: 400 });
+//         assert('expense2', { review: true })
+//     }
+// });
+
+// d.ruleset('flow0', function() {
+//     whenAll: s.state == 'start'
+//     run: {
+//         s.state = 'next';
+//         console.log('flow0 start');
+//     }
+
+//     whenAll: s.state == 'next'
+//     run: {
+//         s.state = 'last';
+//         console.log('flow0 next');
+//     }
+
+//     whenAll: s.state == 'last'
+//     run: {
+//         s.state = 'end';
+//         console.log('flow0 last');
+//         deleteState();
+//     }
+
+//     whenStart: patchState('flow0', {state: 'start'})
+// });
+
+// d.ruleset('flow', function() {
+//     whenAll: m.action == 'start'
+//     run: throw 'Unhandled Exception!'
+
+//     whenAll: +s.exception
+//     run: {
+//         console.log(s.exception);
+//         delete(s.exception); 
+//     }
+
+//     whenStart: {
+//         post('flow', { action: 'start' });
+//     }
+// });
+
+// d.statechart('expense3', function() {
+//     input: {
+//         to: 'denied'
+//         whenAll: m.subject == 'approve' && m.amount > 1000
+//         run: console.log('expense3: Denied amount: ' + m.amount)
+
+//         to: 'pending'
+//         whenAll: m.subject == 'approve' && m.amount <= 1000
+//         run: console.log('expense3: sid ' + m.sid + ' requesting approve amount: ' + m.amount);
+//     }
+
+//     pending: {
+//         to: 'approved'
+//         whenAll: m.subject == 'approved'
+//         run: console.log('expense3: Expense approved for sid ' + m.sid)
+
+//         to: 'denied'
+//         whenAll: m.subject == 'denied'
+//         run: console.log('expense3: Expense denied for sid ' + m.sid)
+//     }
+    
+//     denied: {}
+//     approved: {}
+    
+//     whenStart: {
+//         post('expense3', { subject: 'approve', amount: 100 });
+//         post('expense3', { subject: 'approved' });
+//         post('expense3', { sid: 1, subject: 'approve', amount: 100 });
+//         post('expense3', { sid: 1, subject: 'denied' });
+//         post('expense3', { sid: 2, subject: 'approve', amount: 10000 });
+//     }
+// });
+
+// d.flowchart('expense4', function() {
+//     input: {
+//         request: m.subject == 'approve' && m.amount <= 1000 
+//         deny:  m.subject == 'approve' && m.amount > 1000
+//     }
+
+//     request: {
+//         run: console.log('expense4: Requesting approve for ' + m.sid + ' for ' + m.amount)
+//         approve: m.subject == 'approved'
+//         deny: m.subject == 'denied'
+//         self: m.subject == 'retry'
+//     }
+
+//     approve: {
+//         run: console.log('expense4: Expense approved for ' + m.sid)
+//     }
+
+//     deny: {
+//         run: console.log('expense4: Expense denied for ' + m.sid)
+//     }
+
+//     whenStart: {
+//         post('expense4', { subject: 'approve', amount: 100 });
+//         post('expense4', { subject: 'retry' });
+//         post('expense4', { subject: 'approved' });
+//         post('expense4', {sid: 1, subject: 'approve', amount: 100});
+//         post('expense4', {sid: 1, subject: 'denied'});
+//         post('expense4', {sid: 2, subject: 'approve', amount: 10000});
+//     }
+// });
+
+// d.ruleset('expense5', function() {
+//     // use the '.' notation to match properties in nested objects
+//     whenAll: {
+//         bill = m.t == 'bill' && m.invoice.amount > 50
+//         account = m.t == 'account' && m.payment.invoice.amount == bill.invoice.amount
+//     }
+//     run: {
+//         console.log('expense5 bill amount ->' + bill.invoice.amount);
+//         console.log('expense5 account payment amount ->' + account.payment.invoice.amount);
+//     }
+
+//     whenStart: {
+//         // one level of nesting
+//         post('expense5', {t: 'bill', invoice: {amount: 100}});  
+
+//         // two levels of nesting
+//         post('expense5', {t: 'account', payment: {invoice: {amount: 100}}}); 
+//     }
+// });
+
+d.ruleset('bookstore', function() {
+    // this rule will trigger for events with status
+    whenAll: +m.status
+    run: console.log('bookstore reference ' + m.reference + ' status ' + m.status)
+
+    whenAll: +m.name
+    run: { 
+        console.log('bookstore added: ' + m.name);
+        retract({
+            name: 'The new book',
+            reference: '75323',
+            price: 500,
+            seller: 'bookstore'
+        });
+    }
+
+    // this rule will be triggered when the fact is retracted
+    whenAll: none(+m.name)
+    run: console.log('bookstore no books');
+
+
     whenStart: {
-        post('match', {url: 'https://github.com'});
-        post('match', {url: 'http://github.com/jruizgit/rul!es'});
-        post('match', {url: 'https://github.com/jruizgit/rules/reference.md'});
-        post('match', {url: '//rules'});
-        post('match', {url: 'https://github.c/jruizgit/rules'});
+        // will return 0 because the fact assert was successful 
+        console.log('bookstore result ' + assert('bookstore', {
+            name: 'The new book',
+            seller: 'bookstore',
+            reference: '75323',
+            price: 500
+        }));
+
+        // will return 212 because the fact has already been asserted 
+        console.log('bookstore result ' + assert('bookstore', {
+            reference: '75323',
+            name: 'The new book',
+            price: 500,
+            seller: 'bookstore'
+        }));
+
+        // will return 0 because a new event is being posted
+        console.log('bookstore result ' + post('bookstore', {
+            reference: '75323',
+            status: 'Active'
+        }));
+
+        // will return 0 because a new event is being posted
+        console.log('bookstore result ' + post('bookstore', {
+            reference: '75323',
+            status: 'Active'
+        }));
     }
 });
 
-d.ruleset('strings', function() {
-    whenAll: m.subject.matches('hello.*')
-    run: console.log('string starts with hello: ' + m.subject)
 
-    whenAll: m.subject.imatches('.*hello')
-    run: console.log('string ends with hello: ' + m.subject)
+// d.ruleset('animal', function() {
+//     whenAll: {
+//         first = m.predicate == 'eats' && m.object == 'flies' 
+//         m.predicate == 'lives' && m.object == 'water' && m.subject == first.subject
+//     }
+//     run: assert({ subject: first.subject, predicate: 'is', object: 'frog' })
 
-    whenAll: m.subject.imatches('.*hello.*')
-    run: console.log('string contains hello (case insensitive): ' + m.subject)
+//     whenAll: {
+//         first = m.predicate == 'eats' && m.object == 'flies' 
+//         m.predicate == 'lives' && m.object == 'land' && m.subject == first.subject
+//     }
+//     run: assert({ subject: first.subject, predicate: 'is', object: 'chameleon' })
 
-    whenStart: {
-        assert('strings', { subject: 'HELLO world' });
-        assert('strings', { subject: 'world hello' });
-        assert('strings', { subject: 'hello hi' });
-        assert('strings', { subject: 'has Hello string' });
-        assert('strings', { subject: 'does not match' });
-    }
-});
+//     whenAll: m.predicate == 'eats' && m.object == 'worms' 
+//     run: assert({ subject: m.subject, predicate: 'is', object: 'bird' })
 
-d.ruleset('risk2_0', function() {
-    whenAll: {
-        first = m.t == 'deposit'
-        none(m.t == 'balance')
-        third = m.t == 'withrawal'
-        fourth = m.t == 'chargeback'
-    }
-    run: console.log('risk2_0 fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
+//     whenAll: m.predicate == 'is' && m.object == 'frog'
+//     run: assert({ subject: m.subject, predicate: 'is', object: 'green'})
 
-    whenStart: {
-        assert('risk2_0', {t: 'deposit'});
-        assert('risk2_0', {t: 'withrawal'});
-        assert('risk2_0', {t: 'chargeback'});
-    }
-});
+//     whenAll: m.predicate == 'is' && m.object == 'chameleon'
+//     run: assert({ subject: m.subject, predicate: 'is', object: 'green'})
 
-d.ruleset('risk2_1', function() {
-    whenAll: {
-        first = m.t == 'deposit'
-        none(m.t == 'balance')
-        third = m.t == 'withrawal'
-        fourth = m.t == 'chargeback'
-    }
-    run: console.log('risk2_1 fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
+//     whenAll: m.predicate == 'is' && m.object == 'bird' 
+//     run: assert({ subject: m.subject, predicate: 'is', object: 'black'})
 
-    whenStart: {
-        assert('risk2_1', {t: 'balance'});
-        assert('risk2_1', {t: 'deposit'});
-        assert('risk2_1', {t: 'withrawal'});
-        assert('risk2_1', {t: 'chargeback'});
-        retract('risk2_1', {t: 'balance'});
-    }
-});
+//     whenAll: +m.subject
+//     run: console.log('animal fact: ' + m.subject + ' ' + m.predicate + ' ' + m.object)
 
-d.ruleset('risk2_2', function() {
-    whenAll: {
-        first = m.t == 'deposit'
-        none(m.t == 'balance')
-        third = m.t == 'withrawal'
-        fourth = m.t == 'chargeback'
-    }
-    run: console.log('risk2_2 fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
+//     whenStart: {
+//         assert('animal', { subject: 'Kermit', predicate: 'eats', object: 'flies'});
+//         assert('animal', { subject: 'Kermit', predicate: 'lives', object: 'water'});
+//         assert('animal', { subject: 'Greedy', predicate: 'eats', object: 'flies'});
+//         assert('animal', { subject: 'Greedy', predicate: 'lives', object: 'land'});
+//         assert('animal', { subject: 'Tweety', predicate: 'eats', object: 'worms'});
+//     }
+// });
 
-    whenStart: {
-        assert('risk2_2', {t: 'deposit'});
-        assert('risk2_2', {t: 'withrawal'});
-        assert('risk2_2', {t: 'chargeback'});
-        assert('risk2_2', {t: 'balance'});    
-    }
-});
 
-d.ruleset('expense2', function() {
-    whenAll: m.amount < 100
-    count: 3
-    run: console.log('expense2 approved ' + JSON.stringify(m));
+// d.ruleset('flow1', function() {
+//     whenAll: s.state == 'first'
+//     // runAsync labels an async action
+//     runAsync: {
+//         setTimeout(function() {
+//             s.state = 'second';
+//             console.log('flow1 first completed');
+            
+//             // completes the async action
+//             complete();
+//         }, 3000);
+//     }
 
-    whenAll: {
-        expense = m.amount >= 100
-        approval = m.review == true
-    }
-    cap: 2
-    run: console.log('expense2 rejected ' + JSON.stringify(m));
+//     whenAll: s.state == 'second'
+//     runAsync: {
+//         setTimeout(function() {
+//             console.log('flow1 second completed');
+//             s.state = 'last'
+//             complete();
+//         }, 6000);
+        
+//         // overrides the 5 second default abandon timeout
+//         return 10;
+//     }
 
-    whenStart: {
-        postBatch('expense2', { amount: 10 },
-                             { amount: 20 },
-                             { amount: 100 },
-                             { amount: 30 },
-                             { amount: 200 },
-                             { amount: 400 });
-        assert('expense2', { review: true })
-    }
-});
-
-d.ruleset('flow0', function() {
-    whenAll: s.state == 'start'
-    run: {
-        s.state = 'next';
-        console.log('flow0 start');
-    }
-
-    whenAll: s.state == 'next'
-    run: {
-        s.state = 'last';
-        console.log('flow0 next');
-    }
-
-    whenAll: s.state == 'last'
-    run: {
-        s.state = 'end';
-        console.log('flow0 last');
-        deleteState();
-    }
-
-    whenStart: patchState('flow0', {state: 'start'})
-});
+//     whenStart: {
+//         patchState('flow1', { state: 'first' });
+//     }
+// });
 
 // d.ruleset('expense1', function() {
 //     whenAny: {
@@ -249,53 +469,6 @@ d.ruleset('flow0', function() {
 //     }
 // });
 
-
-
-    
-// d.ruleset('flow1', function() {
-//     whenAll: s.state == 'first'
-//     // runAsync labels an async action
-//     runAsync: {
-//         setTimeout(function() {
-//             s.state = 'second';
-//             console.log('flow1 first completed');
-            
-//             // completes the async action
-//             complete();
-//         }, 3000);
-//     }
-
-//     whenAll: s.state == 'second'
-//     runAsync: {
-//         setTimeout(function() {
-//             console.log('flow1 second completed');
-//             s.state = 'last'
-//             complete();
-//         }, 6000);
-        
-//         // overrides the 5 second default abandon timeout
-//         return 10;
-//     }
-
-//     whenStart: {
-//         patchState('flow1', { state: 'first' });
-//     }
-// });
-
-// d.ruleset('flow', function() {
-//     whenAll: m.action == 'start'
-//     run: throw 'Unhandled Exception!'
-
-//     whenAll: +s.exception
-//     run: {
-//         console.log(s.exception);
-//         delete(s.exception); 
-//     }
-
-//     whenStart: {
-//         post('flow', { action: 'start' });
-//     }
-// });
 
 // d.ruleset('timer', function() {
 //     whenAny: {
@@ -406,38 +579,7 @@ d.ruleset('flow0', function() {
 
 // // curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk4/events
 
-// d.statechart('expense3', function() {
-//     input: {
-//         to: 'denied'
-//         whenAll: m.subject == 'approve' && m.amount > 1000
-//         run: console.log('expense3 Denied amount: ' + m.amount)
 
-//         to: 'pending'
-//         whenAll: m.subject == 'approve' && m.amount <= 1000
-//         run: console.log('expense3 Requesting approve amount: ' + m.amount);
-//     }
-
-//     pending: {
-//         to: 'approved'
-//         whenAll: m.subject == 'approved'
-//         run: console.log('expense3 Expense approved')
-
-//         to: 'denied'
-//         whenAll: m.subject == 'denied'
-//         run: console.log('expense3 Expense denied')
-//     }
-    
-//     denied: {}
-//     approved: {}
-    
-//     whenStart: {
-//         post('expense3', { subject: 'approve', amount: 100 });
-//         post('expense3', { subject: 'approved' });
-//         post('expense3', { sid: 1, subject: 'approve', amount: 100 });
-//         post('expense3', { sid: 1, subject: 'denied' });
-//         post('expense3', { sid: 2, subject: 'approve', amount: 10000 });
-//     }
-// });
 
 // d.statechart('worker', function() {
 //     work: {
@@ -468,145 +610,6 @@ d.ruleset('flow0', function() {
 //     }
 // });
 
-// d.flowchart('expense', function() {
-//     input: {
-//         request: m.subject == 'approve' && m.amount <= 1000 
-//         deny:  m.subject == 'approve' && m.amount > 1000
-//     }
-
-//     request: {
-//         run: console.log('expense Requesting approve ' + m.sid + ' ' + m.amount)
-//         approve: m.subject == 'approved'
-//         deny: m.subject == 'denied'
-//         self: m.subject == 'retry'
-//     }
-
-//     approve: {
-//         run: console.log('expense Expense approved ' + m.sid)
-//     }
-
-//     deny: {
-//         run: console.log('expense Expense denied ' + m.sid)
-//     }
-
-//     whenStart: {
-//         post('expense', { subject: 'approve', amount: 100 });
-//         post('expense', { subject: 'retry' });
-//         post('expense', { subject: 'approved' });
-//         post('expense', {sid: 1, subject: 'approve', amount: 100});
-//         post('expense', {sid: 1, subject: 'denied'});
-//         post('expense', {sid: 2, subject: 'approve', amount: 10000});
-//     }
-// });
-
-// d.ruleset('animal', function() {
-//     whenAll: {
-//         first = m.predicate == 'eats' && m.object == 'flies' 
-//         m.predicate == 'lives' && m.object == 'water' && m.subject == first.subject
-//     }
-//     run: assert({ subject: first.subject, predicate: 'is', object: 'frog' })
-
-//     whenAll: {
-//         first = m.predicate == 'eats' && m.object == 'flies' 
-//         m.predicate == 'lives' && m.object == 'land' && m.subject == first.subject
-//     }
-//     run: assert({ subject: first.subject, predicate: 'is', object: 'chameleon' })
-
-//     whenAll: m.predicate == 'eats' && m.object == 'worms' 
-//     run: assert({ subject: m.subject, predicate: 'is', object: 'bird' })
-
-//     whenAll: m.predicate == 'is' && m.object == 'frog'
-//     run: assert({ subject: m.subject, predicate: 'is', object: 'green'})
-
-//     whenAll: m.predicate == 'is' && m.object == 'chameleon'
-//     run: assert({ subject: m.subject, predicate: 'is', object: 'green'})
-
-//     whenAll: m.predicate == 'is' && m.object == 'bird' 
-//     run: assert({ subject: m.subject, predicate: 'is', object: 'black'})
-
-//     whenAll: +m.subject
-//     run: console.log('fact: ' + m.subject + ' ' + m.predicate + ' ' + m.object)
-
-//     whenStart: {
-//         assert('animal', { subject: 'Kermit', predicate: 'eats', object: 'flies'});
-//         assert('animal', { subject: 'Kermit', predicate: 'lives', object: 'water'});
-//         assert('animal', { subject: 'Greedy', predicate: 'eats', object: 'flies'});
-//         assert('animal', { subject: 'Greedy', predicate: 'lives', object: 'land'});
-//         assert('animal', { subject: 'Tweety', predicate: 'eats', object: 'worms'});
-//     }
-// });
-
-// d.ruleset('expense4', function() {
-//     // use the '.' notation to match properties in nested objects
-//     whenAll: {
-//         bill = m.t == 'bill' && m.invoice.amount > 50
-//         account = m.t == 'account' && m.payment.invoice.amount == bill.invoice.amount
-//     }
-//     run: {
-//         console.log('expense4 bill amount ->' + bill.invoice.amount);
-//         console.log('expense4 account payment amount ->' + account.payment.invoice.amount);
-//     }
-
-//     whenStart: {
-//         // one level of nesting
-//         post('expense4', {t: 'bill', invoice: {amount: 100}});  
-
-//         // two levels of nesting
-//         post('expense4', {t: 'account', payment: {invoice: {amount: 100}}}); 
-//     }
-// });
-
-// d.ruleset('bookstore', function() {
-//     // this rule will trigger for events with status
-//     whenAll: +m.status
-//     run: console.log('bookstore reference ' + m.reference + ' status ' + m.status)
-
-//     whenAll: +m.name
-//     run: { 
-//         console.log('bookstore added: ' + m.name);
-//         retract({
-//             name: 'The new book',
-//             reference: '75323',
-//             price: 500,
-//             seller: 'bookstore'
-//         });
-//     }
-
-//     // this rule will be triggered when the fact is retracted
-//     whenAll: none(+m.name)
-//     run: console.log('bookstore no books');
-
-
-//     whenStart: {
-//         // will return 0 because the fact assert was successful 
-//         console.log('bookstore result ' + assert('bookstore', {
-//             name: 'The new book',
-//             seller: 'bookstore',
-//             reference: '75323',
-//             price: 500
-//         }));
-
-//         // will return 212 because the fact has already been asserted 
-//         console.log('bookstore result ' + assert('bookstore', {
-//             reference: '75323',
-//             name: 'The new book',
-//             price: 500,
-//             seller: 'bookstore'
-//         }));
-
-//         // will return 0 because a new event is being posted
-//         console.log('bookstore result ' + post('bookstore', {
-//             reference: '75323',
-//             status: 'Active'
-//         }));
-
-//         // will return 0 because a new event is being posted
-//         console.log('bookstore result ' + post('bookstore', {
-//             reference: '75323',
-//             status: 'Active'
-//         }));
-//     }
-// });
 
 // d.ruleset('risk5', function() {
     

@@ -78,7 +78,7 @@ static unsigned int reduceString(char *left,
                                  unsigned short rightLength,
                                  unsigned char op,
                                  jsonProperty *targetProperty) {
-    int length = (leftLength < rightLength ? leftLength: rightLength);
+    int length = (leftLength > rightLength ? leftLength: rightLength);
     int result = strncmp(left, right, length);
     switch(op) {
         case OP_ADD:
@@ -585,6 +585,10 @@ static unsigned int isBetaMatch(ruleset *tree,
                                 jsonObject *messageObject,
                                 messageFrame *messageContext,
                                 unsigned char *propertyMatch) {
+#ifdef _PRINT
+    printf("isBetaMatch %s, ", messageObject->content);
+#endif
+
     jsonProperty resultProperty;
     unsigned short i = 0;
     CHECK_RESULT(reduceExpressionSequence(tree,
@@ -601,6 +605,12 @@ static unsigned int isBetaMatch(ruleset *tree,
     }
 
     *propertyMatch = resultProperty.value.b;
+
+#ifdef _PRINT
+    printf("%d, ", *propertyMatch);
+    printExpressionSequence(tree, &currentBeta->expressionSequence, 0);
+#endif
+
     return RULES_OK;
 }
 
@@ -608,25 +618,36 @@ static unsigned int isAlphaMatch(ruleset *tree,
                                  alpha *currentAlpha,
                                  jsonObject *messageObject,
                                  unsigned char *propertyMatch) {
+
+#ifdef _PRINT
+    printf("isAlphaMatch %s, ", messageObject->content);
+#endif
+
     *propertyMatch = 0;
     if (currentAlpha->expression.operator == OP_EX) {
         *propertyMatch = 1;
-        return RULES_OK;
+    } else {
+        jsonProperty resultProperty;
+        CHECK_RESULT(reduceExpression(tree,
+                                      NULL,
+                                      &currentAlpha->expression,
+                                      messageObject,
+                                      NULL,
+                                      &resultProperty));
+
+        if (resultProperty.type != JSON_BOOL) {
+            return ERR_OPERATION_NOT_SUPPORTED;
+        }
+
+        *propertyMatch = resultProperty.value.b;
     }
+    
+#ifdef _PRINT
+    printf("%d, ", *propertyMatch);
+    printSimpleExpression(tree, &currentAlpha->expression, 1, NULL);
+    printf("\n");
+#endif
 
-    jsonProperty resultProperty;
-    CHECK_RESULT(reduceExpression(tree,
-                                  NULL,
-                                  &currentAlpha->expression,
-                                  messageObject,
-                                  NULL,
-                                  &resultProperty));
-
-    if (resultProperty.type != JSON_BOOL) {
-        return ERR_OPERATION_NOT_SUPPORTED;
-    }
-
-    *propertyMatch = resultProperty.value.b;
     return RULES_OK;
 }
 
@@ -651,14 +672,17 @@ static unsigned int handleAction(ruleset *tree,
                                  stateNode *state, 
                                  node *node,
                                  leftFrameNode *frame) {
-    // printf("handle action %s\n", &tree->stringPool[node->nameOffset]);
-    // printf("frame\n");
-    // for (int i = 0; i < MAX_MESSAGE_FRAMES; ++i) {
-    //     if (frame->messages[i].hash) {
-    //         messageNode *node = MESSAGE_NODE(state, frame->messages[i].messageNodeOffset);
-    //         printf("    -> %s\n", node->jo.content);
-    //     }
-    // }
+#ifdef _PRINT
+    printf("handle action %s\n", &tree->stringPool[node->nameOffset]);
+    printf("frame\n");
+    for (int i = 0; i < MAX_MESSAGE_FRAMES; ++i) {
+        if (frame->messages[i].hash) {
+            messageNode *node = MESSAGE_NODE(state, frame->messages[i].messageNodeOffset);
+            printf("    -> %s\n", node->jo.content);
+        }
+    }
+#endif
+
     return RULES_OK;
 }
 
@@ -862,6 +886,7 @@ static unsigned int handleDeleteMessage(ruleset *tree,
         } else {
             node *currentNode = state->betaState[message->locations[i].nodeIndex].reteNode;
             if (currentNode->value.b.not) {
+                printf("evaluating none\n");
                 //TODO get real message hash
                 unsigned int messageHash = fnv1Hash32("1", 1);
                 node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
@@ -1052,7 +1077,6 @@ static unsigned int handleBetaMessage(ruleset *tree,
                                       node *betaNode,
                                       jsonObject *messageObject,
                                       unsigned int currentMessageOffset) { 
-    
     if (betaNode->value.b.isFirst && !betaNode->value.b.not) {
         node *nextNode = &tree->nodePool[betaNode->value.b.nextOffset];
         return handleBetaFrame(tree,
@@ -1236,7 +1260,8 @@ static unsigned int handleAlpha(ruleset *tree,
     alpha *stack[MAX_STACK_SIZE];
     stack[0] = alphaNode;
     alpha *currentAlpha;
-    
+    unsigned int result = ERR_EVENT_NOT_HANDLED;
+
     while (top) {
         --top;
         currentAlpha = stack[top];
@@ -1303,6 +1328,7 @@ static unsigned int handleAlpha(ruleset *tree,
         }
 
         if (currentAlpha->betaListOffset) {
+            result = RULES_OK;
             unsigned int *betaList = &tree->nextPool[currentAlpha->betaListOffset];
             for (unsigned int entry = 0; betaList[entry] != 0; ++entry) {
                 unsigned int bresult = handleBetaMessage(tree, 
@@ -1317,7 +1343,7 @@ static unsigned int handleAlpha(ruleset *tree,
         }
     }
 
-    return ERR_EVENT_NOT_HANDLED;
+    return result;
 }
 
 static unsigned int handleMessageCore(ruleset *tree,
@@ -1397,7 +1423,6 @@ static unsigned int handleMessageCore(ruleset *tree,
                                          *messageOffset));
 
     } else {
-
         CHECK_RESULT(storeMessage(sidState,
                                   mid,
                                   jo,
@@ -1414,10 +1439,10 @@ static unsigned int handleMessageCore(ruleset *tree,
             if (isNewState) {      
     #ifdef _WIN32
                 char *stateMessage = (char *)_alloca(sizeof(char)*(50 + sidProperty->valueLength * 2));
-                sprintf_s(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"mid\":\"sid-%s\", \"$s\":1}", sid, sid);
+                sprintf_s(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"id\":\"sid-%s\", \"$s\":1}", sid, sid);
     #else
                 char stateMessage[50 + sidProperty->valueLength * 2];
-                snprintf(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"mid\":\"sid-%s\", \"$s\":1}", sid, sid);
+                snprintf(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"id\":\"sid-%s\", \"$s\":1}", sid, sid);
     #endif
                 
                 unsigned int stateMessageOffset;
@@ -1457,7 +1482,8 @@ static unsigned int handleMessage(ruleset *tree,
                                  NULL, 
                                  NULL, 
                                  actionType == ACTION_ASSERT_FACT || 
-                                 actionType == ACTION_RETRACT_FACT,
+                                 actionType == ACTION_RETRACT_FACT ||
+                                 actionType == ACTION_UPDATE_STATE,
                                  &jo, 
                                  &next));
     

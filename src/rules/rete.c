@@ -8,7 +8,6 @@
 #include "json.h"
 #include "regex.h"
 
-#define _PRINT 1
 #define HASH_ALL 321211332 // all
 #define HASH_ANY 740945997 // any
 #define HASH_PRI 1450887882 // pri
@@ -1472,7 +1471,84 @@ static void printExpression(ruleset *tree, operand *newValue) {
     }
 }
 
-static void printExpressionSequence(ruleset *tree, expressionSequence *exprs, int level) {
+void printSimpleExpression(ruleset *tree, expression *currentExpression, unsigned char first, char *comp) {
+    if (currentExpression->operator == OP_IALL || currentExpression->operator == OP_IANY) {
+        char *leftProperty = &tree->stringPool[currentExpression->left.value.id.propertyNameOffset];
+        expression *newExpression = &tree->expressionPool[currentExpression->right.value.expressionOffset];
+        char *op = "";
+        switch (newExpression->operator) {
+            case OP_LT:
+                op = "<";
+                break;
+            case OP_LTE:
+                op = "<=";
+                break;
+            case OP_GT:
+                op = ">";
+                break;
+            case OP_GTE:
+                op = ">=";
+                break;
+            case OP_EQ:
+                op = "==";
+                break;
+            case OP_NEQ:
+                op = "!=";
+                break;
+        }
+
+        char *par = "";
+        if (currentExpression->operator == OP_IALL) {
+            par = "true";
+        } else {
+            par = "false";
+        }
+
+        if (!first) {
+            printf("%s compare_array(message[\"%s\"], ", comp, leftProperty);
+        } else {
+            printf("compare_array(message[\"%s\"], ", leftProperty);
+        }
+
+        printExpression(tree, &newExpression->right);
+        printf(", %s, %s)\n", op, par);
+
+    } else {
+        char *leftProperty = &tree->stringPool[currentExpression->left.value.id.propertyNameOffset];
+        char *op = "";
+        switch (currentExpression->operator) {
+            case OP_LT:
+                op = "<";
+                break;
+            case OP_LTE:
+                op = "<=";
+                break;
+            case OP_GT:
+                op = ">";
+                break;
+            case OP_GTE:
+                op = ">=";
+                break;
+            case OP_EQ:
+                op = "==";
+                break;
+            case OP_NEQ:
+                op = "!=";
+                break;
+        }
+
+        if (!first) {
+            printf(" %s message[\"%s\"] %s ", comp, leftProperty, op);
+        } else {
+            printf("message[\"%s\"] %s ", leftProperty, op);   
+        }
+
+        printExpression(tree, &currentExpression->right);
+    }
+
+}
+
+void printExpressionSequence(ruleset *tree, expressionSequence *exprs, int level) {
     for (int i = 0; i < level; ++ i) {
         printf("    ");
     }
@@ -1504,82 +1580,9 @@ static void printExpressionSequence(ruleset *tree, expressionSequence *exprs, in
             --compTop;
             comp = compStack[compTop];
             printf(")");            
-        } else if (currentExpression->operator == OP_IALL || currentExpression->operator == OP_IANY) {
-            char *leftProperty = &tree->stringPool[currentExpression->left.value.id.propertyNameOffset];
-            expression *newExpression = &tree->expressionPool[currentExpression->right.value.expressionOffset];
-            char *op = "";
-            switch (newExpression->operator) {
-                case OP_LT:
-                    op = "<";
-                    break;
-                case OP_LTE:
-                    op = "<=";
-                    break;
-                case OP_GT:
-                    op = ">";
-                    break;
-                case OP_GTE:
-                    op = ">=";
-                    break;
-                case OP_EQ:
-                    op = "==";
-                    break;
-                case OP_NEQ:
-                    op = "!=";
-                    break;
-            }
-
-            char *par = "";
-            if (currentExpression->operator == OP_IALL) {
-                par = "true";
-            } else {
-                par = "false";
-            }
-
-            if (!first) {
-                printf("%s compare_array(message[\"%s\"], ", comp, leftProperty);
-
-            } else {
-                printf("compare_array(message[\"%s\"], ", leftProperty);
-                first = 0;   
-            }
-
-            printExpression(tree, &newExpression->right);
-            printf(", %s, %s)\n", op, par);
-
         } else {
-            char *leftProperty = &tree->stringPool[currentExpression->left.value.id.propertyNameOffset];
-            char *op = "";
-            switch (currentExpression->operator) {
-                case OP_LT:
-                    op = "<";
-                    break;
-                case OP_LTE:
-                    op = "<=";
-                    break;
-                case OP_GT:
-                    op = ">";
-                    break;
-                case OP_GTE:
-                    op = ">=";
-                    break;
-                case OP_EQ:
-                    op = "==";
-                    break;
-                case OP_NEQ:
-                    op = "!=";
-                    break;
-            }
-
-            if (!first) {
-                printf(" %s message[\"%s\"] %s ", comp, leftProperty, op);
-            } else {
-                printf("message[\"%s\"] %s ", leftProperty, op);
-    
-                first = 0;   
-            }
-
-            printExpression(tree, &currentExpression->right);
+            printSimpleExpression(tree, currentExpression, first, comp);
+            first = 0;
         }
     }
     printf("\n");
@@ -1620,7 +1623,15 @@ static void printAlphaNode(ruleset *tree, node *alphaNode, int level, unsigned i
         printf("    ");
     }
 
-    printf("-> alpha: name %s, operator %x, offset %u\n", &tree->stringPool[alphaNode->nameOffset], alphaNode->value.a.expression.operator, offset);
+    printf("-> alpha: name %s, offset %u\n", &tree->stringPool[alphaNode->nameOffset], offset);
+    
+    for (int i = 0; i < level; ++ i) {
+        printf("    ");
+    }
+
+    printSimpleExpression(tree, &alphaNode->value.a.expression, 1, NULL);
+
+    printf("\n");
     if (alphaNode->value.a.nextOffset) {
         unsigned int *nextHashset = &tree->nextPool[alphaNode->value.a.nextOffset];
         for (unsigned int entry = 0; entry < NEXT_BUCKET_LENGTH; ++entry) { 

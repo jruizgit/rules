@@ -113,8 +113,6 @@ typedef struct actionStateNode {
     struct node *reteNode;
     pool resultPool;
     unsigned int resultIndex[1];
-    unsigned short count;
-    unsigned short cap;
 } actionStateNode;
 
 typedef struct betaStateNode {

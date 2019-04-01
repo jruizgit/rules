@@ -64,11 +64,6 @@
 
 #define MAX_HANDLES 131072
 
-#define CHECK_RESULT(result) do { \
-    if (result != RULES_OK) { \
-        return result; \
-    } \
-} while(0)
 
 #ifdef __cplusplus
 extern "C" {
@@ -84,6 +79,13 @@ handleEntry handleEntries[MAX_HANDLES];
 extern unsigned int firstEmptyEntry;
 extern unsigned int lastEmptyEntry;
 extern char entriesInitialized;
+
+#define CHECK_RESULT(func) do { \
+    unsigned int result = func; \
+    if (result != RULES_OK) { \
+        return result; \
+    } \
+} while(0)
 
 #define INITIALIZE_ENTRIES do { \
     if (!entriesInitialized) { \

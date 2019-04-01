@@ -1,5 +1,7 @@
 #include "state.h"
 
+#define _PRINT 1
+
 #define OP_NOP 0
 #define OP_LT 0x01
 #define OP_LTE 0x02
@@ -135,4 +137,16 @@ typedef struct ruleset {
     unsigned int currentStateIndex;
 } ruleset;
 
+#ifdef _PRINT
 
+void printSimpleExpression(ruleset *tree, 
+                           expression *currentExpression, 
+                           unsigned char first, 
+                           char *comp);
+
+void printExpressionSequence(ruleset *tree, 
+                             expressionSequence *exprs, 
+                             int level);
+
+
+#endif
