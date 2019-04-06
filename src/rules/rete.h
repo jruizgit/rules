@@ -1,6 +1,6 @@
 #include "state.h"
 
-#define _PRINT 1
+//#define _PRINT 1
 
 #define OP_NOP 0
 #define OP_LT 0x01

@@ -203,7 +203,8 @@ unsigned int getLeftFrame(stateNode *state,
         hash, 
         valueOffset);
     if (valueOffset == UNDEFINED_HASH_OFFSET) {
-        return ERR_FRAME_NOT_FOUND;
+        *node = NULL;
+        return RULES_OK;
     }
 
     *node = LEFT_FRAME_NODE(state, index, valueOffset);
@@ -360,7 +361,8 @@ unsigned int getRightFrame(stateNode *state,
         hash, 
         valueOffset);
     if (valueOffset == UNDEFINED_HASH_OFFSET) {
-        return ERR_FRAME_NOT_FOUND;
+        *node = NULL;
+        return RULES_OK;
     }
 
     *node = RIGHT_FRAME_NODE(state, index, valueOffset);
