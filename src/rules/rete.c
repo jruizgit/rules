@@ -1514,7 +1514,6 @@ void printSimpleExpression(ruleset *tree, expression *currentExpression, unsigne
         printf(", %s, %s)\n", op, par);
 
     } else {
-        char *leftProperty = &tree->stringPool[currentExpression->left.value.id.propertyNameOffset];
         char *op = "";
         switch (currentExpression->operator) {
             case OP_LT:
@@ -1535,8 +1534,16 @@ void printSimpleExpression(ruleset *tree, expression *currentExpression, unsigne
             case OP_NEQ:
                 op = "!=";
                 break;
+            case OP_NOP:
+            case OP_NEX:
+            case OP_EX:
+            case OP_TYPE:
+            case OP_MT:
+            case OP_IMT:
+                return;
         }
 
+        char *leftProperty = &tree->stringPool[currentExpression->left.value.id.propertyNameOffset];
         if (!first) {
             printf(" %s message[\"%s\"] %s ", comp, leftProperty, op);
         } else {
@@ -1593,11 +1600,12 @@ static void printActionNode(ruleset *tree, node *actionNode, int level, unsigned
         printf("    ");
     }
 
-    printf("-> action: name %s, count %d, cap %d, priority %d, offset %u\n", 
+    printf("-> action: name %s, count %d, cap %d, priority %d, index %d, offset %u\n", 
           &tree->stringPool[actionNode->nameOffset],
           actionNode->value.c.count,
           actionNode->value.c.cap,
           actionNode->value.c.priority,
+          actionNode->value.c.index,
           offset);
 }
 
@@ -1606,7 +1614,12 @@ static void printBetaNode(ruleset *tree, node *betaNode, int level, unsigned int
         printf("    ");
     }
 
-    printf("-> beta: name %s, not %d, distinct %d, index %d, offset %u\n", &tree->stringPool[betaNode->nameOffset], betaNode->value.b.not, betaNode->value.b.distinct, betaNode->value.b.index, offset);
+    printf("-> beta: name %s, not %d, distinct %d, index %d, offset %u\n", 
+           &tree->stringPool[betaNode->nameOffset], 
+           betaNode->value.b.not, 
+           betaNode->value.b.distinct, 
+           betaNode->value.b.index, 
+           offset);
     if (betaNode->value.b.expressionSequence.length != 0) {
         printExpressionSequence(tree, &betaNode->value.b.expressionSequence, level);
     }
@@ -1670,7 +1683,7 @@ static unsigned int createTree(ruleset *tree, char *rules) {
                                        &firstName, 
                                        &lastName, 
                                        &hash);
-    node *ruleActions[MAX_ACTIONS];
+    unsigned int ruleActions[MAX_ACTIONS];
     while (result == PARSE_OK) {
         node *ruleAction;
         unsigned int actionOffset;
@@ -1683,7 +1696,7 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         }
 
         ruleAction->value.c.index = tree->actionCount;
-        ruleActions[tree->actionCount] = ruleAction;
+        ruleActions[tree->actionCount] = actionOffset;
         ++tree->actionCount;
         ruleAction->type = NODE_ACTION;
         
@@ -1720,15 +1733,19 @@ static unsigned int createTree(ruleset *tree, char *rules) {
         //Ensure action index is assigned based on priority
         unsigned int currentIndex = ruleAction->value.c.index;
         while (currentIndex) {
-            if (ruleActions[currentIndex]->value.c.priority >= ruleActions[currentIndex - 1]->value.c.priority) {
+            node *currentAction = &tree->nodePool[ruleActions[currentIndex]];
+            node *previousAction = &tree->nodePool[ruleActions[currentIndex - 1]];
+            if (currentAction->value.c.priority >= previousAction->value.c.priority) {
                 break;
             } else {
-                node *tempAction = ruleActions[currentIndex];
+                unsigned int tempAction = ruleActions[currentIndex];
                 ruleActions[currentIndex] = ruleActions[currentIndex - 1];
-                ruleActions[currentIndex]->value.c.index = currentIndex;
-                ruleActions[currentIndex - 1] = tempAction;
-                ruleActions[currentIndex - 1]->value.c.index = currentIndex - 1;  
-                --currentIndex; 
+                previousAction->value.c.index = currentIndex;
+
+                --currentIndex;
+
+                ruleActions[currentIndex] = tempAction;
+                currentAction->value.c.index = currentIndex;
             }
         }
 
@@ -1827,13 +1844,13 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     CHECK_RESULT(storeAlpha(tree, 
                             &newNode, 
                             &nodeOffset));
-    
+
     newNode->nameOffset = stringOffset;
     newNode->type = NODE_ALPHA;
     newNode->value.a.expression.operator = OP_TYPE;
+
     // will use random numbers for state stored event mids
     srand(time(NULL));
-
     CREATE_HANDLE(tree, handle);
     return createTree(tree, rules);
 }
