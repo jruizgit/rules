@@ -1358,7 +1358,7 @@ static unsigned int createBeta(ruleset *tree,
         newBeta->nameOffset = stringOffset;
         newBeta->type = NODE_BETA_CONNECTOR;
         newBeta->value.b.nextOffset = nextOffset;
-        newBeta->value.b.not = (operator == OP_NOT) ? 1 : 0;
+        newBeta->value.b.operator = operator;
         newBeta->value.b.distinct = (distinct != 0) ? 1 : 0;
         newBeta->value.b.hash = hash;
         newBeta->value.b.index = tree->betaCount;
@@ -1614,9 +1614,9 @@ static void printBetaNode(ruleset *tree, node *betaNode, int level, unsigned int
         printf("    ");
     }
 
-    printf("-> beta: name %s, not %d, distinct %d, index %d, offset %u\n", 
+    printf("-> beta: name %s, operator %d, distinct %d, index %d, offset %u\n", 
            &tree->stringPool[betaNode->nameOffset], 
-           betaNode->value.b.not, 
+           betaNode->value.b.operator, 
            betaNode->value.b.distinct, 
            betaNode->value.b.index, 
            offset);

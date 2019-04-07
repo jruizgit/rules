@@ -54,6 +54,7 @@
             ((type *)pool.content)[i].nextOffset = i + 1; \
             ((type *)pool.content)[i].prevOffset = i - 1; \
         } \
+        value = &((type *)pool.content)[valueOffset]; \
         value->nextOffset = pool.contentLength; \
         ((type *)pool.content)[pool.contentLength].prevOffset = valueOffset; \
         pool.contentLength *= 2; \
@@ -634,6 +635,9 @@ unsigned int serializeResult(void *tree,
 
     if (actionNode->reteNode->value.c.count && count == 1) {
         leftFrameNode *resultFrame = RESULT_FRAME(actionNode, actionNode->resultIndex[0]);
+        if (!resultFrame->isActive) {
+            return ERR_NODE_DELETED;
+        }
         char *actionName = &((ruleset *)tree)->stringPool[resultFrame->nameOffset];
         unsigned int resultLength = strlen(actionName) + 6 + getResultFrameLength(tree, 
                                                                                   state, 
@@ -759,6 +763,12 @@ unsigned int getNextResult(void *tree,
     unsigned int count = 0;
     ruleset *rulesetTree = (ruleset*)tree;
     *resultAction = NULL;
+
+    // In case state pool has been modified.
+    if (rulesetTree->statePool.count) {
+        rulesetTree->currentStateIndex = rulesetTree->currentStateIndex % rulesetTree->statePool.count;
+    }
+    
     while (count < rulesetTree->statePool.count && !*resultAction) {
         unsigned int nodeOffset = rulesetTree->reverseStateIndex[rulesetTree->currentStateIndex];
         *resultState = STATE_NODE(tree, nodeOffset); 

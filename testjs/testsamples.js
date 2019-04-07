@@ -249,6 +249,7 @@ d.statechart('expense3', function() {
     }
 });
 
+
 d.flowchart('expense4', function() {
     input: {
         request: m.subject == 'approve' && m.amount <= 1000 
@@ -280,6 +281,7 @@ d.flowchart('expense4', function() {
     }
 });
 
+
 d.ruleset('expense5', function() {
     // use the '.' notation to match properties in nested objects
     whenAll: {
@@ -300,6 +302,7 @@ d.ruleset('expense5', function() {
     }
 });
 
+
 d.ruleset('bookstore', function() {
     // this rule will trigger for events with status
     whenAll: +m.status
@@ -319,7 +322,6 @@ d.ruleset('bookstore', function() {
     // this rule will be triggered when the fact is retracted
     whenAll: none(+m.name)
     run: console.log('bookstore no books');
-
 
     whenStart: {
         // will return 0 because the fact assert was successful 
@@ -352,6 +354,7 @@ d.ruleset('bookstore', function() {
     }
 });
 
+
 d.ruleset('attributes', function() {
     whenAll: m.amount < 300
     pri: 3 
@@ -372,40 +375,69 @@ d.ruleset('attributes', function() {
     }
 });
 
-// d.ruleset('animal', function() {
-//     whenAll: {
-//         first = m.predicate == 'eats' && m.object == 'flies' 
-//         m.predicate == 'lives' && m.object == 'water' && m.subject == first.subject
+
+d.ruleset('animal', function() {
+    whenAll: {
+        first = m.predicate == 'eats' && m.object == 'flies' 
+        m.predicate == 'lives' && m.object == 'water' && m.subject == first.subject
+    }
+    run: assert({ subject: first.subject, predicate: 'is', object: 'frog' })
+
+    whenAll: {
+        first = m.predicate == 'eats' && m.object == 'flies' 
+        m.predicate == 'lives' && m.object == 'land' && m.subject == first.subject
+    }
+    run: assert({ subject: first.subject, predicate: 'is', object: 'chameleon' })
+
+    whenAll: m.predicate == 'eats' && m.object == 'worms' 
+    run: assert({ subject: m.subject, predicate: 'is', object: 'bird' })
+
+    whenAll: m.predicate == 'is' && m.object == 'frog'
+    run: assert({ subject: m.subject, predicate: 'is', object: 'green'})
+
+    whenAll: m.predicate == 'is' && m.object == 'chameleon'
+    run: assert({ subject: m.subject, predicate: 'is', object: 'green'})
+
+    whenAll: m.predicate == 'is' && m.object == 'bird' 
+    run: assert({ subject: m.subject, predicate: 'is', object: 'black'})
+
+    whenAll: +m.subject
+    run: console.log('animal fact: ' + m.subject + ' ' + m.predicate + ' ' + m.object)
+
+    whenStart: {
+        assert('animal', { subject: 'Kermit', predicate: 'eats', object: 'flies'});
+        assert('animal', { subject: 'Kermit', predicate: 'lives', object: 'water'});
+        assert('animal', { subject: 'Greedy', predicate: 'eats', object: 'flies'});
+        assert('animal', { subject: 'Greedy', predicate: 'lives', object: 'land'});
+        assert('animal', { subject: 'Tweety', predicate: 'eats', object: 'worms'});
+    }
+});
+
+
+// d.ruleset('expense1', function() {
+//     whenAny: {
+//         whenAll: {
+//             first = m.subject == 'approve'
+//             second = m.amount == 1000
+//         }
+//         whenAll: { 
+//             third = m.subject == 'jumbo'
+//             fourth = m.amount == 10000
+//         }
 //     }
-//     run: assert({ subject: first.subject, predicate: 'is', object: 'frog' })
-
-//     whenAll: {
-//         first = m.predicate == 'eats' && m.object == 'flies' 
-//         m.predicate == 'lives' && m.object == 'land' && m.subject == first.subject
+//     run: {
+//         if (first) {
+//             console.log('expense1 Approved ' + first.subject + ' ' + second.amount);     
+//         } else {
+//             console.log('expense1 Approved ' + third.subject + ' ' + fourth.amount);        
+//         }
 //     }
-//     run: assert({ subject: first.subject, predicate: 'is', object: 'chameleon' })
-
-//     whenAll: m.predicate == 'eats' && m.object == 'worms' 
-//     run: assert({ subject: m.subject, predicate: 'is', object: 'bird' })
-
-//     whenAll: m.predicate == 'is' && m.object == 'frog'
-//     run: assert({ subject: m.subject, predicate: 'is', object: 'green'})
-
-//     whenAll: m.predicate == 'is' && m.object == 'chameleon'
-//     run: assert({ subject: m.subject, predicate: 'is', object: 'green'})
-
-//     whenAll: m.predicate == 'is' && m.object == 'bird' 
-//     run: assert({ subject: m.subject, predicate: 'is', object: 'black'})
-
-//     whenAll: +m.subject
-//     run: console.log('animal fact: ' + m.subject + ' ' + m.predicate + ' ' + m.object)
 
 //     whenStart: {
-//         assert('animal', { subject: 'Kermit', predicate: 'eats', object: 'flies'});
-//         assert('animal', { subject: 'Kermit', predicate: 'lives', object: 'water'});
-//         assert('animal', { subject: 'Greedy', predicate: 'eats', object: 'flies'});
-//         assert('animal', { subject: 'Greedy', predicate: 'lives', object: 'land'});
-//         assert('animal', { subject: 'Tweety', predicate: 'eats', object: 'worms'});
+//         post('expense1', {subject: 'approve'});
+//         post('expense1', {amount: 1000});
+//         post('expense1', {subject: 'jumbo'});
+//         post('expense1', {amount: 10000});
 //     }
 // });
 
@@ -437,33 +469,6 @@ d.ruleset('attributes', function() {
 
 //     whenStart: {
 //         patchState('flow1', { state: 'first' });
-//     }
-// });
-
-// d.ruleset('expense1', function() {
-//     whenAny: {
-//         whenAll: {
-//             first = m.subject == 'approve'
-//             second = m.amount == 1000
-//         }
-//         whenAll: { 
-//             third = m.subject == 'jumbo'
-//             fourth = m.amount == 10000
-//         }
-//     }
-//     run: {
-//         if (first) {
-//             console.log('expense1 Approved ' + first.subject + ' ' + second.amount);     
-//         } else {
-//             console.log('expense1 Approved ' + third.subject + ' ' + fourth.amount);        
-//         }
-//     }
-
-//     whenStart: {
-//         post('expense1', {subject: 'approve'});
-//         post('expense1', {amount: 1000});
-//         post('expense1', {subject: 'jumbo'});
-//         post('expense1', {amount: 10000});
 //     }
 // });
 
