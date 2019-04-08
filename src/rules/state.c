@@ -293,6 +293,11 @@ unsigned int getActionFrame(stateNode *state,
                             leftFrameNode **resultNode) {
     actionStateNode *resultStateNode = &state->actionState[index];
     unsigned int resultFrameOffset = resultStateNode->resultIndex[0];
+    if (resultFrameOffset == UNDEFINED_HASH_OFFSET) {
+        *resultNode = NULL;
+        return RULES_OK;
+    }
+
     *resultNode = RESULT_FRAME(resultStateNode, resultFrameOffset);
     if (resultLocation) {
         resultLocation->frameType = ACTION_FRAME;
@@ -306,7 +311,7 @@ unsigned int setActionFrame(stateNode *state,
                             frameLocation location) {
     SET(leftFrameNode, 
         state->actionState[location.nodeIndex].resultIndex, 
-        MAX_LEFT_FRAME_INDEX_LENGTH, 
+        1, 
         state->actionState[location.nodeIndex].resultPool, 
         0, 
         location.frameOffset);
@@ -317,7 +322,7 @@ unsigned int deleteActionFrame(stateNode *state,
                                frameLocation location) {
     DELETE(leftFrameNode,
            state->actionState[location.nodeIndex].resultIndex, 
-           MAX_LEFT_FRAME_INDEX_LENGTH,
+           1,
            state->actionState[location.nodeIndex].resultPool,
            location.frameOffset);
     return RULES_OK;
@@ -339,7 +344,7 @@ unsigned int createActionFrame(stateNode *state,
     newLocation->nodeIndex = reteNode->value.c.index;
     newLocation->frameOffset = newValueOffset;
     targetNode->nameOffset = reteNode->nameOffset;
-
+    
     CHECK_RESULT(copyLeftFrame(state,
                                oldNode, 
                                targetNode, 
@@ -768,7 +773,7 @@ unsigned int getNextResult(void *tree,
     if (rulesetTree->statePool.count) {
         rulesetTree->currentStateIndex = rulesetTree->currentStateIndex % rulesetTree->statePool.count;
     }
-    
+
     while (count < rulesetTree->statePool.count && !*resultAction) {
         unsigned int nodeOffset = rulesetTree->reverseStateIndex[rulesetTree->currentStateIndex];
         *resultState = STATE_NODE(tree, nodeOffset); 

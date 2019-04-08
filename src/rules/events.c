@@ -69,7 +69,7 @@ static unsigned int reduceExpression(ruleset *tree,
                                      stateNode *state, 
                                      expression *currentExpression,
                                      jsonObject *messageObject,
-                                     messageFrame *messageContext,
+                                     leftFrameNode *context,
                                      jsonProperty *targetProperty);
 
 static unsigned int reduceString(char *left, 
@@ -264,7 +264,7 @@ static unsigned int reduceOperand(ruleset *tree,
                                   stateNode *state, 
                                   operand *sourceOperand, 
                                   jsonObject *messageObject,
-                                  messageFrame *messageContext,
+                                  leftFrameNode *context,
                                   jsonProperty **targetProperty) {
     (*targetProperty)->type = sourceOperand->type;
     switch(sourceOperand->type) {
@@ -276,19 +276,20 @@ static unsigned int reduceOperand(ruleset *tree,
                                         state,
                                         currentExpression,
                                         messageObject,
-                                        messageContext,
+                                        context,
                                         *targetProperty);
             }
         case JSON_IDENTIFIER:
             CHECK_RESULT(getMessageFromFrame(state,
-                                             messageContext, 
+                                             context->messages, 
                                              sourceOperand->value.id.nameHash, 
                                              &messageObject));
             // break omitted intentionally, continue to next case
         case JSON_MESSAGE_IDENTIFIER:
-            return getObjectProperty(messageObject,
-                                     sourceOperand->value.id.propertyNameHash,
-                                     targetProperty);
+            CHECK_RESULT(getObjectProperty(messageObject,
+                                           sourceOperand->value.id.propertyNameHash,
+                                           targetProperty));
+            return RULES_OK;
         case JSON_STRING:
             {
                 char *stringValue = &tree->stringPool[sourceOperand->value.stringOffset];
@@ -471,7 +472,7 @@ static unsigned int reduceExpression(ruleset *tree,
                                      stateNode *state, 
                                      expression *currentExpression,
                                      jsonObject *messageObject,
-                                     messageFrame *messageContext,
+                                     leftFrameNode *context,
                                      jsonProperty *targetProperty) {
     jsonProperty leftValue;
     jsonProperty *leftProperty = &leftValue;
@@ -479,7 +480,7 @@ static unsigned int reduceExpression(ruleset *tree,
                                state,
                                &currentExpression->left,
                                messageObject,
-                               messageContext,
+                               context,
                                &leftProperty));
 
     if (currentExpression->right.type == JSON_REGEX || currentExpression->right.type == JSON_IREGEX) {
@@ -500,7 +501,7 @@ static unsigned int reduceExpression(ruleset *tree,
                                state,
                                &currentExpression->right,
                                messageObject,
-                               messageContext,
+                               context,
                                &rightProperty));
 
     return reduceProperties(currentExpression->operator, 
@@ -514,7 +515,7 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
                                              expressionSequence *exprs,
                                              unsigned short operator,
                                              jsonObject *messageObject,
-                                             messageFrame *messageContext,
+                                             leftFrameNode *context,
                                              unsigned short *i,
                                              jsonProperty *targetProperty) {
     targetProperty->type = JSON_BOOL;
@@ -543,7 +544,7 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
                                                       exprs,
                                                       currentExpression->operator,
                                                       messageObject,
-                                                      messageContext,
+                                                      context,
                                                       i,
                                                       &dummyProperty));
             }
@@ -555,7 +556,7 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
                                                       exprs,
                                                       currentExpression->operator,
                                                       messageObject,
-                                                      messageContext,
+                                                      context,
                                                       i,
                                                       targetProperty));
             } else if (currentExpression->operator == OP_IALL || currentExpression->operator == OP_IANY) {
@@ -565,7 +566,7 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
                                               state,
                                               currentExpression,
                                               messageObject,
-                                              messageContext,
+                                              context,
                                               targetProperty));
                 if (targetProperty->type != JSON_BOOL) {
                     return ERR_OPERATION_NOT_SUPPORTED;
@@ -597,7 +598,7 @@ static unsigned int isBetaMatch(ruleset *tree,
                                          &currentBeta->expressionSequence,
                                          OP_NOP,
                                          messageObject,
-                                         context->messages,
+                                         context,
                                          &i,
                                          &resultProperty));
 
@@ -672,14 +673,15 @@ static unsigned char isDistinct(leftFrameNode *currentFrame, unsigned int curren
 static unsigned int handleAction(ruleset *tree, 
                                  stateNode *state, 
                                  node *node,
+                                 frameLocation currentFrameLocation,
                                  leftFrameNode *frame) {
 #ifdef _PRINT
     printf("handle action %s\n", &tree->stringPool[node->nameOffset]);
-    printf("frame\n");
-    for (int i = 0; i < frame->messageCount; ++i) {
+    printf("frame %d, %d\n", currentFrameLocation.nodeIndex, currentFrameLocation.frameOffset);
+    for (int i = 0; i < MAX_MESSAGE_FRAMES; ++i) {
         if (frame->messages[i].hash) {
             messageNode *node = MESSAGE_NODE(state, frame->messages[i].messageNodeOffset);
-            printf("    -> %s\n", node->jo.content);
+            printf("   %d -> %s\n", i, node->jo.content);
         }
     }
 #endif
@@ -728,6 +730,7 @@ static unsigned int handleBetaFrame(ruleset *tree,
         return handleAction(tree, 
                             state, 
                             currentNode,
+                            currentFrameLocation,
                             currentFrame);
     }
 
@@ -991,16 +994,22 @@ static unsigned int handleFilterFrames(ruleset *tree,
             location.frameOffset = currentFrame->nextOffset;
             currentFrame = NULL;
             while (location.frameOffset != UNDEFINED_HASH_OFFSET) {
-                currentFrame = LEFT_FRAME_NODE(state, 
-                                               location.nodeIndex, 
-                                               location.frameOffset);
+                if (nextNode->type == NODE_ACTION) {
+                    currentFrame = ACTION_FRAME_NODE(state, 
+                                                     location.nodeIndex, 
+                                                     location.frameOffset);
+                } else {
+                    currentFrame = LEFT_FRAME_NODE(state, 
+                                                   location.nodeIndex, 
+                                                   location.frameOffset);
+                }
     
-                if (currentFrame->hash != messageHash) {
+                if (currentFrame->hash == messageHash) {
+                    break;
+                } else {
                     location.frameOffset = currentFrame->nextOffset;
                     currentFrame = NULL;
-                } else {
-                    location.frameOffset = UNDEFINED_HASH_OFFSET;
-                }   
+                } 
             }
         }            
 
@@ -1054,12 +1063,12 @@ static unsigned int handleMatchFrames(ruleset *tree,
             currentFrame = LEFT_FRAME_NODE(state, 
                                            currentNode->value.b.index, 
                                            currentFrameOffset);
-            if (currentFrame->hash != messageHash) {
+            if (currentFrame->hash == messageHash) {
+                break;
+            } else {
                 currentFrameOffset = currentFrame->nextOffset;
                 currentFrame = NULL;
-            } else {
-                currentFrameOffset = UNDEFINED_HASH_OFFSET;
-            }   
+            }  
         }
     }
 
@@ -1916,21 +1925,23 @@ static unsigned int deleteCurrentAction(ruleset *tree,
                                     &resultLocation,
                                     &resultFrame));
 
-        for (int i = 0; i < resultFrame->messageCount; ++i) {
-            messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
-            messageNode *currentMessageNode = MESSAGE_NODE(state, 
-                                                           currentMessageFrame->messageNodeOffset);
+        if (resultFrame) {
+            for (int i = 0; i < resultFrame->messageCount; ++i) {
+                messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
+                messageNode *currentMessageNode = MESSAGE_NODE(state, 
+                                                               currentMessageFrame->messageNodeOffset);
 
-            if (currentMessageNode->messageType == MESSAGE_TYPE_EVENT) {
-                CHECK_RESULT(handleDeleteMessage(tree,
-                                                 state, 
-                                                 currentMessageFrame->messageNodeOffset));
+                if (currentMessageNode->messageType == MESSAGE_TYPE_EVENT) {
+                    CHECK_RESULT(handleDeleteMessage(tree,
+                                                     state, 
+                                                     currentMessageFrame->messageNodeOffset));
+                }
             }
-        }
 
-        unsigned int result = deleteActionFrame(state, resultLocation);
-        if (result != RULES_OK && result != ERR_NODE_DELETED) {
-            return result;
+            unsigned int result = deleteActionFrame(state, resultLocation);
+            if (result != RULES_OK && result != ERR_NODE_DELETED) {
+                return result;
+            }
         }
     }
 
