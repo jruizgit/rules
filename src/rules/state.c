@@ -643,6 +643,17 @@ unsigned int serializeResult(void *tree,
         if (!resultFrame->isActive) {
             return ERR_NODE_DELETED;
         }
+
+
+// printf("dispatch result %s\n", &((ruleset *)tree)->stringPool[actionNode->reteNode->nameOffset]);
+// printf("frame %d, %d\n", actionNode->reteNode->value.c.index, actionNode->resultIndex[0]);
+// for (int i = 0; i < MAX_MESSAGE_FRAMES; ++i) {
+//     if (resultFrame->messages[i].hash) {
+//         messageNode *node = MESSAGE_NODE(state, resultFrame->messages[i].messageNodeOffset);
+//         printf("   %d -> %s\n", i, node->jo.content);
+//     }
+// }
+
         char *actionName = &((ruleset *)tree)->stringPool[resultFrame->nameOffset];
         unsigned int resultLength = strlen(actionName) + 6 + getResultFrameLength(tree, 
                                                                                   state, 
@@ -876,7 +887,6 @@ static unsigned int fixupIds(jsonObject *jo, char generateId) {
         //coerce value to string
         property = &jo->properties[jo->sidIndex];
         if (property->type != JSON_STRING) {
-            ++property->valueLength;
             property->value.s = jo->content + property->valueOffset;
             property->type = JSON_STRING;
         }
@@ -900,7 +910,6 @@ static unsigned int fixupIds(jsonObject *jo, char generateId) {
         //coerce value to string
         property = &jo->properties[jo->idIndex];
         if (property->type != JSON_STRING) {
-            ++property->valueLength;
             property->value.s = jo->content + property->valueOffset;
             property->type = JSON_STRING;
         }

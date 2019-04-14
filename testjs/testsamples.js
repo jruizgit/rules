@@ -282,27 +282,6 @@ d.flowchart('expense4', function() {
 });
 
 
-d.ruleset('expense5', function() {
-    // use the '.' notation to match properties in nested objects
-    whenAll: {
-        bill = m.t == 'bill' && m.invoice.amount > 50
-        account = m.t == 'account' && m.payment.invoice.amount == bill.invoice.amount
-    }
-    run: {
-        console.log('expense5 bill amount ->' + bill.invoice.amount);
-        console.log('expense5 account payment amount ->' + account.payment.invoice.amount);
-    }
-
-    whenStart: {
-        // one level of nesting
-        post('expense5', {t: 'bill', invoice: {amount: 100}});  
-
-        // two levels of nesting
-        post('expense5', {t: 'account', payment: {invoice: {amount: 100}}}); 
-    }
-});
-
-
 d.ruleset('bookstore', function() {
     // this rule will trigger for events with status
     whenAll: +m.status
@@ -375,6 +354,26 @@ d.ruleset('attributes', function() {
     }
 });
 
+
+d.ruleset('expense5', function() {
+    // use the '.' notation to match properties in nested objects
+    whenAll: {
+        bill = m.t == 'bill' && m.invoice.amount > 50
+        account = m.t == 'account' && m.payment.invoice.amount == bill.invoice.amount
+    }
+    run: {
+        console.log('expense5 bill amount ->' + bill.invoice.amount);
+        console.log('expense5 account payment amount ->' + account.payment.invoice.amount);
+    }
+
+    whenStart: {
+        // one level of nesting
+        post('expense5', {t: 'bill', invoice: {amount: 100}});  
+
+        // two levels of nesting
+        post('expense5', {t: 'account', payment: {invoice: {amount: 100}}}); 
+    }
+});
 
 d.ruleset('animal', function() {
     whenAll: {
