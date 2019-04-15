@@ -1827,7 +1827,7 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     tree->currentStateIndex = 0;
-    memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
+    memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int) * 2);
     memset(tree->reverseStateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
     initStatePool(tree);
     

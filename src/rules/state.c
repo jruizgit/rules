@@ -29,12 +29,24 @@
     pool.count = 0; \
 } while(0)
 
-#define GET(type, index, max, pool, nodeHash, valueOffset) do { \
-    valueOffset = index[nodeHash % max]; \
+#define GET_FIRST(type, index, max, pool, nodeHash, valueOffset) do { \
+    valueOffset = index[(nodeHash % max) * 2]; \
     while (valueOffset != UNDEFINED_HASH_OFFSET) { \
         type *value = &((type *)pool.content)[valueOffset]; \
         if (value->hash != nodeHash) { \
             valueOffset = value->nextOffset; \
+        } else { \
+            break; \
+        } \
+    } \
+} while(0)
+
+#define GET_LAST(type, index, max, pool, nodeHash, valueOffset) do { \
+    valueOffset = index[(nodeHash % max) * 2 + 1]; \
+    while (valueOffset != UNDEFINED_HASH_OFFSET) { \
+        type *value = &((type *)pool.content)[valueOffset]; \
+        if (value->hash != nodeHash) { \
+            valueOffset = value->prevOffset; \
         } else { \
             break; \
         } \
@@ -72,10 +84,12 @@
     type *value = &((type *)pool.content)[valueOffset]; \
     value->hash = nodeHash; \
     value->prevOffset = UNDEFINED_HASH_OFFSET; \
-    value->nextOffset = index[nodeHash % max]; \
-    index[nodeHash % max] = valueOffset; \
+    value->nextOffset = index[(nodeHash % max) * 2]; \
+    index[(nodeHash % max) * 2] = valueOffset; \
     if (value->nextOffset != UNDEFINED_HASH_OFFSET) { \
         ((type *)pool.content)[value->nextOffset].prevOffset = valueOffset; \
+    } else { \
+        index[(nodeHash % max) * 2 + 1] = valueOffset; \
     } \
 } while(0)
 
@@ -85,12 +99,14 @@
         return ERR_NODE_DELETED; \
     } \
     if (value->prevOffset == UNDEFINED_HASH_OFFSET) { \
-        index[value->hash % max] = value->nextOffset; \
+        index[(value->hash % max) * 2] = value->nextOffset; \
     } else { \
         type *prevValue = &((type *)pool.content)[value->prevOffset]; \
         prevValue->nextOffset = value->nextOffset; \
     } \
-    if (value->nextOffset != UNDEFINED_HASH_OFFSET) { \
+    if (value->nextOffset == UNDEFINED_HASH_OFFSET) { \
+        index[(value->hash % max) * 2 + 1] = value->prevOffset; \
+    } else { \
         type *nextValue = &((type *)pool.content)[value->nextOffset]; \
         nextValue->prevOffset = value->prevOffset; \
     } \
@@ -191,18 +207,18 @@ unsigned int setMessageInFrame(leftFrameNode *node,
     return RULES_OK;   
 }
 
-unsigned int getLeftFrame(stateNode *state,
+unsigned int getLastLeftFrame(stateNode *state,
                           unsigned int index, 
                           unsigned int hash, 
                           frameLocation *location,
                           leftFrameNode **node) {
     unsigned int valueOffset;
-    GET(leftFrameNode, 
-        state->betaState[index].leftFrameIndex, 
-        MAX_LEFT_FRAME_INDEX_LENGTH, 
-        state->betaState[index].leftFramePool, 
-        hash, 
-        valueOffset);
+    GET_LAST(leftFrameNode, 
+             state->betaState[index].leftFrameIndex, 
+             MAX_LEFT_FRAME_INDEX_LENGTH, 
+             state->betaState[index].leftFramePool, 
+             hash, 
+             valueOffset);
     if (valueOffset == UNDEFINED_HASH_OFFSET) {
         *node = NULL;
         return RULES_OK;
@@ -355,17 +371,17 @@ unsigned int createActionFrame(stateNode *state,
     return RULES_OK;
 }
 
-unsigned int getRightFrame(stateNode *state,
+unsigned int getLastRightFrame(stateNode *state,
                            unsigned int index, 
                            unsigned int hash, 
                            rightFrameNode **node) {
     unsigned int valueOffset;
-    GET(rightFrameNode, 
-        state->betaState[index].rightFrameIndex, 
-        MAX_RIGHT_FRAME_INDEX_LENGTH, 
-        state->betaState[index].rightFramePool, 
-        hash, 
-        valueOffset);
+    GET_LAST(rightFrameNode, 
+             state->betaState[index].rightFrameIndex, 
+             MAX_RIGHT_FRAME_INDEX_LENGTH, 
+             state->betaState[index].rightFramePool, 
+             hash, 
+             valueOffset);
     if (valueOffset == UNDEFINED_HASH_OFFSET) {
         *node = NULL;
         return RULES_OK;
@@ -452,12 +468,12 @@ unsigned int getMessage(stateNode *state,
     *valueOffset = UNDEFINED_HASH_OFFSET;
     unsigned int hash = fnv1Hash32(mid, strlen(mid));
 
-    GET(messageNode, 
-        state->messageIndex, 
-        MAX_MESSAGE_INDEX_LENGTH, 
-        state->messagePool, 
-        hash, 
-        *valueOffset);
+    GET_FIRST(messageNode, 
+              state->messageIndex, 
+              MAX_MESSAGE_INDEX_LENGTH, 
+              state->messagePool, 
+              hash, 
+              *valueOffset);
 
     return RULES_OK;
 }
@@ -491,12 +507,12 @@ unsigned int storeMessage(stateNode *state,
     unsigned int hash = fnv1Hash32(mid, strlen(mid));
     *valueOffset = UNDEFINED_HASH_OFFSET;
 
-    GET(messageNode, 
-        state->messageIndex, 
-        MAX_MESSAGE_INDEX_LENGTH, 
-        state->messagePool, 
-        hash, 
-        *valueOffset);
+    GET_FIRST(messageNode, 
+              state->messageIndex, 
+              MAX_MESSAGE_INDEX_LENGTH, 
+              state->messagePool, 
+              hash, 
+              *valueOffset);
 
     if (*valueOffset != UNDEFINED_HASH_OFFSET) {
         return ERR_EVENT_OBSERVED;
@@ -525,32 +541,60 @@ unsigned int ensureStateNode(void *tree,
     unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
     unsigned int nodeOffset;
     ruleset *rulesetTree = (ruleset*)tree;
-    GET(stateNode, rulesetTree->stateIndex, MAX_STATE_INDEX_LENGTH, ((ruleset*)tree)->statePool, sidHash, nodeOffset);
+
+    GET_FIRST(stateNode, 
+              rulesetTree->stateIndex, 
+              MAX_STATE_INDEX_LENGTH, 
+              ((ruleset*)tree)->statePool, 
+              sidHash, 
+              nodeOffset);
+
     if (nodeOffset != UNDEFINED_HASH_OFFSET) {
         *isNew = 0;
         *state = STATE_NODE(tree, nodeOffset); 
     } else {
         *isNew = 1;
-        NEW(stateNode, rulesetTree->statePool, nodeOffset);
-        SET(stateNode, rulesetTree->stateIndex, MAX_STATE_INDEX_LENGTH, rulesetTree->statePool, sidHash, nodeOffset);
+        NEW(stateNode, 
+            rulesetTree->statePool, 
+            nodeOffset);
+
+        SET(stateNode, 
+            rulesetTree->stateIndex, 
+            MAX_STATE_INDEX_LENGTH, 
+            rulesetTree->statePool, 
+            sidHash, 
+            nodeOffset);
+
         rulesetTree->reverseStateIndex[rulesetTree->statePool.count - 1] = nodeOffset;
         stateNode *node = STATE_NODE(tree, nodeOffset); 
         node->offset = nodeOffset;
     
-        CHECK_RESULT(getBindingIndex(tree, sidHash, &node->bindingIndex));
-        INIT(messageNode, node->messagePool, MAX_MESSAGE_NODES);
-        memset(node->messageIndex, 0, MAX_MESSAGE_INDEX_LENGTH * sizeof(unsigned int));
+        CHECK_RESULT(getBindingIndex(tree, 
+                                     sidHash, 
+                                     &node->bindingIndex));
+
+        INIT(messageNode, 
+             node->messagePool, 
+             MAX_MESSAGE_NODES);
+
+        memset(node->messageIndex, 0, MAX_MESSAGE_INDEX_LENGTH * sizeof(unsigned int) * 2);
         
         node->betaState = malloc(((ruleset*)tree)->betaCount * sizeof(betaStateNode));
         for (unsigned int i = 0; i < ((ruleset*)tree)->betaCount; ++i) {
             betaStateNode *betaNode = &node->betaState[i];
             betaNode->reteNode = NULL;
 
-            INIT(leftFrameNode, betaNode->leftFramePool, MAX_LEFT_FRAME_NODES);
-            memset(betaNode->leftFrameIndex, 0, MAX_LEFT_FRAME_INDEX_LENGTH * sizeof(unsigned int));
+            INIT(leftFrameNode, 
+                 betaNode->leftFramePool, 
+                 MAX_LEFT_FRAME_NODES);
+
+            memset(betaNode->leftFrameIndex, 0, MAX_LEFT_FRAME_INDEX_LENGTH * sizeof(unsigned int) * 2);
             
-            INIT(rightFrameNode, betaNode->rightFramePool, MAX_RIGHT_FRAME_NODES);
-            memset(betaNode->rightFrameIndex, 0, MAX_RIGHT_FRAME_INDEX_LENGTH * sizeof(unsigned int));
+            INIT(rightFrameNode, 
+                 betaNode->rightFramePool, 
+                 MAX_RIGHT_FRAME_NODES);
+
+            memset(betaNode->rightFrameIndex, 0, MAX_RIGHT_FRAME_INDEX_LENGTH * sizeof(unsigned int) * 2);
         }
 
         node->actionState = malloc(((ruleset*)tree)->actionCount * sizeof(actionStateNode));
@@ -559,7 +603,11 @@ unsigned int ensureStateNode(void *tree,
             actionNode->reteNode = NULL;
             
             actionNode->resultIndex[0] = UNDEFINED_HASH_OFFSET;
-            INIT(leftFrameNode, actionNode->resultPool, MAX_LEFT_FRAME_NODES);
+            actionNode->resultIndex[1] = UNDEFINED_HASH_OFFSET;
+
+            INIT(leftFrameNode, 
+                 actionNode->resultPool, 
+                 MAX_LEFT_FRAME_NODES);
         }        
 
         node->factOffset = UNDEFINED_HASH_OFFSET;
@@ -643,16 +691,6 @@ unsigned int serializeResult(void *tree,
         if (!resultFrame->isActive) {
             return ERR_NODE_DELETED;
         }
-
-
-// printf("dispatch result %s\n", &((ruleset *)tree)->stringPool[actionNode->reteNode->nameOffset]);
-// printf("frame %d, %d\n", actionNode->reteNode->value.c.index, actionNode->resultIndex[0]);
-// for (int i = 0; i < MAX_MESSAGE_FRAMES; ++i) {
-//     if (resultFrame->messages[i].hash) {
-//         messageNode *node = MESSAGE_NODE(state, resultFrame->messages[i].messageNodeOffset);
-//         printf("   %d -> %s\n", i, node->jo.content);
-//     }
-// }
 
         char *actionName = &((ruleset *)tree)->stringPool[resultFrame->nameOffset];
         unsigned int resultLength = strlen(actionName) + 6 + getResultFrameLength(tree, 
@@ -1153,12 +1191,12 @@ unsigned int deleteState(unsigned int handle, char *sid) {
     unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
     unsigned int nodeOffset;
 
-    GET(stateNode, 
-        tree->stateIndex, 
-        MAX_STATE_INDEX_LENGTH, 
-        ((ruleset*)tree)->statePool, 
-        sidHash, 
-        nodeOffset);
+    GET_FIRST(stateNode, 
+             tree->stateIndex, 
+             MAX_STATE_INDEX_LENGTH, 
+             ((ruleset*)tree)->statePool, 
+             sidHash, 
+             nodeOffset);
 
     DELETE(stateNode, 
            tree->stateIndex, 

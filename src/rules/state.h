@@ -11,10 +11,10 @@
 #define UNDEFINED_HASH_OFFSET 0
 #define MAX_OBJECT_PROPERTIES 64
 #define MAX_MESSAGE_FRAMES 32
-#define MAX_MESSAGE_INDEX_LENGTH 16384
+#define MAX_MESSAGE_INDEX_LENGTH 1024
 #define MAX_LEFT_FRAME_INDEX_LENGTH 1024
 #define MAX_RIGHT_FRAME_INDEX_LENGTH 1024
-#define MAX_FRAME_LOCATIONS 1024
+#define MAX_FRAME_LOCATIONS 32768
 
 #define LEFT_FRAME 0
 #define RIGHT_FRAME 1
@@ -112,15 +112,15 @@ typedef struct pool {
 typedef struct actionStateNode {
     struct node *reteNode;
     pool resultPool;
-    unsigned int resultIndex[1];
+    unsigned int resultIndex[2];
 } actionStateNode;
 
 typedef struct betaStateNode {
     struct node *reteNode;
     pool leftFramePool;
-    unsigned int leftFrameIndex[MAX_LEFT_FRAME_INDEX_LENGTH];
+    unsigned int leftFrameIndex[MAX_LEFT_FRAME_INDEX_LENGTH * 2];
     pool rightFramePool;
-    unsigned int rightFrameIndex[MAX_RIGHT_FRAME_INDEX_LENGTH];
+    unsigned int rightFrameIndex[MAX_RIGHT_FRAME_INDEX_LENGTH * 2];
 } betaStateNode;
 
 typedef struct actionContext {
@@ -138,7 +138,7 @@ typedef struct stateNode {
     unsigned char isActive;
     unsigned int bindingIndex;
     pool messagePool;
-    unsigned int messageIndex[MAX_MESSAGE_INDEX_LENGTH];
+    unsigned int messageIndex[MAX_MESSAGE_INDEX_LENGTH * 2];
     betaStateNode *betaState;
     actionStateNode *actionState; 
     actionContext context;
@@ -187,7 +187,7 @@ unsigned int setMessageInFrame(leftFrameNode *node,
                                unsigned int hash, 
                                unsigned int messageNodeOffset);
 
-unsigned int getLeftFrame(stateNode *state,
+unsigned int getLastLeftFrame(stateNode *state,
                           unsigned int index, 
                           unsigned int hash,
                           frameLocation *location,
@@ -207,7 +207,7 @@ unsigned int createLeftFrame(stateNode *state,
                              leftFrameNode **newNode,
                              frameLocation *newLocation);
 
-unsigned int getRightFrame(stateNode *state,
+unsigned int getLastRightFrame(stateNode *state,
                            unsigned int index, 
                            unsigned int hash,
                            rightFrameNode **node);
