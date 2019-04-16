@@ -10,6 +10,7 @@
 #define MAX_MESSAGE_NODES 16
 #define MAX_LEFT_FRAME_NODES 8
 #define MAX_RIGHT_FRAME_NODES 8
+#define MAX_LOCATION_NODES 16
 
 // The first node is never used as it corresponds to UNDEFINED_HASH_OFFSET
 #define INIT(type, pool, length) do { \
@@ -142,22 +143,85 @@ unsigned int getHash(char *sid, char *key) {
     return fnv1Hash32(fullKey, fullKeyLength - 1);
 }
 
+unsigned int getLocationHash(frameLocation location) {
+    unsigned int hash = FNV_32_OFFSET_BASIS;
+    hash ^= location.frameType;
+    hash *= FNV_32_PRIME;
+    hash ^= location.nodeIndex;
+    hash *= FNV_32_PRIME;
+    hash ^= location.frameOffset;
+    hash *= FNV_32_PRIME;
+
+    return hash;
+}
+
 unsigned int initStatePool(void *tree) {
     INIT(stateNode, ((ruleset*)tree)->statePool, MAX_STATE_NODES);
     return RULES_OK;
 }
 
-unsigned int appendFrameLocation(stateNode *state,
-                                 frameLocation location,
-                                 unsigned int messageNodeOffset) { 
-    messageNode *currentNode = MESSAGE_NODE(state, messageNodeOffset);
-    if (currentNode->locationCount == MAX_FRAME_LOCATIONS) {
-        return ERR_MAX_FRAME_LOCATIONS;
+unsigned int addFrameLocation(stateNode *state,
+                              frameLocation location,
+                              unsigned int messageNodeOffset) { 
+    messageNode *message = MESSAGE_NODE(state, messageNodeOffset);
+    unsigned int locationNodeOffset;
+    NEW(locationNode, 
+        message->locationPool, 
+        locationNodeOffset);
+    
+    locationNode *newLocationNode = LOCATION_NODE(message, locationNodeOffset);
+    newLocationNode->location.frameType = location.frameType;
+    newLocationNode->location.nodeIndex = location.nodeIndex;
+    newLocationNode->location.frameOffset = location.frameOffset;
+    
+    unsigned int hash = getLocationHash(newLocationNode->location);
+    SET(locationNode, 
+        message->locationIndex, 
+        MAX_LOCATION_INDEX_LENGTH, 
+        message->locationPool, 
+        hash, 
+        locationNodeOffset);
+
+    return RULES_OK;
+}
+
+unsigned int deleteFrameLocation(stateNode *state,
+                                 unsigned int messageNodeOffset,
+                                 frameLocation location) {
+    messageNode *message = MESSAGE_NODE(state, messageNodeOffset);
+    if (!message->isActive) {
+        return RULES_OK;
     }
-    currentNode->locations[currentNode->locationCount].frameType = location.frameType;
-    currentNode->locations[currentNode->locationCount].nodeIndex = location.nodeIndex;
-    currentNode->locations[currentNode->locationCount].frameOffset = location.frameOffset;
-    ++currentNode->locationCount;
+
+    unsigned int hash = getLocationHash(location);
+    unsigned int locationNodeOffset;
+    GET_FIRST(locationNode, 
+              message->locationIndex, 
+              MAX_LOCATION_INDEX_LENGTH, 
+              message->locationPool, 
+              hash, 
+              locationNodeOffset);
+    
+    while (locationNodeOffset != UNDEFINED_HASH_OFFSET) {
+        locationNode *newLocationNode = LOCATION_NODE(message, locationNodeOffset);
+        if (newLocationNode->location.frameType == location.frameType &&
+            newLocationNode->location.nodeIndex == location.nodeIndex &&
+            newLocationNode->location.frameOffset == location.frameOffset) {
+            DELETE(locationNode,
+                   message->locationIndex, 
+                   MAX_LOCATION_INDEX_LENGTH,
+                   message->locationPool,
+                   locationNodeOffset);
+
+            return RULES_OK;
+        }
+
+        if (newLocationNode->hash == hash) {
+            locationNodeOffset = newLocationNode->nextOffset;
+        } else {
+            locationNodeOffset = UNDEFINED_HASH_OFFSET;
+        }
+    }
 
     return RULES_OK;
 }
@@ -268,9 +332,9 @@ static unsigned int copyLeftFrame(stateNode *state,
         memcpy(targetNode->reverseIndex, oldNode->reverseIndex, MAX_MESSAGE_FRAMES * sizeof(unsigned short));
         targetNode->messageCount = oldNode->messageCount;
         for (unsigned short i = 0; i < targetNode->messageCount; ++i) {
-            CHECK_RESULT(appendFrameLocation(state,
-                                             newLocation, 
-                                             targetNode->messages[targetNode->reverseIndex[i]].messageNodeOffset));
+            CHECK_RESULT(addFrameLocation(state,
+                                          newLocation, 
+                                          targetNode->messages[targetNode->reverseIndex[i]].messageNodeOffset));
         }
     } 
 
@@ -431,29 +495,17 @@ unsigned int createRightFrame(stateNode *state,
     return RULES_OK;
 }
 
-unsigned int deleteLocationFromMessage(stateNode *state,
-                                       unsigned int messageNodeOffset,
-                                       frameLocation location) {
-
-    messageNode *message = MESSAGE_NODE(state, messageNodeOffset);
-
-    for (unsigned short i = 0; i < message->locationCount; ++i) {
-        if (message->locations[i].frameType == location.frameType &&
-            message->locations[i].nodeIndex == location.nodeIndex &&
-            message->locations[i].frameOffset == location.frameOffset) {
-
-            --message->locationCount;
-            memcpy(&message->locations[i], 
-                   &message->locations[i + 1], 
-                   (message->locationCount - i) * sizeof(frameLocation));
-        }
-    }
-
-    return RULES_OK;
-}
-
 unsigned int deleteMessage(stateNode *state,
                            unsigned int messageNodeOffset) {
+
+    messageNode *node = MESSAGE_NODE(state, messageNodeOffset);
+    if (node->jo.content) {
+        free(node->jo.content);
+        free(node->locationPool.content);
+        node->jo.content = NULL;
+        node->locationPool.content = NULL;
+    }
+    
     DELETE(messageNode,
            state->messageIndex, 
            MAX_MESSAGE_INDEX_LENGTH,
@@ -525,11 +577,18 @@ unsigned int storeMessage(stateNode *state,
     SET(messageNode, 
         state->messageIndex, 
         MAX_MESSAGE_INDEX_LENGTH, 
-        state->messagePool, hash, 
+        state->messagePool, 
+        hash, 
         *valueOffset);
 
     messageNode *node = MESSAGE_NODE(state, *valueOffset);
-    node->locationCount = 0;
+    
+    INIT(locationNode, 
+         node->locationPool, 
+         MAX_LOCATION_NODES);
+
+    memset(node->locationIndex, 0, MAX_LOCATION_INDEX_LENGTH * sizeof(unsigned int) * 2);
+
     node->messageType = messageType;
     return copyMessage(&node->jo, message);
 }

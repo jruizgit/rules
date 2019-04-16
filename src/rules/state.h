@@ -14,7 +14,7 @@
 #define MAX_MESSAGE_INDEX_LENGTH 1024
 #define MAX_LEFT_FRAME_INDEX_LENGTH 1024
 #define MAX_RIGHT_FRAME_INDEX_LENGTH 1024
-#define MAX_FRAME_LOCATIONS 32768
+#define MAX_LOCATION_INDEX_LENGTH 1024
 
 #define LEFT_FRAME 0
 #define RIGHT_FRAME 1
@@ -33,8 +33,18 @@
 
 #define STATE_NODE(tree, offset) &((stateNode *)((ruleset *)tree)->statePool.content)[offset]
 
+#define LOCATION_NODE(message, offset) &((locationNode *)message->locationPool.content)[offset]
+
+
 // defined in rete.h
 struct node;
+
+typedef struct pool {
+    void *content;
+    unsigned int freeOffset;
+    unsigned int contentLength;
+    unsigned int count;
+} pool;
 
 typedef struct jsonProperty {
     unsigned int hash;
@@ -61,10 +71,18 @@ typedef struct jsonObject {
 } jsonObject;
 
 typedef struct frameLocation {
-  unsigned char frameType;
-  unsigned int nodeIndex;
-  unsigned int frameOffset;
+    unsigned char frameType;
+    unsigned int nodeIndex;
+    unsigned int frameOffset;
 } frameLocation;
+
+typedef struct locationNode {
+    unsigned int prevOffset;
+    unsigned int nextOffset;
+    unsigned int hash;
+    frameLocation location;
+    unsigned char isActive;
+} locationNode;
 
 typedef struct messageNode {
     unsigned int prevOffset;
@@ -72,8 +90,8 @@ typedef struct messageNode {
     unsigned int hash;
     unsigned char isActive;
     unsigned char messageType;
-    unsigned short locationCount;
-    frameLocation locations[MAX_FRAME_LOCATIONS];
+    pool locationPool;
+    unsigned int locationIndex[MAX_LOCATION_INDEX_LENGTH * 2];
     jsonObject jo;
 } messageNode;
 
@@ -101,13 +119,6 @@ typedef struct rightFrameNode {
     unsigned char isActive;
     unsigned int messageOffset;
 } rightFrameNode;
-
-typedef struct pool {
-    void *content;
-    unsigned int freeOffset;
-    unsigned int contentLength;
-    unsigned int count;
-} pool;
 
 typedef struct actionStateNode {
     struct node *reteNode;
@@ -173,9 +184,13 @@ unsigned int getHash(char *sid, char *key);
 
 unsigned int initStatePool(void *tree);
 
-unsigned int appendFrameLocation(stateNode *state,
-                                 frameLocation location,
-                                 unsigned int messageNodeOffset);
+unsigned int addFrameLocation(stateNode *state,
+                              frameLocation location,
+                              unsigned int messageNodeOffset);
+
+unsigned int deleteFrameLocation(stateNode *state,
+                                 unsigned int messageNodeOffset,
+                                 frameLocation location);
 
 unsigned int getMessageFromFrame(stateNode *state,
                                  messageFrame *messages,
@@ -242,13 +257,8 @@ unsigned int createActionFrame(stateNode *state,
                                leftFrameNode **newNode,
                                frameLocation *newLocation);
 
-unsigned int deleteLocationFromMessage(stateNode *state,
-                                       unsigned int messageNodeOffset,
-                                       frameLocation location);
-
 unsigned int deleteMessage(stateNode *state,
                            unsigned int messageNodeOffset);
-
 
 unsigned int getMessage(stateNode *state,
                         char *mid,
