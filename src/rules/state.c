@@ -58,11 +58,11 @@
     valueOffset = pool.freeOffset; \
     type *value = &((type *)pool.content)[valueOffset]; \
     if (value->nextOffset == UNDEFINED_HASH_OFFSET) { \
-        pool.content = realloc(pool.content, (pool.contentLength * 2) * sizeof(type)); \
+        pool.content = realloc(pool.content, (pool.contentLength * 1.5) * sizeof(type)); \
         if (!pool.content) { \
             return ERR_OUT_OF_MEMORY; \
         } \
-        for (unsigned int i = pool.contentLength; i < pool.contentLength * 2; ++ i) { \
+        for (unsigned int i = pool.contentLength; i < pool.contentLength * 1.5; ++ i) { \
             ((type *)pool.content)[i].isActive = 0; \
             ((type *)pool.content)[i].nextOffset = i + 1; \
             ((type *)pool.content)[i].prevOffset = i - 1; \
@@ -70,7 +70,7 @@
         value = &((type *)pool.content)[valueOffset]; \
         value->nextOffset = pool.contentLength; \
         ((type *)pool.content)[pool.contentLength].prevOffset = valueOffset; \
-        pool.contentLength *= 2; \
+        pool.contentLength *= 1.5; \
         ((type *)pool.content)[pool.contentLength - 1].nextOffset = UNDEFINED_HASH_OFFSET; \
     } \
     ((type *)pool.content)[value->nextOffset].prevOffset = UNDEFINED_HASH_OFFSET; \

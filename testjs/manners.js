@@ -61,15 +61,12 @@ d.statechart('missManners', function() {
             path = m.t == 'path' && m.pid == seating.pid
             none(m.t == 'path' && m.pid == seating.tid && m.guestName == path.guestName)
         }
-        cap: 1000
         run: {
-            for (var i = 0; i < m.length; ++i) {
-                var frame = m[i];
-                assert({ t: 'path',
-                         pid: frame.seating.tid,
-                         seat: frame.path.seat,
-                         guestName: frame.path.guestName });
-            }
+            assert({ t: 'path',
+                     pid: seating.tid,
+                     seat: path.seat,
+                     guestName: path.guestName });
+        
         }
 
         to: 'check'
