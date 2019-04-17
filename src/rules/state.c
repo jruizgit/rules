@@ -204,22 +204,22 @@ unsigned int deleteFrameLocation(stateNode *state,
     
     while (locationNodeOffset != UNDEFINED_HASH_OFFSET) {
         locationNode *newLocationNode = LOCATION_NODE(message, locationNodeOffset);
-        if (newLocationNode->location.frameType == location.frameType &&
-            newLocationNode->location.nodeIndex == location.nodeIndex &&
-            newLocationNode->location.frameOffset == location.frameOffset) {
-            DELETE(locationNode,
-                   message->locationIndex, 
-                   MAX_LOCATION_INDEX_LENGTH,
-                   message->locationPool,
-                   locationNodeOffset);
-
-            return RULES_OK;
-        }
-
-        if (newLocationNode->hash == hash) {
-            locationNodeOffset = newLocationNode->nextOffset;
-        } else {
+        if (newLocationNode->hash != hash) {
             locationNodeOffset = UNDEFINED_HASH_OFFSET;
+        } else {
+            if (newLocationNode->location.frameType == location.frameType &&
+                newLocationNode->location.nodeIndex == location.nodeIndex &&
+                newLocationNode->location.frameOffset == location.frameOffset) {
+                DELETE(locationNode,
+                       message->locationIndex, 
+                       MAX_LOCATION_INDEX_LENGTH,
+                       message->locationPool,
+                       locationNodeOffset);
+
+                return RULES_OK;
+            }
+        
+            locationNodeOffset = newLocationNode->nextOffset;
         }
     }
 

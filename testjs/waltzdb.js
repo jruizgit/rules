@@ -100,7 +100,7 @@ with (d.statechart('waltzdb')) {
     }
 
     with (state('duplicate')) {
-        to('duplicate').whenAll(cap(1000),
+        to('duplicate').whenAll(cap(10000),
                                 c.line = m.t.eq('line'), 
         function (c) {
             for (var i = 0; i < c.m.length; ++i) {

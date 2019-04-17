@@ -12,14 +12,13 @@ static PyObject *RulesError;
 static PyObject *pyCreateRuleset(PyObject *self, PyObject *args) {
     char *name;
     char *rules;
-    unsigned int stateCacheSize;
-    if (!PyArg_ParseTuple(args, "Iss", &stateCacheSize, &name, &rules)) {
+    if (!PyArg_ParseTuple(args, "ss", &name, &rules)) {
         PyErr_SetString(RulesError, "pyCreateRuleset Invalid argument");
         return NULL;
     }
 
     unsigned int output = 0;
-    unsigned int result = createRuleset(&output, name, rules, stateCacheSize);
+    unsigned int result = createRuleset(&output, name, rules);
     if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -66,14 +65,13 @@ static PyObject *pyDeleteRuleset(PyObject *self, PyObject *args) {
 
 static PyObject *pyCreateClient(PyObject *self, PyObject *args) {
     char *name;
-    unsigned int stateCacheSize;
-    if (!PyArg_ParseTuple(args, "Is", &stateCacheSize, &name)) {
+    if (!PyArg_ParseTuple(args, "s", &name)) {
         PyErr_SetString(RulesError, "pyCreateRuleset Invalid argument");
         return NULL;
     }
 
     unsigned int output = 0;
-    unsigned int result = createClient(&output, name, stateCacheSize);
+    unsigned int result = createClient(&output, name);
     if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -150,11 +148,11 @@ static PyObject *pyBindRuleset(PyObject *self, PyObject *args) {
 }
 
 static PyObject *pyComplete(PyObject *self, PyObject *args) {
-    void *rulesBinding = NULL;
+    unsigned int stateOffset;
     unsigned int replyCount = 0;
     unsigned int result;
-    if (PyArg_ParseTuple(args, "KI", &rulesBinding, &replyCount)) {
-        result = complete(rulesBinding, replyCount);
+    if (PyArg_ParseTuple(args, "II", &stateOffset, &replyCount)) {
+        result = complete(stateOffset, replyCount);
     } else {
         PyErr_SetString(RulesError, "pyComplete Invalid argument");
         return NULL;
@@ -243,10 +241,10 @@ static PyObject *pyStartAssertEvent(PyObject *self, PyObject *args) {
     }
 
     unsigned int replyCount;
-    void *rulesBinding = NULL;
-    unsigned int result = startAssertEvent(handle, event, &rulesBinding, &replyCount);
+    unsigned int stateOffset;
+    unsigned int result = startAssertEvent(handle, event, &stateOffset, &replyCount);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("KI", rulesBinding, replyCount);    
+        return Py_BuildValue("II", stateOffset, replyCount);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -299,10 +297,10 @@ static PyObject *pyStartAssertEvents(PyObject *self, PyObject *args) {
     }
 
     unsigned int replyCount;
-    void *rulesBinding = NULL;
-    unsigned int result = startAssertEvents(handle, events, &rulesBinding, &replyCount);
+    unsigned int stateOffset;
+    unsigned int result = startAssertEvents(handle, events, &stateOffset, &replyCount);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) { 
-        return Py_BuildValue("Ki", rulesBinding, replyCount);    
+        return Py_BuildValue("Ii", stateOffset, replyCount);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -411,10 +409,10 @@ static PyObject *pyStartAssertFact(PyObject *self, PyObject *args) {
     }
 
     unsigned int replyCount;
-    void *rulesBinding = NULL;
-    unsigned int result = startAssertFact(handle, fact, &rulesBinding, &replyCount);
+    unsigned int stateOffset;
+    unsigned int result = startAssertFact(handle, fact, &stateOffset, &replyCount);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("KI", rulesBinding, replyCount);    
+        return Py_BuildValue("II", stateOffset, replyCount);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -467,10 +465,10 @@ static PyObject *pyStartAssertFacts(PyObject *self, PyObject *args) {
     }
 
     unsigned int replyCount;
-    void *rulesBinding = NULL;
-    unsigned int result = startAssertFacts(handle, facts, &rulesBinding, &replyCount);
+    unsigned int stateOffset;
+    unsigned int result = startAssertFacts(handle, facts, &stateOffset, &replyCount);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {  
-        return Py_BuildValue("Ki", rulesBinding, replyCount);    
+        return Py_BuildValue("Ii", stateOffset, replyCount);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -552,10 +550,10 @@ static PyObject *pyStartRetractFact(PyObject *self, PyObject *args) {
     }
 
     unsigned int replyCount;
-    void *rulesBinding = NULL;
-    unsigned int result = startRetractFact(handle, fact, &rulesBinding, &replyCount);
+    unsigned int stateOffset;
+    unsigned int result = startRetractFact(handle, fact, &stateOffset, &replyCount);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("Ki", rulesBinding, replyCount);    
+        return Py_BuildValue("Ii", stateOffset, replyCount);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -608,10 +606,10 @@ static PyObject *pyStartRetractFacts(PyObject *self, PyObject *args) {
     }
 
     unsigned int replyCount;
-    void *rulesBinding = NULL;
-    unsigned int result = startRetractFacts(handle, facts, &rulesBinding, &replyCount);
+    unsigned int stateOffset;
+    unsigned int result = startRetractFacts(handle, facts, &stateOffset, &replyCount);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {  
-        return Py_BuildValue("Ki", rulesBinding, replyCount);    
+        return Py_BuildValue("Ii", stateOffset, replyCount);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -628,7 +626,7 @@ static PyObject *pyStartRetractFacts(PyObject *self, PyObject *args) {
     }
 }
 
-static PyObject *pyAssertState(PyObject *self, PyObject *args) {
+static PyObject *pyUpdateState(PyObject *self, PyObject *args) {
     unsigned int handle;
     char *state;
     char *sid;
@@ -637,7 +635,7 @@ static PyObject *pyAssertState(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    unsigned int result = assertState(handle, sid, state);
+    unsigned int result = updateState(handle, sid, state);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
         return Py_BuildValue("I", result);
     } else {
@@ -658,18 +656,17 @@ static PyObject *pyAssertState(PyObject *self, PyObject *args) {
 
 static PyObject *pyStartUpdateState(PyObject *self, PyObject *args) {
     unsigned int handle;
-    void *actionHandle;
     char *state;
-    if (!PyArg_ParseTuple(args, "IKs", &handle, &actionHandle, &state)) {
+    if (!PyArg_ParseTuple(args, "Is", &handle, &state)) {
         PyErr_SetString(RulesError, "pyStartUpdateState Invalid argument");
         return NULL;
     }
 
     unsigned int replyCount;
-    void *rulesBinding = NULL;
-    unsigned int result = startUpdateState(handle, actionHandle, state, &rulesBinding, &replyCount);
+    unsigned int stateOffset;
+    unsigned int result = startUpdateState(handle, state, &stateOffset, &replyCount);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-        return Py_BuildValue("Ki", rulesBinding, replyCount);    
+        return Py_BuildValue("Ii", stateOffset, replyCount);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -695,9 +692,8 @@ static PyObject *pyStartAction(PyObject *self, PyObject *args) {
     
     char *state;
     char *messages;
-    void *actionHandle;
-    void *actionBinding;
-    unsigned int result = startAction(handle, &state, &messages, &actionHandle, &actionBinding);
+    unsigned int stateOffset;
+    unsigned int result = startAction(handle, &state, &messages, &stateOffset);
     if (result == ERR_NO_ACTION_AVAILABLE) {
         Py_RETURN_NONE;
     } else if (result != RULES_OK) {
@@ -715,49 +711,21 @@ static PyObject *pyStartAction(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    PyObject *returnValue = Py_BuildValue("ssKK", state, messages, actionHandle, actionBinding);
+    PyObject *returnValue = Py_BuildValue("ssI", state, messages, stateOffset);
     return returnValue;
-}
-
-static PyObject *pyCompleteAction(PyObject *self, PyObject *args) {
-    unsigned int handle;
-    void *actionHandle;
-    char *state;
-    if (!PyArg_ParseTuple(args, "IKs", &handle, &actionHandle, &state)) {
-        PyErr_SetString(RulesError, "pyCompleteAction Invalid argument");
-        return NULL;
-    }
-
-    unsigned int result = completeAction(handle, actionHandle, state);
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            PyErr_NoMemory();
-        } else { 
-            char *message;
-            if (asprintf(&message, "Could not complete action, error code: %d", result) == -1) {
-                PyErr_NoMemory();
-            } else {
-                PyErr_SetString(RulesError, message);
-                free(message);
-            }
-        }
-        return NULL;
-    }
-
-    Py_RETURN_NONE;  
 }
 
 static PyObject *pyCompleteAndStartAction(PyObject *self, PyObject *args) {
     unsigned int handle;
-    void *actionHandle;
+    unsigned int stateOffset;
     unsigned int expectedReplies;
-    if (!PyArg_ParseTuple(args, "IIK", &handle, &expectedReplies, &actionHandle)) {
+    if (!PyArg_ParseTuple(args, "II", &handle, &expectedReplies, &stateOffset)) {
         PyErr_SetString(RulesError, "pyCompleteAndStartAction Invalid argument");
         return NULL;
     }
 
     char *messages;
-    unsigned int result = completeAndStartAction(handle, expectedReplies, actionHandle, &messages);
+    unsigned int result = completeAndStartAction(handle, expectedReplies, stateOffset, &messages);
     if (result == ERR_NO_ACTION_AVAILABLE) {
         Py_RETURN_NONE;
     } if (result != RULES_OK) {
@@ -781,13 +749,13 @@ static PyObject *pyCompleteAndStartAction(PyObject *self, PyObject *args) {
 
 static PyObject *pyAbandonAction(PyObject *self, PyObject *args) {
     unsigned int handle;
-    void *actionHandle;
-    if (!PyArg_ParseTuple(args, "IK", &handle, &actionHandle)) {
+    unsigned int stateOffset;
+    if (!PyArg_ParseTuple(args, "IK", &handle, &stateOffset)) {
         PyErr_SetString(RulesError, "pyAbandonAction Invalid argument");
         return NULL;
     }
 
-    unsigned int result = abandonAction(handle, actionHandle);
+    unsigned int result = abandonAction(handle, stateOffset);
     if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             PyErr_NoMemory();
@@ -997,10 +965,9 @@ static PyMethodDef myModule_methods[] = {
     {"start_retract_fact", pyStartRetractFact, METH_VARARGS},
     {"retract_facts", pyRetractFacts, METH_VARARGS},
     {"start_retract_facts", pyStartRetractFacts, METH_VARARGS},
-    {"assert_state", pyAssertState, METH_VARARGS},
+    {"update_state", pyUpdateState, METH_VARARGS},
     {"start_update_state", pyStartUpdateState, METH_VARARGS},
     {"start_action", pyStartAction, METH_VARARGS},
-    {"complete_action", pyCompleteAction, METH_VARARGS},
     {"complete_and_start_action", pyCompleteAndStartAction, METH_VARARGS},
     {"abandon_action", pyAbandonAction, METH_VARARGS},
     {"start_timer", pyStartTimer, METH_VARARGS},

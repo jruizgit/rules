@@ -409,7 +409,7 @@ module Engine
   class Ruleset
     attr_reader :definition
 
-    def initialize(name, host, ruleset_definition, state_cache_size)
+    def initialize(name, host, ruleset_definition)
       @actions = {}
       @name = name
       @host = host
@@ -435,7 +435,7 @@ module Engine
         end
       end
 
-      @handle = Rules.create_ruleset name, JSON.generate(ruleset_definition), state_cache_size
+      @handle = Rules.create_ruleset name, JSON.generate(ruleset_definition)
       @definition = ruleset_definition
     end
 
@@ -525,11 +525,11 @@ module Engine
       Rules.start_retract_facts @handle, JSON.generate(facts)
     end
 
-    def assert_state(state)
+    def update_state(state)
       if state.key? :sid 
-        Rules.assert_state @handle, state[:sid].to_s, JSON.generate(state)
+        Rules.update_state @handle, state[:sid].to_s, JSON.generate(state)
       else
-        Rules.assert_state @handle, state["sid"].to_s, JSON.generate(state)
+        Rules.update_state @handle, state["sid"].to_s, JSON.generate(state)
       end
     end
 
@@ -545,21 +545,21 @@ module Engine
       Rules.renew_action_lease @handle, sid.to_s
     end
 
-    def Ruleset.create_rulesets(parent_name, host, ruleset_definitions, state_cache_size)
+    def Ruleset.create_rulesets(parent_name, host, ruleset_definitions)
       branches = {}
       for name, definition in ruleset_definitions do
         name = name.to_s
         if name.end_with? "$state"
           name = name[0..-7]
           name = "#{parent_name}.#{name}" if parent_name
-          branches[name] = Statechart.new name, host, definition, state_cache_size
+          branches[name] = Statechart.new name, host, definition
         elsif name.end_with? "$flow"
           name = name[0..-6]
           name = "#{parent_name}.#{name}" if parent_name
-          branches[name] = Flowchart.new name, host, definition, state_cache_size
+          branches[name] = Flowchart.new name, host, definition
         else
           name = "#{parent_name}.#{name}" if parent_name
-          branches[name] = Ruleset.new name, host, definition, state_cache_size
+          branches[name] = Ruleset.new name, host, definition
         end
       end
 
@@ -581,14 +581,12 @@ module Engine
 
     def dispatch(complete, async_result = nil)
       state = nil
-      action_handle = nil
-      action_binding = nil
+      state_offset = nil
       result_container = {}
       if async_result
         state = async_result[0]
         result_container = {:message => JSON.parse(async_result[1])}
-        action_handle = async_result[2]
-        action_binding = async_result[3]
+        state_offset = async_result[2]
       else
         begin
           result = Rules.start_action @handle
@@ -598,8 +596,7 @@ module Engine
           else
             state = JSON.parse result[0]
             result_container = {:message => JSON.parse(result[1])}
-            action_handle = result[2]
-            action_binding = result[3]
+            state_offset = result[2]
           end
         rescue Exception => e
           puts "start action exception #{e}"
@@ -616,7 +613,7 @@ module Engine
         end
 
         result_container.delete :message
-        c = Closure.new @host, state, message, action_handle, @name
+        c = Closure.new @host, state, message, state_offset, @name
 
         if result_container.key? :async
           result_container.delete :async
@@ -661,61 +658,61 @@ module Engine
                 @host.delete_state ruleset_name, sid
               end
 
-              binding  = 0
+              offset  = 0
               replies = 0
-              pending = {action_binding => 0}
+              pending = {state_offset => 0}
               for ruleset_name, facts in c._retract do
                 if facts.length == 1
-                  binding, replies = @host.start_retract ruleset_name, facts[0]
+                  offset, replies = @host.start_retract ruleset_name, facts[0]
                 else
-                  binding, replies = @host.start_retract_facts ruleset_name, facts
+                  offset, replies = @host.start_retract_facts ruleset_name, facts
                 end
-                if pending.key? binding
-                  pending[binding] = pending[binding] + replies
+                if pending.key? offset
+                  pending[offset] = pending[offset] + replies
                 else
-                  pending[binding] = replies
+                  pending[offset] = replies
                 end
               end
               for ruleset_name, facts in c._facts do
                 if facts.length == 1
-                  binding, replies = @host.start_assert ruleset_name, facts[0]
+                  offset, replies = @host.start_assert ruleset_name, facts[0]
                 else
-                  binding, replies = @host.start_assert_facts ruleset_name, facts
+                  offset, replies = @host.start_assert_facts ruleset_name, facts
                 end
-                if pending.key? binding
-                  pending[binding] = pending[binding] + replies
+                if pending.key? offset
+                  pending[offset] = pending[offset] + replies
                 else
-                  pending[binding] = replies
+                  pending[offset] = replies
                 end
               end
               for ruleset_name, messages in c._messages do
                 if messages.length == 1
-                  binding, replies = @host.start_post ruleset_name, messages[0]
+                  offset, replies = @host.start_post ruleset_name, messages[0]
                 else
-                  binding, replies = @host.start_post_batch ruleset_name, messages
+                  offset, replies = @host.start_post_batch ruleset_name, messages
                 end
-                if pending.key? binding
-                  pending[binding] = pending[binding] + replies
+                if pending.key? offset
+                  pending[offset] = pending[offset] + replies
                 else
-                  pending[binding] = replies
+                  pending[offset] = replies
                 end
               end
-              binding, replies = Rules.start_update_state @handle, c.handle, JSON.generate(c.s._d)
-              if pending.key? binding
-                pending[binding] = pending[binding] + replies
+              offset, replies = Rules.start_update_state @handle, c.handle, JSON.generate(c.s._d)
+              if pending.key? offset
+                pending[offset] = pending[offset] + replies
               else
-                pending[binding] = replies
+                pending[offset] = replies
               end
 
-              for binding, replies in pending do
-                if binding != 0
-                  if binding != action_binding
-                    Rules.complete(binding, replies)
+              for offset, replies in pending do
+                if offset != 0
+                  if offset != state_offset
+                    Rules.complete(offset, replies)
                   else
                     new_result = Rules.complete_and_start_action @handle, replies, c.handle
                     if new_result
                       if result_container.key? :async
-                        dispatch -> e, wait {}, [state, new_result, action_handle, action_binding]
+                        dispatch -> e, wait {}, [state, new_result, state_offset]
                       else
                         result_container[:message] = JSON.parse new_result
                       end
@@ -753,12 +750,12 @@ module Engine
 
   class Statechart < Ruleset
 
-    def initialize(name, host, chart_definition, state_cache_size)
+    def initialize(name, host, chart_definition)
       @name = name
       @host = host
       ruleset_definition = {}
       transform nil, nil, nil, chart_definition, ruleset_definition
-      super name, host, ruleset_definition, state_cache_size
+      super name, host, ruleset_definition
       @definition = chart_definition
       @definition[:$type] = "stateChart"
     end
@@ -933,12 +930,12 @@ module Engine
 
   class Flowchart < Ruleset
 
-    def initialize(name, host, chart_definition, state_cache_size)
+    def initialize(name, host, chart_definition)
       @name = name
       @host = host
       ruleset_definition = {}
       transform chart_definition, ruleset_definition
-      super name, host, ruleset_definition, state_cache_size
+      super name, host, ruleset_definition
       @definition = chart_definition
       @definition["$type"] = "flowChart"
     end
@@ -1109,11 +1106,10 @@ module Engine
 
   class Host
 
-    def initialize(ruleset_definitions = nil, databases = [{:host => 'localhost', :port => 6379, :password => nil, :db => 0}], state_cache_size = 1024)
+    def initialize(ruleset_definitions = nil, databases = [{:host => 'localhost', :port => 6379, :password => nil, :db => 0}])
       @ruleset_directory = {}
       @ruleset_list = []
       @databases = databases
-      @state_cache_size = state_cache_size
       register_rulesets nil, ruleset_definitions if ruleset_definitions
     end
 
@@ -1216,7 +1212,7 @@ module Engine
     end
 
     def patch_state(ruleset_name, state)
-      get_ruleset(ruleset_name).assert_state state
+      get_ruleset(ruleset_name).update_state state
     end
 
     def renew_action_lease(ruleset_name, sid)
@@ -1224,7 +1220,7 @@ module Engine
     end
 
     def register_rulesets(parent_name, ruleset_definitions)
-      rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions, @state_cache_size)
+      rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions)
       for ruleset_name, ruleset in rulesets do
         if @ruleset_directory.key? ruleset_name
           raise ArgumentError, "Ruleset with name #{ruleset_name} already registered"
@@ -1342,9 +1338,9 @@ module Engine
 
   class Queue
 
-    def initialize(ruleset_name, database = {:host => "localhost", :port => 6379, :password => nil, :db => 0}, state_cache_size = 1024)
+    def initialize(ruleset_name, database = {:host => "localhost", :port => 6379, :password => nil, :db => 0})
       @_ruleset_name = ruleset_name.to_s
-      @handle = Rules.create_client @_ruleset_name, state_cache_size
+      @handle = Rules.create_client @_ruleset_name
       if database.kind_of? String
         Rules.bind_ruleset @handle, database, 0, nil, 0
       else

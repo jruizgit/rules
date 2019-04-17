@@ -397,7 +397,7 @@ class To(Promise):
 
 class Ruleset(object):
 
-    def __init__(self, name, host, ruleset_definition, state_cache_size):
+    def __init__(self, name, host, ruleset_definition):
         self._actions = {}
         self._name = name
         self._host = host
@@ -411,7 +411,7 @@ class Ruleset(object):
             elif (hasattr(action, '__call__')):
                 self._actions[rule_name] = Promise(action)
 
-        self._handle = rules.create_ruleset(state_cache_size, name, json.dumps(ruleset_definition, ensure_ascii=False))
+        self._handle = rules.create_ruleset(name, json.dumps(ruleset_definition, ensure_ascii=False))
         self._definition = ruleset_definition
         
     def bind(self, databases):
@@ -493,11 +493,11 @@ class Ruleset(object):
 
         rules.cancel_timer(self._handle, sid, timer_name)
 
-    def assert_state(self, state):
+    def update_state(self, state):
         if 'sid' in state:
-            return rules.assert_state(self._handle, str(state['sid']), json.dumps(state, ensure_ascii=False))
+            return rules.update_state(self._handle, str(state['sid']), json.dumps(state, ensure_ascii=False))
         else:
-            return rules.assert_state(self._handle, None, json.dumps(state, ensure_ascii=False))
+            return rules.update_state(self._handle, None, json.dumps(state, ensure_ascii=False))
 
     def get_state(self, sid):
         if sid != None: 
@@ -521,7 +521,7 @@ class Ruleset(object):
         return self._definition
 
     @staticmethod
-    def create_rulesets(parent_name, host, ruleset_definitions, state_cache_size):
+    def create_rulesets(parent_name, host, ruleset_definitions):
         branches = {}
         for name, definition in ruleset_definitions.items():  
             if name.rfind('$state') != -1:
@@ -529,18 +529,18 @@ class Ruleset(object):
                 if parent_name:
                     name = '{0}.{1}'.format(parent_name, name) 
 
-                branches[name] = Statechart(name, host, definition, state_cache_size)
+                branches[name] = Statechart(name, host, definition)
             elif name.rfind('$flow') != -1:
                 name = name[:name.rfind('$flow')]
                 if parent_name:
                     name = '{0}.{1}'.format(parent_name, name) 
 
-                branches[name] = Flowchart(name, host, definition, state_cache_size)
+                branches[name] = Flowchart(name, host, definition)
             else:
                 if parent_name:
                     name = '{0}.{1}'.format(parent_name, name)
 
-                branches[name] = Ruleset(name, host, definition, state_cache_size)
+                branches[name] = Ruleset(name, host, definition)
 
         return branches
 
@@ -556,14 +556,12 @@ class Ruleset(object):
 
     def dispatch(self, complete, async_result = None):
         state = None
-        action_handle = None
-        action_binding = None
+        state_offset = None
         result_container = {}
         if async_result:
             state = async_result[0]
             result_container = {'message': json.loads(async_result[1])}
-            action_handle = async_result[2]
-            action_binding = async_result[3]
+            state_offset = async_result[2]
         else:
             try:
                 result = rules.start_action(self._handle)
@@ -573,8 +571,7 @@ class Ruleset(object):
                 else: 
                     state = json.loads(result[0])
                     result_container = {'message': json.loads(result[1])}
-                    action_handle = result[2]
-                    action_binding = result[3]
+                    state_offset = result[2]
             except BaseException as error:
                 t, v, tb = sys.exc_info()
                 print('start action base exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
@@ -592,7 +589,7 @@ class Ruleset(object):
                 break
 
             del(result_container['message'])
-            c = Closure(self._host, state, message, action_handle, self._name)
+            c = Closure(self._host, state, message, state_offset, self._name)
             
             def action_callback(e):
                 if c._has_completed():
@@ -623,53 +620,53 @@ class Ruleset(object):
                         for ruleset_name, sid in c.get_deletes().items():
                             self._host.delete_state(ruleset_name, sid)
 
-                        binding  = 0
+                        offset  = 0
                         replies = 0
-                        pending = {action_binding: 0}
+                        pending = {state_offset: 0}
         
                         for ruleset_name, facts in c.get_retract_facts().items():
                             if len(facts) == 1:
-                                binding, replies = self._host.start_retract_fact(ruleset_name, facts[0])
+                                offset, replies = self._host.start_retract_fact(ruleset_name, facts[0])
                             else:
-                                binding, replies = self._host.start_retract_facts(ruleset_name, facts)
+                                offset, replies = self._host.start_retract_facts(ruleset_name, facts)
                            
-                            if binding in pending:
-                                pending[binding] = pending[binding] + replies
+                            if offset in pending:
+                                pending[offset] = pending[offset] + replies
                             else:
-                                pending[binding] = replies
+                                pending[offset] = replies
                         
                         for ruleset_name, facts in c.get_facts().items():
                             if len(facts) == 1:
-                                binding, replies = self._host.start_assert_fact(ruleset_name, facts[0])
+                                offset, replies = self._host.start_assert_fact(ruleset_name, facts[0])
                             else:
-                                binding, replies = self._host.start_assert_facts(ruleset_name, facts)
+                                offset, replies = self._host.start_assert_facts(ruleset_name, facts)
                             
-                            if binding in pending:
-                                pending[binding] = pending[binding] + replies
+                            if offset in pending:
+                                pending[offset] = pending[offset] + replies
                             else:
-                                pending[binding] = replies
+                                pending[offset] = replies
 
                         for ruleset_name, messages in c.get_messages().items():
                             if len(messages) == 1:
-                                binding, replies = self._host.start_post(ruleset_name, messages[0])
+                                offset, replies = self._host.start_post(ruleset_name, messages[0])
                             else:
-                                binding, replies = self._host.start_post_batch(ruleset_name, messages)
+                                offset, replies = self._host.start_post_batch(ruleset_name, messages)
                             
-                            if binding in pending:
-                                pending[binding] = pending[binding] + replies
+                            if offset in pending:
+                                pending[offset] = pending[offset] + replies
                             else:
-                                pending[binding] = replies
+                                pending[offset] = replies
 
-                        binding, replies = rules.start_update_state(self._handle, c._handle, json.dumps(c.s._d, ensure_ascii=False))
-                        if binding in pending:
-                            pending[binding] = pending[binding] + replies
+                        offset, replies = rules.start_update_state(self._handle, c._handle, json.dumps(c.s._d, ensure_ascii=False))
+                        if offset in pending:
+                            pending[offset] = pending[offset] + replies
                         else:
-                            pending[binding] = replies
+                            pending[offset] = replies
                         
-                        for binding, replies in pending.items():
-                            if binding != 0:
-                                if binding != action_binding:
-                                    rules.complete(binding, replies)
+                        for offset, replies in pending.items():
+                            if offset != 0:
+                                if offset != state_offset:
+                                    rules.complete(offset, replies)
                                 else:
                                     new_result = rules.complete_and_start_action(self._handle, replies, c._handle)
                                     if new_result:
@@ -677,7 +674,7 @@ class Ruleset(object):
                                             def terminal(e, wait):
                                                 return
 
-                                            self.dispatch(terminal, [state, new_result, action_handle, action_binding])
+                                            self.dispatch(terminal, [state, new_result, state_offset])
                                         else:
                                             result_container['message'] = json.loads(new_result)
 
@@ -707,12 +704,12 @@ class Ruleset(object):
 
 class Statechart(Ruleset):
 
-    def __init__(self, name, host, chart_definition, state_cache_size):
+    def __init__(self, name, host, chart_definition):
         self._name = name
         self._host = host
         ruleset_definition = {}
         self._transform(None, None, None, chart_definition, ruleset_definition)
-        super(Statechart, self).__init__(name, host, ruleset_definition, state_cache_size)
+        super(Statechart, self).__init__(name, host, ruleset_definition)
         self._definition = chart_definition
         self._definition['$type'] = 'stateChart'
 
@@ -821,12 +818,12 @@ class Statechart(Ruleset):
 
 class Flowchart(Ruleset):
 
-    def __init__(self, name, host, chart_definition, state_cache_size):
+    def __init__(self, name, host, chart_definition):
         self._name = name
         self._host = host
         ruleset_definition = {} 
         self._transform(chart_definition, ruleset_definition)
-        super(Flowchart, self).__init__(name, host, ruleset_definition, state_cache_size)
+        super(Flowchart, self).__init__(name, host, ruleset_definition)
         self._definition = chart_definition
         self._definition['$type'] = 'flowChart'
 
@@ -936,14 +933,13 @@ class Flowchart(Ruleset):
 
 class Host(object):
 
-    def __init__(self, ruleset_definitions = None, databases = None, state_cache_size = 1024):
+    def __init__(self, ruleset_definitions = None, databases = None):
         if not databases:
             databases = [{'host': 'localhost', 'port': 6379, 'password': None, 'db': 0}]
             
         self._ruleset_directory = {}
         self._ruleset_list = []
         self._databases = databases
-        self._state_cache_size = state_cache_size
         if ruleset_definitions:
             self.register_rulesets(None, ruleset_definitions)
 
@@ -1023,7 +1019,7 @@ class Host(object):
         return self.get_ruleset(ruleset_name).start_retract_facts(facts)
 
     def patch_state(self, ruleset_name, state):
-        return self.get_ruleset(ruleset_name).assert_state(state)
+        return self.get_ruleset(ruleset_name).update_state(state)
 
     def renew_action_lease(self, ruleset_name, sid):
         self.get_ruleset(ruleset_name).renew_action_lease(sid)
@@ -1112,12 +1108,12 @@ class Host(object):
 
 class Queue(object):
 
-    def __init__(self, ruleset_name, database = None, state_cache_size = 1024):
+    def __init__(self, ruleset_name, database = None):
         if not database:
             database = {'host': 'localhost', 'port': 6379, 'password':None, 'db': 0}
 
         self._ruleset_name = ruleset_name
-        self._handle = rules.create_client(state_cache_size, ruleset_name)
+        self._handle = rules.create_client(ruleset_name)
         if isinstance(database, str):
             rules.bind_ruleset(0, 0, database, None, self._handle)
         else:
