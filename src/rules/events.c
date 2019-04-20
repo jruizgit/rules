@@ -669,19 +669,27 @@ static unsigned int getFrameHash(ruleset *tree,
         }
     } else if (exprs->length > 0) {
         if (exprs->expressions[0].operator == OP_AND) {
+            *hash = FNV_32_OFFSET_BASIS;
+            unsigned int result;
             for (unsigned int i = 1; i < exprs->length; ++ i) {
+
                 if (exprs->expressions[i].operator == OP_EQ) {
-                    return getFrameHashForExpression(tree,
-                                             state,
-                                             &exprs->expressions[i],
-                                             messageObject,
-                                             context,
-                                             hash);
+                    unsigned int newHash;
+                    result = getFrameHashForExpression(tree,
+                                                       state,
+                                                       &exprs->expressions[i],
+                                                       messageObject,
+                                                       context,
+                                                       &newHash);
+                    if (result == RULES_OK) {
+                        *hash ^= newHash;
+                        *hash *= FNV_32_PRIME;
+                    }
                 }
             }
         }
     }
-
+    
     return RULES_OK;
 }
 
