@@ -1,468 +1,534 @@
 var d = require('../libjs/durable');
 
-var factCount = 0;
-function createAndPost (host, fact) {
-    fact.id = factCount;
-    fact.sid = 1;
-    host.post('waltzdb', fact);
-    factCount += 1;
-}
-
-function createAndAssert (host, fact) {
-    fact.id = factCount;
-    fact.sid = 1;
-    host.assert('waltzdb', fact);
-    factCount += 1;
-}
-
-function getX (val) {
-    return Math.floor(val / 100);
-}
-
-function getY (val) {
-    return val % 100;
-}
-
-function getAngle (p1, p2) {
-    var deltaX = getX(p2) - getX(p1);
-    var deltaY = getY(p2) - getY(p1);
-    if (deltaX == 0) {
-        if (deltaY > 0) {
-            return Math.PI / 2;
-        } else if (deltaY < 0) { 
-            return -Math.PI / 2;
-        }
-    } else if (deltaY == 0) {
-        if (deltaX > 0) {
-            return 0;
-        } else if (deltaX < 0) {
-            return Math.PI;
-        }    
-    } else {
-        return Math.atan2(deltaY, deltaX);
-    }
-}
-
-function getInscribableAngle (basePoint, p1, p2) {
-    var angle1 = getAngle(basePoint, p1);
-    var angle2 = getAngle(basePoint, p2);
-    var temp = Math.abs(angle1 - angle2);
-    if (temp > Math.PI) {
-        return Math.abs(2 * Math.PI - temp);
+d.statechart('waltzdb', function() {
+    var factCount = 0;
+    function createAndPost (host, fact) {
+        fact.id = factCount;
+        fact.sid = 1;
+        host.post('waltzdb', fact);
+        factCount += 1;
     }
 
-    return temp;
-}
+    function createAndAssert (host, fact) {
+        fact.id = factCount;
+        fact.sid = 1;
+        host.assert('waltzdb', fact);
+        factCount += 1;
+    }
 
-function make3jJunction (j, basePoint, p1, p2, p3) {
-    var angle12 = getInscribableAngle(basePoint, p1, p2);
-    var angle13 = getInscribableAngle(basePoint, p1, p3);
-    var angle23 = getInscribableAngle(basePoint, p2, p3);
-    var sum1213 = angle12 + angle13;
-    var sum1223 = angle12 + angle23;
-    var sum1323 = angle13 + angle23;
+    function getX (val) {
+        return Math.floor(val / 100);
+    }
 
-    var total = 0;
-    if (sum1213 < sum1223) {
-        if (sum1213 < sum1323) {
-            total = sum1213;
-            j.p2 = p1; j.p1 = p2; j.p3 = p3;
+    function getY (val) {
+        return val % 100;
+    }
+
+    function getAngle (p1, p2) {
+        var deltaX = getX(p2) - getX(p1);
+        var deltaY = getY(p2) - getY(p1);
+        if (deltaX == 0) {
+            if (deltaY > 0) {
+                return Math.PI / 2;
+            } else if (deltaY < 0) { 
+                return -Math.PI / 2;
+            }
+        } else if (deltaY == 0) {
+            if (deltaX > 0) {
+                return 0;
+            } else if (deltaX < 0) {
+                return Math.PI;
+            }    
         } else {
-            total = sum1323;
-            j.p2 = p3; j.p1 = p1; j.p3 = p2;
+            return Math.atan2(deltaY, deltaX);
         }
-    } else {
-        if (sum1223 < sum1323) {
-            total = sum1223;
-            j.p2 = p2; j.p1 = p1; j.p3 = p3;
+    }
+
+    function getInscribableAngle (basePoint, p1, p2) {
+        var angle1 = getAngle(basePoint, p1);
+        var angle2 = getAngle(basePoint, p2);
+        var temp = Math.abs(angle1 - angle2);
+        if (temp > Math.PI) {
+            return Math.abs(2 * Math.PI - temp);
+        }
+
+        return temp;
+    }
+
+    function make3jJunction (j, basePoint, p1, p2, p3) {
+        var angle12 = getInscribableAngle(basePoint, p1, p2);
+        var angle13 = getInscribableAngle(basePoint, p1, p3);
+        var angle23 = getInscribableAngle(basePoint, p2, p3);
+        var sum1213 = angle12 + angle13;
+        var sum1223 = angle12 + angle23;
+        var sum1323 = angle13 + angle23;
+
+        var total = 0;
+        if (sum1213 < sum1223) {
+            if (sum1213 < sum1323) {
+                total = sum1213;
+                j.p2 = p1; j.p1 = p2; j.p3 = p3;
+            } else {
+                total = sum1323;
+                j.p2 = p3; j.p1 = p1; j.p3 = p2;
+            }
         } else {
-            total = sum1323;
-            j.p2 = p3; j.p1 = p1; j.p3 = p2;
+            if (sum1223 < sum1323) {
+                total = sum1223;
+                j.p2 = p2; j.p1 = p1; j.p3 = p3;
+            } else {
+                total = sum1323;
+                j.p2 = p3; j.p1 = p1; j.p3 = p2;
+            }
+        }
+
+        if (Math.abs(total - Math.PI) < 0.001) {
+            j.name = 'tee';
+        } else if (total > Math.PI) {
+            j.name = 'fork'; 
+        } else {
+            j.name = 'arrow';
         }
     }
 
-    if (Math.abs(total - Math.PI) < 0.001) {
-        j.name = 'tee';
-    } else if (total > Math.PI) {
-        j.name = 'fork'; 
-    } else {
-        j.name = 'arrow';
-    }
-}
-
-with (d.statechart('waltzdb')) {
-    with (state('start')) {
-        to('duplicate', 
-        function (c) {
+    start: {
+        to: 'duplicate'
+        run: {
             c.s.gid = 1000;
-            c.s.startTime = new Date();
-        });
-    }
-
-    with (state('duplicate')) {
-        to('duplicate').whenAll(cap(10000),
-                                c.line = m.t.eq('line'), 
-        function (c) {
-            for (var i = 0; i < c.m.length; ++i) {
-                var frame = c.m[i];
-                console.log('Edge ' + frame.line.p1 + ' ' + frame.line.p2);
-                console.log('Edge ' + frame.line.p2 + ' ' + frame.line.p1);
-                c.post({id: c.s.gid, t: 'edge', p1: frame.line.p1, p2: frame.line.p2, joined: false});
-                c.post({id: c.s.gid + 1, t: 'edge', p1: frame.line.p2, p2: frame.line.p1, joined: false});
-                c.s.gid += 2
-            }
-        });
-
-        to('detectJunctions').whenAll(pri(1), 
-        function (c) {
-            console.log('detectJunctions');
-        });
-    }
-
-    with (state('detectJunctions')) {
-        to('detectJunctions').whenAll(cap(1000),
-                                      c.e1 = and(m.t.eq('edge'), m.joined.eq(false)),
-                                      c.e2 = and(m.t.eq('edge'), m.joined.eq(false), m.p1.eq(c.e1.p1), m.p2.neq(c.e1.p2)),
-                                      c.e3 = and(m.t.eq('edge'), m.joined.eq(false), m.p1.eq(c.e1.p1), m.p2.neq(c.e1.p2), m.p2.neq(c.e2.p2)),
-        function (c) {
-            for (var i = 0; i < c.m.length; ++i) {
-                var frame = c.m[i];
-                var j = {id: c.s.gid, t: 'junction', basePoint: frame.e1.p1, jt: '3j', visited: 'no'};
-                make3jJunction(j, frame.e1.p1, frame.e1.p2, frame.e2.p2, frame.e3.p2);
-                console.log('Junction ' + j.name + ' ' + j.basePoint + ' ' + j.p1 + ' ' + j.p2 + ' ' + j.p3);
-                c.assert(j);
-                frame.e1.id = c.s.gid + 1; frame.e1.joined = true; frame.e1.jt = '3j'; c.assert(frame.e1);
-                frame.e2.id = c.s.gid + 2; frame.e2.joined = true; frame.e2.jt = '3j'; c.assert(frame.e2);
-                frame.e3.id = c.s.gid + 3; frame.e3.joined = true; frame.e3.jt = '3j'; c.assert(frame.e3);
-                c.s.gid += 4;
-            }
-         });
-
-        to('detectJunctions').whenAll(cap(1000),
-                                      c.e1 = and(m.t.eq('edge'), m.joined.eq(false)),
-                                      c.e2 = and(m.t.eq('edge'), m.joined.eq(false), m.p1.eq(c.e1.p1), m.p2.neq(c.e1.p2)),
-                                      none(and(m.t.eq('edge'), m.p1.eq(c.e1.p1), m.p2.neq(c.e1.p2), m.p2.neq(c.e2.p2))),
-        function (c) {
-            for (var i = 0; i < c.m.length; ++i) {
-                var frame = c.m[i];
-                var j = {id: c.s.gid, t: 'junction', basePoint: frame.e1.p1, jt: '2j', visited: 'no', name: 'L', p1: frame.e1.p2, p2: frame.e2.p2};
-                console.log('Junction L ' + frame.e1.p1 + ' ' + frame.e1.p2 + ' ' + frame.e2.p2);
-                c.assert(j)
-                frame.e1.id = c.s.gid + 1; frame.e1.joined = true; frame.e1.jt = '2j'; c.assert(frame.e1);
-                frame.e2.id = c.s.gid + 2; frame.e2.joined = true; frame.e2.jt = '2j'; c.assert(frame.e2);
-                c.s.gid += 3;
-            }
-        });
-
-        to('findInitialBoundary').whenAll(pri(1), 
-        function (c) {
-            console.log('findInitialBoundary');
-        });                           
-    }
-
-    with (state('findInitialBoundary')) {
-        to('findSecondBoundary').whenAll(c.j = and(m.t.eq('junction'), m.jt.eq('2j'), m.visited.eq('no')),
-                                         c.e1 = and(m.t.eq('edge'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p1)),
-                                         c.e2 = and(m.t.eq('edge'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p2)),
-                                         none(and(m.t.eq('junction'), m.jt.eq('2j'), m.visited.eq('no'), m.basePoint.gt(c.j.basePoint))),
-        function (c) {
-            c.assert({id: c.s.gid, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p1, labelName: 'B', lid: '1'});
-            c.assert({id: c.s.gid + 1, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p2, labelName: 'B', lid: '1'});
-            c.s.gid += 2;
-            console.log('findSecondBoundary');
-        });
-        
-        to('findSecondBoundary').whenAll(c.j = and(m.t.eq('junction'), m.jt.eq('3j'), m.name.eq('arrow'), m.visited.eq('no')),
-                                         c.e1 = and(m.t.eq('edge'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p1)),
-                                         c.e2 = and(m.t.eq('edge'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p2)),
-                                         c.e3 = and(m.t.eq('edge'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p3)),
-                                         none(and(m.t.eq('junction'), m.jt.eq('3j'), m.visited.eq('no'), m.basePoint.gt(c.j.basePoint))),
-        function (c) {
-            c.assert({id: c.s.gid, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p1, labelName: 'B', lid: '14'});
-            c.assert({id: c.s.gid + 1, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p2, labelName: '+', lid: '14'});
-            c.assert({id: c.s.gid + 2, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p3, labelName: 'B', lid: '14'});
-            c.s.gid += 3;
-            console.log('findSecondBoundary');
-        });
-    }
-
-    with (state('findSecondBoundary')) {
-        to('labeling').whenAll(c.j = and(m.t.eq('junction'), m.jt.eq('2j'), m.visited.eq('no')),
-                               c.e1 = and(m.t.eq('edge'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p1)),
-                               c.e2 = and(m.t.eq('edge'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p2)),
-                               none(and(m.t.eq('junction'), m.visited.neq('no'), m.basePoint.lt(c.j.basePoint))),
-        function (c) {
-            c.retract(c.j); c.j.id = c.s.gid; c.j.visited = 'yes'; c.assert(c.j);            
-            c.assert({id: c.s.gid + 1, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p1, labelName: 'B', lid: '1'});
-            c.assert({id: c.s.gid + 2, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p2, labelName: 'B', lid: '1'});
-            c.s.gid += 3;
-            console.log('labeling');
-
-        });
-
-        to('labeling').whenAll(c.j = and(m.t.eq('junction'), m.jt.eq('3j'), m.name.eq('arrow'), m.visited.eq('no')),
-                               c.e1 = and(m.t.eq('edge'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p1)),
-                               c.e2 = and(m.t.eq('edge'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p2)),
-                               c.e3 = and(m.t.eq('edge'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p3)),
-                               none(and(m.t.eq('junction'), m.visited.neq('no'), m.base_point.lt(c.j.basePoint))),
-        function (c) {
-            c.retract(c.j); c.j.id = c.s.gid; c.j.visited = 'yes'; c.assert(c.j);            
-            c.assert({id: c.s.gid + 1, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p1, labelName: 'B', lid: '14'});
-            c.assert({id: c.s.gid + 2, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p2, labelName: '+', lid: '14'});
-            c.assert({id: c.s.gid + 3, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p3, labelName: 'B', lid: '14'});
-            c.s.gid += 4;
-            console.log('labeling');
-        });
-    }
-
-    with (state('labeling')) {
-        to('visiting3j').whenAll(c.j = and(m.t.eq('junction'), m.jt.eq('3j'), m.visited.eq('no')),
-        function (c) {
-            c.retract(c.j); c.j.id = c.s.gid; c.j.visited = 'now'; c.assert(c.j);
-            c.s.gid += 1;
-            console.log('visiting3j');
-        });
-
-        to('visiting2j').whenAll(pri(1),
-                                 c.j = and(m.t.eq('junction'), m.jt.eq('2j'), m.visited.eq('no')),
-        function (c) {
-            c.retract(c.j); c.j.id = c.s.gid; c.j.visited = 'now'; c.assert(c.j); 
-            c.s.gid += 1;
-            console.log('visiting2j');
-        });
-
-        to('end').whenAll(pri(2), 
-        function (c) {
-            console.log('end ' + (new Date() - c.s.startTime));
-            c.delete();
-        });
-    }
-
-    with(state('visiting3j')) {
-        function visit3j (c) {
-            console.log('Edge Label ' + c.j.basePoint + ' ' + c.j.p1 + ' ' + c.l.n1 + ' ' + c.l.lid);
-            console.log('Edge Label ' + c.j.basePoint + ' ' + c.j.p2 + ' ' + c.l.n2 + ' ' + c.l.lid);
-            console.log('Edge Label ' + c.j.basePoint + ' ' + c.j.p3 + ' ' + c.l.n3 + ' ' + c.l.lid);
-            c.assert({id: c.s.gid, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p1, labelName: c.l.n1, lid: c.l.lid});
-            c.assert({id: c.s.gid + 1, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p2, labelName: c.l.n2, lid: c.l.lid});
-            c.assert({id: c.s.gid + 2, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p3, labelName: c.l.n3, lid: c.l.lid});
-            c.s.gid += 3;
-        }
-
-        to('visiting3j').whenAll(c.j = and(m.t.eq('junction'), m.visited.eq('now'), m.jt.eq('3j')),
-                                 c.l = and(m.t.eq('label'), m.name.eq(c.j.name)), 
-                                 c.el1 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p1), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n1)),
-                                 c.el2 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p2), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n2)),
-                                 c.el3 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p3), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n3)),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.lid.eq(c.l.lid))),
-        function (c) {
-            visit3j(c);
-        });
-
-        to('visiting3j').whenAll(c.j = and(m.t.eq('junction'), m.visited.eq('now'), m.jt.eq('3j')),
-                                 c.l = and(m.t.eq('label'), m.name.eq(c.j.name)), 
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p1), m.p2.eq(c.j.basePoint))),
-                                 c.el2 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p2), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n2)),
-                                 c.el3 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p3), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n3)),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.lid.eq(c.l.lid))),
-        function (c) {
-            visit3j(c);
-        });
-
-        to('visiting3j').whenAll(c.j = and(m.t.eq('junction'), m.visited.eq('now'), m.jt.eq('3j')),
-                                 c.l = and(m.t.eq('label'), m.name.eq(c.j.name)), 
-                                 c.el1 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p1), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n1)),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p2), m.p2.eq(c.j.basePoint))),
-                                 c.el3 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p3), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n3)),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.lid.eq(c.l.lid))),
-        function (c) {
-            visit3j(c);
-        });
-
-        to('visiting3j').whenAll(c.j = and(m.t.eq('junction'), m.visited.eq('now'), m.jt.eq('3j')),
-                                 c.l = and(m.t.eq('label'), m.name.eq(c.j.name)), 
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p1), m.p2.eq(c.j.basePoint))),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p2), m.p2.eq(c.j.basePoint))),
-                                 c.el3 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p3), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n3)),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.lid.eq(c.l.lid))),
-        function (c) {
-            visit3j(c);
-        });
-
-        to('visiting3j').whenAll(c.j = and(m.t.eq('junction'), m.visited.eq('now'), m.jt.eq('3j')),
-                                 c.l = and(m.t.eq('label'), m.name.eq(c.j.name)), 
-                                 c.el1 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p1), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n1)),
-                                 c.el2 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p2), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n2)),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p3), m.p2.eq(c.j.basePoint))),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.lid.eq(c.l.lid))),
-        function (c) {
-            visit3j(c);
-        });
-
-        to('visiting3j').whenAll(c.j = and(m.t.eq('junction'), m.visited.eq('now'), m.jt.eq('3j')),
-                                 c.l = and(m.t.eq('label'), m.name.eq(c.j.name)), 
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p1), m.p2.eq(c.j.basePoint))),
-                                 c.el2 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p2), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n2)),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p3), m.p2.eq(c.j.basePoint))),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.lid.eq(c.l.lid))),
-        function (c) {
-            visit3j(c);
-        });
-
-        to('visiting3j').whenAll(c.j = and(m.t.eq('junction'), m.visited.eq('now'), m.jt.eq('3j')),
-                                 c.l = and(m.t.eq('label'), m.name.eq(c.j.name)), 
-                                 c.el1 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p1), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n1)),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p2), m.p2.eq(c.j.basePoint))),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p3), m.p2.eq(c.j.basePoint))),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.lid.eq(c.l.lid))),
-        function (c) {
-            visit3j(c);
-        });
-
-        to('visiting3j').whenAll(c.j = and(m.t.eq('junction'), m.visited.eq('now'), m.jt.eq('3j')),
-                                 c.l = and(m.t.eq('label'), m.name.eq(c.j.name)), 
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p1), m.p2.eq(c.j.basePoint))),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p2), m.p2.eq(c.j.basePoint))),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p3), m.p2.eq(c.j.basePoint))),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.lid.eq(c.l.lid))),
-        function (c) {
-            visit3j(c);
-        });
-
-        to('marking').whenAll(pri(1),
-                              and(m.t.eq('junction'), m.visited.eq('now'), m.jt.eq('3j')), 
-        function (c) {
-            console.log('marking');
-        });
-    }
-
-    with(state('visiting2j')) {
-        function visit2j (c) {
-            console.log('Edge Label ' + c.j.basePoint + ' ' + c.j.p1 + ' ' + c.l.n1 + ' ' + c.l.lid);
-            console.log('Edge Label ' + c.j.basePoint + ' ' + c.j.p2 + ' ' + c.l.n2 + ' ' + c.l.lid);
-            c.assert({id: c.s.gid, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p1, labelName: c.l.n1, lid: c.l.lid});
-            c.assert({id: c.s.gid + 1, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p2, labelName: c.l.n2, lid: c.l.lid});
-            c.s.gid += 2;
-        }
-
-        to('visiting2j').whenAll(c.j = and(m.t.eq('junction'), m.visited.eq('now'), m.jt.eq('2j')),
-                                 c.l = and(m.t.eq('label'), m.name.eq(c.j.name)), 
-                                 c.el1 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p1), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n1)),
-                                 c.el2 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p2), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n2)),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.lid.eq(c.l.lid))),
-        function (c) {
-            visit2j(c);
-        });
-
-        to('visiting2j').whenAll(c.j = and(m.t.eq('junction'), m.visited.eq('now'), m.jt.eq('2j')),
-                                 c.l = and(m.t.eq('label'), m.name.eq(c.j.name)), 
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p1), m.p2.eq(c.j.basePoint))),
-                                 c.el2 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p2), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n2)),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.lid.eq(c.l.lid))),
-        function (c) {
-            visit2j(c);
-        });
-
-        to('visiting2j').whenAll(c.j = and(m.t.eq('junction'), m.visited.eq('now'), m.jt.eq('2j')),
-                                 c.l = and(m.t.eq('label'), m.name.eq(c.j.name)), 
-                                 c.el1 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p1), m.p2.eq(c.j.basePoint), m.labelName.eq(c.l.n1)),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p2), m.p2.eq(c.j.basePoint))),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.lid.eq(c.l.lid))),
-        function (c) {
-            visit2j(c);
-        });
-
-        to('visiting2j').whenAll(c.j = and(m.t.eq('junction'), m.visited.eq('now'), m.jt.eq('2j')),
-                                 c.l = and(m.t.eq('label'), m.name.eq(c.j.name)), 
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p1), m.p2.eq(c.j.basePoint))),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.p2), m.p2.eq(c.j.basePoint))),
-                                 none(and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.lid.eq(c.l.lid))),
-        function (c) {
-            visit2j(c);
-        });
-
-        to('marking').whenAll(pri(1),
-                              and(m.t.eq('junction'), m.visited.eq('now'), m.jt.eq('2j')), 
-        function (c) {
-            console.log('marking');
-        });
-    }
-
-    with (state('marking')) {
-        to('marking').whenAll(c.j = and(m.t.eq('junction'), m.visited.eq('now')),
-                              c.e = and(m.t.eq('edge'), m.p2.eq(c.j.basePoint)),
-                              c.junction = and(m.t.eq('junction'), m.basePoint.eq(c.e.p1), m.visited.eq('yes')),
-        function (c) {
-            c.retract(c.junction); c.junction.id = c.s.gid; c.junction.visited = 'check'; c.assert(c.junction); 
-            c.s.gid += 1;
-        });
-
-        to('marking').whenAll(pri(1),
-                              c.j = and(m.t.eq('junction'), m.visited.eq('now')),
-        function (c) {
-            c.retract(c.j); c.j.id = c.s.gid; c.j.visited = 'yes'; c.assert(c.j); 
-            c.s.gid += 1;
-        });
-
-        to('checking').whenAll(pri(2),
-        function (c) {
-            console.log('checking');
-        });
-    }
-
-    with (state('checking')) {
-        to('removeLabel').whenAll(c.junction = and(m.t.eq('junction'), m.visited.eq('check')),
-                                  c.el1 = and(m.t.eq('edge_label'), m.p1.eq(c.junction.basePoint)),
-                                  c.j = and(m.t.eq('junction'), m.basePoint.eq(c.el1.p2), m.visited.eq('yes')),
-                                  none(and(m.t.eq('edge_label'), m.p1.eq(c.el1.p2), m.p2.eq(c.junction.basePoint), m.labelName.eq(c.el1.labelName))),
-        function (c) {
-            console.log('removeLabel');
-            c.assert({id: c.s.gid, t: 'illegal', basePoint: c.junction.basePoint, lid: c.el1.lid});
-            c.s.gid += 1;
-        });
-
-        to('checking').whenAll(pri(1),
-                              c.j = and(m.t.eq('junction'), m.visited.eq('check')),
-        function (c) {
-            c.retract(c.j); c.j.id = c.s.gid; c.j.visited = 'yes'; c.assert(c.j); 
-            c.s.gid += 1;
-        });
-
-        to('labeling').whenAll(pri(2),
-        function (c) {
-            console.log('labeling');
-        });
-    }
-
-    with (state('removeLabel')) {
-        to('checking').whenAll(c.i = m.t.eq('illegal'),
-                               c.j = and(m.t.eq('junction'), m.jt.eq('3j'), m.basePoint.eq(c.i.basePoint)),
-                               c.el1 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p1), m.lid.eq(c.i.lid)),
-                               c.el2 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p2), m.lid.eq(c.i.lid)),
-                               c.el3 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p3), m.lid.eq(c.i.lid)),
-        function (c) {
-            console.log('checking');
-            c.retract(c.i);
-            c.retract(c.el1);
-            c.retract(c.el2);
-            c.retract(c.el3);
-        });
-
-        to('checking').whenAll(c.i = m.t.eq('illegal'),
-                               c.j = and(m.t.eq('junction'), m.jt.eq('2j'), m.basePoint.eq(c.i.basePoint)),
-                               c.el1 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p1), m.lid.eq(c.i.lid)),
-                               c.el2 = and(m.t.eq('edgeLabel'), m.p1.eq(c.j.basePoint), m.p2.eq(c.j.p2), m.lid.eq(c.i.lid)),
-        function (c) {
-            console.log('checking');
-            c.retract(c.i);
-            c.retract(c.el1);
-            c.retract(c.el2);
-        });
+            c.s.startTime = new Date(); 
+        }  
     }
     
-    state('end');
+    duplicate: {
+        to: 'duplicate'
+        whenAll: line = m.t == 'line'
+        cap: 1000
+        run: {
+            for (var i = 0; i < m.length; ++i) {
+                var frame = m[i];
+                console.log('Edge ' + frame.line.p1 + ' ' + frame.line.p2);
+                console.log('Edge ' + frame.line.p2 + ' ' + frame.line.p1);
+                post({id: s.gid, t: 'edge', p1: frame.line.p1, p2: frame.line.p2, joined: false});
+                post({id: s.gid + 1, t: 'edge', p1: frame.line.p2, p2: frame.line.p1, joined: false});
+                c.s.gid += 2
+            }
+        }
 
-    whenStart(function (host) {
+        to: 'detectJunctions'
+        pri: 1
+        run: console.log('detectJunctions');
+    }
+
+    detectJunctions: {
+        to: 'detectJunctions'
+        whenAll: {
+            e1 = m.t == 'edge' && m.joined == false
+            e2 = m.t == 'edge' && m.joined == false && m.p1 == e1.p1 && m.p2 != e1.p2
+            e3 = m.t == 'edge' && m.joined == false && m.p1 == e1.p1 && m.p2 != e1.p2 && m.p2 != e2.p2
+        }
+        cap: 1
+        run: {
+            for (var i = 0; i < m.length; ++i) {
+                var frame = m[i];
+                var j = {id: s.gid, t: 'junction', basePoint: frame.e1.p1, jt: '3j', visited: 'no'};
+                make3jJunction(j, frame.e1.p1, frame.e1.p2, frame.e2.p2, frame.e3.p2);
+                console.log('Junction ' + j.name + ' ' + j.basePoint + ' ' + j.p1 + ' ' + j.p2 + ' ' + j.p3);
+                assert(j);
+                frame.e1.id = s.gid + 1; frame.e1.joined = true; frame.e1.jt = '3j'; assert(frame.e1);
+                frame.e2.id = s.gid + 2; frame.e2.joined = true; frame.e2.jt = '3j'; assert(frame.e2);
+                frame.e3.id = s.gid + 3; frame.e3.joined = true; frame.e3.jt = '3j'; assert(frame.e3);
+                s.gid += 4;
+            }
+        }
+
+        to: 'detectJunctions'
+        whenAll: {
+            e1 = m.t == 'edge' && m.joined == false
+            e2 = m.t == 'edge' && m.joined == false && m.p1 == e1.p1 && m.p2 != e1.p2
+            none(m.t == 'edge' && m.joined == false && m.p1 == e1.p1 && m.p2 != e1.p2 && m.p2 != e2.p2)
+        }
+        cap: 1
+        run: {
+            for (var i = 0; i < m.length; ++i) {
+                var frame = m[i];
+                var j = {id: s.gid, t: 'junction', basePoint: frame.e1.p1, jt: '2j', visited: 'no', name: 'L', p1: frame.e1.p2, p2: frame.e2.p2};
+                console.log('Junction L ' + frame.e1.p1 + ' ' + frame.e1.p2 + ' ' + frame.e2.p2);
+                assert(j)
+                frame.e1.id = s.gid + 1; frame.e1.joined = true; frame.e1.jt = '2j'; assert(frame.e1);
+                frame.e2.id = s.gid + 2; frame.e2.joined = true; frame.e2.jt = '2j'; assert(frame.e2);
+                s.gid += 3;
+            }
+        }
+
+        to: 'findInitialBoundary'
+        pri: 1
+        run: console.log('findInitialBoundary');
+    }
+
+    findInitialBoundary: {
+        to: 'findSecondBoundary'
+        whenAll: {
+            j = m.t == 'junction' && m.jt == '2j' && m.visited == 'no'
+            e1 = m.t == 'edge' && m.p1 == j.basePoint && m.p2 == j.p1
+            e2 = m.t == 'edge' && m.p1 == j.basePoint && m.p2 == j.p2
+            none(m.t == 'junction' && m.jt == '2j' && m.visited == 'no' && m.basePoint > j.basePoint)
+        }
+        run: {
+            assert({id: s.gid, t: 'edgeLabel', p1: j.basePoint, p2: j.p1, labelName: 'B', lid: '1'});
+            assert({id: s.gid + 1, t: 'edgeLabel', p1: j.basePoint, p2: j.p2, labelName: 'B', lid: '1'});
+            s.gid += 2;
+            console.log('findInitialBoundary');
+
+        }
+
+        to: 'findSecondBoundary'
+        whenAll: {
+            j = m.t == 'junction' && m.jt == '3j' && m.name == 'arrow' && m.visited == 'no'
+            e1 = m.t == 'edge' && m.p1 == j.basePoint && m.p2 == j.p1
+            e2 = m.t == 'edge' && m.p1 == j.basePoint && m.p2 == j.p2
+            e3 = m.t == 'edge' && m.p1 == j.basePoint && m.p2 == j.p3
+            none(m.t == 'junction' && m.jt == '3j' && m.visited == 'no' && m.basePoint > j.basePoint)
+        }
+        run: {
+            assert({id: s.gid, t: 'edgeLabel', p1: j.basePoint, p2: j.p1, labelName: 'B', lid: '14'});
+            assert({id: s.gid + 1, t: 'edgeLabel', p1: j.basePoint, p2: j.p2, labelName: '+', lid: '14'});
+            assert({id: s.gid + 2, t: 'edgeLabel', p1: j.basePoint, p2: j.p3, labelName: 'B', lid: '14'});
+            s.gid += 3;
+            console.log('findSecondBoundary');
+        }
+    }    
+
+    findSecondBoundary: {
+        to: 'labeling'
+        whenAll: {
+            j = m.t == 'junction' && m.jt == '2j' && m.visited == 'no'
+            e1 = m.t == 'edge' && m.p1 == j.basePoint && m.p2 == j.p1
+            e2 = m.t == 'edge' && m.p1 == j.basePoint && m.p2 == j.p2
+            none(m.t == 'junction' && m.visited != 'no' && m.basePoint < j.basePoint)
+        }
+        run: {
+            retract(j); j.id = s.gid; j.visited = 'yes'; assert(j);            
+            assert({id: s.gid + 1, t: 'edgeLabel', p1: j.basePoint, p2: j.p1, labelName: 'B', lid: '1'});
+            assert({id: s.gid + 2, t: 'edgeLabel', p1: j.basePoint, p2: j.p2, labelName: 'B', lid: '1'});
+            s.gid += 3;
+            console.log('labeling');
+        }
+
+        to: 'labeling'
+        whenAll: {
+            j = m.t == 'junction' && m.jt == '3j' && m.name == 'arrow' && m.visited == 'no'
+            e1 = m.t == 'edge' && m.p1 == j.basePoint && m.p2 == j.p1
+            e2 = m.t == 'edge' && m.p1 == j.basePoint && m.p2 == j.p2
+            e2 = m.t == 'edge' && m.p1 == j.basePoint && m.p2 == j.p3
+            none(m.t == 'junction' && m.visited != 'no' && m.basePoint < j.basePoint)
+        }
+        run: {
+            retract(j); j.id = s.gid; j.visited = 'yes'; assert(j);            
+            c.assert({id: s.gid + 1, t: 'edgeLabel', p1: j.basePoint, p2: j.p1, labelName: 'B', lid: '14'});
+            c.assert({id: s.gid + 2, t: 'edgeLabel', p1: j.basePoint, p2: j.p2, labelName: '+', lid: '14'});
+            c.assert({id: s.gid + 3, t: 'edgeLabel', p1: j.basePoint, p2: j.p3, labelName: 'B', lid: '14'});
+            s.gid += 4;
+            console.log('labeling');
+        }        
+    }
+
+    labeling: {
+        to: 'visiting3j'
+        whenAll: j = m.t == 'junction' && m.jt == '3j' && m.visited == 'no'
+        run: {
+            retract(j); j.id = s.gid; j.visited = 'now'; assert(j);
+            s.gid += 1;
+            console.log('visiting3j');
+        }
+
+        to: 'visiting2j'
+        whenAll: j = m.t == 'junction' && m.jt == '2j' && m.visited == 'no'
+        pri: 1
+        run: {
+            retract(j); j.id = s.gid; j.visited = 'now'; assert(j);
+            s.gid += 1;
+            console.log('visiting2j');
+        }
+
+        to: 'end'
+        pri: 2
+        run: {
+            console.log('end ' + (new Date() - s.startTime));
+            deleteState();
+        }
+    }
+    
+    function visit3j (c) {
+        console.log('Edge Label ' + c.j.basePoint + ' ' + c.j.p1 + ' ' + c.l.n1 + ' ' + c.l.lid);
+        console.log('Edge Label ' + c.j.basePoint + ' ' + c.j.p2 + ' ' + c.l.n2 + ' ' + c.l.lid);
+        console.log('Edge Label ' + c.j.basePoint + ' ' + c.j.p3 + ' ' + c.l.n3 + ' ' + c.l.lid);
+        c.assert({id: c.s.gid, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p1, labelName: c.l.n1, lid: c.l.lid});
+        c.assert({id: c.s.gid + 1, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p2, labelName: c.l.n2, lid: c.l.lid});
+        c.assert({id: c.s.gid + 2, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p3, labelName: c.l.n3, lid: c.l.lid});
+        c.s.gid += 3;
+    }
+
+    visiting3j: {
+        to: 'visiting3j'
+        whenAll: {
+            j = m.t == 'junction' && m.visited == 'now' && m.jt == '3j'
+            l = m.t == 'label' && m.name == j.name
+            el1 = m.t == 'edgeLabel' && m.p1 == j.p1 && m.p2 == j.basePoint && m.labelName == l.n1
+            el2 = m.t == 'edgeLabel' && m.p1 == j.p2 && m.p2 == j.basePoint && m.labelName == l.n2
+            el3 = m.t == 'edgeLabel' && m.p1 == j.p3 && m.p2 == j.basePoint && m.labelName == l.n3
+            none(m.t == 'edgeLabel' && m.p1 == j.basePoint && m.lid == l.lid)
+        }
+        run: {
+            visit3j(c);
+        }
+
+        to: 'visiting3j'
+        whenAll: {
+            j = m.t == 'junction' && m.visited == 'now' && m.jt == '3j'
+            l = m.t == 'label' && m.name == j.name
+            none(m.t == 'edgeLabel' && m.p1 == j.p1 && m.p2 == j.basePoint)
+            el2 = m.t == 'edgeLabel' && m.p1 == j.p2 && m.p2 == j.basePoint && m.labelName == l.n2
+            el3 = m.t == 'edgeLabel' && m.p1 == j.p3 && m.p2 == j.basePoint && m.labelName == l.n3
+            none(m.t == 'edgeLabel' && m.p1 == j.basePoint && m.lid == l.lid)
+        }
+        run: {
+            visit3j(c);
+        } 
+
+        to: 'visiting3j'
+        whenAll: {
+            j = m.t == 'junction' && m.visited == 'now' && m.jt == '3j'
+            l = m.t == 'label' && m.name == j.name
+            el1 = m.t == 'edgeLabel' && m.p1 == j.p1 && m.p2 == j.basePoint && m.labelName == l.n1
+            none(m.t == 'edgeLabel' && m.p1 == j.p2 && m.p2 == j.basePoint)
+            el3 = m.t == 'edgeLabel' && m.p1 == j.p3 && m.p2 == j.basePoint && m.labelName == l.n3
+            none(m.t == 'edgeLabel' && m.p1 == j.basePoint && m.lid == l.lid)
+        }
+        run: {
+            visit3j(c);
+        }     
+
+        to: 'visiting3j'
+        whenAll: {
+            j = m.t == 'junction' && m.visited == 'now' && m.jt == '3j'
+            l = m.t == 'label' && m.name == j.name
+            none(m.t == 'edgeLabel' && m.p1 == j.p1 && m.p2 == j.basePoint)
+            none(m.t == 'edgeLabel' && m.p1 == j.p2 && m.p2 == j.basePoint)
+            el3 = m.t == 'edgeLabel' && m.p1 == j.p3 && m.p2 == j.basePoint && m.labelName == l.n3
+            none(m.t == 'edgeLabel' && m.p1 == j.basePoint && m.lid == l.lid)
+        }
+        run: {
+            visit3j(c);
+        }  
+
+        to: 'visiting3j'
+        whenAll: {
+            j = m.t == 'junction' && m.visited == 'now' && m.jt == '3j'
+            l = m.t == 'label' && m.name == j.name
+            el1 = m.t == 'edgeLabel' && m.p1 == j.p1 && m.p2 == j.basePoint && m.labelName == l.n1
+            el2 = m.t == 'edgeLabel' && m.p1 == j.p2 && m.p2 == j.basePoint && m.labelName == l.n2
+            none(m.t == 'edgeLabel' && m.p1 == j.p3 && m.p2 == j.basePoint)
+            none(m.t == 'edgeLabel' && m.p1 == j.basePoint && m.lid == l.lid)
+        }
+        run: {
+            visit3j(c);
+        }
+
+        to: 'visiting3j'
+        whenAll: {
+            j = m.t == 'junction' && m.visited == 'now' && m.jt == '3j'
+            l = m.t == 'label' && m.name == j.name
+            none(m.t == 'edgeLabel' && m.p1 == j.p1 && m.p2 == j.basePoint)
+            el2 = m.t == 'edgeLabel' && m.p1 == j.p2 && m.p2 == j.basePoint && m.labelName == l.n2
+            none(m.t == 'edgeLabel' && m.p1 == j.p3 && m.p2 == j.basePoint)
+            none(m.t == 'edgeLabel' && m.p1 == j.basePoint && m.lid == l.lid)
+        }
+        run: {
+            visit3j(c);
+        } 
+
+        to: 'visiting3j'
+        whenAll: {
+            j = m.t == 'junction' && m.visited == 'now' && m.jt == '3j'
+            l = m.t == 'label' && m.name == j.name
+            el1 = m.t == 'edgeLabel' && m.p1 == j.p1 && m.p2 == j.basePoint && m.labelName == l.n1
+            none(m.t == 'edgeLabel' && m.p1 == j.p2 && m.p2 == j.basePoint)
+            none(m.t == 'edgeLabel' && m.p1 == j.p3 && m.p2 == j.basePoint)
+            none(m.t == 'edgeLabel' && m.p1 == j.basePoint && m.lid == l.lid)
+        }
+        run: {
+            visit3j(c);
+        }
+
+        to: 'visiting3j'
+        whenAll: {
+            j = m.t == 'junction' && m.visited == 'now' && m.jt == '3j'
+            l = m.t == 'label' && m.name == j.name
+            none(m.t == 'edgeLabel' && m.p1 == j.p1 && m.p2 == j.basePoint)
+            none(m.t == 'edgeLabel' && m.p1 == j.p2 && m.p2 == j.basePoint)
+            none(m.t == 'edgeLabel' && m.p1 == j.p3 && m.p2 == j.basePoint)
+            none(m.t == 'edgeLabel' && m.p1 == j.basePoint && m.lid == l.lid)
+        }
+        run: {
+            visit3j(c);
+        }
+
+        to: 'marking'
+        whenAll: m.t == 'junction' && m.visited == 'now' && m.jt == '3j'
+        pri: 1
+        run: console.log('marking');
+    }
+
+    function visit2j (c) {
+        console.log('Edge Label ' + c.j.basePoint + ' ' + c.j.p1 + ' ' + c.l.n1 + ' ' + c.l.lid);
+        console.log('Edge Label ' + c.j.basePoint + ' ' + c.j.p2 + ' ' + c.l.n2 + ' ' + c.l.lid);
+        c.assert({id: c.s.gid, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p1, labelName: c.l.n1, lid: c.l.lid});
+        c.assert({id: c.s.gid + 1, t: 'edgeLabel', p1: c.j.basePoint, p2: c.j.p2, labelName: c.l.n2, lid: c.l.lid});
+        c.s.gid += 2;
+    }
+
+    visiting2j: {
+        to: 'visiting2j'
+        whenAll: {
+            j = m.t == 'junction' && m.visited == 'now' && m.jt == '2j'
+            l = m.t == 'label' && m.name == j.name
+            el1 = m.t == 'edgeLabel' && m.p1 == j.p1 && m.p2 == j.basePoint && m.labelName == l.n1
+            el2 = m.t == 'edgeLabel' && m.p1 == j.p2 && m.p2 == j.basePoint && m.labelName == l.n2
+            none(m.t == 'edgeLabel' && m.p1 == j.basePoint && m.lid == l.lid)
+        }
+        run: {
+            visit2j(c);
+        }
+
+        to: 'visiting2j'
+        whenAll: {
+            j = m.t == 'junction' && m.visited == 'now' && m.jt == '2j'
+            l = m.t == 'label' && m.name == j.name
+            none(m.t == 'edgeLabel' && m.p1 == j.p1 && m.p2 == j.basePoint)
+            el2 = m.t == 'edgeLabel' && m.p1 == j.p2 && m.p2 == j.basePoint && m.labelName == l.n2
+            none(m.t == 'edgeLabel' && m.p1 == j.basePoint && m.lid == l.lid)
+        }
+        run: {
+            visit2j(c);
+        }
+
+        to: 'visiting2j'
+        whenAll: {
+            j = m.t == 'junction' && m.visited == 'now' && m.jt == '2j'
+            l = m.t == 'label' && m.name == j.name
+            el1 = m.t == 'edgeLabel' && m.p1 == j.p1 && m.p2 == j.basePoint && m.labelName == l.n1
+            none(m.t == 'edgeLabel' && m.p1 == j.p2 && m.p2 == j.basePoint)
+            none(m.t == 'edgeLabel' && m.p1 == j.basePoint && m.lid == l.lid)
+        }
+        run: {
+            visit2j(c);
+        }
+
+        to: 'visiting2j'
+        whenAll: {
+            j = m.t == 'junction' && m.visited == 'now' && m.jt == '2j'
+            l = m.t == 'label' && m.name == j.name
+            none(m.t == 'edgeLabel' && m.p1 == j.p1 && m.p2 == j.basePoint)
+            none(m.t == 'edgeLabel' && m.p1 == j.p2 && m.p2 == j.basePoint)
+            none(m.t == 'edgeLabel' && m.p1 == j.basePoint && m.lid == l.lid)
+        }
+        run: {
+            visit2j(c);
+        }
+
+        to: 'marking'
+        whenAll: m.t == 'junction' && m.visited == 'now' && m.jt == '2j'
+        pri: 1
+        run: console.log('marking');
+    }
+
+    marking: {
+        to: 'marking'
+        whenAll: {
+            j = m.t == 'junction' && m.visited == 'now'
+            e = m.t == 'edge' && m.p2 == j.basePoint
+            junction = m.t == 'junction' && m.basePoint == e.p1 && m.visited == 'yes'
+        }
+        run: {
+            retract(junction); junction.id = s.gid; junction.visited = 'check'; assert(junction); 
+            s.gid += 1;
+        }
+
+        to: 'marking'
+        whenAll: j = m.t == 'junction' && m.visited == 'now'
+        pri: 1
+        run: {
+            retract(j); j.id = s.gid; j.visited = 'yes'; assert(j); 
+            s.gid += 1;
+        }
+
+        to: 'checking'
+        pri: 2
+        run: console.log('checking');
+    }
+
+    checking: {
+        to: 'removeLabel'
+        whenAll: {
+            junction = m.t == 'junction' && m.visited == 'check'
+            el1 = m.t == 'edge_label' && m.p1 == junction.basePoint
+            j = m.t == 'junction' && m.basePoint == el1.p2 && m.visited == 'yes'
+            none(m.t == 'edge_label' && m.p1 == el1.p2 && m.p2 == junction.basePoint && m.labelName == el1.labelName)
+        }
+        run: {
+            console.log('removeLabel');
+            assert({id: s.gid, t: 'illegal', basePoint: junction.basePoint, lid: el1.lid});
+            s.gid += 1;
+        }
+
+        to: 'checking'
+        whenAll: j = m.t == 'junction' && m.visited == 'check'
+        pri: 1
+        run: {
+            retract(j); j.id = s.gid; j.visited = 'yes'; assert(j); 
+            s.gid += 1;
+        }
+
+        to: 'labeling'
+        pri: 2
+        run: console.log('labeling');
+    }
+  
+    removeLabel: {
+        to: 'checking'
+        whenAll: {
+            i = m.t == 'illegal'
+            j = m.t == 'junction' && m.jt == '3j' && m.basePoint == i.basePoint
+            el1 = m.t == 'edgeLabel' && m.p1 == j.basePoint && m.p2 == j.p1 && m.lid == i.lid
+            el2 = m.t == 'edgeLabel' && m.p1 == j.basePoint && m.p2 == j.p2 && m.lid == i.lid
+            el3 = m.t == 'edgeLabel' && m.p1 == j.basePoint && m.p2 == j.p3 && m.lid == i.lid
+        }
+        run: {
+            console.log('checking');
+            retract(i);
+            retract(el1);
+            retract(el2);
+            retract(el3);
+        }
+
+        to: 'checking'
+        whenAll: {
+            i = m.t == 'illegal'
+            j = m.t == 'junction' && m.jt == '2j' && m.basePoint == i.basePoint
+            el1 = m.t == 'edgeLabel' && m.p1 == j.basePoint && m.p2 == j.p1 && m.lid == i.lid
+            el2 = m.t == 'edgeLabel' && m.p1 == j.basePoint && m.p2 == j.p2 && m.lid == i.lid
+        }
+        run: {
+            console.log('checking');
+            retract(i);
+            retract(el1);
+            retract(el2);
+        }
+    }
+
+    end: {}    
+    
+    whenStart: {
         createAndAssert(host, {t:'label' ,jt:'2j' ,name:'L' ,lid:'1' ,n1:'B' ,n2:'B'});
         createAndAssert(host, {t:'label' ,jt:'2j' ,name:'L' ,lid:'2' ,n1:'+' ,n2:'B'});
         createAndAssert(host, {t:'label' ,jt:'2j' ,name:'L' ,lid:'3' ,n1:'B' ,n2:'+'});
@@ -855,8 +921,8 @@ with (d.statechart('waltzdb')) {
         createAndPost(host, {t:'line' ,p1:450005 ,p2:450006});
         createAndPost(host, {t:'line' ,p1:500005 ,p2:500006});
         createAndPost(host, {t:'line' ,p1:470008 ,p2:480008});
-    });
-}
+    }
+});
 
 d.runAll();
 

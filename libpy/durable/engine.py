@@ -64,7 +64,6 @@ class Closure(object):
         self._queue_directory = {}
         self._branch_directory = {}
         self._fact_directory = {}
-        self._delete_directory = {}
         self._retract_directory = {}
         self._completed = False
         self._deleted = False
@@ -93,9 +92,6 @@ class Closure(object):
 
     def get_queues(self):
         return self._queue_directory
-
-    def get_deletes(self):
-        return self._delete_directory
 
     def get_facts(self):
         return self._fact_directory
@@ -128,23 +124,8 @@ class Closure(object):
 
         message_list.append(message)
 
-    def delete(self, ruleset_name = None, sid = None):
-        if not ruleset_name: 
-            ruleset_name = self.ruleset_name
-            
-        if not sid:
-            sid = self.s.sid
-
-        if (ruleset_name == self.ruleset_name) and (sid == self.s.sid):
-            self._deleted = True
-
-        sid_list = []
-        if  ruleset_name in self._delete_directory:
-            sid_list = self._delete_directory[ruleset_name]
-        else:
-            self._delete_directory[ruleset_name] = sid_list
-
-        sid_list.append(sid)
+    def delete(self):
+        self._deleted = True
 
     def start_timer(self, timer_name, duration, manual_reset = False):
         if timer_name in self._timer_directory:
@@ -616,10 +597,6 @@ class Ruleset(object):
                             for message in q.get_queued_retracts():
                                 self.queue_retract_fact(message['sid'], ruleset_name, message)
 
-  
-                        for ruleset_name, sid in c.get_deletes().items():
-                            self._host.delete_state(ruleset_name, sid)
-
                         offset  = 0
                         replies = 0
                         pending = {state_offset: 0}
@@ -657,7 +634,7 @@ class Ruleset(object):
                             else:
                                 pending[offset] = replies
 
-                        offset, replies = rules.start_update_state(self._handle, c._handle, json.dumps(c.s._d, ensure_ascii=False))
+                        offset, replies = rules.start_update_state(self._handle, json.dumps(c.s._d, ensure_ascii=False))
                         if offset in pending:
                             pending[offset] = pending[offset] + replies
                         else:
@@ -690,7 +667,7 @@ class Ruleset(object):
 
                     if c._is_deleted():
                         try:
-                            self.delete_state(c.s.sid)
+                            self.delete_state(c.s['sid'])
                         except BaseException as error:
                             complete(error, True)
 
@@ -1025,7 +1002,7 @@ class Host(object):
         self.get_ruleset(ruleset_name).renew_action_lease(sid)
 
     def register_rulesets(self, parent_name, ruleset_definitions):
-        rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions, self._state_cache_size)
+        rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions)
         for ruleset_name, ruleset in rulesets.items():
             if ruleset_name in self._ruleset_directory:
                 raise Exception('Ruleset with name {0} already registered'.format(ruleset_name))

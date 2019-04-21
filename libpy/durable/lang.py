@@ -657,27 +657,27 @@ _ruleset_stack = []
 _rulesets = []
 _start_functions = []
 
-def create_queue(ruleset_name, database = None, state_cache_size = 1024):
-    return engine.Queue(ruleset_name, database, state_cache_size)
+def create_queue(ruleset_name, database = None):
+    return engine.Queue(ruleset_name, database)
 
-def create_host(databases = None, state_cache_size = 1024):
+def create_host(databases = None):
     ruleset_definitions = {}
     for rset in _rulesets:
         ruleset_name, ruleset_definition = rset.define()
         ruleset_definitions[ruleset_name] = ruleset_definition
         
-    main_host = engine.Host(ruleset_definitions, databases, state_cache_size)
+    main_host = engine.Host(ruleset_definitions, databases)
     for start in _start_functions:
         start(main_host)
 
     main_host.run()
     return main_host
 
-def run_all(databases = None, host_name = '127.0.0.1', port = 5000, routing_rules = None, run = None, state_cache_size = 1024):
-    main_host = create_host(databases, state_cache_size)
+def run_all(databases = None, host_name = '127.0.0.1', port = 5000, routing_rules = None, run = None):
+    main_host = create_host(databases)
     main_app = interface.Application(main_host, host_name, port, routing_rules, run)
     main_app.run()
 
-def run_server(run, databases = None, routing_rules = None, state_cache_size = 1024):
-    run_all(databases, None, None, routing_rules, run, state_cache_size)
+def run_server(run, databases = None, routing_rules = None):
+    run_all(databases, None, None, routing_rules, run)
 

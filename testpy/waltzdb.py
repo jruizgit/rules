@@ -114,7 +114,7 @@ with statechart('waltzdb'):
 
     with state('detect_junctions'):
         @to('detect_junctions')
-        @when_all(cap(1000),
+        @when_all(cap(1),
                   c.e1 << (m.t == 'edge') & (m.joined == False),
                   c.e2 << (m.t == 'edge') & (m.joined == False) & (m.p1 == c.e1.p1) & (m.p2 != c.e1.p2),
                   c.e3 << (m.t == 'edge') & (m.joined == False) & (m.p1 == c.e1.p1) & (m.p2 != c.e1.p2) & (m.p2 != c.e2.p2))
@@ -130,7 +130,7 @@ with statechart('waltzdb'):
                 c.s.gid += 4
 
         @to('detect_junctions')
-        @when_all(cap(1000),
+        @when_all(cap(1),
                   c.e1 << (m.t == 'edge') & (m.joined == False),
                   c.e2 << (m.t == 'edge') & (m.joined == False) & (m.p1 == c.e1.p1) & (m.p2 != c.e1.p2),
                   none((m.t == 'edge') & (m.p1 == c.e1.p1) & (m.p2 != c.e1.p2) & (m.p2 != c.e2.p2))) 

@@ -719,7 +719,7 @@ static PyObject *pyCompleteAndStartAction(PyObject *self, PyObject *args) {
     unsigned int handle;
     unsigned int stateOffset;
     unsigned int expectedReplies;
-    if (!PyArg_ParseTuple(args, "II", &handle, &expectedReplies, &stateOffset)) {
+    if (!PyArg_ParseTuple(args, "III", &handle, &expectedReplies, &stateOffset)) {
         PyErr_SetString(RulesError, "pyCompleteAndStartAction Invalid argument");
         return NULL;
     }

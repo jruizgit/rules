@@ -697,7 +697,7 @@ module Engine
                   pending[offset] = replies
                 end
               end
-              offset, replies = Rules.start_update_state @handle, c.handle, JSON.generate(c.s._d)
+              offset, replies = Rules.start_update_state @handle, JSON.generate(c.s._d)
               if pending.key? offset
                 pending[offset] = pending[offset] + replies
               else

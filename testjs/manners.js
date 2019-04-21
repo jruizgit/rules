@@ -6,9 +6,7 @@ d.statechart('missManners', function() {
         whenAll: m.t == 'guest' 
         run: {
             s.count = 0;
-            s.g_count = 1000;
             assert({ t: 'seating',
-                     id: s.g_count,
                      tid: s.count,
                      pid: 0,
                      path: true,
@@ -21,7 +19,6 @@ d.statechart('missManners', function() {
                      seat: 1,
                      guestName: m.name });
             s.count += 1;
-            s.g_count += 2;
             s.startTime = new Date();
             console.log('assign ' + c.m.name);
         }
@@ -33,12 +30,11 @@ d.statechart('missManners', function() {
             seating = m.t == 'seating' && m.path == true
             rightGuest = m.t == 'guest' && m.name == seating.rightGuestName
             leftGuest = m.t == 'guest' && m.sex != rightGuest.sex && m.hobby == rightGuest.hobby
-            none(m.t == 'path' && m.pid == seating.tid && m.guestName == leftGuest.name)
+            none(m.t == 'path' && m.pid == seating.tid && m.guestName ==leftGuest.name)
             none(m.t == 'chosen' && m.cid == seating.tid && m.guestName == leftGuest.name && m.hobby == rightGuest.hobby)
         } 
         run: {
             assert({ t: 'seating',
-                     id: s.g_count,
                      tid: s.count,
                      pid: seating.tid,
                      path: false,
@@ -47,17 +43,14 @@ d.statechart('missManners', function() {
                      rightSeat: seating.rightSeat + 1,
                      rightGuestName: leftGuest.name });
             assert({ t: 'path',
-                     id: s.g_count + 1,
                      pid: s.count,
                      seat: seating.rightSeat + 1,
                      guestName: leftGuest.name });
             assert({ t: 'chosen',
-                     id: s.g_count + 2,
                      cid: seating.tid,
                      guestName: leftGuest.name,
                      hobby: rightGuest.hobby });
             s.count += 1;
-            s.g_count += 3;
         } 
     }
 
@@ -73,12 +66,9 @@ d.statechart('missManners', function() {
             for (var i = 0; i < m.length; ++i) {
                 var frame = m[i];
                 assert({ t: 'path',
-                         id: s.g_count,
                          pid: frame.seating.tid,
                          seat: frame.path.seat,
                          guestName: frame.path.guestName });
-
-                s.g_count += 1;
             }
         }
 
@@ -87,10 +77,9 @@ d.statechart('missManners', function() {
         pri: 1
         run: {
             retract(m);
-            m.id = s.g_count;
+            delete(m.id);
             m.path = true;
             assert(m);
-            s.g_count += 1;
             console.log('path sid: ' + m.tid + ', pid: ' + m.pid + ', left: ' + m.leftGuestName + ', right: ' + m.rightGuestName);
         }
     }
@@ -100,7 +89,7 @@ d.statechart('missManners', function() {
         whenAll: {
             lastSeat = m.t == 'lastSeat'
             m.t == 'seating' && m.rightSeat == lastSeat.seat
-        }
+        } 
         run: {
             console.log('end ' + (new Date() - s.startTime));
             deleteState();
@@ -555,5 +544,3 @@ d.statechart('missManners', function() {
 });
 
 d.runAll();
-
-

@@ -1609,6 +1609,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                                           jo,
                                           *messageOffset,
                                           &tree->nodePool[NODE_M_OFFSET].value.a);
+
         if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             if (isNewState) {      
     #ifdef _WIN32
@@ -2097,7 +2098,6 @@ static unsigned int deleteCurrentAction(ruleset *tree,
                                     actionStateIndex,
                                     &resultLocation,
                                     &resultFrame));
-
         if (resultFrame) {
             for (int i = 0; i < resultFrame->messageCount; ++i) {
                 messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 

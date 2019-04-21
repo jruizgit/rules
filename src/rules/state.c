@@ -399,7 +399,7 @@ unsigned int setActionFrame(stateNode *state,
 }
 
 unsigned int deleteActionFrame(stateNode *state,
-                               frameLocation location) {
+                               frameLocation location) {                    
     DELETE(leftFrameNode,
            state->actionState[location.nodeIndex].resultIndex, 
            1,
@@ -547,7 +547,6 @@ static unsigned int copyMessage(jsonObject *targetMessage,
             targetMessage->properties[i].value.s = targetMessage->content + targetMessage->properties[i].valueOffset;
         }
     }
-
     return RULES_OK;
 }
 
@@ -582,7 +581,6 @@ unsigned int storeMessage(stateNode *state,
         *valueOffset);
 
     messageNode *node = MESSAGE_NODE(state, *valueOffset);
-    
     INIT(locationNode, 
          node->locationPool, 
          MAX_LOCATION_NODES);

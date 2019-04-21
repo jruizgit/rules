@@ -443,14 +443,13 @@ static VALUE rbUpdateState(VALUE self, VALUE handle, VALUE sid, VALUE state) {
     return Qnil;
 }
 
-static VALUE rbStartUpdateState(VALUE self, VALUE handle, VALUE actionHandle, VALUE state) {
+static VALUE rbStartUpdateState(VALUE self, VALUE handle, VALUE state) {
     Check_Type(handle, T_FIXNUM);
-    Check_Type(actionHandle, T_FIXNUM);
     Check_Type(state, T_STRING);
 
     unsigned int replyCount;
     unsigned int stateOffset;
-    unsigned int result = startUpdateState(FIX2INT(handle), (void *)FIX2LONG(actionHandle), RSTRING_PTR(state), &stateOffset, &replyCount);
+    unsigned int result = startUpdateState(FIX2INT(handle), RSTRING_PTR(state), &stateOffset, &replyCount);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
         VALUE output = rb_ary_new(); 
         rb_ary_push(output, INT2FIX(stateOffset));
@@ -497,7 +496,7 @@ static VALUE rbCompleteAndStartAction(VALUE self, VALUE handle, VALUE expectedRe
     Check_Type(stateOffset, T_FIXNUM);
 
     char *messages;
-    unsigned int result = completeAndStartAction(FIX2INT(handle), FIX2LONG(expectedReplies), FIX2LONG(stateOffset), &messages);
+    unsigned int result = completeAndStartAction(FIX2INT(handle), FIX2INT(expectedReplies), FIX2INT(stateOffset), &messages);
     if (result == ERR_NO_ACTION_AVAILABLE) {
         return Qnil;
     } else if (result != RULES_OK) {
@@ -659,7 +658,7 @@ void Init_rules() {
     rb_define_singleton_method(rulesModule, "start_retract_facts", rbStartRetractFacts, 2);
     rb_define_singleton_method(rulesModule, "retract_facts", rbRetractFacts, 2);
     rb_define_singleton_method(rulesModule, "update_state", rbUpdateState, 3);
-    rb_define_singleton_method(rulesModule, "start_update_state", rbStartUpdateState, 3);
+    rb_define_singleton_method(rulesModule, "start_update_state", rbStartUpdateState, 2);
     rb_define_singleton_method(rulesModule, "start_action", rbStartAction, 1);
     rb_define_singleton_method(rulesModule, "complete_and_start_action", rbCompleteAndStartAction, 3);
     rb_define_singleton_method(rulesModule, "abandon_action", rbAbandonAction, 2);

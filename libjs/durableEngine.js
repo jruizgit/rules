@@ -50,7 +50,6 @@ exports = module.exports = durableEngine = function () {
         var timerDirectory = {};
         var cancelledTimerDirectory = {};
         var branchDirectory = {};
-        var deleteDirectory = {};
         var startTime = new Date().getTime();
         var ended = false;
         var deleted = false;
@@ -113,10 +112,6 @@ exports = module.exports = durableEngine = function () {
 
         that.getFacts = function () {
             return factDirectory;
-        };
-
-        that.getDeletes = function () {
-            return deleteDirectory;
         };
 
         that.getRetract = function () {
@@ -647,12 +642,6 @@ exports = module.exports = durableEngine = function () {
                                     for (var i = 0; i < messages.length; ++i) {
                                         that.queueRetractFact(messages[i].sid, targetRuleset, messages[i]);
                                     }
-                                }
-
-                                var deletes = c.getDeletes();
-                                for (var rulesetName in deletes) {
-                                    var sid = deletes[rulesetName];
-                                    host.deleteState(rulesetName, sid);
                                 }
 
                                 var retractFacts = c.getRetract();
