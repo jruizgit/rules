@@ -109,7 +109,7 @@ with ruleset('waltzdb'):
         c.s.gid += 1
         print('detect_junctions')
         
-    @when_all(cap(1000),
+    @when_all(cap(1),
               c.e1 << (m.t == 'edge') & (m.joined == False),
               c.e2 << (m.t == 'edge') & (m.joined == False) & (m.p1 == c.e1.p1) & (m.p2 != c.e1.p2),
               c.e3 << (m.t == 'edge') & (m.joined == False) & (m.p1 == c.e1.p1) & (m.p2 != c.e1.p2) & (m.p2 != c.e2.p2),
@@ -125,7 +125,7 @@ with ruleset('waltzdb'):
             frame.e3.id = c.s.gid + 3; frame.e3.joined = True; frame.e3.j_t = '3j'; c.assert_fact(frame.e3)
             c.s.gid += 4
 
-    @when_all(cap(1000),
+    @when_all(cap(1),
               c.e1 << (m.t == 'edge') & (m.joined == False),
               c.e2 << (m.t == 'edge') & (m.joined == False) & (m.p1 == c.e1.p1) & (m.p2 != c.e1.p2),
               none((m.t == 'edge') & (m.p1 == c.e1.p1) & (m.p2 != c.e1.p2) & (m.p2 != c.e2.p2)),
@@ -153,7 +153,7 @@ with ruleset('waltzdb'):
               none((m.t == 'junction') & (m.j_t == '2j') & (m.visited == 'no') & (m.base_point > c.j.base_point)),
               (m.t == 'stage') & (m.l == 'find_initial_boundary'))
     def initial_boundary_junction_l(c):
-        #c.retract_fact(c.j); c.j.id = c.s.gid; c.j.visited = 'yes'; c.assert_fact(c.j)            
+        c.retract_fact(c.j); c.j.id = c.s.gid; c.j.visited = 'yes'; c.assert_fact(c.j)            
         c.assert_fact({'id': c.s.gid + 1, 't': 'edge_label', 'p1': c.j.base_point, 'p2': c.j.p1, 'label_name': 'B', 'lid': '1'})
         c.assert_fact({'id': c.s.gid + 2, 't': 'edge_label', 'p1': c.j.base_point, 'p2': c.j.p2, 'label_name': 'B', 'lid': '1'})
         c.post({'id': c.s.gid + 3, 't': 'stage', 'l': 'find_second_boundary'})
@@ -167,7 +167,7 @@ with ruleset('waltzdb'):
               none((m.t == 'junction') & (m.visited == 'no') & (m.base_point > c.j.base_point)),
               (m.t == 'stage') & (m.l == 'find_initial_boundary'))
     def initial_boundary_junction_arrow(c):
-        #c.retract_fact(c.j); c.j.id = c.s.gid; c.j.visited = 'yes'; c.assert_fact(c.j)            
+        c.retract_fact(c.j); c.j.id = c.s.gid; c.j.visited = 'yes'; c.assert_fact(c.j)            
         c.assert_fact({'id': c.s.gid + 1, 't': 'edge_label', 'p1': c.j.base_point, 'p2': c.j.p1, 'label_name': 'B', 'lid': '14'})
         c.assert_fact({'id': c.s.gid + 2, 't': 'edge_label', 'p1': c.j.base_point, 'p2': c.j.p2, 'label_name': '+', 'lid': '14'})
         c.assert_fact({'id': c.s.gid + 3, 't': 'edge_label', 'p1': c.j.base_point, 'p2': c.j.p3, 'label_name': 'B', 'lid': '14'})

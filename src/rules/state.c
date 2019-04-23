@@ -226,6 +226,19 @@ unsigned int deleteFrameLocation(stateNode *state,
     return RULES_OK;
 }
 
+unsigned int deleteMessageFromFrame(unsigned int messageNodeOffset, 
+                                    leftFrameNode *frame) {
+
+    for (int i = 0; i < MAX_MESSAGE_FRAMES; ++i) {
+        if (frame->messages[i].hash && frame->messages[i].messageNodeOffset == messageNodeOffset) {
+            frame->messages[i].hash = 0;
+            frame->messages[i].messageNodeOffset = UNDEFINED_HASH_OFFSET;
+        }
+    }
+
+    return RULES_OK;
+}
+
 unsigned int getMessageFromFrame(stateNode *state,
                                  messageFrame *messages,
                                  unsigned int hash,
@@ -356,6 +369,7 @@ unsigned int createLeftFrame(stateNode *state,
     newLocation->nodeIndex = reteNode->value.b.index;
     newLocation->frameOffset = newValueOffset;
     targetNode->nameOffset = reteNode->nameOffset;
+    targetNode->isDispatching = 0;
     
     CHECK_RESULT(copyLeftFrame(state,
                                oldNode, 
@@ -368,21 +382,13 @@ unsigned int createLeftFrame(stateNode *state,
 }
 
 unsigned int getActionFrame(stateNode *state,
-                            unsigned int index, 
-                            frameLocation *resultLocation,
+                            frameLocation resultLocation,
                             leftFrameNode **resultNode) {
-    actionStateNode *resultStateNode = &state->actionState[index];
-    unsigned int resultFrameOffset = resultStateNode->resultIndex[0];
-    if (resultFrameOffset == UNDEFINED_HASH_OFFSET) {
+    actionStateNode *resultStateNode = &state->actionState[resultLocation.nodeIndex];
+    *resultNode = RESULT_FRAME(resultStateNode, resultLocation.frameOffset);
+    if (!(*resultNode)->isActive) {
         *resultNode = NULL;
-        return RULES_OK;
-    }
-
-    *resultNode = RESULT_FRAME(resultStateNode, resultFrameOffset);
-    if (resultLocation) {
-        resultLocation->frameType = ACTION_FRAME;
-        resultLocation->nodeIndex = index;
-        resultLocation->frameOffset = resultFrameOffset;
+        return ERR_NODE_DELETED;
     }
     return RULES_OK;
 }
@@ -398,8 +404,24 @@ unsigned int setActionFrame(stateNode *state,
     return RULES_OK;
 }
 
+unsigned int deleteDispatchingActionFrame(stateNode *state,
+                                          frameLocation location) {    
+    DELETE(leftFrameNode,
+           state->actionState[location.nodeIndex].resultIndex, 
+           1,
+           state->actionState[location.nodeIndex].resultPool,
+           location.frameOffset);
+    return RULES_OK;
+}
+
 unsigned int deleteActionFrame(stateNode *state,
-                               frameLocation location) {                    
+                               frameLocation location) {    
+
+    leftFrameNode *targetNode = ACTION_FRAME_NODE(state, location.nodeIndex, location.frameOffset);
+    if (targetNode->isDispatching) {
+        return ERR_NODE_DISPATCHING;
+    }
+
     DELETE(leftFrameNode,
            state->actionState[location.nodeIndex].resultIndex, 
            1,
@@ -424,6 +446,7 @@ unsigned int createActionFrame(stateNode *state,
     newLocation->nodeIndex = reteNode->value.c.index;
     newLocation->frameOffset = newValueOffset;
     targetNode->nameOffset = reteNode->nameOffset;
+    targetNode->isDispatching = 0;
     
     CHECK_RESULT(copyLeftFrame(state,
                                oldNode, 
@@ -733,16 +756,9 @@ static void serializeResultFrame(ruleset *tree,
 unsigned int serializeResult(void *tree, 
                              stateNode *state, 
                              actionStateNode *actionNode, 
+                             unsigned int count,
                              char **result) {
-    unsigned int count;
-    if (actionNode->reteNode->value.c.count) {
-        count = actionNode->reteNode->value.c.count;
-    } else {
-        count = (actionNode->reteNode->value.c.cap > actionNode->resultPool.count ? 
-                 actionNode->resultPool.count : 
-                 actionNode->reteNode->value.c.cap);
-    }
-
+    
     if (actionNode->reteNode->value.c.count && count == 1) {
         leftFrameNode *resultFrame = RESULT_FRAME(actionNode, actionNode->resultIndex[0]);
         if (!resultFrame->isActive) {
@@ -769,6 +785,7 @@ unsigned int serializeResult(void *tree,
         first += tupleLength - 1;
 
         char *last;
+        resultFrame->isDispatching = 1;
         serializeResultFrame(tree, 
                              state, 
                              resultFrame, 
@@ -778,6 +795,10 @@ unsigned int serializeResult(void *tree,
         last[1] = 0;
     } else {
         leftFrameNode *resultFrame = RESULT_FRAME(actionNode, actionNode->resultIndex[0]);
+        if (!resultFrame->isActive) {
+            return ERR_NODE_DELETED;
+        }
+
         char *actionName = &((ruleset *)tree)->stringPool[resultFrame->nameOffset];
         unsigned int resultLength = strlen(actionName) + 8;
         for (unsigned int currentCount = 0; currentCount < count; ++currentCount) {
@@ -809,6 +830,7 @@ unsigned int serializeResult(void *tree,
         char *last;
         resultFrame = RESULT_FRAME(actionNode, actionNode->resultIndex[0]);
         for (unsigned int currentCount = 0; currentCount < count; ++currentCount) {
+            resultFrame->isDispatching = 1;
             serializeResultFrame(tree, 
                                  state, 
                                  resultFrame, 
@@ -848,7 +870,10 @@ unsigned int serializeState(stateNode *state,
 }
 
 unsigned int getNextResultInState(void *tree, 
-                                  stateNode *state, 
+                                  stateNode *state,
+                                  unsigned int *actionStateIndex,
+                                  unsigned int *resultCount,
+                                  unsigned int *resultFrameOffset, 
                                   actionStateNode **resultAction) {
 
     ruleset *rulesetTree = (ruleset*)tree;
@@ -859,7 +884,16 @@ unsigned int getNextResultInState(void *tree,
             if ((actionNode->reteNode->value.c.cap && actionNode->resultPool.count) ||
                 (actionNode->reteNode->value.c.count && actionNode->resultPool.count >= actionNode->reteNode->value.c.count)) {
                 *resultAction = actionNode;
-                state->context.actionStateIndex = index;
+                *actionStateIndex = index;
+                *resultFrameOffset = actionNode->resultIndex[0];
+                if (actionNode->reteNode->value.c.count) {
+                    *resultCount = actionNode->reteNode->value.c.count;
+                } else {
+                    *resultCount = (actionNode->reteNode->value.c.cap > actionNode->resultPool.count ? 
+                                    actionNode->resultPool.count : 
+                                    actionNode->reteNode->value.c.cap);
+                }
+
                 return RULES_OK;
             }
         }
@@ -870,6 +904,9 @@ unsigned int getNextResultInState(void *tree,
 
 unsigned int getNextResult(void *tree, 
                            stateNode **resultState, 
+                           unsigned int *actionStateIndex,
+                           unsigned int *resultCount,
+                           unsigned int *resultFrameOffset, 
                            actionStateNode **resultAction) {
     unsigned int count = 0;
     ruleset *rulesetTree = (ruleset*)tree;
@@ -885,6 +922,9 @@ unsigned int getNextResult(void *tree,
         *resultState = STATE_NODE(tree, nodeOffset); 
         unsigned int result = getNextResultInState(tree,
                                                    *resultState,
+                                                   actionStateIndex,
+                                                   resultCount,
+                                                   resultFrameOffset,
                                                    resultAction);
         if (result != ERR_NO_ACTION_AVAILABLE) {
             return result;

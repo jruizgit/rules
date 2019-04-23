@@ -107,6 +107,7 @@ typedef struct leftFrameNode {
     unsigned int nameOffset;
     unsigned int hash;
     unsigned char isActive;
+    unsigned char isDispatching;
     unsigned short messageCount;
     unsigned short reverseIndex[MAX_MESSAGE_FRAMES];
     messageFrame messages[MAX_MESSAGE_FRAMES];
@@ -136,6 +137,8 @@ typedef struct betaStateNode {
 
 typedef struct actionContext {
     unsigned int actionStateIndex;
+    unsigned int resultCount;
+    unsigned int resultFrameOffset;
     char *messages;
     char *stateFact;
 } actionContext;
@@ -192,6 +195,10 @@ unsigned int deleteFrameLocation(stateNode *state,
                                  unsigned int messageNodeOffset,
                                  frameLocation location);
 
+
+unsigned int deleteMessageFromFrame(unsigned int messageNodeOffset, 
+                                    leftFrameNode *frame);
+
 unsigned int getMessageFromFrame(stateNode *state,
                                  messageFrame *messages,
                                  unsigned int hash,
@@ -240,8 +247,7 @@ unsigned int createRightFrame(stateNode *state,
                               frameLocation *location);
 
 unsigned int getActionFrame(stateNode *state,
-                            unsigned int index, 
-                            frameLocation *resultLocation,
+                            frameLocation resultLocation,
                             leftFrameNode **resultNode);
 
 unsigned int setActionFrame(stateNode *state, 
@@ -250,6 +256,9 @@ unsigned int setActionFrame(stateNode *state,
 
 unsigned int deleteActionFrame(stateNode *state,
                                frameLocation location);
+
+unsigned int deleteDispatchingActionFrame(stateNode *state,
+                                          frameLocation location);
 
 unsigned int createActionFrame(stateNode *state,
                                struct node *reteNode,
@@ -278,17 +287,24 @@ unsigned int ensureStateNode(void *tree,
 unsigned int serializeResult(void *tree, 
                              stateNode *state, 
                              actionStateNode *actionNode, 
+                             unsigned int count,
                              char **result);
 
 unsigned int serializeState(stateNode *state, 
                             char **stateFact);
 
 unsigned int getNextResultInState(void *tree, 
-                                  stateNode *state, 
+                                  stateNode *state,
+                                  unsigned int *actionStateIndex,
+                                  unsigned int *resultCount,
+                                  unsigned int *resultFrameOffset, 
                                   actionStateNode **resultAction);
 
 unsigned int getNextResult(void *tree, 
                            stateNode **resultState, 
+                           unsigned int *actionStateIndex,
+                           unsigned int *resultCount,
+                           unsigned int *resultFrameOffset, 
                            actionStateNode **resultAction);
 
 
