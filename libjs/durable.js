@@ -686,6 +686,7 @@ exports = module.exports = durableEngine = function () {
                 }
             }
         });
+
         return func;
     }
 
@@ -1537,8 +1538,10 @@ exports = module.exports = durableEngine = function () {
     };
 
     var stateTrigger = function (stateName, run, parent, triggerObject) {
+        console.log(JSON.stringify(triggerObject))
         var that = {};
         var condition;
+        var pri;
 
         that.getName = function() {
             return stateName;
@@ -1557,9 +1560,17 @@ exports = module.exports = durableEngine = function () {
         that.define = function(name)  {
             if (!condition) {
                 if (!run) {
-                    return {to: stateName};
+                    if (pri) {
+                        return {to: stateName, pri: pri}; 
+                    } else {
+                        return {to: stateName};
+                    }
                 } else {
-                    return {to: stateName, run: run};
+                    if (pri) {
+                        return {to: stateName, pri: triggerObject.pri, run: run};
+                    } else {
+                        return {to: stateName, run: run};
+                    }
                 }
             } 
 
@@ -1570,6 +1581,10 @@ exports = module.exports = durableEngine = function () {
 
         if (triggerObject && (triggerObject.whenAll || triggerObject.whenAny)) {
             condition = rule(triggerObject);
+        }
+
+        if (triggerObject && typeof triggerObject.pri !==  "undefined") {
+            pri = triggerObject.pri;
         }
 
         return that;

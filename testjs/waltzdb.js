@@ -145,7 +145,7 @@ d.statechart('waltzdb', function() {
         whenAll: {
             e1 = m.t == 'edge' && m.joined == false
             e2 = m.t == 'edge' && m.joined == false && m.p1 == e1.p1 && m.p2 != e1.p2
-            none(m.t == 'edge' && m.joined == false && m.p1 == e1.p1 && m.p2 != e1.p2 && m.p2 != e2.p2)
+            none(m.t == 'edge' && m.p1 == e1.p1 && m.p2 != e1.p2 && m.p2 != e2.p2)
         }
         cap: 1
         run: {
@@ -219,7 +219,7 @@ d.statechart('waltzdb', function() {
             j = m.t == 'junction' && m.jt == '3j' && m.name == 'arrow' && m.visited == 'no'
             e1 = m.t == 'edge' && m.p1 == j.basePoint && m.p2 == j.p1
             e2 = m.t == 'edge' && m.p1 == j.basePoint && m.p2 == j.p2
-            e2 = m.t == 'edge' && m.p1 == j.basePoint && m.p2 == j.p3
+            e3 = m.t == 'edge' && m.p1 == j.basePoint && m.p2 == j.p3
             none(m.t == 'junction' && m.visited != 'no' && m.basePoint < j.basePoint)
         }
         run: {

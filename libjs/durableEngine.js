@@ -761,7 +761,6 @@ exports = module.exports = durableEngine = function () {
 
             delete(rule.run);
         }
-
         handle = r.createRuleset(name, JSON.stringify(rulesetDefinition));
         return that;
     }
@@ -1066,6 +1065,7 @@ exports = module.exports = durableEngine = function () {
     };
 
     var createRulesets = function (parentName, host, rulesetDefinitions) {
+        
         var branches = {};
         for (var name in rulesetDefinitions) {
             var currentDefinition = rulesetDefinitions[name];
