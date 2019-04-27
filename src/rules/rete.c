@@ -1014,9 +1014,9 @@ static unsigned int findAlpha(ruleset *tree,
         type = JSON_IREGEX;
     }
 
-    if (operator == OP_IANY || operator == OP_IALL) {
-        newAlpha->value.a.expression.right.type = JSON_NIL;
-    } else {
+    //if (operator == OP_IANY || operator == OP_IALL) {
+    //    newAlpha->value.a.expression.right.type = JSON_NIL;
+    //} else {
         CHECK_RESULT(copyValue(tree, 
                                &newAlpha->value.a.expression.right, 
                                first, 
@@ -1032,7 +1032,7 @@ static unsigned int findAlpha(ruleset *tree,
                            expr);
             copyExpression(&newAlpha->value.a.expression, expr);
         } 
-    }
+    //}
 
     return linkAlpha(tree, parentOffset, *resultOffset);
 }
@@ -1474,45 +1474,7 @@ static void printExpression(ruleset *tree, operand *newValue) {
 void printSimpleExpression(ruleset *tree, expression *currentExpression, unsigned char first, char *comp) {
     if (currentExpression->operator == OP_IALL || currentExpression->operator == OP_IANY) {
         char *leftProperty = &tree->stringPool[currentExpression->left.value.id.propertyNameOffset];
-        expression *newExpression = &tree->expressionPool[currentExpression->right.value.expressionOffset];
-        char *op = "";
-        switch (newExpression->operator) {
-            case OP_LT:
-                op = "<";
-                break;
-            case OP_LTE:
-                op = "<=";
-                break;
-            case OP_GT:
-                op = ">";
-                break;
-            case OP_GTE:
-                op = ">=";
-                break;
-            case OP_EQ:
-                op = "==";
-                break;
-            case OP_NEQ:
-                op = "!=";
-                break;
-        }
-
-        char *par = "";
-        if (currentExpression->operator == OP_IALL) {
-            par = "true";
-        } else {
-            par = "false";
-        }
-
-        if (!first) {
-            printf("%s compare_array(message[\"%s\"], ", comp, leftProperty);
-        } else {
-            printf("compare_array(message[\"%s\"], ", leftProperty);
-        }
-
-        printExpression(tree, &newExpression->right);
-        printf(", %s, %s)\n", op, par);
-
+        printf("compare array: %s", leftProperty);
     } else {
         char *op = "";
         switch (currentExpression->operator) {

@@ -102,46 +102,40 @@ with statechart('waltzdb'):
             print('detect_junctions')
 
         @to('duplicate')
-        @when_all(cap(1000),
-                  c.line << m.t == 'line')
+        @when_all(c.line << m.t == 'line')
         def reverse_edges(c):
-            for frame in c.m:
-                print('Edge {0} {1}'.format(frame.line.p1, frame.line.p2))
-                print('Edge {0} {1}'.format(frame.line.p2, frame.line.p1))
-                c.post({'id': c.s.gid, 't': 'edge', 'p1': frame.line.p1, 'p2': frame.line.p2, 'joined': False})
-                c.post({'id': c.s.gid + 1, 't': 'edge', 'p1': frame.line.p2, 'p2': frame.line.p1, 'joined': False})
-                c.s.gid += 2
+            print('Edge {0} {1}'.format(c.line.p1, c.line.p2))
+            print('Edge {0} {1}'.format(c.line.p2, c.line.p1))
+            c.post({'id': c.s.gid, 't': 'edge', 'p1': c.line.p1, 'p2': c.line.p2, 'joined': False})
+            c.post({'id': c.s.gid + 1, 't': 'edge', 'p1': c.line.p2, 'p2': c.line.p1, 'joined': False})
+            c.s.gid += 2
 
     with state('detect_junctions'):
         @to('detect_junctions')
-        @when_all(cap(1),
-                  c.e1 << (m.t == 'edge') & (m.joined == False),
+        @when_all(c.e1 << (m.t == 'edge') & (m.joined == False),
                   c.e2 << (m.t == 'edge') & (m.joined == False) & (m.p1 == c.e1.p1) & (m.p2 != c.e1.p2),
                   c.e3 << (m.t == 'edge') & (m.joined == False) & (m.p1 == c.e1.p1) & (m.p2 != c.e1.p2) & (m.p2 != c.e2.p2))
         def make_3_junction(c):
-            for frame in c.m:
-                j = {'id': c.s.gid, 't': 'junction', 'base_point': frame.e1.p1, 'j_t': '3j', 'visited': 'no'}
-                make_3j_junction(j, frame.e1.p1, frame.e1.p2, frame.e2.p2, frame.e3.p2)
-                print('Junction {0} {1} {2} {3} {4}'.format(j['name'], j['base_point'], j['p1'], j['p2'], j['p3']))
-                c.assert_fact(j)
-                frame.e1.id = c.s.gid + 1; frame.e1.joined = True; frame.e1.j_t = '3j'; c.assert_fact(frame.e1)
-                frame.e2.id = c.s.gid + 2; frame.e2.joined = True; frame.e2.j_t = '3j'; c.assert_fact(frame.e2)
-                frame.e3.id = c.s.gid + 3; frame.e3.joined = True; frame.e3.j_t = '3j'; c.assert_fact(frame.e3)
-                c.s.gid += 4
+            j = {'id': c.s.gid, 't': 'junction', 'base_point': c.e1.p1, 'j_t': '3j', 'visited': 'no'}
+            make_3j_junction(j, c.e1.p1, c.e1.p2, c.e2.p2, c.e3.p2)
+            print('Junction {0} {1} {2} {3} {4}'.format(j['name'], j['base_point'], j['p1'], j['p2'], j['p3']))
+            c.assert_fact(j)
+            c.e1.id = c.s.gid + 1; c.e1.joined = True; c.e1.j_t = '3j'; c.assert_fact(c.e1)
+            c.e2.id = c.s.gid + 2; c.e2.joined = True; c.e2.j_t = '3j'; c.assert_fact(c.e2)
+            c.e3.id = c.s.gid + 3; c.e3.joined = True; c.e3.j_t = '3j'; c.assert_fact(c.e3)
+            c.s.gid += 4
 
         @to('detect_junctions')
-        @when_all(cap(1),
-                  c.e1 << (m.t == 'edge') & (m.joined == False),
+        @when_all(c.e1 << (m.t == 'edge') & (m.joined == False),
                   c.e2 << (m.t == 'edge') & (m.joined == False) & (m.p1 == c.e1.p1) & (m.p2 != c.e1.p2),
                   none((m.t == 'edge') & (m.p1 == c.e1.p1) & (m.p2 != c.e1.p2) & (m.p2 != c.e2.p2))) 
         def make_l(c):
-            for frame in c.m:
-                j = {'id': c.s.gid, 't': 'junction', 'base_point': frame.e1.p1, 'j_t': '2j', 'visited': 'no', 'name': 'L', 'p1': frame.e1.p2, 'p2': frame.e2.p2}
-                print('Junction L {0} {1} {2}'.format(frame.e1.p1, frame.e1.p2, frame.e2.p2))
-                c.assert_fact(j)
-                frame.e1.id = c.s.gid + 1; frame.e1.joined = True; frame.e1.j_t = '2j'; c.assert_fact(frame.e1)
-                frame.e2.id = c.s.gid + 2; frame.e2.joined = True; frame.e2.j_t = '2j'; c.assert_fact(frame.e2)
-                c.s.gid += 3
+            j = {'id': c.s.gid, 't': 'junction', 'base_point': c.e1.p1, 'j_t': '2j', 'visited': 'no', 'name': 'L', 'p1': c.e1.p2, 'p2': c.e2.p2}
+            print('Junction L {0} {1} {2}'.format(c.e1.p1, c.e1.p2, c.e2.p2))
+            c.assert_fact(j)
+            c.e1.id = c.s.gid + 1; c.e1.joined = True; c.e1.j_t = '2j'; c.assert_fact(c.e1)
+            c.e2.id = c.s.gid + 2; c.e2.joined = True; c.e2.j_t = '2j'; c.assert_fact(c.e2)
+            c.s.gid += 3
 
         @to('find_initial_boundary')
         @when_all(pri(1))

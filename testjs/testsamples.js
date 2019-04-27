@@ -412,6 +412,74 @@ d.ruleset('animal', function() {
     }
 });
 
+d.ruleset('risk6', function() {
+    
+    // matching primitive array
+    whenAll: {
+        m.payments.allItems(item > 2000)
+    }
+    run: console.log('risk6 should not match ' + m.payments)
+
+    // matching primitive array
+    whenAll: {
+        m.payments.allItems(item > 1000)
+    }
+    run: console.log('risk6 fraud 1 detected ' + m.payments)
+
+    // matching object array
+    whenAll: {
+        m.payments.allItems(item.amount < 250 || item.amount >= 300)
+    }
+    run: console.log('risk6 fraud 2 detected ' + JSON.stringify(m.payments))
+   
+    // pattern matching string array
+    whenAll: {
+        m.cards.anyItem(item.matches('three.*'))
+    }
+    run: console.log('risk6 fraud 3 detected ' + m.cards)
+
+    // matching nested arrays
+    whenAll: {
+        m.payments.anyItem(item.allItems(item < 100))
+    }
+    run: console.log('risk6 fraud 4 detected ' + JSON.stringify(m.payments))
+
+    // matching array and value
+    whenAll: {
+        m.payments.allItems(item > 100) && m.cash == true
+    }
+    run: console.log('risk6 fraud 5 detected ' + JSON.stringify(m))
+
+    whenAll: {
+        m.field == 1 && m.payments.allItems(item.allItems(item > 100 && item < 1000))
+    }
+    run: console.log('risk6 fraud 6 detected ' + JSON.stringify(m.payments))
+
+    whenAll: {
+        m.field == 1 && m.payments.allItems(item.anyItem(item > 100 || item < 50))
+    }
+    run: console.log('risk6 fraud 7 detected ' + JSON.stringify(m.payments))
+
+    whenAll: { 
+        m.payments.anyItem(~item.field1 && item.field2 == 2) 
+    }
+    run: console.log('risk6 fraud 8 detected ' + JSON.stringify(m.payments));
+
+    whenStart: {
+        post('risk6', { payments: [ 2500, 150, 450 ] });
+        post('risk6', { payments: [ 1500, 3500, 4500 ] });
+        post('risk6', { payments: [ { amount: 200 }, { amount: 300 }, { amount: 400 } ] });
+        post('risk6', { cards: [ 'one card', 'two cards', 'three cards' ] });
+        post('risk6', { payments: [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]});
+        post('risk6', { payments: [ 150, 350, 450 ], cash : true});    
+        post('risk6', { field: 1, payments: [ [ 200, 300 ], [ 150, 200 ] ]}); 
+        post('risk6', { field: 1, payments: [ [ 20, 180 ], [ 90, 190 ] ]}); 
+        post('risk6', { payments: [{field2: 2}]}); 
+        post('risk6', { payments: [{field2: 1}]}); 
+        post('risk6', { payments: [{field1: 1, field2: 2}]});  
+        post('risk6', { payments: [{field1: 1, field2: 1}]});  
+    }
+});
 
 // d.ruleset('expense1', function() {
 //     whenAny: {
@@ -638,74 +706,6 @@ d.ruleset('animal', function() {
 //     }
 // });
 
-// d.ruleset('risk6', function() {
-    
-//     // matching primitive array
-//     whenAll: {
-//         m.payments.allItems(item > 2000)
-//     }
-//     run: console.log('risk6 should not match ' + m.payments)
-
-//     // matching primitive array
-//     whenAll: {
-//         m.payments.allItems(item > 1000)
-//     }
-//     run: console.log('risk6 fraud 1 detected ' + m.payments)
-
-//     // matching object array
-//     whenAll: {
-//         m.payments.allItems(item.amount < 250 || item.amount >= 300)
-//     }
-//     run: console.log('risk6 fraud 2 detected ' + JSON.stringify(m.payments))
-   
-//     // pattern matching string array
-//     whenAll: {
-//         m.cards.anyItem(item.matches('three.*'))
-//     }
-//     run: console.log('risk6 fraud 3 detected ' + m.cards)
-
-//     // matching nested arrays
-//     whenAll: {
-//         m.payments.anyItem(item.allItems(item < 100))
-//     }
-//     run: console.log('risk6 fraud 4 detected ' + JSON.stringify(m.payments))
-
-//     // matching array and value
-//     whenAll: {
-//         m.payments.allItems(item > 100) && m.cash == true
-//     }
-//     run: console.log('risk6 fraud 5 detected ' + JSON.stringify(m))
-
-//     whenAll: {
-//         m.field == 1 && m.payments.allItems(item.allItems(item > 100 && item < 1000))
-//     }
-//     run: console.log('risk6 fraud 6 detected ' + JSON.stringify(m.payments))
-
-//     whenAll: {
-//         m.field == 1 && m.payments.allItems(item.anyItem(item > 100 || item < 50))
-//     }
-//     run: console.log('risk6 fraud 7 detected ' + JSON.stringify(m.payments))
-
-//     whenAll: { 
-//         m.payments.anyItem(~item.field1 && item.field2 == 2) 
-//     }
-//     run: console.log('risk6 fraud 8 detected ' + JSON.stringify(m.payments));
-
-//     whenStart: {
-//         post('risk6', { payments: [ 2500, 150, 450 ] });
-//         post('risk6', { payments: [ 1500, 3500, 4500 ] });
-//         post('risk6', { payments: [ { amount: 200 }, { amount: 300 }, { amount: 400 } ] });
-//         post('risk6', { cards: [ 'one card', 'two cards', 'three cards' ] });
-//         post('risk6', { payments: [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]});
-//         post('risk6', { payments: [ 150, 350, 450 ], cash : true});    
-//         post('risk6', { field: 1, payments: [ [ 200, 300 ], [ 150, 200 ] ]}); 
-//         post('risk6', { field: 1, payments: [ [ 20, 180 ], [ 90, 190 ] ]}); 
-//         post('risk6', { payments: [{field2: 2}]}); 
-//         post('risk6', { payments: [{field2: 1}]}); 
-//         post('risk6', { payments: [{field1: 1, field2: 2}]});  
-//         post('risk6', { payments: [{field1: 1, field2: 1}]});  
-//     }
-// });
 
 // d.ruleset('flow', function() {
 //     whenAll: m.state == 'start'

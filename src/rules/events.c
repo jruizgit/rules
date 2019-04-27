@@ -730,18 +730,18 @@ static unsigned int isAlphaMatch(ruleset *tree,
         *propertyMatch = 1;
     } else {
         jsonProperty resultProperty;
-        CHECK_RESULT(reduceExpression(tree,
-                                      NULL,
-                                      &currentAlpha->expression,
-                                      messageObject,
-                                      NULL,
-                                      &resultProperty));
+        unsigned int result = reduceExpression(tree,
+                                               NULL,
+                                               &currentAlpha->expression,
+                                               messageObject,
+                                               NULL,
+                                               &resultProperty);
 
-        if (resultProperty.type != JSON_BOOL) {
-            return ERR_OPERATION_NOT_SUPPORTED;
+        if (result == ERR_OPERATION_NOT_SUPPORTED || resultProperty.type != JSON_BOOL) {
+            *propertyMatch = 0;
+        } else {
+            *propertyMatch = resultProperty.value.b;
         }
-
-        *propertyMatch = resultProperty.value.b;
     }
 
     return RULES_OK;
@@ -1328,6 +1328,11 @@ static unsigned int handleAplhaArray(ruleset *tree,
         if (type == JSON_OBJECT) {
             char *next;
             jo.propertiesLength = 0;
+            jo.content = first;
+            jo.idIndex = UNDEFINED_INDEX;
+            jo.sidIndex = UNDEFINED_INDEX;
+            memset(jo.propertyIndex, 0, MAX_OBJECT_PROPERTIES * sizeof(unsigned short));
+
             CHECK_RESULT(constructObject(first,
                                          "$i", 
                                          NULL, 
@@ -1342,7 +1347,7 @@ static unsigned int handleAplhaArray(ruleset *tree,
                                            HASH_I, 
                                            type, 
                                            0, 
-                                           last - first));
+                                           last - first + 1));
         }
 
         while (top) {
@@ -1385,14 +1390,14 @@ static unsigned int handleAplhaArray(ruleset *tree,
                             if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
                                 // handleAplhaArray finds a valid path, thus use propertyMatch
                                 CHECK_RESULT(handleAplhaArray(tree, 
-                                                              messageObject,
+                                                              &jo,
                                                               currentProperty, 
                                                               &hashNode->value.a,
                                                               propertyMatch));
                             } else {
                                 CHECK_RESULT(isAlphaMatch(tree,
                                                           &hashNode->value.a,
-                                                          messageObject,
+                                                          &jo,
                                                           &match));
 
                                 if (match) {

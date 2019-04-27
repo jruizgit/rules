@@ -1538,7 +1538,6 @@ exports = module.exports = durableEngine = function () {
     };
 
     var stateTrigger = function (stateName, run, parent, triggerObject) {
-        console.log(JSON.stringify(triggerObject))
         var that = {};
         var condition;
         var pri;

@@ -102,16 +102,12 @@ d.statechart('waltzdb', function() {
     duplicate: {
         to: 'duplicate'
         whenAll: line = m.t == 'line'
-        cap: 1000
         run: {
-            for (var i = 0; i < m.length; ++i) {
-                var frame = m[i];
-                console.log('Edge ' + frame.line.p1 + ' ' + frame.line.p2);
-                console.log('Edge ' + frame.line.p2 + ' ' + frame.line.p1);
-                post({id: s.gid, t: 'edge', p1: frame.line.p1, p2: frame.line.p2, joined: false});
-                post({id: s.gid + 1, t: 'edge', p1: frame.line.p2, p2: frame.line.p1, joined: false});
-                c.s.gid += 2
-            }
+            console.log('Edge ' + line.p1 + ' ' + line.p2);
+            console.log('Edge ' + line.p2 + ' ' + line.p1);
+            post({id: s.gid, t: 'edge', p1: line.p1, p2: line.p2, joined: false});
+            post({id: s.gid + 1, t: 'edge', p1: line.p2, p2: line.p1, joined: false});
+            c.s.gid += 2
         }
 
         to: 'detectJunctions'
@@ -126,19 +122,15 @@ d.statechart('waltzdb', function() {
             e2 = m.t == 'edge' && m.joined == false && m.p1 == e1.p1 && m.p2 != e1.p2
             e3 = m.t == 'edge' && m.joined == false && m.p1 == e1.p1 && m.p2 != e1.p2 && m.p2 != e2.p2
         }
-        cap: 1
         run: {
-            for (var i = 0; i < m.length; ++i) {
-                var frame = m[i];
-                var j = {id: s.gid, t: 'junction', basePoint: frame.e1.p1, jt: '3j', visited: 'no'};
-                make3jJunction(j, frame.e1.p1, frame.e1.p2, frame.e2.p2, frame.e3.p2);
-                console.log('Junction ' + j.name + ' ' + j.basePoint + ' ' + j.p1 + ' ' + j.p2 + ' ' + j.p3);
-                assert(j);
-                frame.e1.id = s.gid + 1; frame.e1.joined = true; frame.e1.jt = '3j'; assert(frame.e1);
-                frame.e2.id = s.gid + 2; frame.e2.joined = true; frame.e2.jt = '3j'; assert(frame.e2);
-                frame.e3.id = s.gid + 3; frame.e3.joined = true; frame.e3.jt = '3j'; assert(frame.e3);
-                s.gid += 4;
-            }
+            var j = {id: s.gid, t: 'junction', basePoint: e1.p1, jt: '3j', visited: 'no'};
+            make3jJunction(j, e1.p1, e1.p2, e2.p2, e3.p2);
+            console.log('Junction ' + j.name + ' ' + j.basePoint + ' ' + j.p1 + ' ' + j.p2 + ' ' + j.p3);
+            assert(j);
+            e1.id = s.gid + 1; e1.joined = true; e1.jt = '3j'; assert(e1);
+            e2.id = s.gid + 2; e2.joined = true; e2.jt = '3j'; assert(e2);
+            e3.id = s.gid + 3; e3.joined = true; e3.jt = '3j'; assert(e3);
+            s.gid += 4;
         }
 
         to: 'detectJunctions'
@@ -147,17 +139,13 @@ d.statechart('waltzdb', function() {
             e2 = m.t == 'edge' && m.joined == false && m.p1 == e1.p1 && m.p2 != e1.p2
             none(m.t == 'edge' && m.p1 == e1.p1 && m.p2 != e1.p2 && m.p2 != e2.p2)
         }
-        cap: 1
         run: {
-            for (var i = 0; i < m.length; ++i) {
-                var frame = m[i];
-                var j = {id: s.gid, t: 'junction', basePoint: frame.e1.p1, jt: '2j', visited: 'no', name: 'L', p1: frame.e1.p2, p2: frame.e2.p2};
-                console.log('Junction L ' + frame.e1.p1 + ' ' + frame.e1.p2 + ' ' + frame.e2.p2);
-                assert(j)
-                frame.e1.id = s.gid + 1; frame.e1.joined = true; frame.e1.jt = '2j'; assert(frame.e1);
-                frame.e2.id = s.gid + 2; frame.e2.joined = true; frame.e2.jt = '2j'; assert(frame.e2);
-                s.gid += 3;
-            }
+            var j = {id: s.gid, t: 'junction', basePoint: e1.p1, jt: '2j', visited: 'no', name: 'L', p1: e1.p2, p2: e2.p2};
+            console.log('Junction L ' + e1.p1 + ' ' + e1.p2 + ' ' + e2.p2);
+            assert(j)
+            e1.id = s.gid + 1; e1.joined = true; e1.jt = '2j'; assert(e1);
+            e2.id = s.gid + 2; e2.joined = true; e2.jt = '2j'; assert(e2);
+            s.gid += 3;           
         }
 
         to: 'findInitialBoundary'
