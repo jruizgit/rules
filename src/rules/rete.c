@@ -1312,6 +1312,7 @@ static unsigned int createAlpha(ruleset *tree,
 
 static unsigned int createBeta(ruleset *tree, 
                                char *rule,
+                               unsigned char gateType,
                                unsigned short distinct,
                                unsigned int nextOffset) {
     char *first;
@@ -1320,6 +1321,8 @@ static unsigned int createBeta(ruleset *tree,
     unsigned int hash;
     unsigned int previousOffset = 0;
     unsigned char type; 
+    unsigned char nextGateType = GATE_AND;
+
     unsigned int result = readNextArrayValue(rule, 
                                              &first, 
                                              &lastArrayValue, 
@@ -1333,6 +1336,7 @@ static unsigned int createBeta(ruleset *tree,
                 operator = OP_ALL;
             } else if (!strncmp("$any", last - 4, 4)) {
                 operator = OP_ANY;
+                nextGateType = GATE_OR;
             } else if (!strncmp("$not", last - 4, 4)) {
                 operator = OP_NOT;
             }
@@ -1356,13 +1360,21 @@ static unsigned int createBeta(ruleset *tree,
                                &betaOffset));
         
         newBeta->nameOffset = stringOffset;
-        newBeta->type = NODE_BETA_CONNECTOR;
         newBeta->value.b.nextOffset = nextOffset;
-        newBeta->value.b.operator = operator;
+        newBeta->value.b.gateType = gateType;
+        newBeta->value.b.not = (operator == OP_NOT) ? 1: 0;
         newBeta->value.b.distinct = (distinct != 0) ? 1 : 0;
         newBeta->value.b.hash = hash;
-        newBeta->value.b.index = tree->betaCount;
-        ++tree->betaCount;
+        
+        if (operator != OP_ALL && operator != OP_ANY) {
+            newBeta->value.b.index = tree->betaCount;
+            ++tree->betaCount;
+            newBeta->type = NODE_BETA;
+        } else {
+            newBeta->value.b.index = tree->betaConnectorCount;
+            ++tree->betaConnectorCount;
+            newBeta->type = NODE_BETA_CONNECTOR;
+        }
         
         if (previousOffset == 0) {
             newBeta->value.b.isFirst = 1;
@@ -1397,7 +1409,8 @@ static unsigned int createBeta(ruleset *tree,
                                              &type));
 
             CHECK_RESULT(createBeta(tree, 
-                                    first, 
+                                    first,
+                                    nextGateType, 
                                     distinct, 
                                     betaOffset));
         }
@@ -1576,10 +1589,11 @@ static void printBetaNode(ruleset *tree, node *betaNode, int level, unsigned int
         printf("    ");
     }
 
-    printf("-> beta: name %s, operator %d, distinct %d, index %d, offset %u\n", 
+    printf("-> beta: name %s, not %d, distinct %d, gate %d, index %d, offset %u\n", 
            &tree->stringPool[betaNode->nameOffset], 
-           betaNode->value.b.operator, 
+           betaNode->value.b.not, 
            betaNode->value.b.distinct, 
+           betaNode->value.b.gateType, 
            betaNode->value.b.index, 
            offset);
     if (betaNode->value.b.expressionSequence.length != 0) {
@@ -1728,6 +1742,7 @@ static unsigned int createTree(ruleset *tree, char *rules) {
             if (hash == HASH_ANY || hash == HASH_ALL) {
                 CHECK_RESULT(createBeta(tree, 
                                         first, 
+                                        (hash == HASH_ALL) ? GATE_AND : GATE_OR,
                                         distinct, 
                                         actionOffset));        
             }
@@ -1786,6 +1801,7 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     tree->regexStateMachinePool = NULL;
     tree->regexStateMachineOffset = 0;
     tree->betaCount = 0;
+    tree->betaConnectorCount = 0;
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     tree->currentStateIndex = 0;

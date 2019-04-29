@@ -842,7 +842,7 @@ static unsigned int handleBetaFrame(ruleset *tree,
                               currentFrameLocation));
 
     node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
-    if (currentNode->value.b.operator == OP_NOT) {
+    if (currentNode->value.b.not) {
         // Apply filter to frame and clone old closure
         rightFrameNode *rightFrame = NULL;
         CHECK_RESULT(getLastRightFrame(state,
@@ -859,8 +859,7 @@ static unsigned int handleBetaFrame(ruleset *tree,
                                      currentFrame,
                                      &match));
             if (match) {
-                if (!currentNode->value.b.distinct || 
-                    isDistinct(currentFrame, rightFrame->messageOffset)) {
+                if (!currentNode->value.b.distinct || isDistinct(currentFrame, rightFrame->messageOffset)) {
                     return RULES_OK;
                 }
             }
@@ -924,6 +923,15 @@ static unsigned int handleBetaFrame(ruleset *tree,
                     rightFrame = NULL;
                 } 
             }
+        }
+
+        if (currentNode->value.b.gateType == GATE_OR) {
+            CHECK_RESULT(handleBetaFrame(tree,
+                                         state, 
+                                         UNDEFINED_HASH_OFFSET,
+                                         currentNode,
+                                         nextNode,
+                                         currentFrame));
         }                
     }
 
@@ -969,9 +977,7 @@ static unsigned int handleDeleteMessage(ruleset *tree,
             if (result != RULES_OK && result != ERR_NODE_DISPATCHING && result != ERR_NODE_DELETED) {
                 return result;
             } else if (result == ERR_NODE_DISPATCHING) {
-
                 CHECK_RESULT(deleteMessageFromFrame(messageOffset, frame));
-
             } else if (result == RULES_OK) {
                 if (currentLocationNode->location.frameType != RIGHT_FRAME) {
                     for (unsigned int ii = 0; ii < frame->messageCount; ++ii) {
@@ -984,7 +990,7 @@ static unsigned int handleDeleteMessage(ruleset *tree,
                     }                  
                 } else {
                     node *currentNode = state->betaState[currentLocationNode->location.nodeIndex].reteNode;
-                    if (currentNode->value.b.operator == OP_NOT) {
+                    if (currentNode->value.b.not) {
                         if (currentNode->value.b.isFirst) {
                             if (!state->betaState[currentLocationNode->location.nodeIndex].rightFramePool.count) {
                                 node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
@@ -1089,6 +1095,7 @@ static unsigned int deleteDownstreamFrames(ruleset *tree,
                                            leftFrameNode *currentFrame) {
 
     messageNode *currentMessage = NULL;
+
     // Find message with the smallest location count
     for (unsigned int i = 0; i < currentFrame->messageCount; ++i) {
         if (currentFrame->messages[i].messageNodeOffset != UNDEFINED_HASH_OFFSET) {
@@ -1243,6 +1250,15 @@ static unsigned int handleMatchFrames(ruleset *tree,
         }
     }
 
+    if(currentNode->value.b.gateType == GATE_OR && !currentNode->value.b.expressionSequence.length) {
+        return handleBetaFrame(tree,
+                               state,
+                               currentMessageOffset,
+                               currentNode, 
+                               nextNode,
+                               NULL);   
+    }
+
     return RULES_OK;
 }
 
@@ -1251,7 +1267,7 @@ static unsigned int handleBetaMessage(ruleset *tree,
                                       node *betaNode,
                                       jsonObject *messageObject,
                                       unsigned int currentMessageOffset) { 
-    if (betaNode->value.b.isFirst && betaNode->value.b.operator != OP_NOT) {
+    if (betaNode->value.b.isFirst && !betaNode->value.b.not) {
         node *nextNode = &tree->nodePool[betaNode->value.b.nextOffset];
         return handleBetaFrame(tree,
                                state,
@@ -1286,7 +1302,7 @@ static unsigned int handleBetaMessage(ruleset *tree,
                                messageHash,
                                rightFrameLocation)); 
 
-    if (betaNode->value.b.operator == OP_NOT) {
+    if (betaNode->value.b.not) {
         return handleFilterFrames(tree,
                                   state,
                                   betaNode,

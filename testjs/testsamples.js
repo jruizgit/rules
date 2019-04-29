@@ -249,6 +249,34 @@ d.statechart('expense3', function() {
     }
 });
 
+d.statechart('worker', function() {
+    work: {
+        enter: {
+            to: 'process'
+            whenAll: m.subject == 'enter'
+            run: console.log('worker start process')
+        }
+
+        process: {
+            to: 'process'
+            whenAll: m.subject == 'continue'
+            run: console.log('worker continue processing')
+        }
+    
+        to: 'canceled'
+        pri: 1
+        whenAll: m.subject == 'cancel'
+        run: console.log('worker cancel process')
+    }
+
+    canceled: {}
+    whenStart: {
+        post('worker', { subject: 'enter' });
+        post('worker', { id: 1, subject: 'continue' });
+        post('worker', { id: 2, subject: 'continue' });
+        post('worker', { subject: 'cancel' });
+    }
+});
 
 d.flowchart('expense4', function() {
     input: {
@@ -412,6 +440,32 @@ d.ruleset('animal', function() {
     }
 });
 
+d.ruleset('risk5', function() {
+    
+    // compares properties in the same event, evaluated in alpha tree (node.js)
+    whenAll: {
+        m.debit > 2 * m.credit
+    }
+    run: console.log('risk5 debit ' + m.debit + ' more than twice the credit ' + m.credit)
+   
+    // correlates two events, evaluated in the beta tree (redis)
+    whenAll: {
+        first = m.amount > 100
+        second = m.amount > first.amount + m.amount / 2
+    }
+    run: {
+        console.log('risk5 fraud detected -> ' + first.amount);
+        console.log('risk5 fraud detected -> ' + second.amount);
+    }
+
+    whenStart: {
+        post('risk5', { debit: 220, credit: 100 });
+        post('risk5', { debit: 150, credit: 100 });
+        post('risk5', { amount: 200 });
+        post('risk5', { amount: 500 });
+    }
+});
+
 d.ruleset('risk6', function() {
     
     // matching primitive array
@@ -478,6 +532,29 @@ d.ruleset('risk6', function() {
         post('risk6', { payments: [{field2: 1}]}); 
         post('risk6', { payments: [{field1: 1, field2: 2}]});  
         post('risk6', { payments: [{field1: 1, field2: 1}]});  
+    }
+});
+
+d.ruleset('expense6', function() {
+    whenAny: {
+        first = m.subject == 'approve' || m.subject == 'jumbo'
+        second = m.amount <= 1000
+    }   
+    run: {
+        if (first) {
+            console.log('expense6 Approved ' + first.subject);     
+        } 
+
+        if (second) {
+            console.log('expense6 Approved ' + second.amount);     
+        }
+    }
+
+    whenStart: {
+        post('expense6', {subject: 'approve'});
+        assert('expense6', {amount: 1000});
+        assert('expense6', {subject: 'jumbo'});
+        post('expense6', {amount: 100});
     }
 });
 
@@ -647,65 +724,6 @@ d.ruleset('risk6', function() {
 // });
 
 // // curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk4/events
-
-
-
-// d.statechart('worker', function() {
-//     work: {
-//         enter: {
-//             to: 'process'
-//             whenAll: m.subject == 'enter'
-//             run: console.log('worker start process')
-//         }
-
-//         process: {
-//             to: 'process'
-//             whenAll: m.subject == 'continue'
-//             run: console.log('worker continue processing')
-//         }
-    
-//         to: 'canceled'
-//         pri: 1
-//         whenAll: m.subject == 'cancel'
-//         run: console.log('worker cancel process')
-//     }
-
-//     canceled: {}
-//     whenStart: {
-//         post('worker', { subject: 'enter' });
-//         post('worker', { subject: 'continue' });
-//         post('worker', { subject: 'continue' });
-//         post('worker', { subject: 'cancel' });
-//     }
-// });
-
-
-// d.ruleset('risk5', function() {
-    
-//     // compares properties in the same event, evaluated in alpha tree (node.js)
-//     whenAll: {
-//         m.debit > 2 * m.credit
-//     }
-//     run: console.log('risk5 debit ' + m.debit + ' more than twice the credit ' + m.credit)
-   
-//     // correlates two events, evaluated in the beta tree (redis)
-//     whenAll: {
-//         first = m.amount > 100
-//         second = m.amount > first.amount + m.amount / 2
-//     }
-//     run: {
-//         console.log('risk5 fraud detected -> ' + first.amount);
-//         console.log('risk5 fraud detected -> ' + second.amount);
-//     }
-
-//     whenStart: {
-//         post('risk5', { debit: 220, credit: 100 });
-//         post('risk5', { debit: 150, credit: 100 });
-//         post('risk5', { amount: 200 });
-//         post('risk5', { amount: 500 });
-//     }
-// });
-
 
 // d.ruleset('flow', function() {
 //     whenAll: m.state == 'start'
