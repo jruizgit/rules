@@ -229,10 +229,13 @@ unsigned int deleteFrameLocation(stateNode *state,
 unsigned int deleteMessageFromFrame(unsigned int messageNodeOffset, 
                                     leftFrameNode *frame) {
 
-    for (int i = 0; i < MAX_MESSAGE_FRAMES; ++i) {
-        if (frame->messages[i].hash && frame->messages[i].messageNodeOffset == messageNodeOffset) {
-            frame->messages[i].hash = 0;
-            frame->messages[i].messageNodeOffset = UNDEFINED_HASH_OFFSET;
+    for (int i = 0, c = 0; c < frame->messageCount; ++i) {
+        if (frame->messages[i].hash) {
+            ++c;
+            if (frame->messages[i].messageNodeOffset == messageNodeOffset) {
+                frame->messages[i].hash = 0;
+                frame->messages[i].messageNodeOffset = UNDEFINED_HASH_OFFSET;
+            }
         }
     }
 
@@ -378,6 +381,123 @@ unsigned int createLeftFrame(stateNode *state,
     
     *newNode = targetNode;
     state->betaState[reteNode->value.b.index].reteNode = reteNode;
+    return RULES_OK;
+}
+
+unsigned int getLastConnectorFrame(stateNode *state,
+                                   unsigned int frameType,
+                                   unsigned int index, 
+                                   unsigned int *valueOffset,
+                                   leftFrameNode **node) {
+    if (frameType == A_FRAME) {
+        GET_LAST(leftFrameNode, 
+                 state->connectorState[index].aFrameIndex, 
+                 1, 
+                 state->connectorState[index].aFramePool, 
+                 0, 
+                 *valueOffset);
+        if (*valueOffset == UNDEFINED_HASH_OFFSET) {
+            *node = NULL;
+            return RULES_OK;
+        }
+
+        *node = A_FRAME_NODE(state, index, *valueOffset);
+    } else {
+        GET_LAST(leftFrameNode, 
+                 state->connectorState[index].bFrameIndex, 
+                 1, 
+                 state->connectorState[index].bFramePool, 
+                 0, 
+                 *valueOffset);
+        if (*valueOffset == UNDEFINED_HASH_OFFSET) {
+            *node = NULL;
+            return RULES_OK;
+        }
+
+        *node = B_FRAME_NODE(state, index, *valueOffset);
+    }
+
+    return RULES_OK;
+}
+
+unsigned int setConnectorFrame(stateNode *state, 
+                               unsigned int frameType,
+                               frameLocation location) {
+    if (frameType == A_FRAME) {
+        SET(leftFrameNode, 
+            state->connectorState[location.nodeIndex].aFrameIndex, 
+            1, 
+            state->connectorState[location.nodeIndex].aFramePool, 
+            0, 
+            location.frameOffset);
+    } else {
+        SET(leftFrameNode, 
+            state->connectorState[location.nodeIndex].bFrameIndex, 
+            1, 
+            state->connectorState[location.nodeIndex].bFramePool, 
+            0, 
+            location.frameOffset);
+    }
+
+    return RULES_OK;
+}
+
+unsigned int deleteConnectorFrame(stateNode *state,
+                                  unsigned int frameType,
+                                  frameLocation location) {
+    if (frameType == A_FRAME) {
+        DELETE(leftFrameNode,
+               state->connectorState[location.nodeIndex].aFrameIndex, 
+               1,
+               state->connectorState[location.nodeIndex].aFramePool,
+               location.frameOffset);
+    } else {
+        DELETE(leftFrameNode,
+               state->connectorState[location.nodeIndex].bFrameIndex, 
+               1,
+               state->connectorState[location.nodeIndex].bFramePool,
+               location.frameOffset);
+
+    }
+
+    return RULES_OK;
+}
+
+unsigned int createConnectorFrame(stateNode *state,
+                                  unsigned int frameType,
+                                  node *reteNode,
+                                  leftFrameNode *oldNode,                        
+                                  leftFrameNode **newNode,
+                                  frameLocation *newLocation) {
+    unsigned int newValueOffset;
+    leftFrameNode *targetNode = NULL;
+    if (frameType == A_FRAME) {
+        NEW(leftFrameNode, 
+            state->connectorState[reteNode->value.b.index].aFramePool, 
+            newValueOffset);
+
+        targetNode = A_FRAME_NODE(state, reteNode->value.b.index, newValueOffset);
+    } else {
+        NEW(leftFrameNode, 
+            state->connectorState[reteNode->value.b.index].bFramePool, 
+            newValueOffset);
+
+        targetNode = B_FRAME_NODE(state, reteNode->value.b.index, newValueOffset);
+    }
+
+    newLocation->frameType = frameType;
+    newLocation->nodeIndex = reteNode->value.b.index;
+    newLocation->frameOffset = newValueOffset;
+    targetNode->nameOffset = reteNode->nameOffset;
+    targetNode->isDispatching = 0;
+    
+    CHECK_RESULT(copyLeftFrame(state,
+                               oldNode, 
+                               targetNode, 
+                               *newLocation));
+    
+    *newNode = targetNode;
+    state->connectorState[reteNode->value.b.index].reteNode = reteNode;
     return RULES_OK;
 }
 
@@ -675,6 +795,26 @@ unsigned int ensureStateNode(void *tree,
                  MAX_RIGHT_FRAME_NODES);
 
             memset(betaNode->rightFrameIndex, 0, MAX_RIGHT_FRAME_INDEX_LENGTH * sizeof(unsigned int) * 2);
+        }
+
+        node->connectorState = malloc(((ruleset*)tree)->connectorCount * sizeof(connectorStateNode));
+        for (unsigned int i = 0; i < ((ruleset*)tree)->connectorCount; ++i) {
+            connectorStateNode *connectorNode = &node->connectorState[i];
+            connectorNode->reteNode = NULL;
+
+            INIT(leftFrameNode, 
+                 connectorNode->aFramePool, 
+                 MAX_LEFT_FRAME_NODES);
+ 
+            connectorNode->aFrameIndex[0] = UNDEFINED_HASH_OFFSET;
+            connectorNode->aFrameIndex[1] = UNDEFINED_HASH_OFFSET;
+
+            INIT(leftFrameNode, 
+                 connectorNode->bFramePool, 
+                 MAX_LEFT_FRAME_NODES);
+
+            connectorNode->bFrameIndex[0] = UNDEFINED_HASH_OFFSET;
+            connectorNode->bFrameIndex[1] = UNDEFINED_HASH_OFFSET;
         }
 
         node->actionState = malloc(((ruleset*)tree)->actionCount * sizeof(actionStateNode));

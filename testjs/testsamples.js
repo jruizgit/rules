@@ -535,18 +535,46 @@ d.ruleset('risk6', function() {
     }
 });
 
+d.ruleset('expense1', function() {
+    whenAny: {
+        whenAll: {
+            first = m.subject == 'approve'
+            second = m.amount == 1000
+        }
+        whenAll: { 
+            third = m.subject == 'jumbo'
+            fourth = m.amount == 10000
+        }
+    }
+    run: {
+        if (first) {
+            console.log('expense1 Approved ' + first.subject + ' ' + second.amount);     
+        } else {
+            console.log('expense1 Approved ' + third.subject + ' ' + fourth.amount);        
+        }
+    }
+
+    whenStart: {
+        post('expense1', {subject: 'approve'});
+        post('expense1', {amount: 1000});
+        post('expense1', {subject: 'jumbo'});
+        post('expense1', {amount: 10000});
+    }
+});
+
 d.ruleset('expense6', function() {
     whenAny: {
         first = m.subject == 'approve' || m.subject == 'jumbo'
         second = m.amount <= 1000
     }   
     run: {
+        console.log('expense 6 Approved')
         if (first) {
-            console.log('expense6 Approved ' + first.subject);     
+            console.log('expense6 ' + first.subject);     
         } 
 
         if (second) {
-            console.log('expense6 Approved ' + second.amount);     
+            console.log('expense6 ' + second.amount);     
         }
     }
 
@@ -558,33 +586,43 @@ d.ruleset('expense6', function() {
     }
 });
 
-// d.ruleset('expense1', function() {
-//     whenAny: {
-//         whenAll: {
-//             first = m.subject == 'approve'
-//             second = m.amount == 1000
-//         }
-//         whenAll: { 
-//             third = m.subject == 'jumbo'
-//             fourth = m.amount == 10000
-//         }
-//     }
-//     run: {
-//         if (first) {
-//             console.log('expense1 Approved ' + first.subject + ' ' + second.amount);     
-//         } else {
-//             console.log('expense1 Approved ' + third.subject + ' ' + fourth.amount);        
-//         }
-//     }
+d.ruleset('expense7', function() {
+    whenAll: {
+        whenAny: {
+            first = m.subject == 'approve'
+            second = m.amount == 1000
+        }
+        whenAny: { 
+            third = m.subject == 'jumbo'
+            fourth = m.amount == 10000
+        }
+    }
+    run: {
+        console.log('expense 7 Approved')
+        if (first) {
+            console.log('expense7 ' + first.subject);     
+        } 
 
-//     whenStart: {
-//         post('expense1', {subject: 'approve'});
-//         post('expense1', {amount: 1000});
-//         post('expense1', {subject: 'jumbo'});
-//         post('expense1', {amount: 10000});
-//     }
-// });
+        if (second) {
+            console.log('expense7 ' + second.amount);     
+        }
 
+        if (third) {
+            console.log('expense7 ' + third.subject);     
+        } 
+
+        if (fourth) {
+            console.log('expense7 ' + fourth.amount);     
+        } 
+    }
+
+    whenStart: {
+        post('expense7', {subject: 'approve'});
+        assert('expense7', {amount: 1000});
+        assert('expense7', {subject: 'jumbo'});
+        post('expense7', {amount: 10000});
+    }
+});
 
 // d.ruleset('flow1', function() {
 //     whenAll: s.state == 'first'

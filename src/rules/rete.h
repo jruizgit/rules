@@ -1,6 +1,6 @@
 #include "state.h"
 
-// #define _PRINT 1
+//#define _PRINT 1
 
 #define OP_NOP 0
 #define OP_LT 0x01
@@ -29,7 +29,7 @@
 
 #define NODE_ALPHA 0
 #define NODE_BETA 1
-#define NODE_BETA_CONNECTOR 2
+#define NODE_CONNECTOR 2
 #define NODE_ACTION 3
 
 #define GATE_AND 0
@@ -93,6 +93,8 @@ typedef struct beta {
     expressionSequence expressionSequence;
     unsigned int hash;
     unsigned int nextOffset;
+    unsigned int aOffset;
+    unsigned int bOffset;
     unsigned char distinct;
     unsigned char not;
     unsigned char gateType;
@@ -120,7 +122,7 @@ typedef struct ruleset {
     unsigned int nameOffset;
     unsigned int actionCount;
     unsigned int betaCount;
-    unsigned int betaConnectorCount;
+    unsigned int connectorCount;
     void *bindingsList;
     
     node *nodePool;

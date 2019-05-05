@@ -1361,6 +1361,8 @@ static unsigned int createBeta(ruleset *tree,
         
         newBeta->nameOffset = stringOffset;
         newBeta->value.b.nextOffset = nextOffset;
+        newBeta->value.b.aOffset = betaOffset;
+        newBeta->value.b.bOffset = betaOffset;
         newBeta->value.b.gateType = gateType;
         newBeta->value.b.not = (operator == OP_NOT) ? 1: 0;
         newBeta->value.b.distinct = (distinct != 0) ? 1 : 0;
@@ -1371,18 +1373,27 @@ static unsigned int createBeta(ruleset *tree,
             ++tree->betaCount;
             newBeta->type = NODE_BETA;
         } else {
-            newBeta->value.b.index = tree->betaConnectorCount;
-            ++tree->betaConnectorCount;
-            newBeta->type = NODE_BETA_CONNECTOR;
+            newBeta->value.b.index = tree->connectorCount;
+            ++tree->connectorCount;
+            newBeta->type = NODE_CONNECTOR;
         }
-        
+
         if (previousOffset == 0) {
             newBeta->value.b.isFirst = 1;
         } else {
             newBeta->value.b.isFirst = 0;
             tree->nodePool[previousOffset].value.b.nextOffset = betaOffset;
+            if (newBeta->type == NODE_CONNECTOR) {
+                // always set 'a' to previous beta in array
+                newBeta->value.b.aOffset = previousOffset;
+            }
         } 
 
+        if (tree->nodePool[nextOffset].type == NODE_CONNECTOR) {
+            // always set 'b' to last beta in array
+            tree->nodePool[nextOffset].value.b.bOffset = betaOffset;
+        }
+        
         previousOffset = betaOffset;
 
         newBeta->value.b.expressionSequence.nameOffset = stringOffset;
@@ -1589,12 +1600,20 @@ static void printBetaNode(ruleset *tree, node *betaNode, int level, unsigned int
         printf("    ");
     }
 
-    printf("-> beta: name %s, not %d, distinct %d, gate %d, index %d, offset %u\n", 
-           &tree->stringPool[betaNode->nameOffset], 
+    if (betaNode->type == NODE_BETA) {
+        printf("-> beta: ");
+    } else {
+        printf("-> connector: ");
+    }
+    printf("name %s, isFirst %d, not %d, distinct %d, gate %d, index %d, a %d, b %d, offset %u\n", 
+           &tree->stringPool[betaNode->nameOffset],
+           betaNode->value.b.isFirst,  
            betaNode->value.b.not, 
            betaNode->value.b.distinct, 
            betaNode->value.b.gateType, 
-           betaNode->value.b.index, 
+           betaNode->value.b.index,
+           betaNode->value.b.aOffset,
+           betaNode->value.b.bOffset,
            offset);
     if (betaNode->value.b.expressionSequence.length != 0) {
         printExpressionSequence(tree, &betaNode->value.b.expressionSequence, level);
@@ -1801,7 +1820,7 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     tree->regexStateMachinePool = NULL;
     tree->regexStateMachineOffset = 0;
     tree->betaCount = 0;
-    tree->betaConnectorCount = 0;
+    tree->connectorCount = 0;
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     tree->currentStateIndex = 0;

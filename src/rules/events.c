@@ -790,21 +790,32 @@ static unsigned int handleBetaFrame(ruleset *tree,
                                     unsigned int oldMessageOffset,
                                     node *oldNode,
                                     node *currentNode,
+                                    leftFrameNode *oldFrame,
                                     leftFrameNode *currentFrame) {
     frameLocation currentFrameLocation;
-
+    unsigned int frameType = LEFT_FRAME; 
+    
     if (currentNode->type == NODE_ACTION) {
         CHECK_RESULT(createActionFrame(state,
                                        currentNode,
                                        currentFrame,
                                        &currentFrame,
                                        &currentFrameLocation));
-    } else {
+    } else if (currentNode->type == NODE_BETA) {
         CHECK_RESULT(createLeftFrame(state,
                                      currentNode,
                                      currentFrame,
                                      &currentFrame,
                                      &currentFrameLocation));
+    } else {
+        node *aNode = &tree->nodePool[currentNode->value.b.aOffset];
+        frameType = (aNode == oldNode) ? A_FRAME : B_FRAME;
+        CHECK_RESULT(createConnectorFrame(state,
+                                          frameType,
+                                          currentNode,
+                                          currentFrame,
+                                          &currentFrame,
+                                          &currentFrameLocation));
     }
 
     if (oldMessageOffset != UNDEFINED_HASH_OFFSET) {
@@ -818,6 +829,21 @@ static unsigned int handleBetaFrame(ruleset *tree,
                                       oldMessageOffset));  
     }
 
+    if (oldFrame) {
+        for (int i = 0; i < oldFrame->messageCount; ++i) {
+            messageFrame *currentMessageFrame = &oldFrame->messages[oldFrame->reverseIndex[i]]; 
+            CHECK_RESULT(setMessageInFrame(currentFrame,
+                                           currentMessageFrame->nameOffset,
+                                           currentMessageFrame->hash,
+                                           currentMessageFrame->messageNodeOffset));
+
+            CHECK_RESULT(addFrameLocation(state,
+                                          currentFrameLocation,
+                                          currentMessageFrame->messageNodeOffset));     
+        }
+    }
+
+    unsigned int frameHash = UNDEFINED_HASH_OFFSET;
     if (currentNode->type == NODE_ACTION) {
         CHECK_RESULT(setActionFrame(state, 
                                     currentFrameLocation));
@@ -827,19 +853,23 @@ static unsigned int handleBetaFrame(ruleset *tree,
                             currentNode,
                             currentFrameLocation,
                             currentFrame);
+    } else if (currentNode->type == NODE_BETA) {
+        CHECK_RESULT(getFrameHash(tree,
+                                  state,
+                                  &currentNode->value.b,
+                                  NULL,
+                                  currentFrame,
+                                  &frameHash));
+
+        CHECK_RESULT(setLeftFrame(state,
+                                  frameHash,
+                                  currentFrameLocation));
+    } else {
+        CHECK_RESULT(setConnectorFrame(state,
+                                       frameType,                         
+                                       currentFrameLocation));
     }
 
-    unsigned int frameHash;
-    CHECK_RESULT(getFrameHash(tree,
-                              state,
-                              &currentNode->value.b,
-                              NULL,
-                              currentFrame,
-                              &frameHash));
-
-    CHECK_RESULT(setLeftFrame(state,
-                              frameHash,
-                              currentFrameLocation));
 
     node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
     if (currentNode->value.b.not) {
@@ -882,9 +912,10 @@ static unsigned int handleBetaFrame(ruleset *tree,
                                UNDEFINED_HASH_OFFSET,
                                currentNode,
                                nextNode,
+                               NULL,
                                currentFrame);
 
-    } else {
+    } else if (currentNode->type == NODE_BETA) {
         // Find all messages for frame 
         rightFrameNode *rightFrame;
         CHECK_RESULT(getLastRightFrame(state,
@@ -909,6 +940,7 @@ static unsigned int handleBetaFrame(ruleset *tree,
                                              rightFrame->messageOffset,
                                              currentNode,
                                              nextNode,
+                                             NULL,
                                              currentFrame));
             }
             
@@ -923,17 +955,51 @@ static unsigned int handleBetaFrame(ruleset *tree,
                     rightFrame = NULL;
                 } 
             }
-        }
+        }   
+    } else {
+        // Get all other frames 
+        leftFrameNode *connectorFrame;
+        unsigned int connectorFrameOffset;
+        unsigned int otherFrameType = (frameType == B_FRAME) ? A_FRAME : B_FRAME;
+        CHECK_RESULT(getLastConnectorFrame(state,
+                                           otherFrameType,
+                                           currentNode->value.b.index,
+                                           &connectorFrameOffset,
+                                           &connectorFrame));
 
-        if (currentNode->value.b.gateType == GATE_OR) {
+        while (connectorFrame) {
             CHECK_RESULT(handleBetaFrame(tree,
                                          state, 
                                          UNDEFINED_HASH_OFFSET,
                                          currentNode,
                                          nextNode,
+                                         connectorFrame,
                                          currentFrame));
-        }                
+
+            connectorFrameOffset = connectorFrame->prevOffset;
+            if (connectorFrameOffset == UNDEFINED_HASH_OFFSET) {
+                connectorFrame = NULL;
+            } else if (otherFrameType == A_FRAME) {
+                connectorFrame = A_FRAME_NODE(state,
+                                              currentNode->value.b.index, 
+                                              connectorFrameOffset); 
+            } else {
+                connectorFrame = B_FRAME_NODE(state,
+                                              currentNode->value.b.index, 
+                                              connectorFrameOffset);
+            }
+        }
     }
+
+    if (currentNode->value.b.gateType == GATE_OR || currentNode->value.b.isFirst) {
+        CHECK_RESULT(handleBetaFrame(tree,
+                                     state, 
+                                     UNDEFINED_HASH_OFFSET,
+                                     currentNode,
+                                     nextNode,
+                                     NULL,
+                                     currentFrame));
+    } 
 
     return RULES_OK;
 }
@@ -955,22 +1021,39 @@ static unsigned int handleDeleteMessage(ruleset *tree,
             ++count;
             leftFrameNode *frame = NULL;
             switch(currentLocationNode->location.frameType) {
+                case A_FRAME:
+                    frame = A_FRAME_NODE(state, 
+                                         currentLocationNode->location.nodeIndex,
+                                         currentLocationNode->location.frameOffset);
+
+                case B_FRAME:
+                    frame = B_FRAME_NODE(state, 
+                                         currentLocationNode->location.nodeIndex,
+                                         currentLocationNode->location.frameOffset);
+                    
+                    result = deleteConnectorFrame(state, 
+                                                  currentLocationNode->location.frameType, 
+                                                  currentLocationNode->location);
+                    break;
                 case LEFT_FRAME:
                     frame = LEFT_FRAME_NODE(state, 
                                             currentLocationNode->location.nodeIndex,
                                             currentLocationNode->location.frameOffset);
                     
-                    result = deleteLeftFrame(state, currentLocationNode->location);
+                    result = deleteLeftFrame(state, 
+                                             currentLocationNode->location);
                     break;
                 case ACTION_FRAME:
                     frame = ACTION_FRAME_NODE(state, 
                                               currentLocationNode->location.nodeIndex,
                                               currentLocationNode->location.frameOffset);
 
-                    result = deleteActionFrame(state, currentLocationNode->location);
+                    result = deleteActionFrame(state, 
+                                               currentLocationNode->location);
                     break;
                 case RIGHT_FRAME:
-                    result = deleteRightFrame(state, currentLocationNode->location);
+                    result = deleteRightFrame(state, 
+                                              currentLocationNode->location);
                     break;
             }
 
@@ -999,6 +1082,7 @@ static unsigned int handleDeleteMessage(ruleset *tree,
                                                              UNDEFINED_HASH_OFFSET,
                                                              currentNode,
                                                              nextNode,
+                                                             NULL,
                                                              NULL));
                             }
                         } else {
@@ -1034,6 +1118,7 @@ static unsigned int handleDeleteMessage(ruleset *tree,
                                                                  UNDEFINED_HASH_OFFSET,
                                                                  currentNode,
                                                                  nextNode,
+                                                                 NULL,
                                                                  currentFrame));
                                 }
 
@@ -1232,6 +1317,7 @@ static unsigned int handleMatchFrames(ruleset *tree,
                                          currentMessageOffset,
                                          currentNode,
                                          nextNode,
+                                         NULL,
                                          currentFrame));
         }
 
@@ -1256,6 +1342,7 @@ static unsigned int handleMatchFrames(ruleset *tree,
                                currentMessageOffset,
                                currentNode, 
                                nextNode,
+                               NULL,
                                NULL);   
     }
 
@@ -1274,6 +1361,7 @@ static unsigned int handleBetaMessage(ruleset *tree,
                                currentMessageOffset,
                                betaNode, 
                                nextNode,
+                               NULL,
                                NULL);
     }
 

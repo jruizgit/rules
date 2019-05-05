@@ -18,7 +18,9 @@
 
 #define LEFT_FRAME 0
 #define RIGHT_FRAME 1
-#define ACTION_FRAME 2
+#define A_FRAME 2
+#define B_FRAME 3
+#define ACTION_FRAME 4
 
 
 #define MESSAGE_NODE(state, offset) &((messageNode *)state->messagePool.content)[offset]
@@ -26,6 +28,10 @@
 #define RIGHT_FRAME_NODE(state, index, offset) &((rightFrameNode *)state->betaState[index].rightFramePool.content)[offset]
 
 #define LEFT_FRAME_NODE(state, index, offset) &((leftFrameNode *)state->betaState[index].leftFramePool.content)[offset]
+
+#define A_FRAME_NODE(state, index, offset) &((leftFrameNode *)state->connectorState[index].aFramePool.content)[offset]
+
+#define B_FRAME_NODE(state, index, offset) &((leftFrameNode *)state->connectorState[index].bFramePool.content)[offset]
 
 #define ACTION_FRAME_NODE(state, index, offset) &((leftFrameNode *)state->actionState[index].resultPool.content)[offset]
 
@@ -127,6 +133,14 @@ typedef struct actionStateNode {
     unsigned int resultIndex[2];
 } actionStateNode;
 
+typedef struct connectorStateNode {
+    struct node *reteNode;
+    pool aFramePool;
+    unsigned int aFrameIndex[2];
+    pool bFramePool;
+    unsigned int bFrameIndex[2];
+} connectorStateNode;
+
 typedef struct betaStateNode {
     struct node *reteNode;
     pool leftFramePool;
@@ -155,6 +169,7 @@ typedef struct stateNode {
     unsigned int messageIndex[MAX_MESSAGE_INDEX_LENGTH * 2];
     betaStateNode *betaState;
     actionStateNode *actionState; 
+    connectorStateNode *connectorState;
     actionContext context;
 } stateNode;
 
@@ -210,10 +225,10 @@ unsigned int setMessageInFrame(leftFrameNode *node,
                                unsigned int messageNodeOffset);
 
 unsigned int getLastLeftFrame(stateNode *state,
-                          unsigned int index, 
-                          unsigned int hash,
-                          frameLocation *location,
-                          leftFrameNode **node);
+                              unsigned int index, 
+                              unsigned int hash,
+                              frameLocation *location,
+                              leftFrameNode **node);
 
 unsigned int setLeftFrame(stateNode *state,
                           unsigned int hash, 
@@ -228,6 +243,28 @@ unsigned int createLeftFrame(stateNode *state,
                              leftFrameNode *oldNode,                        
                              leftFrameNode **newNode,
                              frameLocation *newLocation);
+
+unsigned int getLastConnectorFrame(stateNode *state,
+                                   unsigned int frameType,
+                                   unsigned int index, 
+                                   unsigned int *valueOffset,
+                                   leftFrameNode **node);
+
+unsigned int setConnectorFrame(stateNode *state, 
+                               unsigned int frameType,
+                               frameLocation location);
+
+
+unsigned int deleteConnectorFrame(stateNode *state,
+                                  unsigned int frameType,
+                                  frameLocation location);
+
+unsigned int createConnectorFrame(stateNode *state,
+                                  unsigned int frameType,
+                                  struct node *reteNode,
+                                  leftFrameNode *oldNode,                        
+                                  leftFrameNode **newNode,
+                                  frameLocation *newLocation);
 
 unsigned int getLastRightFrame(stateNode *state,
                            unsigned int index, 
