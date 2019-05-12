@@ -1321,7 +1321,7 @@ static unsigned int handleMatchFrames(ruleset *tree,
                                          currentFrame));
         }
 
-        unsigned int currentFrameOffset = currentFrame->prevOffset;
+        unsigned int currentFrameOffset = currentFrame->prevOffset;        
         currentFrame = NULL;
         while (currentFrameOffset != UNDEFINED_HASH_OFFSET) {
             currentFrame = LEFT_FRAME_NODE(state, 
@@ -1723,13 +1723,13 @@ static unsigned int handleMessageCore(ruleset *tree,
 
         if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
             if (isNewState) {      
-    #ifdef _WIN32
+#ifdef _WIN32
                 char *stateMessage = (char *)_alloca(sizeof(char)*(50 + sidProperty->valueLength * 2));
                 sprintf_s(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"id\":\"sid-%s\", \"$s\":1}", sid, sid);
-    #else
+#else
                 char stateMessage[50 + sidProperty->valueLength * 2];
                 snprintf(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"id\":\"sid-%s\", \"$s\":1}", sid, sid);
-    #endif
+#endif
                 
                 unsigned int stateMessageOffset;
                 unsigned int stateResult = handleMessage(tree,
@@ -1840,13 +1840,6 @@ static unsigned int handleMessages(ruleset *tree,
     }
 
     return returnResult;
-}
-
-static unsigned int handleTimers(ruleset *tree, 
-                                 char **commands,
-                                 unsigned int *commandCount,
-                                 unsigned int *stateOffset) {
-    return RULES_OK;
 }
 
 static unsigned int startHandleMessage(ruleset *tree, 
@@ -2135,30 +2128,6 @@ unsigned int startUpdateState(unsigned int handle,
 
 }
 
-unsigned int assertTimers(unsigned int handle) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
-    unsigned int stateOffset;
-    unsigned int result = handleTimers(tree, 
-                                       commands,
-                                       &commandCount,
-                                       &stateOffset);
-    if (result != RULES_OK) {
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    result = executeBatch(NULL, commands, commandCount);
-    if (result != RULES_OK && result != ERR_EVENT_OBSERVED) {
-        return result;
-    }
-
-    return RULES_OK;
-}
-
 unsigned int startAction(unsigned int handle, 
                          char **stateFact, 
                          char **messages, 
@@ -2318,21 +2287,90 @@ unsigned int queueMessage(unsigned int handle, unsigned int queueAction, char *s
     return registerMessage(rulesBinding, queueAction, destination, message);
 }
 
-unsigned int startTimer(unsigned int handle, char *sid, unsigned int duration, char manualReset, char *timer) {
+
+unsigned int assertTimers(unsigned int handle) {
+    ruleset *tree;
+    unsigned int result;
+    RESOLVE_HANDLE(handle, &tree);
+
+    time_t pulseTime = time(NULL);
+    for (unsigned int i = 0; i < tree->statePool.count; ++i) {
+        stateNode *state = STATE_NODE(tree, tree->reverseStateIndex[i]);
+        unsigned int messageOffset;
+        result = getMessage(state,
+                            "$pulse",
+                            &messageOffset);
+        if (result != RULES_OK && result != ERR_MESSAGE_NOT_FOUND) {
+            return result;
+        }
+
+        if (result == RULES_OK && messageOffset != UNDEFINED_HASH_OFFSET) {
+            messageNode *message = MESSAGE_NODE(state, messageOffset);
+            CHECK_RESULT(executeHandleMessage(tree, 
+                                              message->jo.content, 
+                                              ACTION_RETRACT_FACT));
+        }
+
+        int messageSize = sizeof(char) * (100 + strlen(state->sid));
+#ifdef _WIN32
+        char *pulseMessage = (char *)_alloca(messageSize);
+        sprintf_s(pulseMessage, 
+                  messageSize, 
+                  "{ \"sid\":\"%s\", \"id\":\"$pulse\", \"$time\":%ld }", 
+                  state->sid, 
+                  pulseTime);
+#else
+        char pulseMessage[messageSize];
+        snprintf(pulseMessage, 
+                messageSize, 
+                "{ \"sid\":\"%s\", \"id\":\"$pulse\", \"$time\":%ld }", 
+                state->sid, 
+                pulseTime);
+#endif
+        result = executeHandleMessage(tree, 
+                                      pulseMessage, 
+                                      ACTION_ASSERT_EVENT);
+        if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+            return result;
+        }
+    }
+
+    return RULES_OK;
+}
+
+unsigned int startTimer(unsigned int handle, 
+                        char *sid, 
+                        unsigned int duration, 
+                        char manualReset, 
+                        char *timer) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    void *rulesBinding;
-    if (!sid) {
-        sid = "0";
-    }
-    
-    unsigned int result = resolveBinding(tree, sid, &rulesBinding);
-    if (result != RULES_OK) {
-        return result;
-    }
+    time_t baseTime = time(NULL);
+    baseTime += duration;
+    int messageSize = sizeof(char) * (100 + strlen(sid) + strlen(timer));
 
-    return registerTimer(rulesBinding, duration, manualReset, timer);
+#ifdef _WIN32
+    char *baseMessage = (char *)_alloca(messageSize);
+    sprintf_s(baseMessage, 
+              messageSize, 
+              "{ \"sid\":\"%s\", \"$timerName\":\"%s\", \"$baseTime\":%ld }", 
+              sid, 
+              timer, 
+              baseTime);
+#else
+    char baseMessage[messageSize];
+    snprintf(baseMessage, 
+             messageSize, 
+             "{ \"sid\":\"%s\", \"$timerName\":\"%s\", \"$baseTime\":%ld }", 
+             sid,
+             timer, 
+             baseTime);
+#endif
+
+    return executeHandleMessage(tree, 
+                                baseMessage, 
+                                manualReset ? ACTION_ASSERT_FACT : ACTION_ASSERT_EVENT);
 }
 
 unsigned int cancelTimer(unsigned int handle, char *sid, char *timerName) {

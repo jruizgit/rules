@@ -158,6 +158,7 @@ typedef struct actionContext {
 } actionContext;
 
 typedef struct stateNode {
+    char *sid;
     unsigned int offset;
     unsigned int prevOffset;
     unsigned int nextOffset;

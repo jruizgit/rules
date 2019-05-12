@@ -768,7 +768,14 @@ unsigned int ensureStateNode(void *tree,
         rulesetTree->reverseStateIndex[rulesetTree->statePool.count - 1] = nodeOffset;
         stateNode *node = STATE_NODE(tree, nodeOffset); 
         node->offset = nodeOffset;
-    
+
+        int sidLength = sizeof(char) * (strlen(sid) + 1);
+        node->sid = malloc(sidLength);
+        if (!node->sid) {
+            return ERR_OUT_OF_MEMORY;
+        }
+        memcpy(node->sid, sid, sidLength);
+
         CHECK_RESULT(getBindingIndex(tree, 
                                      sidHash, 
                                      &node->bindingIndex));
@@ -872,18 +879,18 @@ static void serializeResultFrame(ruleset *tree,
         char *value = currentNode->jo.content;
         if (i < (frame->messageCount -1)) {
             tupleLength = strlen(name) + strlen(value) + 5;
-            #ifdef _WIN32
+#ifdef _WIN32
                 sprintf_s(first, tupleLength, "\"%s\":%s,", name, value);
-            #else
+#else
                 snprintf(first, tupleLength, "\"%s\":%s,", name, value);
-            #endif
+#endif
         } else {
             tupleLength = strlen(name) + strlen(value) + 4;
-            #ifdef _WIN32
+#ifdef _WIN32
                 sprintf_s(first, tupleLength, "\"%s\":%s", name, value);
-            #else
+#else
                 snprintf(first, tupleLength, "\"%s\":%s", name, value);
-            #endif
+#endif
         }
 
         first += (tupleLength - 1); 
@@ -1434,6 +1441,29 @@ unsigned int deleteState(unsigned int handle, char *sid) {
              ((ruleset*)tree)->statePool, 
              sidHash, 
              nodeOffset);
+
+    stateNode *node = STATE_NODE(tree, nodeOffset); 
+    free(node->sid);
+
+    for (unsigned int i = 0; i < ((ruleset*)tree)->betaCount; ++i) {
+        betaStateNode *betaNode = &node->betaState[i];
+        free(betaNode->leftFramePool.content);
+        free(betaNode->rightFramePool.content);
+    }
+    free(node->betaState);
+
+    for (unsigned int i = 0; i < ((ruleset*)tree)->connectorCount; ++i) {
+        connectorStateNode *connectorNode = &node->connectorState[i];
+        free(connectorNode->aFramePool.content);
+        free(connectorNode->bFramePool.content);
+    }
+    free(node->connectorState);
+
+    for (unsigned int i = 0; i < ((ruleset*)tree)->actionCount; ++i) {
+        actionStateNode *actionNode = &node->actionState[i];
+        free(actionNode->resultPool.content);
+    }   
+    free(node->actionState);
 
     DELETE(stateNode, 
            tree->stateIndex, 

@@ -213,7 +213,7 @@ exports = module.exports = durableEngine = function () {
             if (timerDirectory[name]) {
                 throw 'timer with name ' + name + ' already added';
             } else {
-                timerDirectory[name] = [{sid: that.s.sid, $t: name}, duration, manualReset];
+                timerDirectory[name] = [name, duration, manualReset];
             }
         };
 
@@ -498,7 +498,7 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.startTimer = function (sid, timer, timerDuration, manualReset) {
-            return r.startTimer(handle, sid, timerDuration, manualReset, JSON.stringify(timer));
+            return r.startTimer(handle, sid, timerDuration, manualReset, timer);
         };
 
         that.cancelTimer = function (sid, timer_name) {
@@ -521,17 +521,8 @@ exports = module.exports = durableEngine = function () {
             return JSON.parse(r.getRulesetState(handle));
         }
 
-        that.dispatchTimers = function (complete) { 
-            try {
-                if (!r.assertTimers(handle)) {
-                    complete(null, true);
-                } else {
-                    complete(null, false);
-                }
-            } catch (reason) {
-                complete(reason);
-                return;
-            }
+        that.dispatchTimers = function () { 
+            return r.assertTimers(handle);
         };
 
         var ensureRulesets = function (names, index, c, complete) {
@@ -1300,23 +1291,23 @@ exports = module.exports = durableEngine = function () {
                 setTimeout(dispatchTimers, 500, index);
             } else {
                 var rules = rulesList[index];
-                if (!index) {
+                try {
+                    rules.dispatchTimers();
+                } catch (reason) {
+                    console.log(reason);
+                }
+
+                var timeout = 0;
+                if (wait) {
+                    timeout = 250;
+                    wait = false;
+                }
+
+                if (index === (rulesList.length -1)) {
                     wait = true;
                 }
 
-                rules.dispatchTimers(function (err, w) {
-                    if (err) {
-                        console.log(err);
-                    } else if (!w) {
-                        wait = false;
-                    }
-
-                    if ((index === (rulesList.length -1)) && wait) {
-                        setTimeout(dispatchTimers, 250, (index + 1) % rulesList.length, wait);
-                    } else {
-                        setImmediate(dispatchTimers, (index + 1) % rulesList.length, wait);
-                    }
-                });
+                setTimeout(dispatchTimers, timeout, (index + 1) % rulesList.length, wait);
             }
         };
 
