@@ -624,6 +624,88 @@ d.ruleset('expense7', function() {
     }
 });
 
+d.ruleset('timer1', function() {
+    
+    whenAll: m.subject == 'start'
+    run: startTimer('MyTimer', 5);
+
+    whenAll: {
+        timeout('MyTimer')    
+    }
+    run: {
+        console.log('timer1 timeout'); 
+    }
+
+    whenStart: {
+        post('timer1', {subject: 'start'});
+    }
+});
+
+
+d.ruleset('timer2', function() {
+    whenAny: {
+        whenAll: s.count == 0
+        // will trigger when MyTimer expires
+        whenAll: {
+            s.count < 5 
+            timeout('MyTimer')
+        }
+    }
+    run: {
+        s.count += 1;
+        // MyTimer will expire in 1 second
+        startTimer('MyTimer', 1);
+        console.log('timer2 Pusle ->' + new Date());
+    }
+
+    whenAll: {
+        m.cancel == true
+    }
+    run: {
+        cancelTimer('MyTimer');
+        console.log('timer2 canceled timer');
+    }
+
+    whenStart: {
+        patchState('timer2', { count: 0 }); 
+    }
+});
+
+d.statechart('risk3', function() {
+    start: {
+        to: 'meter'
+        run: startTimer('RiskTimer', 5)
+    }
+
+    meter: {
+        to: 'fraud'
+        whenAll: message = m.amount > 100
+        count: 3
+        run: m.forEach(function(e, i){ console.log('risk3 ' + JSON.stringify(e.message)) })
+
+        to: 'exit'
+        whenAll: timeout('RiskTimer')
+        run: console.log('risk3 exit for ' + c.s.sid)
+    }
+
+    fraud: {}
+    exit:{}
+
+    whenStart: {
+        // three events in a row will trigger the fraud rule
+        post('risk3', { amount: 200 }); 
+        post('risk3', { amount: 300 }); 
+        post('risk3', { amount: 400 }); 
+
+        // two events will exit after 5 seconds
+        post('risk3', { sid: 1, amount: 500 }); 
+        post('risk3', { sid: 1, amount: 600 }); 
+        
+    }
+});
+
+// curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:5000/timer2/events
+
 // d.ruleset('flow1', function() {
 //     whenAll: s.state == 'first'
 //     // runAsync labels an async action
@@ -653,71 +735,6 @@ d.ruleset('expense7', function() {
 //         patchState('flow1', { state: 'first' });
 //     }
 // });
-
-// d.ruleset('timer', function() {
-//     whenAny: {
-//         whenAll: s.count == 0
-//         // will trigger when MyTimer expires
-//         whenAll: {
-//             s.count < 5 
-//             timeout('MyTimer')
-//         }
-//     }
-//     run: {
-//         s.count += 1;
-//         // MyTimer will expire in 5 seconds
-//         startTimer('MyTimer', 5);
-//         console.log('timer Pusle ->' + new Date());
-//     }
-
-//     whenAll: {
-//         m.cancel == true
-//     }
-//     run: {
-//         cancelTimer('MyTimer');
-//         console.log('timer canceled timer');
-//     }
-
-//     whenStart: {
-//         patchState('timer', { count: 0 }); 
-//     }
-// });
-
-// // curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:5000/timer/events
-
-// d.statechart('risk3', function() {
-//     start: {
-//         to: 'meter'
-//         run: startTimer('RiskTimer', 5)
-//     }
-
-//     meter: {
-//         to: 'fraud'
-//         whenAll: message = m.amount > 100
-//         count: 3
-//         run: m.forEach(function(e, i){ console.log('risk3 ' + JSON.stringify(e.message)) });
-
-//         to: 'exit'
-//         whenAll: timeout('RiskTimer')
-//         run: console.log('risk3 exit')    
-//     }
-
-//     fraud: {}
-//     exit:{}
-
-//     whenStart: {
-//         // three events in a row will trigger the fraud rule
-//         post('risk3', { amount: 200 }); 
-//         post('risk3', { amount: 300 }); 
-//         post('risk3', { amount: 400 }); 
-
-//         // two events will exit after 5 seconds
-//         post('risk3', { sid: 1, amount: 500 }); 
-//         post('risk3', { sid: 1, amount: 600 }); 
-        
-//     }
-// });
-
 
 // d.statechart('risk4', function() {
 //     start: {

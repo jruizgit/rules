@@ -1025,7 +1025,11 @@ static unsigned int handleDeleteMessage(ruleset *tree,
                     frame = A_FRAME_NODE(state, 
                                          currentLocationNode->location.nodeIndex,
                                          currentLocationNode->location.frameOffset);
-
+                    
+                    result = deleteConnectorFrame(state, 
+                                                  currentLocationNode->location.frameType, 
+                                                  currentLocationNode->location);
+                    break;
                 case B_FRAME:
                     frame = B_FRAME_NODE(state, 
                                          currentLocationNode->location.nodeIndex,
@@ -1703,10 +1707,11 @@ static unsigned int handleMessageCore(ruleset *tree,
                                 mid,
                                 messageOffset));
 
-        CHECK_RESULT(handleDeleteMessage(tree,
-                                         sidState,
-                                         *messageOffset));
-
+        if (*messageOffset != UNDEFINED_HASH_OFFSET) {
+            CHECK_RESULT(handleDeleteMessage(tree,
+                                             sidState,
+                                             *messageOffset));
+        }
     } else {
         CHECK_RESULT(storeMessage(sidState,
                                   mid,
@@ -2185,14 +2190,16 @@ static unsigned int deleteCurrentAction(ruleset *tree,
         
         for (int i = 0; i < resultFrame->messageCount; ++i) {
             messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
-            messageNode *currentMessageNode = MESSAGE_NODE(state, 
-                                                           currentMessageFrame->messageNodeOffset);
+            if (currentMessageFrame->messageNodeOffset != UNDEFINED_HASH_OFFSET) {
+                messageNode *currentMessageNode = MESSAGE_NODE(state, 
+                                                               currentMessageFrame->messageNodeOffset);
 
 
-            if (currentMessageNode->messageType == MESSAGE_TYPE_EVENT) {
-                CHECK_RESULT(handleDeleteMessage(tree,
-                                                 state, 
-                                                 currentMessageFrame->messageNodeOffset));
+                if (currentMessageNode->messageType == MESSAGE_TYPE_EVENT) {
+                    CHECK_RESULT(handleDeleteMessage(tree,
+                                                     state, 
+                                                     currentMessageFrame->messageNodeOffset));
+                }
             }
         }
 
@@ -2297,14 +2304,11 @@ unsigned int assertTimers(unsigned int handle) {
     for (unsigned int i = 0; i < tree->statePool.count; ++i) {
         stateNode *state = STATE_NODE(tree, tree->reverseStateIndex[i]);
         unsigned int messageOffset;
-        result = getMessage(state,
-                            "$pulse",
-                            &messageOffset);
-        if (result != RULES_OK && result != ERR_MESSAGE_NOT_FOUND) {
-            return result;
-        }
-
-        if (result == RULES_OK && messageOffset != UNDEFINED_HASH_OFFSET) {
+        CHECK_RESULT(getMessage(state,
+                                "$pulse",
+                                &messageOffset));
+        
+        if (messageOffset != UNDEFINED_HASH_OFFSET) {
             messageNode *message = MESSAGE_NODE(state, messageOffset);
             CHECK_RESULT(executeHandleMessage(tree, 
                                               message->jo.content, 
@@ -2338,6 +2342,36 @@ unsigned int assertTimers(unsigned int handle) {
     return RULES_OK;
 }
 
+unsigned int cancelTimer(unsigned int handle, char *sid, char *timerName) {
+    ruleset *tree;
+    unsigned char isNewState;
+    unsigned int messageOffset;
+    stateNode *state = NULL;
+
+    RESOLVE_HANDLE(handle, &tree);
+    if (!sid) {
+        sid = "0";
+    }
+
+    CHECK_RESULT(ensureStateNode(tree, 
+                                 sid,
+                                 &isNewState, 
+                                 &state));
+
+    CHECK_RESULT(getMessage(state,
+                            timerName,
+                            &messageOffset));
+    
+    if (messageOffset != UNDEFINED_HASH_OFFSET) {
+        messageNode *message = MESSAGE_NODE(state, messageOffset);
+        CHECK_RESULT(executeHandleMessage(tree, 
+                                          message->jo.content, 
+                                          ACTION_RETRACT_FACT));
+    }
+    
+    return RULES_OK;
+}
+
 unsigned int startTimer(unsigned int handle, 
                         char *sid, 
                         unsigned int duration, 
@@ -2346,28 +2380,35 @@ unsigned int startTimer(unsigned int handle,
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
+    unsigned int result  = cancelTimer(handle, sid, timer);
+    if (result != RULES_OK && result != ERR_MESSAGE_NOT_FOUND) {
+        return result;
+    }
+
     time_t baseTime = time(NULL);
     baseTime += duration;
     if (!sid) {
         sid = "0";
     }
     
-    int messageSize = sizeof(char) * (100 + strlen(sid) + strlen(timer));
+    int messageSize = sizeof(char) * (100 + strlen(sid) + strlen(timer) * 2);
 
 #ifdef _WIN32
     char *baseMessage = (char *)_alloca(messageSize);
     sprintf_s(baseMessage, 
               messageSize, 
-              "{ \"sid\":\"%s\", \"$timerName\":\"%s\", \"$baseTime\":%ld }", 
-              sid, 
+              "{ \"sid\":\"%s\", \"id\":\"%s\", \"$timerName\":\"%s\", \"$baseTime\":%ld }", 
+              sid,
+              timer, 
               timer, 
               baseTime);
 #else
     char baseMessage[messageSize];
     snprintf(baseMessage, 
              messageSize, 
-             "{ \"sid\":\"%s\", \"$timerName\":\"%s\", \"$baseTime\":%ld }", 
+             "{ \"sid\":\"%s\", \"id\":\"%s\", \"$timerName\":\"%s\", \"$baseTime\":%ld }", 
              sid,
+             timer,
              timer, 
              baseTime);
 #endif
@@ -2375,23 +2416,6 @@ unsigned int startTimer(unsigned int handle,
     return executeHandleMessage(tree, 
                                 baseMessage, 
                                 manualReset ? ACTION_ASSERT_FACT : ACTION_ASSERT_EVENT);
-}
-
-unsigned int cancelTimer(unsigned int handle, char *sid, char *timerName) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    void *rulesBinding;
-    if (!sid) {
-        sid = "0";
-    }
-
-    unsigned int result = resolveBinding(tree, sid, &rulesBinding);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    return removeTimer(rulesBinding, timerName);
 }
 
 unsigned int renewActionLease(unsigned int handle, char *sid) {
