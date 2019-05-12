@@ -1410,7 +1410,8 @@ exports = module.exports = durableEngine = function () {
     };
 
     var timeout = function(name) {
-        return m.$t.eq(name);
+        return all(c.base = m.$timerName.eq(name), 
+                   c.timeout = m.$time.gte(c.base.$baseTime));
     };
 
 

@@ -2348,6 +2348,10 @@ unsigned int startTimer(unsigned int handle,
 
     time_t baseTime = time(NULL);
     baseTime += duration;
+    if (!sid) {
+        sid = "0";
+    }
+    
     int messageSize = sizeof(char) * (100 + strlen(sid) + strlen(timer));
 
 #ifdef _WIN32

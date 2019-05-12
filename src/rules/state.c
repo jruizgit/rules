@@ -1119,14 +1119,14 @@ static void radixSortProperties(jsonObject *jo, jsonProperty **properties) {
     }
 }
 
-static void calculateId(jsonObject *jo) {
+unsigned int calculateId(jsonObject *jo) {
 
 #ifdef _WIN32
     jsonProperty **properties = (jsonProperty *)_alloca(sizeof(jsonProperty *) * (jo->propertiesLength));
 #else
     jsonProperty *properties[jo->propertiesLength];
 #endif
-
+    
     radixSortProperties(jo, properties);
     insertSortProperties(jo, properties);
 
@@ -1158,7 +1158,28 @@ static void calculateId(jsonObject *jo) {
 #else
     snprintf(jo->idBuffer, sizeof(char) * ID_BUFFER_LENGTH, "$%020llu", hash);
 #endif
-    jo->properties[jo->idIndex].valueLength = 20;
+
+    jsonProperty *property;
+    property = &jo->properties[jo->propertiesLength];
+    jo->idIndex = jo->propertiesLength;
+    ++jo->propertiesLength;
+    if (jo->propertiesLength == MAX_OBJECT_PROPERTIES) {
+        return ERR_EVENT_MAX_PROPERTIES;
+    }
+
+    unsigned int candidate = HASH_ID % MAX_OBJECT_PROPERTIES;
+    while (jo->propertyIndex[candidate] != 0) {
+        candidate = candidate + 1 % MAX_OBJECT_PROPERTIES;
+    }
+
+    // Index intentionally offset by 1 to enable getObject 
+    jo->propertyIndex[candidate] = jo->propertiesLength;
+    property->hash = HASH_ID;
+    property->valueOffset = 0;
+    property->valueLength = 20;
+    property->type = JSON_STRING;
+
+    return RULES_OK;
 }
 
 static unsigned int fixupIds(jsonObject *jo, char generateId) {
@@ -1180,6 +1201,14 @@ static unsigned int fixupIds(jsonObject *jo, char generateId) {
             return ERR_EVENT_MAX_PROPERTIES;
         }
 
+        unsigned int candidate = HASH_SID % MAX_OBJECT_PROPERTIES;
+        while (jo->propertyIndex[candidate] != 0) {
+            candidate = candidate + 1 % MAX_OBJECT_PROPERTIES;
+        }
+
+        // Index intentionally offset by 1 to enable getObject 
+        jo->propertyIndex[candidate] = jo->propertiesLength;
+
         strncpy(jo->sidBuffer, "0", 1);
         property->hash = HASH_SID;
         property->valueOffset = 0;
@@ -1195,22 +1224,8 @@ static unsigned int fixupIds(jsonObject *jo, char generateId) {
             property->value.s = jo->content + property->valueOffset;
             property->type = JSON_STRING;
         }
-    } else {
-        property = &jo->properties[jo->propertiesLength];
-        jo->idIndex = jo->propertiesLength;
-        ++jo->propertiesLength;
-        if (jo->propertiesLength == MAX_OBJECT_PROPERTIES) {
-            return ERR_EVENT_MAX_PROPERTIES;
-        }
-
-        jo->idBuffer[0] = 0;
-        property->hash = HASH_ID;
-        property->valueOffset = 0;
-        property->valueLength = 0;
-        property->type = JSON_STRING;
-        if (generateId) {
-            calculateId(jo);
-        }
+    } else if (generateId) {
+        return calculateId(jo);
     }
 
     return RULES_OK;
