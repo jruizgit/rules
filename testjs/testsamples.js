@@ -706,6 +706,49 @@ d.statechart('risk3', function() {
 
 // curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:5000/timer2/events
 
+d.statechart('risk4', function() {
+    start: {
+        to: 'meter'
+        // will start a manual reset timer
+        run: startTimer('VelocityTimer', 5, true)
+    }
+
+    meter: {
+        to: 'meter'
+        whenAll: { 
+            message = m.amount > 100
+            timeout('VelocityTimer')
+        }
+        cap: 100
+        run: {
+            console.log('risk4 velocity: ' + m.length + ' events in 5 seconds');
+            // resets and restarts the manual reset timer
+            startTimer('VelocityTimer', 5, true);
+        }  
+
+        to: 'meter'
+        whenAll: {
+            timeout('VelocityTimer')
+        }
+        run: {
+            console.log('risk4 velocity: no events in 5 seconds');
+            resetTimer('VelocityTimer');
+            startTimer('VelocityTimer', 5, true);
+        }
+    }
+
+    whenStart: {
+        // the velocity will 4 events in 5 seconds
+        post('risk4', { amount: 200 }); 
+        post('risk4', { amount: 300 }); 
+        post('risk4', { amount: 50 }); 
+        post('risk4', { amount: 500 }); 
+        post('risk4', { amount: 600 }); 
+    }
+});
+
+// curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk4/events
+
 // d.ruleset('flow1', function() {
 //     whenAll: s.state == 'first'
 //     // runAsync labels an async action
@@ -735,50 +778,6 @@ d.statechart('risk3', function() {
 //         patchState('flow1', { state: 'first' });
 //     }
 // });
-
-// d.statechart('risk4', function() {
-//     start: {
-//         to: 'meter'
-//         // will start a manual reset timer
-//         run: startTimer('VelocityTimer', 5, true)
-//     }
-
-//     meter: {
-//         to: 'meter'
-//         whenAll: { 
-//             message = m.amount > 100
-//             timeout('VelocityTimer')
-//         }
-//         cap: 100
-//         run: {
-//             console.log('risk4 velocity: ' + m.length + ' events in 5 seconds');
-//             // resets and restarts the manual reset timer
-//             resetTimer('VelocityTimer');
-//             startTimer('VelocityTimer', 5, true);
-//         }  
-
-//         to: 'meter'
-//         whenAll: {
-//             timeout('VelocityTimer')
-//         }
-//         run: {
-//             console.log('risk4 velocity: no events in 5 seconds');
-//             resetTimer('VelocityTimer');
-//             startTimer('VelocityTimer', 5, true);
-//         }
-//     }
-
-//     whenStart: {
-//         // the velocity will 4 events in 5 seconds
-//         post('risk4', { amount: 200 }); 
-//         post('risk4', { amount: 300 }); 
-//         post('risk4', { amount: 50 }); 
-//         post('risk4', { amount: 500 }); 
-//         post('risk4', { amount: 600 }); 
-//     }
-// });
-
-// // curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk4/events
 
 // d.ruleset('flow', function() {
 //     whenAll: m.state == 'start'
