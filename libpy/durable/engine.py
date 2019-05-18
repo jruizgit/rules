@@ -131,35 +131,13 @@ class Closure(object):
         if timer_name in self._timer_directory:
             raise Exception('Timer with name {0} already added'.format(timer_name))
         else:
-            timer = {'sid': self.s.sid, '$t': timer_name}
-            self._timer_directory[timer_name] = (timer, duration, manual_reset)
+            self._timer_directory[timer_name] = (timer_name, duration, manual_reset)
         
     def cancel_timer(self, timer_name):
         if timer_name in self._cancelled_timer_directory:
             raise Exception('Timer with name {0} already cancelled'.format(timer_name))
         else:
             self._cancelled_timer_directory[timer_name] = True
-
-    def _retract_timer(self, timer_name, message):
-        if '$t' in message and message['$t'] == timer_name:
-            self.retract_fact(message)
-            return True
-
-        for property_name, property_value in message.items():
-            if isinstance(property_value, dict) and self._retract_timer(timer_name, property_value):
-                return True
-
-        return False
-
-    def reset_timer(self, timer_name):
-        if self._m:
-            return self._retract_timer(timer_name, self._m)
-        else:
-            for message in self.m:
-                if self._retract_timer(timer_name, message):
-                    return True
-
-            return False
 
     def assert_fact(self, ruleset_name, fact = None):
         if not fact: 
@@ -466,7 +444,7 @@ class Ruleset(object):
         if sid != None: 
             sid = str(sid)
 
-        rules.start_timer(self._handle, timer_duration, manual_reset, json.dumps(timer, ensure_ascii=False), sid)
+        rules.start_timer(self._handle, timer_duration, manual_reset, timer, sid)
 
     def cancel_timer(self, sid, timer_name):
         if sid != None: 
@@ -475,6 +453,7 @@ class Ruleset(object):
         rules.cancel_timer(self._handle, sid, timer_name)
 
     def update_state(self, state):
+        state['$s'] = 1
         if 'sid' in state:
             return rules.update_state(self._handle, str(state['sid']), json.dumps(state, ensure_ascii=False))
         else:
@@ -527,12 +506,10 @@ class Ruleset(object):
 
     def dispatch_timers(self, complete):
         try:
-            if not rules.assert_timers(self._handle):
-               complete(None, True)
-            else:
-               complete(None, False) 
+            rules.assert_timers(self._handle)
+            complete(None) 
         except Exception as error:
-            complete(error, True)
+            complete(error)
             return
 
     def dispatch(self, complete, async_result = None):
@@ -547,7 +524,7 @@ class Ruleset(object):
             try:
                 result = rules.start_action(self._handle)
                 if not result:
-                    complete(None, True)
+                    complete(None)
                     return
                 else: 
                     state = json.loads(result[0])
@@ -556,12 +533,12 @@ class Ruleset(object):
             except BaseException as error:
                 t, v, tb = sys.exc_info()
                 print('start action base exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
-                complete(error, True)
+                complete(error)
                 return
             except:
                 t, v, tb = sys.exc_info()
                 print('start action unknown exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
-                complete('unknown error', True)
+                complete('unknown error')
                 return
         
         while 'message' in result_container:
@@ -648,7 +625,7 @@ class Ruleset(object):
                                     new_result = rules.complete_and_start_action(self._handle, replies, c._handle)
                                     if new_result:
                                         if 'async' in result_container:
-                                            def terminal(e, wait):
+                                            def terminal(e):
                                                 return
 
                                             self.dispatch(terminal, [state, new_result, state_offset])
@@ -659,17 +636,17 @@ class Ruleset(object):
                         t, v, tb = sys.exc_info()
                         print('base exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                         rules.abandon_action(self._handle, c._handle)
-                        complete(error, True)
+                        complete(error)
                     except:
                         print('unknown exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                         rules.abandon_action(self._handle, c._handle)
-                        complete('unknown error', True)
+                        complete('unknown error')
 
                     if c._is_deleted():
                         try:
                             self.delete_state(c.s['sid'])
                         except BaseException as error:
-                            complete(error, True)
+                            complete(error)
 
             if 'async' in result_container:
                 del result_container['async']
@@ -677,7 +654,7 @@ class Ruleset(object):
             self._actions[action_name].run(c, action_callback) 
             result_container['async'] = True 
            
-        complete(None, False)
+        complete(None)
 
 class Statechart(Ruleset):
 
@@ -1014,71 +991,56 @@ class Host(object):
         return list(rulesets.keys())
 
     def run(self):
-        def dispatch_ruleset(index, wait):
-            def callback(e, w):
-                inner_wait = wait
+        def dispatch_ruleset(index):
+            def callback(e):
                 if e:
                     if str(e).find('306') == -1:
                         print('Exiting {0}'.format(str(e)))
                         os._exit(1)
-                elif not w:
-                    inner_wait = False
-
-                if (index == (len(self._ruleset_list) -1)) and inner_wait:
-                    self._d_timer = threading.Timer(0.25, dispatch_ruleset, ((index + 1) % len(self._ruleset_list), inner_wait, ))
+                
+                if (index == (len(self._ruleset_list) -1)):
+                    self._d_timer = threading.Timer(0.2, dispatch_ruleset, ((index + 1) % len(self._ruleset_list), ))
                     self._d_timer.daemon = True
                     self._d_timer.start()
                 else:
-                    self._d_timer = threading.Thread(target = dispatch_ruleset, args = ((index + 1) % len(self._ruleset_list), inner_wait, ))
+                    self._d_timer = threading.Thread(target = dispatch_ruleset, args = ((index + 1) % len(self._ruleset_list), ))
                     self._d_timer.daemon = True
                     self._d_timer.start()
 
             if not len(self._ruleset_list):
-                self._d_timer = threading.Timer(0.5, dispatch_ruleset, (0, False, ))
+                self._d_timer = threading.Timer(0.5, dispatch_ruleset, (0, ))
                 self._d_timer.daemon = True
                 self._d_timer.start()
             else: 
                 ruleset = self._ruleset_list[index]
-                if not index:
-                    wait = True
-
                 ruleset.dispatch(callback)
 
-        def dispatch_timers(index, wait):
-            def callback(e, w):
-                inner_wait = wait
+        def dispatch_timers(index):
+            def callback(e):
                 if e:
                     print('Error {0}'.format(str(e)))
-                elif not w:
-                    inner_wait = False
-
-                if (index == (len(self._ruleset_list) -1)) and inner_wait:
-                    self._t_timer = threading.Timer(0.25, dispatch_timers, ((index + 1) % len(self._ruleset_list), inner_wait, ))
+                
+                if (index == (len(self._ruleset_list) -1)):
+                    self._t_timer = threading.Timer(0.2, dispatch_timers, ((index + 1) % len(self._ruleset_list), ))
                     self._t_timer.daemon = True
                     self._t_timer.start()
                 else:
-                    self._t_timer = threading.Thread(target = dispatch_timers, args = ((index + 1) % len(self._ruleset_list), inner_wait, ))
+                    self._t_timer = threading.Thread(target = dispatch_timers, args = ((index + 1) % len(self._ruleset_list), ))
                     self._t_timer.daemon = True
                     self._t_timer.start()
 
-
-
             if not len(self._ruleset_list):
-                self._t_timer = threading.Timer(0.5, dispatch_timers, (0, False, ))
+                self._t_timer = threading.Timer(0.5, dispatch_timers, (0, ))
                 self._t_timer.daemon = True
                 self._t_timer.start()
             else: 
                 ruleset = self._ruleset_list[index]
-                if not index:
-                    wait = True
-
                 ruleset.dispatch_timers(callback)
 
-
-        self._d_timer = threading.Timer(0.1, dispatch_ruleset, (0, False, ))
+        self._d_timer = threading.Timer(0.1, dispatch_ruleset, (0, ))
         self._d_timer.daemon = True
         self._d_timer.start()
-        self._t_timer = threading.Timer(0.1, dispatch_timers, (0, False, ))
+        self._t_timer = threading.Timer(0.1, dispatch_timers, (0, ))
         self._t_timer.daemon = True
         self._t_timer.start()
 

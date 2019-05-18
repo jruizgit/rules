@@ -2,34 +2,6 @@ from durable.lang import *
 import threading
 import datetime
 
-
-with statechart('expense'):
-    with state('input'):
-        @to('denied')
-        @when_all((m.subject == 'approve') & (m.amount > 1000))
-        def denied(c):
-            print ('expense denied')
-        
-        @to('pending')    
-        @when_all((m.subject == 'approve') & (m.amount <= 1000))
-        def request(c):
-            print ('requesting expense approva')
-        
-    with state('pending'):
-        @to('approved')
-        @when_all(m.subject == 'approved')
-        def approved(c):
-            print ('expense approved')
-            
-        @to('denied')
-        @when_all(m.subject == 'denied')
-        def denied(c):
-            print ('expense denied')
-        
-    state('denied')
-    state('approved')
-
-
 with ruleset('animal'):
     @when_all(c.first << (m.predicate == 'eats') & (m.object == 'flies'),
               (m.predicate == 'lives') & (m.object == 'water') & (m.subject == c.first.subject))
@@ -59,7 +31,7 @@ with ruleset('animal'):
 
     @when_all(+m.subject)
     def output(c):
-        print ('Fact: {0} {1} {2}'.format(c.m.subject, c.m.predicate, c.m.object))
+        print ('animal-> Fact: {0} {1} {2}'.format(c.m.subject, c.m.predicate, c.m.object))
 
     @when_start
     def start(host):
@@ -75,7 +47,7 @@ with ruleset('test'):
     @when_all(m.subject == 'World')
     def say_hello(c):
         # consequent
-        print('Hello {0}'.format(c.m.subject))
+        print('test-> Hello {0}'.format(c.m.subject))
 
     # on ruleset start
     @when_start
@@ -104,7 +76,7 @@ with ruleset('animal0'):
 
     @when_all(+m.subject)
     def output(c):
-        print('Fact: {0} {1} {2}'.format(c.m.subject, c.m.predicate, c.m.object))
+        print('animal0-> Fact: {0} {1} {2}'.format(c.m.subject, c.m.predicate, c.m.object))
 
     @when_start
     def start(host):
@@ -116,7 +88,7 @@ with ruleset('risk'):
               c.second << m.location != c.first.location)
     # the event pair will only be observed once
     def fraud(c):
-        print('Fraud detected -> {0}, {1}'.format(c.first.location, c.second.location))
+        print('risk-> Fraud detected -> {0}, {1}'.format(c.first.location, c.second.location))
 
     @when_start
     def start(host):
@@ -131,17 +103,17 @@ with ruleset('flow'):
     def start(c):
         # state update on 's'
         c.s.status = 'next' 
-        print('start')
+        print('flow-> start')
 
     @when_all(s.status == 'next')
     def next(c):
         c.s.status = 'last' 
-        print('next')
+        print('flow-> next')
 
     @when_all(s.status == 'last')
     def last(c):
         c.s.status = 'end' 
-        print('last')
+        print('flow-> last')
         # deletes state at the end
         c.delete_state()
 
@@ -155,7 +127,7 @@ with ruleset('flow'):
 with ruleset('expense0'):
     @when_all((m.subject == 'approve') | (m.subject == 'ok'))
     def approved(c):
-        print ('Approved subject: {0}'.format(c.m.subject))
+        print ('expense0-> Approved subject: {0}'.format(c.m.subject))
         
     @when_start
     def start(host):
@@ -165,7 +137,7 @@ with ruleset('expense0'):
 with ruleset('match'):
     @when_all(m.url.matches('(https?://)?([0-9a-z.-]+)%.[a-z]{2,6}(/[A-z0-9_.-]+/?)*'))
     def approved(c):
-        print ('match url ->{0}'.format(c.m.url))
+        print ('match-> url {0}'.format(c.m.url))
 
     @when_start
     def start(host):
@@ -179,15 +151,15 @@ with ruleset('match'):
 with ruleset('strings'):
     @when_all(m.subject.matches('hello.*'))
     def starts_with(c):
-        print ('string starts with hello -> {0}'.format(c.m.subject))
+        print ('string-> starts with hello: {0}'.format(c.m.subject))
 
     @when_all(m.subject.matches('.*hello'))
     def ends_with(c):
-        print ('string ends with hello -> {0}'.format(c.m.subject))
+        print ('string-> ends with hello: {0}'.format(c.m.subject))
 
     @when_all(m.subject.imatches('.*hello.*'))
     def contains(c):
-        print ('string contains hello (case insensitive) -> {0}'.format(c.m.subject))
+        print ('string-> contains hello (case insensitive): {0}'.format(c.m.subject))
 
     @when_start
     def start(host):
@@ -204,9 +176,9 @@ with ruleset('indistinct'):
               c.second << m.amount > c.first.amount * 2,
               c.third << m.amount > (c.first.amount + c.second.amount) / 2)
     def detected(c):
-        print('indistinct detected -> {0}'.format(c.first.amount))
-        print('               -> {0}'.format(c.second.amount))
-        print('               -> {0}'.format(c.third.amount))
+        print('indistinct -> {0}'.format(c.first.amount))
+        print('           -> {0}'.format(c.second.amount))
+        print('           -> {0}'.format(c.third.amount))
         
     @when_start
     def start(host):
@@ -220,9 +192,9 @@ with ruleset('distinct'):
               c.second << m.amount > c.first.amount * 2,
               c.third << m.amount > (c.first.amount + c.second.amount) / 2)
     def detected(c):
-        print('distinct detected -> {0}'.format(c.first.amount))
-        print('               -> {0}'.format(c.second.amount))
-        print('               -> {0}'.format(c.third.amount))
+        print('distinct -> {0}'.format(c.first.amount))
+        print('         -> {0}'.format(c.second.amount))
+        print('         -> {0}'.format(c.third.amount))
         
     @when_start
     def start(host):
@@ -238,9 +210,9 @@ with ruleset('expense1'):
                   c.fourth << m.amount == 10000))
     def action(c):
         if c.first:
-            print ('Approved {0} {1}'.format(c.first.subject, c.second.amount))
+            print ('expense1-> Approved {0} {1}'.format(c.first.subject, c.second.amount))
         else:
-            print ('Approved {0} {1}'.format(c.third.subject, c.fourth.amount))
+            print ('expense1-> Approved {0} {1}'.format(c.third.subject, c.fourth.amount))
     
     @when_start
     def start(host):
@@ -256,7 +228,7 @@ with ruleset('risk1'):
               c.third << m.t == 'withrawal',
               c.fourth << m.t == 'chargeback')
     def detected(c):
-        print('fraud detected {0} {1} {2}'.format(c.first.t, c.third.t, c.fourth.t))
+        print('risk1-> fraud detected {0} {1} {2}'.format(c.first.t, c.third.t, c.fourth.t))
         
     @when_start
     def start(host):
@@ -268,15 +240,15 @@ with ruleset('risk1'):
 with ruleset('attributes'):
     @when_all(pri(3), m.amount < 300)
     def first_detect(c):
-        print('attributes P3 ->{0}'.format(c.m.amount))
+        print('attributes-> P3: {0}'.format(c.m.amount))
         
     @when_all(pri(2), m.amount < 200)
     def second_detect(c):
-        print('attributes P2 ->{0}'.format(c.m.amount))
+        print('attributes-> P2: {0}'.format(c.m.amount))
         
     @when_all(pri(1), m.amount < 100)
     def third_detect(c):
-        print('attributes P1 ->{0}'.format(c.m.amount))
+        print('attributes-> P1: {0}'.format(c.m.amount))
         
     @when_start
     def start(host):
@@ -289,14 +261,14 @@ with ruleset('expense2'):
     # this rule will trigger as soon as three events match the condition
     @when_all(count(3), m.amount < 100)
     def approve(c):
-        print('approved {0}'.format(c.m))
+        print('expense2-> approved {0}'.format(c.m))
 
     # this rule will be triggered when 'expense' is asserted batching at most two results       
     @when_all(cap(2),
               c.expense << m.amount >= 100,
               c.approval << m.review == True)
     def reject(c):
-        print('rejected {0}'.format(c.m))
+        print('expense2-> rejected {0}'.format(c.m))
 
     @when_start
     def start(host):
@@ -309,47 +281,6 @@ with ruleset('expense2'):
         host.assert_fact('expense2', { 'review': True })
 
 
-with ruleset('flow0'):
-    timer = None
-
-    def start_timer(time, callback):
-        timer = threading.Timer(time, callback)
-        timer.daemon = True    
-        timer.start()
-
-    @when_all(s.state == 'first')
-    # async actions take a callback argument to signal completion
-    def first(c, complete):
-        def end_first():
-            c.s.state = 'second'     
-            print('first completed')
-
-            # completes the action after 3 seconds
-            complete(None)
-        
-        start_timer(3, end_first)
-
-    @when_all(s.state == 'second')
-    def second(c, complete):
-        def end_second():
-            c.s.state = 'third'
-            print('second completed')
-
-            # completes the action after 6 seconds
-            # use the first argument to signal an error
-            complete(Exception('error detected'))
-
-        start_timer(6, end_second)
-
-        # overrides the 5 second default abandon timeout
-        return 10
-
-
-    @when_start
-    def on_start(host):
-        host.patch_state('flow0', { 'state': 'first' })
-
-
 with ruleset('flow1'):
     
     @when_all(m.action == 'start')
@@ -359,103 +290,13 @@ with ruleset('flow1'):
     # when the exception property exists
     @when_all(+s.exception)
     def second(c):
-        print(c.s.exception)
+        print('flow1-> expected {0}', c.s.exception)
         c.s.exception = None
         
     @when_start
     def on_start(host):
         host.post('flow1', { 'action': 'start' })
 
-
-with ruleset('timer'):
-    # will trigger when MyTimer expires
-    @when_any(all(s.count == 0),
-              all(s.count < 5,
-                  timeout('MyTimer')))
-    def pulse(c):
-        c.s.count += 1
-        # MyTimer will expire in 5 seconds
-        c.start_timer('MyTimer', 5)
-        print('pulse ->{0}'.format(datetime.datetime.now().strftime('%I:%M:%S%p')))
-        
-    @when_all(m.cancel == True)
-    def cancel(c):
-        c.cancel_timer('MyTimer')
-        print('canceled timer')
-
-    @when_start
-    def on_start(host):
-        host.patch_state('timer', { 'count': 0 })
-
-# curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:5000/timer/events
-
-with statechart('risk3'):
-    with state('start'):
-        @to('meter')
-        def start(c):
-            c.start_timer('RiskTimer', 5)
-
-    with state('meter'):
-        @to('fraud')
-        @when_all(count(3), c.message << m.amount > 100)
-        def fraud(c):
-            for e in c.m:
-                print(e.message) 
-
-        @to('exit')
-        @when_all(timeout('RiskTimer'))
-        def exit(c):
-            print('exit')
-
-    state('fraud')
-    state('exit')
-
-    @when_start
-    def on_start(host):
-        # three events in a row will trigger the fraud rule
-        host.post('risk3', { 'amount': 200 })
-        host.post('risk3', { 'amount': 300 })
-        host.post('risk3', { 'amount': 400 })
-
-        # two events will exit after 5 seconds
-        host.post('risk3', { 'sid': 1, 'amount': 500 })
-        host.post('risk3', { 'sid': 1, 'amount': 600 })
-
-
-with statechart('risk4'):
-    with state('start'):
-        @to('meter')
-        def start(c):
-            c.start_timer('VelocityTimer', 5, True)
-
-    with state('meter'):
-        @to('meter')
-        @when_all(cap(5), 
-                  m.amount > 100,
-                  timeout('VelocityTimer'))
-        def some_events(c):
-            print('velocity: {0} in 5 seconds'.format(len(c.m)))
-            # resets and restarts the manual reset timer
-            c.reset_timer('VelocityTimer')
-            c.start_timer('VelocityTimer', 5, True)
-
-        @to('meter')
-        @when_all(pri(1), timeout('VelocityTimer'))
-        def no_events(c):
-            print('velocity: no events in 5 seconds')
-            c.reset_timer('VelocityTimer')
-            c.start_timer('VelocityTimer', 5, True)
-
-    @when_start
-    def on_start(host):
-        # the velocity will be 4 events in 5 seconds
-        host.post('risk4', { 'amount': 200 })
-        host.post('risk4', { 'amount': 300 })
-        host.post('risk4', { 'amount': 50 })
-        host.post('risk4', { 'amount': 500 })
-        host.post('risk4', { 'amount': 600 })
-
-# curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk4/events
 
 with statechart('expense3'):
     # initial state 'input' with two triggers
@@ -465,24 +306,24 @@ with statechart('expense3'):
         @when_all((m.subject == 'approve') & (m.amount > 1000))
         # action executed before state change
         def denied(c):
-            print ('denied amount {0}'.format(c.m.amount))
+            print ('expense3-> denied amount {0}'.format(c.m.amount))
         
         @to('pending')    
         @when_all((m.subject == 'approve') & (m.amount <= 1000))
         def request(c):
-            print ('requesting approve amount {0}'.format(c.m.amount))
+            print ('expense3-> requesting approve amount {0}'.format(c.m.amount))
     
     # intermediate state 'pending' with two triggers
     with state('pending'):
         @to('approved')
         @when_all(m.subject == 'approved')
         def approved(c):
-            print ('expense approved')
+            print ('expense3-> expense approved')
             
         @to('denied')
         @when_all(m.subject == 'denied')
         def denied(c):
-            print ('expense denied')
+            print ('expense3-> expense denied')
     
     # 'denied' and 'approved' are final states    
     state('denied')
@@ -512,7 +353,7 @@ with flowchart('expense4'):
     with stage('request'):
         @run
         def request(c):
-            print('requesting approve')
+            print('expense4-> requesting approve')
             
         to('approve').when_all(m.subject == 'approved')
         to('deny').when_all(m.subject == 'denied')
@@ -522,12 +363,12 @@ with flowchart('expense4'):
     with stage('approve'):
         @run 
         def approved(c):
-            print('expense approved')
+            print('expense4-> expense approved')
 
     with stage('deny'):
         @run
         def denied(c):
-            print('expense denied')
+            print('expense4-> expense denied')
 
     @when_start
     def start(host):
@@ -552,19 +393,19 @@ with statechart('worker'):
             @to('process')
             @when_all(m.subject == 'enter')
             def continue_process(c):
-                print('start process')
+                print('worker-> start process')
     
         with state('process'):
             @to('process')
             @when_all(m.subject == 'continue')
             def continue_process(c):
-                print('continue processing')
+                print('worker-> continue processing')
 
         # the super-state trigger will be evaluated for all sub-state triggers
         @to('canceled')
         @when_all(m.subject == 'cancel')
         def cancel(c):
-            print('cancel process')
+            print('worker-> cancel process')
 
     state('canceled')
 
@@ -585,8 +426,8 @@ with ruleset('expense5'):
     @when_all(c.bill << (m.t == 'bill') & (m.invoice.amount > 50),
               c.account << (m.t == 'account') & (m.payment.invoice.amount == c.bill.invoice.amount))
     def approved(c):
-        print ('bill amount  ->{0}'.format(c.bill.invoice.amount))
-        print ('account payment amount ->{0}'.format(c.account.payment.invoice.amount))
+        print ('expense5-> bill amount: {0}'.format(c.bill.invoice.amount))
+        print ('expense5-> account payment amount: {0}'.format(c.account.payment.invoice.amount))
         
     @when_start
     def start(host):
@@ -598,11 +439,11 @@ with ruleset('bookstore'):
     # this rule will trigger for events with status
     @when_all(+m.status)
     def event(c):
-        print('Reference {0} status {1}'.format(c.m.reference, c.m.status))
+        print('bookstore-> Reference {0} status {1}'.format(c.m.reference, c.m.status))
 
     @when_all(+m.name)
     def fact(c):
-        print('Added {0}'.format(c.m.name))
+        print('bookstore-> Added {0}'.format(c.m.name))
         c.retract_fact({
             'name': 'The new book',
             'reference': '75323',
@@ -612,7 +453,7 @@ with ruleset('bookstore'):
     # this rule will be triggered when the fact is retracted
     @when_all(none(+m.name))
     def empty(c):
-        print('No books')
+        print('bookstore-> No books')
 
     @when_start
     def start(host):    
@@ -649,14 +490,14 @@ with ruleset('risk5'):
     # compares properties in the same event, this expression is evaluated in the client 
     @when_all(m.debit > m.credit * 2)
     def fraud_1(c):
-        print('debit {0} more than twice the credit {1}'.format(c.m.debit, c.m.credit))
+        print('risk5-> debit {0} more than twice the credit {1}'.format(c.m.debit, c.m.credit))
 
     # compares two correlated events, this expression is evaluated in the backend
     @when_all(c.first << m.amount > 100,
               c.second << m.amount > c.first.amount + m.amount / 2)
     def fraud_2(c):
-        print('fraud detected ->{0}'.format(c.first.amount))
-        print('fraud detected ->{0}'.format(c.second.amount))
+        print('risk5-> fraud detected ->{0}'.format(c.first.amount))
+        print('risk5-> fraud detected ->{0}'.format(c.second.amount))
         
     @when_start
     def start(host):    
@@ -670,46 +511,46 @@ with ruleset('risk6'):
     # matching primitive array
     @when_all(m.payments.allItems((item > 100) & (item < 400)))
     def rule1(c):
-        print('should not match {0}'.format(c.m.payments))
+        print('risk6-> should not match {0}'.format(c.m.payments))
 
     # matching primitive array
     @when_all(m.payments.allItems((item > 100) & (item < 500)))
     def rule1(c):
-        print('fraud 1 detected {0}'.format(c.m.payments))
+        print('risk6-> fraud 1 detected {0}'.format(c.m.payments))
 
     # matching object array
     @when_all(m.payments.allItems((item.amount < 250) | (item.amount >= 300)))
     def rule2(c):
-        print('fraud 2 detected {0}'.format(c.m.payments))
+        print('risk6-> fraud 2 detected {0}'.format(c.m.payments))
 
     # pattern matching string array
     @when_all(m.cards.anyItem(item.matches('three.*')))
     def rule3(c):
-        print('fraud 3 detected {0}'.format(c.m.cards))
+        print('risk6-> fraud 3 detected {0}'.format(c.m.cards))
 
     # matching nested arrays
     @when_all(m.payments.anyItem(item.allItems(item < 100)))
     def rule4(c):
-        print('fraud 4 detected {0}'.format(c.m.payments))
+        print('risk6-> fraud 4 detected {0}'.format(c.m.payments))
 
 
     @when_all(m.payments.allItems(item > 100) & (m.cash == True))
     def rule5(c):
-        print('fraud 5 detected {0}'.format(c.m.cash))
+        print('risk6-> fraud 5 detected {0}'.format(c.m.cash))
 
     @when_all((m.field == 1) & m.payments.allItems(item.allItems((item > 100) & (item < 1000))))
     def rule6(c):
-        print('fraud 6 detected {0}'.format(c.m.payments))
+        print('risk6-> fraud 6 detected {0}'.format(c.m.payments))
 
 
     @when_all((m.field == 1) & m.payments.allItems(item.anyItem((item > 100) | (item < 50))))
     def rule7(c):
-        print('fraud 7 detected {0}'.format(c.m.payments))
+        print('risk6-> fraud 7 detected {0}'.format(c.m.payments))
 
 
     @when_all(m.payments.anyItem(-item.field1 & (item.field2 == 2)))
     def rule8(c):
-        print('fraud 8 detected {0}'.format(c.m.payments))
+        print('risk6-> fraud 8 detected {0}'.format(c.m.payments))
 
  
     @when_start
@@ -726,26 +567,150 @@ with ruleset('risk6'):
         host.post('risk6', {'payments': [ {'field1': 1, 'field2': 2} ]})
         host.post('risk6', {'payments': [ {'field1': 1, 'field2': 1} ]})
 
-# with ruleset('flow'):
-#     @when_all(m.status == 'start')
-#     def start(c):
-#         c.post({ 'status': 'next' })
-#         print('start')
-#     # the process will always exit here every time the action is run
-#     # when restarting the process this action will be retried after a few seconds
-#     @when_all(m.status == 'next')
-#     def next(c):
-#         c.post({ 'status': 'last' })
-#         print('next')
-#         os._exit(1)
 
-#     @when_all(m.status == 'last')
-#     def last(c):
-#         print('last')
+with ruleset('timer1'):
+    
+    @when_all(m.subject == 'start')
+    def start(c):
+        c.start_timer('MyTimer', 5)
         
-#     @when_start
-#     def on_start(host):
-#         host.post('flow', { 'status': 'start' })
+    @when_all(timeout('MyTimer'))
+    def timer(c):
+        print('timer1 timeout')
+
+    @when_start
+    def on_start(host):
+        host.post('timer1', { 'subject': 'start' })
+
+
+with ruleset('timer2'):
+    # will trigger when MyTimer expires
+    @when_any(all(s.count == 0),
+              all(s.count < 5,
+                  timeout('MyTimer')))
+    def pulse(c):
+        c.s.count += 1
+        # MyTimer will expire in 5 seconds
+        c.start_timer('MyTimer', 1)
+        print('timer2 pulse ->{0}'.format(datetime.datetime.now().strftime('%I:%M:%S%p')))
+        
+    @when_all(m.cancel == True)
+    def cancel(c):
+        c.cancel_timer('MyTimer')
+        print('timer2 canceled timer')
+
+    @when_start
+    def on_start(host):
+        host.patch_state('timer2', { 'count': 0 })
+
+
+# curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:5000/timer2/events
+
+with statechart('risk3'):
+    with state('start'):
+        @to('meter')
+        def start(c):
+            c.start_timer('RiskTimer', 5)
+
+    with state('meter'):
+        @to('fraud')
+        @when_all(count(3), c.message << m.amount > 100)
+        def fraud(c):
+            for e in c.m:
+                print('risk3-> {0}'.format(e.message)) 
+
+        @to('exit')
+        @when_all(timeout('RiskTimer'))
+        def exit(c):
+            print('risk3-> exit')
+
+    state('fraud')
+    state('exit')
+
+    @when_start
+    def on_start(host):
+        # three events in a row will trigger the fraud rule
+        host.post('risk3', { 'amount': 200 })
+        host.post('risk3', { 'amount': 300 })
+        host.post('risk3', { 'amount': 400 })
+
+        # two events will exit after 5 seconds
+        host.post('risk3', { 'sid': 1, 'amount': 500 })
+        host.post('risk3', { 'sid': 1, 'amount': 600 })
+
+
+with statechart('risk4'):
+    with state('start'):
+        @to('meter')
+        def start(c):
+            c.start_timer('VelocityTimer', 5, True)
+
+    with state('meter'):
+        @to('meter')
+        @when_all(cap(5), 
+                  m.amount > 100,
+                  timeout('VelocityTimer'))
+        def some_events(c):
+            print('velocity: {0} in 5 seconds'.format(len(c.m)))
+            # resets and restarts the manual reset timer
+            c.start_timer('VelocityTimer', 5, True)
+
+        @to('meter')
+        @when_all(timeout('VelocityTimer'))
+        def no_events(c):
+            print('velocity: no events in 5 seconds')
+            c.cancel_timer('VelocityTimer')
+            
+    @when_start
+    def on_start(host):
+        # the velocity will be 4 events in 5 seconds
+        host.post('risk4', { 'amount': 200 })
+        host.post('risk4', { 'amount': 300 })
+        host.post('risk4', { 'amount': 50 })
+        host.post('risk4', { 'amount': 500 })
+        host.post('risk4', { 'amount': 600 })
+
+# curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk4/events
+
+with ruleset('flow0'):
+    timer = None
+
+    def start_timer(time, callback):
+        timer = threading.Timer(time, callback)
+        timer.daemon = True    
+        timer.start()
+
+    @when_all(s.state == 'first')
+    # async actions take a callback argument to signal completion
+    def first(c, complete):
+        def end_first():
+            c.s.state = 'second'     
+            print('flow0-> first completed')
+
+            # completes the action after 3 seconds
+            complete(None)
+        
+        start_timer(3, end_first)
+
+    @when_all(s.state == 'second')
+    def second(c, complete):
+        def end_second():
+            c.s.state = 'third'
+            print('flow0-> second completed')
+
+            # completes the action after 6 seconds
+            # use the first argument to signal an error
+            complete(Exception('error detected'))
+
+        start_timer(10, end_second)
+
+        # overrides the 5 second default abandon timeout
+        return 15
+
+    @when_start
+    def on_start(host):
+        host.patch_state('flow0', { 'state': 'first' })
+
 
 run_all()
 

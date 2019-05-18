@@ -520,7 +520,7 @@ exports = module.exports = durableEngine = function () {
                 try {
                     var result = r.startAction(handle);
                     if (!result) {
-                        complete(null, true);
+                        complete(null);
                         return;
                     } else { 
                         state = JSON.parse(result[0]);
@@ -701,7 +701,7 @@ exports = module.exports = durableEngine = function () {
                 resultContainer['async'] = true;
             }
 
-            complete(null, false);
+            complete(null);
         };
 
         that.getDefinition = function () {
@@ -1226,35 +1226,31 @@ exports = module.exports = durableEngine = function () {
             return that.getRuleset(rulesetName).renewActionLease(sid);
         };
 
-        var dispatchRules = function (index, wait) {
+        var dispatchRules = function (index) {
             if (!rulesList.length) {
                 setTimeout(dispatchRules, 500, index);
             } else {
                 var rules = rulesList[index];
-                if (!index) {
-                    wait = true;
-                }
-                rules.dispatch(function (err, w) {
+                rules.dispatch(function (err) {
                     if (err) {
                         console.log(err);
                         if (String(err).search('306') == -1) {
                             console.log('Exiting ' + err);
                             process.exit(1);
                         }
-                    } else if (!w) {
-                        wait = false;
+                    } 
+
+                    var timeout = 0;
+                    if (index === (rulesList.length -1)) {
+                        timeout = 200;
                     }
 
-                    if ((index == (rulesList.length -1)) && (wait)) {
-                        setTimeout(dispatchRules, 250, (index + 1) % rulesList.length, wait);
-                    } else {
-                        setImmediate(dispatchRules, (index + 1) % rulesList.length, wait);
-                    }
+                    setTimeout(dispatchRules, timeout, (index + 1) % rulesList.length);
                 });
             }
         };
 
-        var dispatchTimers = function (index, wait) {
+        var dispatchTimers = function (index) {
             if (!rulesList.length) {
                 setTimeout(dispatchTimers, 500, index);
             } else {
@@ -1266,16 +1262,11 @@ exports = module.exports = durableEngine = function () {
                 }
 
                 var timeout = 0;
-                if (wait) {
-                    timeout = 250;
-                    wait = false;
-                }
-
                 if (index === (rulesList.length -1)) {
-                    wait = true;
+                    timeout = 200;
                 }
 
-                setTimeout(dispatchTimers, timeout, (index + 1) % rulesList.length, wait);
+                setTimeout(dispatchTimers, timeout, (index + 1) % rulesList.length);
             }
         };
 

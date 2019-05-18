@@ -626,7 +626,8 @@ class flowchart(object):
 
 
 def timeout(name):
-    return (value('$m', '$t') == name) 
+    return all(avalue('base') << value('$m', '$timerName') == name, 
+               avalue('timeout') << value('$m', '$time') >= avalue('base', '$baseTime'))
 
 def count(value):
     return {'count': value}
