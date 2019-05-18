@@ -225,38 +225,6 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
-        var retractTimer = function(timerName, object) {
-            if (object.$t === timerName) {
-                that.retract(object);
-                return true;
-            }
-
-            for (var propertyName in object) {
-                var propertyType = typeof(object[propertyName]);
-                if (propertyType === 'object' && object[propertyName] !== null) {
-                    if (retractTimer(timerName, object[propertyName])) {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        that.resetTimer = function (timerName) {
-            if (output && output.constructor !== Array) {
-                return retractTimer(timerName, output);
-            } else if (output) {
-                for (var i = 0; i < output.length; ++i) {
-                    if (retractTimer(timerName, output[i])) {
-                        return true;
-                    }
-                }
-            }    
-
-            return false;
-        }
-
         that.renewActionLease = function() {
             if ((new Date().getTime() - startTime) < 10000) {
                 startTime = new Date().getTime();

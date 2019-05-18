@@ -7,8 +7,6 @@
 #include "json.h"
 #include "regex.h"
 
-#include <time.h> 
-
 #define MAX_RESULT_NODES 32
 #define MAX_NODE_RESULTS 16
 #define MAX_STACK_SIZE 64
@@ -2144,8 +2142,10 @@ unsigned int startAction(unsigned int handle,
     unsigned int actionStateIndex;
     unsigned int resultCount;
     unsigned int resultFrameOffset;
+    time_t currentTime = time(NULL);
 
     CHECK_RESULT(getNextResult(tree,
+                               currentTime,
                                &resultState, 
                                &actionStateIndex,
                                &resultCount,
@@ -2165,6 +2165,7 @@ unsigned int startAction(unsigned int handle,
     resultState->context.actionStateIndex = actionStateIndex;
     resultState->context.resultCount = resultCount;
     resultState->context.resultFrameOffset = resultFrameOffset;
+    resultState->lockExpireTime = currentTime + STATE_LEASE_TIME;
     *stateOffset = resultState->offset;
     *messages  = resultState->context.messages;
     *stateFact = resultState->context.stateFact;
@@ -2223,6 +2224,8 @@ static void freeActionContext(stateNode *resultState) {
         free(resultState->context.stateFact);
         resultState->context.stateFact = NULL;
     }
+
+    resultState->lockExpireTime = 0;
 }
 
 unsigned int completeAndStartAction(unsigned int handle, 
@@ -2241,12 +2244,12 @@ unsigned int completeAndStartAction(unsigned int handle,
 
     
     freeActionContext(resultState);
-
+    
     actionStateNode *resultAction;
     unsigned int actionStateIndex;
     unsigned int resultCount;
     unsigned int resultFrameOffset;
-
+    
     CHECK_RESULT(getNextResultInState(tree,
                                       resultState,
                                       &actionStateIndex,
@@ -2263,6 +2266,7 @@ unsigned int completeAndStartAction(unsigned int handle,
     resultState->context.actionStateIndex = actionStateIndex;
     resultState->context.resultCount = resultCount;
     resultState->context.resultFrameOffset = resultFrameOffset;
+    resultState->lockExpireTime = time(NULL) + STATE_LEASE_TIME;
     *messages  = resultState->context.messages;
     
     return RULES_OK;
@@ -2276,6 +2280,26 @@ unsigned int abandonAction(unsigned int handle, unsigned int stateOffset) {
     freeActionContext(resultState);
     return RULES_OK;
 }
+
+unsigned int renewActionLease(unsigned int handle, char *sid) {
+    ruleset *tree;
+    unsigned char isNewState;
+    stateNode *state = NULL;
+
+    RESOLVE_HANDLE(handle, &tree);
+    if (!sid) {
+        sid = "0";
+    }
+
+    CHECK_RESULT(ensureStateNode(tree, 
+                                 sid,
+                                 &isNewState, 
+                                 &state));    
+
+    state->lockExpireTime = time(NULL) + STATE_LEASE_TIME;
+    return RULES_OK;
+}
+
 
 unsigned int queueMessage(unsigned int handle, unsigned int queueAction, char *sid, char *destination, char *message) {
     ruleset *tree;
@@ -2418,20 +2442,4 @@ unsigned int startTimer(unsigned int handle,
                                 manualReset ? ACTION_ASSERT_FACT : ACTION_ASSERT_EVENT);
 }
 
-unsigned int renewActionLease(unsigned int handle, char *sid) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    void *rulesBinding;
-    if (!sid) {
-        sid = "0";
-    }
-
-    unsigned int result = resolveBinding(tree, sid, &rulesBinding);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    return updateAction(rulesBinding, sid);
-}
 

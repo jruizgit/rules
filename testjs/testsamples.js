@@ -207,7 +207,7 @@ d.ruleset('flow', function() {
 
     whenAll: +s.exception
     run: {
-        console.log(s.exception);
+        console.log('flow expected ' + s.exception);
         delete(s.exception); 
     }
 
@@ -732,8 +732,7 @@ d.statechart('risk4', function() {
         }
         run: {
             console.log('risk4 velocity: no events in 5 seconds');
-            resetTimer('VelocityTimer');
-            startTimer('VelocityTimer', 5, true);
+            cancelTimer('VelocityTimer');
         }
     }
 
@@ -749,58 +748,34 @@ d.statechart('risk4', function() {
 
 // curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk4/events
 
-// d.ruleset('flow1', function() {
-//     whenAll: s.state == 'first'
-//     // runAsync labels an async action
-//     runAsync: {
-//         setTimeout(function() {
-//             s.state = 'second';
-//             console.log('flow1 first completed');
+d.ruleset('flow1', function() {
+    whenAll: s.state == 'first'
+    // runAsync labels an async action
+    runAsync: {
+        setTimeout(function() {
+            s.state = 'second';
+            console.log('flow1 first completed');
             
-//             // completes the async action
-//             complete();
-//         }, 3000);
-//     }
+            // completes the async action
+            complete();
+        }, 3000);
+    }
 
-//     whenAll: s.state == 'second'
-//     runAsync: {
-//         setTimeout(function() {
-//             console.log('flow1 second completed');
-//             s.state = 'last'
-//             complete();
-//         }, 6000);
+    whenAll: s.state == 'second'
+    runAsync: {
+        setTimeout(function() {
+            console.log('flow1 second completed');
+            s.state = 'last'
+            complete();
+        }, 10000);
         
-//         // overrides the 5 second default abandon timeout
-//         return 10;
-//     }
+        // overrides the 5 second default abandon timeout
+        return 15;
+    }
 
-//     whenStart: {
-//         patchState('flow1', { state: 'first' });
-//     }
-// });
-
-// d.ruleset('flow', function() {
-//     whenAll: m.state == 'start'
-//     run: {
-//         post({state: 'next'});
-//         console.log('start');
-//     }
-//     // the process will always exit here every time the action is run
-//     // when restarting the process this action will be retried after a few seconds
-//     whenAll: m.state == 'next'
-//     run: {
-//         post({state: 'last'});
-//         console.log('next');
-//         process.exit();
-//     }
-
-//     whenAll: m.state == 'last'
-//     run: {
-//         console.log('last');
-//     }
-
-//     whenStart: post('flow', {state: 'start'})
-// });
-
+    whenStart: {
+        patchState('flow1', { state: 'first' });
+    }
+});
 
 d.runAll();

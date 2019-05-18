@@ -838,6 +838,7 @@ unsigned int ensureStateNode(void *tree,
         }        
 
         node->factOffset = UNDEFINED_HASH_OFFSET;
+        node->lockExpireTime = 0;
         *state = node;
     }
     
@@ -1050,6 +1051,7 @@ unsigned int getNextResultInState(void *tree,
 }
 
 unsigned int getNextResult(void *tree, 
+                           time_t currentTime,
                            stateNode **resultState, 
                            unsigned int *actionStateIndex,
                            unsigned int *resultCount,
@@ -1058,7 +1060,7 @@ unsigned int getNextResult(void *tree,
     unsigned int count = 0;
     ruleset *rulesetTree = (ruleset*)tree;
     *resultAction = NULL;
-
+    
     // In case state pool has been modified.
     if (rulesetTree->statePool.count) {
         rulesetTree->currentStateIndex = rulesetTree->currentStateIndex % rulesetTree->statePool.count;
@@ -1066,17 +1068,19 @@ unsigned int getNextResult(void *tree,
 
     while (count < rulesetTree->statePool.count && !*resultAction) {
         unsigned int nodeOffset = rulesetTree->reverseStateIndex[rulesetTree->currentStateIndex];
-        *resultState = STATE_NODE(tree, nodeOffset); 
-        unsigned int result = getNextResultInState(tree,
-                                                   *resultState,
-                                                   actionStateIndex,
-                                                   resultCount,
-                                                   resultFrameOffset,
-                                                   resultAction);
-        if (result != ERR_NO_ACTION_AVAILABLE) {
-            return result;
+        *resultState = STATE_NODE(tree, nodeOffset);
+        if (currentTime - (*resultState)->lockExpireTime > STATE_LEASE_TIME) { 
+            unsigned int result = getNextResultInState(tree,
+                                                       *resultState,
+                                                       actionStateIndex,
+                                                       resultCount,
+                                                       resultFrameOffset,
+                                                       resultAction);
+            if (result != ERR_NO_ACTION_AVAILABLE) {
+                return result;
+            }
         }
-        
+
         rulesetTree->currentStateIndex = (rulesetTree->currentStateIndex + 1) % rulesetTree->statePool.count;
         ++count;
     }

@@ -1,4 +1,6 @@
 
+#include <time.h> 
+
 #define HASH_ID 926444256
 #define HASH_SID 3593476751
 #define UNDEFINED_INDEX 0xFFFFFFFF
@@ -22,6 +24,7 @@
 #define B_FRAME 3
 #define ACTION_FRAME 4
 
+#define STATE_LEASE_TIME 30 
 
 #define MESSAGE_NODE(state, offset) &((messageNode *)state->messagePool.content)[offset]
 
@@ -159,6 +162,7 @@ typedef struct actionContext {
 
 typedef struct stateNode {
     char *sid;
+    time_t lockExpireTime;
     unsigned int offset;
     unsigned int prevOffset;
     unsigned int nextOffset;
@@ -339,6 +343,7 @@ unsigned int getNextResultInState(void *tree,
                                   actionStateNode **resultAction);
 
 unsigned int getNextResult(void *tree, 
+                           time_t currentTime,
                            stateNode **resultState, 
                            unsigned int *actionStateIndex,
                            unsigned int *resultCount,
