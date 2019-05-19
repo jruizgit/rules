@@ -2106,7 +2106,6 @@ unsigned int startUpdateState(unsigned int handle,
                               unsigned int *replyCount) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
-
     char *commands[MAX_COMMAND_COUNT];
     unsigned int result = RULES_OK;
     unsigned int commandCount = 0;
@@ -2403,7 +2402,6 @@ unsigned int startTimer(unsigned int handle,
                         char *timer) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
-
     unsigned int result  = cancelTimer(handle, sid, timer);
     if (result != RULES_OK && result != ERR_MESSAGE_NOT_FOUND) {
         return result;
@@ -2436,7 +2434,6 @@ unsigned int startTimer(unsigned int handle,
              timer, 
              baseTime);
 #endif
-
     return executeHandleMessage(tree, 
                                 baseMessage, 
                                 manualReset ? ACTION_ASSERT_FACT : ACTION_ASSERT_EVENT);

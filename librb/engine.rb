@@ -69,6 +69,10 @@ module Engine
           @m << Content.new(one_message)
         end
       end
+
+      if !s.sid
+        s.sid = "0" 
+      end
     end
 
     def post(ruleset_name, message = nil)
@@ -134,8 +138,7 @@ module Engine
       if @_timers.key? timer_name
         raise ArgumentError, "Timer with name #{timer_name} already added"
       else
-        timer = {:sid => @s.sid, :$t => timer_name}
-        @_timers[timer_id] = [timer, duration, manual_reset]
+        @_timers[timer_name] = [timer_name, duration, manual_reset]
       end
     end
 
@@ -144,18 +147,6 @@ module Engine
         raise ArgumentError, "Timer with id #{timer_name} already cancelled"
       else
         @_cancelled_timers[timer_name] = true
-      end
-    end
-
-    def reset_timer(timer_name)
-      if @m.kind_of? Hash 
-        retract_timer timer_name, @m
-      else
-        for m in @m do
-          return true if retract_timer(timer_name, m)
-        end
-
-        return false
       end
     end
 
@@ -222,22 +213,6 @@ module Engine
     end
 
     private
-
-    def retract_timer(timer_name, message) 
-      if ((message.key? :$t) && (message[:$t] == timer_name)) ||
-         ((message.key? '$t') && (message['$t'] == timer_name))
-         retract(message)
-         return true
-      end
-
-      for property_name, property_value in message do
-        if (property_value.kind_of? Hash) && retract_timer(timer_name, property_value)
-          return true
-        end
-      end
-
-      return false
-    end
 
     def handle_property(name, value=nil)
       name = name.to_s
@@ -435,6 +410,7 @@ module Engine
         end
       end
 
+      puts JSON.generate(ruleset_definition)
       @handle = Rules.create_ruleset name, JSON.generate(ruleset_definition)
       @definition = ruleset_definition
     end
@@ -478,7 +454,7 @@ module Engine
     end
 
     def start_timer(sid, timer, timer_duration, manual_reset)
-      Rules.start_timer @handle, sid.to_s, timer_duration, manual_reset, JSON.generate(timer)
+      Rules.start_timer @handle, sid.to_s, timer_duration, manual_reset, timer
     end
 
     def cancel_timer(sid, timer_name)
@@ -526,9 +502,10 @@ module Engine
     end
 
     def update_state(state)
+      state["$s"] = 1
       if state.key? :sid 
         Rules.update_state @handle, state[:sid].to_s, JSON.generate(state)
-      else
+      else state.key? "sid" 
         Rules.update_state @handle, state["sid"].to_s, JSON.generate(state)
       end
     end
@@ -568,13 +545,10 @@ module Engine
 
     def dispatch_timers(complete)
       begin
-        if !(Rules.assert_timers @handle)
-          complete.call nil, false
-        else
-          complete.call nil, true
-        end
+        Rules.assert_timers @handle
+        complete.call nil
       rescue Exception => e
-        complete.call e, true
+        complete.call e
         return
       end
     end
@@ -591,7 +565,7 @@ module Engine
         begin
           result = Rules.start_action @handle
           if !result
-            complete.call nil, true
+            complete.call nil
             return
           else
             state = JSON.parse result[0]
@@ -601,7 +575,7 @@ module Engine
         rescue Exception => e
           puts "start action exception #{e}"
           puts e.backtrace
-          complete.call e, true
+          complete.call e
           return
         end
       end
@@ -712,7 +686,7 @@ module Engine
                     new_result = Rules.complete_and_start_action @handle, replies, c.handle
                     if new_result
                       if result_container.key? :async
-                        dispatch -> e, wait {}, [state, new_result, state_offset]
+                        dispatch (-> e {}), [state, new_result, state_offset]
                       else
                         result_container[:message] = JSON.parse new_result
                       end
@@ -724,14 +698,14 @@ module Engine
               Rules.abandon_action @handle, c.handle
               puts "unknown exception #{e}"
               puts e.backtrace
-              complete.call e, true
+              complete.call e
             end
 
             if c._deleted
               begin
                 delete_state c.s.sid
               rescue Exception => e
-                complete.call e, true
+                complete.call e
               end
             end
 
@@ -739,7 +713,7 @@ module Engine
         }
         result_container[:async] = true
       end
-      complete.call nil, false
+      complete.call nil
     end
 
     def to_json
@@ -1249,44 +1223,34 @@ module Engine
       timer = Timers::Group.new
 
       thread_lambda = -> c {
-
-        callback = -> e, w {
+        callback = -> e {
           inner_wait = Thread.current[:wait]
           if e
             puts "unexpected error #{e}"
-          elsif !w
-            inner_wait = false
           end
-
-          if (Thread.current[:index] == (@ruleset_list.length-1)) & inner_wait
-            Thread.current[:index] = (Thread.current[:index] + 1) % @ruleset_list.length
-            Thread.current[:wait] = inner_wait
-            timer.after 0.25, &thread_lambda
-          else
-            Thread.current[:index] = (Thread.current[:index] + 1) % @ruleset_list.length
-            Thread.current[:wait] = inner_wait
-            timer.after 0, &thread_lambda
+          
+          timeout = 0
+          if (Thread.current[:index] == (@ruleset_list.length-1))
+            timeout = 0.2
           end
+          Thread.current[:index] = (Thread.current[:index] + 1) % @ruleset_list.length
+          timer.after timeout, &thread_lambda
         }
 
-        if @ruleset_list.length > 0
-          ruleset = @ruleset_list[Thread.current[:index]]
-          Thread.current[:wait] = true unless Thread.current[:index] > 0
-          ruleset.dispatch_timers callback
-        else
+        if @ruleset_list.empty?
           timer.after 0.5, &thread_lambda
+        else
+          ruleset = @ruleset_list[Thread.current[:index]]
+          ruleset.dispatch_timers callback
         end
-
       }
 
       timer.after 0.1, &thread_lambda
 
       Thread.new do
         Thread.current[:index] = 0
-        Thread.current[:wait] = 0
         loop { timer.wait }
       end
-
     end
 
     def start_dispatch_ruleset_thread
@@ -1295,43 +1259,35 @@ module Engine
 
       thread_lambda = -> c {
 
-        callback = -> e, w {
-          inner_wait = Thread.current[:wait]
+        callback = -> e {
           if e
             puts "unexpected error #{e}"
             puts e.backtrace
-          elsif !w
-            inner_wait = false
           end
-          if (Thread.current[:index] == (@ruleset_list.length-1)) & inner_wait
-            Thread.current[:index] = ( Thread.current[:index] + 1 ) % @ruleset_list.length
-            Thread.current[:wait] = inner_wait
-            timer.after 0.25, &thread_lambda
-          else
-            Thread.current[:index] = ( Thread.current[:index] + 1 ) % @ruleset_list.length
-            Thread.current[:wait] = inner_wait
-            timer.after 0, &thread_lambda
+          
+          timeout = 0
+          if (Thread.current[:index] == (@ruleset_list.length-1))
+            timeout = 0.2
           end
+
+          Thread.current[:index] = (Thread.current[:index] + 1) % @ruleset_list.length
+          timer.after timeout, &thread_lambda
         }
 
         if @ruleset_list.empty?
           timer.after 0.5, &thread_lambda
         else
           ruleset = @ruleset_list[Thread.current[:index]]
-          Thread.current[:wait] = true if (Thread.current[:index] > 0)
           ruleset.dispatch callback
         end
-
       }
 
       timer.after 0.1, &thread_lambda
 
       Thread.new do
         Thread.current[:index] = 0
-        Thread.current[:wait] = 0
         loop { timer.wait }
       end
-
     end
 
   end

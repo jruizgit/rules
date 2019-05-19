@@ -1,26 +1,5 @@
 require "durable"
 
-Durable.statechart :expense1 do
-  state :input do
-    to :denied, when_all((m.subject == "approve") & (m.amount > 1000)) do
-      puts "expense denied"
-    end
-    to :pending, when_all((m.subject == "approve") & (m.amount <= 1000)) do
-      puts "requesting expense approval"
-    end
-  end  
-  state :pending do
-    to :approved, when_all(m.subject == "approved") do
-      puts "expense approved"
-    end
-    to :denied, when_all(m.subject == "denied") do
-      puts "expense denied"
-    end
-  end
-  state :approved
-  state :denied
-end
-
 Durable.ruleset :animal1 do
   when_all c.first = (m.predicate == "eats") & (m.object == "flies"),  
           (m.predicate == "lives") & (m.object == "water") & (m.subject == first.subject) do
@@ -49,7 +28,7 @@ Durable.ruleset :animal1 do
   end
     
   when_all +m.subject, count(11) do
-    m.each { |f| puts "fact: #{f.subject} #{f.predicate} #{f.object}" }
+    m.each { |f| puts "animal1-> fact: #{f.subject} #{f.predicate} #{f.object}" }
   end
     
   when_start do
@@ -66,7 +45,7 @@ Durable.ruleset :test do
   # antecedent
   when_all m.subject == "World" do
     # consequent
-    puts "Hello #{m.subject}"
+    puts "test-> Hello #{m.subject}"
   end
   # on ruleset start
   when_start do
@@ -94,7 +73,7 @@ Durable.ruleset :animal do
   end
     
   when_all +m.subject do
-    puts "fact: #{m.subject} #{m.predicate} #{m.object}"
+    puts "animal-> fact: #{m.subject} #{m.predicate} #{m.object}"
   end
     
   when_start do
@@ -108,7 +87,7 @@ Durable.ruleset :risk1 do
   when_all c.first = m.t == "purchase",
            c.second = m.location != first.location do
     # the event pair will only be observed once
-    puts "fraud detected -> #{first.location}, #{second.location}"
+    puts "riks1-> fraud detected: #{first.location}, #{second.location}"
   end
 
   when_start do
@@ -127,17 +106,17 @@ Durable.ruleset :flow1 do
   when_all s.status == "start" do
     # state update on 's'
     s.status = "next"
-    puts "start"
+    puts "flow1-> start"
   end
 
   when_all s.status == "next" do
     s.status = "last"
-    puts "next"
+    puts "flow1-> next"
   end
 
   when_all s.status == "last" do
     s.status = "end"
-    puts "last"
+    puts "flow1-> last"
     # deletes state at the end
     delete_state
   end
@@ -152,7 +131,7 @@ end
 
 Durable.ruleset :expense2 do
   when_all (m.subject == "approve") | (m.subject == "ok") do
-    puts "Approved subject: #{m.subject}"
+    puts "expense2-> Approved subject: #{m.subject}"
   end
 
   when_start do
@@ -201,9 +180,9 @@ Durable.ruleset :indistinct do
            c.first = m.amount > 10,
            c.second = m.amount > first.amount * 2,
            c.third = m.amount > (first.amount + second.amount) / 2 do
-    puts "indistinct detected -> #{first.amount}" 
-    puts "               -> #{second.amount}"
-    puts "               -> #{third.amount}"
+    puts "indistinct -> #{first.amount}" 
+    puts "           -> #{second.amount}"
+    puts "           -> #{third.amount}"
   end
 
   when_start do
@@ -217,9 +196,9 @@ Durable.ruleset :distinct do
   when_all c.first = m.amount > 10,
            c.second = m.amount > first.amount * 2,
            c.third = m.amount > (first.amount + second.amount) / 2 do
-    puts "distinct detected -> #{first.amount}" 
-    puts "               -> #{second.amount}"
-    puts "               -> #{third.amount}"
+    puts "distinct -> #{first.amount}" 
+    puts "         -> #{second.amount}"
+    puts "         -> #{third.amount}"
   end
 
   when_start do
@@ -232,8 +211,8 @@ end
 Durable.ruleset :expense3 do
   when_all c.bill = (m.t == "bill") & (m.invoice.amount > 50),
            c.account = (m.t == "account") & (m.payment.invoice.amount == bill.invoice.amount) do
-    puts "bill amount -> #{bill.invoice.amount}" 
-    puts "account payment amount -> #{account.payment.invoice.amount}" 
+    puts "expense3-> bill amount: #{bill.invoice.amount}" 
+    puts "expense3-> account payment amount: #{account.payment.invoice.amount}" 
   end
 
   when_start do
@@ -247,7 +226,7 @@ Durable.ruleset :risk do
            none(m.t == "balance"),
            c.third = m.t == "withrawal",
            c.fourth = m.t == "chargeback" do
-    puts "fraud detected #{first.t} #{third.t} #{fourth.t}"
+    puts "risk-> fraud detected: #{first.t} #{third.t} #{fourth.t}"
   end
 
   when_start do
@@ -263,9 +242,9 @@ Durable.ruleset :expense4 do
            all(c.third = m.subject == "jumbo", 
                c.fourth = m.amount == 10000) do
     if first
-      puts "Approved #{first.subject} #{second.amount}"
+      puts "expense4-> Approved #{first.subject} #{second.amount}"
     else
-      puts "Approved #{third.subject} #{fourth.amount}"
+      puts "expense4-> Approved #{third.subject} #{fourth.amount}"
     end
   end
 
@@ -279,15 +258,15 @@ end
 
 Durable.ruleset :attributes do
   when_all pri(3), m.amount < 300 do
-    puts "attributes P3 -> #{m.amount}"
+    puts "attributes-> P3: #{m.amount}"
   end
 
   when_all pri(2), m.amount < 200 do
-    puts "attributes P2 -> #{m.amount}"
+    puts "attributes-> P2: #{m.amount}"
   end
 
   when_all pri(1), m.amount < 100  do
-    puts "attributes P1 -> #{m.amount}"
+    puts "attributes-> P1: #{m.amount}"
   end
 
   when_start do
@@ -297,7 +276,6 @@ Durable.ruleset :attributes do
   end
 end
 
-
 Durable.ruleset :flow2 do
   when_all m.action == "start" do
     raise "Unhandled Exception!"
@@ -305,7 +283,7 @@ Durable.ruleset :flow2 do
   
   # when the exception property exists
   when_all +s.exception do
-    puts "#{s.exception}"
+    puts "flow2-> expected #{s.exception}"
     s.exception = nil
   end
 
@@ -320,22 +298,22 @@ Durable.statechart :expense5 do
     # trigger to move to :denied given a condition
     to :denied, when_all((m.subject == "approve") & (m.amount > 1000)) do
       # action executed before state change
-      puts "denied amount #{m.amount}"
+      puts "expense5-> denied amount #{m.amount}"
     end
 
     to :pending, when_all((m.subject == "approve") & (m.amount <= 1000)) do
-      puts "requesting approve amount #{m.amount}"
+      puts "expense5-> requesting approve amount #{m.amount}"
     end
   end  
 
   # intermediate state :pending with two triggers
   state :pending do
     to :approved, when_all(m.subject == "approved") do
-      puts "expense approved"
+      puts "expense5-> expense approved"
     end
 
     to :denied, when_all(m.subject == "denied") do
-      puts "expense denied"
+      puts "expense5-> expense denied"
     end
   end
 
@@ -352,10 +330,9 @@ Durable.statechart :expense5 do
     post :expense5, { :sid => 1, :subject => 'denied' }
 
     # events directed to statechart instance with id '2'
-    post :expense, { :sid => 2, :subject => 'approve', :amount => 10000 }
+    post :expense5, { :sid => 2, :subject => 'approve', :amount => 10000 }
   end
 end
-
 
 Durable.statechart :worker do
   # super-state :work has two states and one trigger
@@ -363,19 +340,19 @@ Durable.statechart :worker do
     # sub-sate :enter has only one trigger   
     state :enter do
       to :process, when_all(m.subject == "enter") do
-        puts "start process"
+        puts "worker-> start process"
       end
     end
 
     state :process do
       to :process, when_all(m.subject == "continue") do
-        puts "continue processing"
+        puts "worker-> continue processing"
       end
     end
 
     # the super-state trigger will be evaluated for all sub-state triggers
     to :canceled, when_all(pri(1), m.subject == "cancel") do
-      puts "cancel process"
+      puts "worker-> cancel process"
     end
   end
 
@@ -394,7 +371,6 @@ Durable.statechart :worker do
   end
 end
 
-
 Durable.flowchart :expense do
   # initial stage :input has two conditions
   stage :input
@@ -403,7 +379,7 @@ Durable.flowchart :expense do
   
   # intermediate stage :request has an action and three conditions
   stage :request do
-    puts "requesting approve"
+    puts "expense-> requesting approve"
   end
   to :approve, when_all(m.subject == "approved")
   to :deny, when_all(m.subject == "denied")
@@ -411,11 +387,11 @@ Durable.flowchart :expense do
   to :request, when_any(m.subject == "retry")
   
   stage :approve do
-    puts "expense approved"
+    puts "expense-> approved"
   end
 
   stage :deny do
-    puts "expense denied"
+    puts "expense-> denied"
   end
 
   when_start do
@@ -433,12 +409,11 @@ Durable.flowchart :expense do
   end
 end
 
-
 Durable.ruleset :expense6 do
   # this rule will trigger as soon as three events match the condition
   when_all count(3), m.amount < 100 do
     for f in m do
-      puts "approved ->#{f}"
+      puts "expense6-> approved ->#{f}"
     end
   end
 
@@ -447,7 +422,7 @@ Durable.ruleset :expense6 do
            c.expense = m.amount >= 100,
            c.approval = m.review == true do
     for f in m do
-      puts "rejected ->#{f}"
+      puts "expense6-> rejected ->#{f}"
     end
   end
 
@@ -462,20 +437,34 @@ Durable.ruleset :expense6 do
   end
 end
 
+Durable.ruleset :timer1 do
+  when_all m.subject == "start" do
+    start_timer "MyTimer", 5
+  end
+
+  when_all timeout("MyTimer") do
+    puts "timer1-> timeout"
+  end
+
+  when_start do
+    post :timer1, { :subject => "start" }
+  end
+end
+
 Durable.ruleset :timer do
   when_any all(s.count == 0),
            # will trigger when MyTimer expires
            all(s.count < 5, 
                timeout("MyTimer")) do
     s.count += 1
-    # MyTimer will expire in 5 seconds
-    start_timer "MyTimer", 5
-    puts "pulse -> #{Time.now}"
+    # MyTimer will expire in 1 second
+    start_timer "MyTimer", 1
+    puts "timer-> pulse #{Time.now}"
   end
 
   when_all m.cancel == true do
     cancel_timer "MyTimer"
-    puts "canceled timer"
+    puts "timer-> canceled timer"
   end
 
   when_start do
@@ -495,12 +484,12 @@ Durable.statechart :risk3 do
   state :meter do
     to :fraud, when_all(count(3), c.message = m.amount > 100) do
       for e in m do
-        puts e.message
+        puts "risk3-> #{e.message}"
       end
     end
 
     to :exit, when_all(timeout("RiskTimer")) do
-      puts "exit"
+      puts "risk3-> exit"
     end
   end
 
@@ -532,23 +521,21 @@ Durable.statechart :risk4 do
     to :meter, when_all(cap(100), 
                         c.message = m.amount > 100,
                         timeout("VelocityTimer")) do
-      puts "velocity: #{m.length} events in 5 seconds"
+      puts "risk4-> velocity: #{m.length} events in 5 seconds"
       # resets and restarts the manual reset timer
-      reset_timer "VelocityTimer"
       start_timer "VelocityTimer", 5, true
     end
 
     to :meter, when_all(timeout("VelocityTimer")) do
-      puts "velocity: no events in 5 seconds"
-      reset_timer "VelocityTimer"
-      start_timer "VelocityTimer", 5, true
+      puts "risk4-> velocity: no events in 5 seconds"
+      cancel_timer "VelocityTimer"
     end
   end
 
   when_start do
     # the velocity will 4 events in 5 seconds
     post 'risk4', { :amount => 200 } 
-    post 'risk4', { :amount => 300 } 
+    post 'risk4', { :amount => 350 } 
     post 'risk4', { :amount => 50 }
     post 'risk4', { :amount => 300 } 
     post 'risk4', { :amount => 400 }
@@ -558,47 +545,47 @@ end
 # curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:4567/risk4/events
 
 
-Durable.ruleset :flow3 do
+# Durable.ruleset :flow3 do
 
-  # async actions take a callback argument to signal completion
-  when_all s.state == "first" do |c, complete|
-    Thread.new do
-      sleep 3
-      s.state = "second"
-      puts "first completed"
-      complete.call nil
-    end
-  end
+#   # async actions take a callback argument to signal completion
+#   when_all s.state == "first" do |c, complete|
+#     Thread.new do
+#       sleep 3
+#       s.state = "second"
+#       puts "first completed"
+#       complete.call nil
+#     end
+#   end
 
-  when_all s.state == "second" do |c, complete|
-    Thread.new do
-      sleep 6
-      s.state = "third"
-      puts "second completed"
+#   when_all s.state == "second" do |c, complete|
+#     Thread.new do
+#       sleep 6
+#       s.state = "third"
+#       puts "second completed"
 
-      # completes the action after 6 seconds
-      # use the first argument to signal an error
-      complete.call Exception('error detected')
-    end
+#       # completes the action after 6 seconds
+#       # use the first argument to signal an error
+#       complete.call Exception('error detected')
+#     end
 
-    # overrides the 5 second default abandon timeout
-    10
-  end
+#     # overrides the 5 second default abandon timeout
+#     10
+#   end
   
-  when_start do
-    patch_state :flow3, { :state => "first" }
-  end
-end
+#   when_start do
+#     patch_state :flow3, { :state => "first" }
+#   end
+# end
 
 
 Durable.ruleset :bookstore do
   # this rule will trigger for events with status
   when_all +m.status do
-    puts "Reference #{m.reference} status #{m.status}"
+    puts "bookstore-> Reference #{m.reference} status #{m.status}"
   end
 
   when_all +m.name do
-    puts "Added: #{m.name}"
+    puts "bookstore-> Added: #{m.name}"
     retract(:name => 'The new book',
             :reference => '75323',
             :price => 500,
@@ -606,7 +593,7 @@ Durable.ruleset :bookstore do
   end
 
   when_all none(+m.name) do
-    puts "No books"
+    puts "bookstore-> No books"
   end  
 
   when_start do
@@ -639,13 +626,13 @@ end
 Durable.ruleset :risk5 do
   # compares properties in the same event, this expression is evaluated in the client 
   when_all m.debit > m.credit * 2 do
-    puts "debit #{m.debit} more than twice the credit #{m.credit}"
+    puts "risk5-> debit #{m.debit} more than twice the credit #{m.credit}"
   end
   # compares two correlated events, this expression is evaluated in the backend
   when_all c.first = m.amount > 100,
            c.second = m.amount > first.amount + m.amount / 2  do
-    puts "fraud detected -> #{first.amount}"
-    puts "fraud detected -> #{second.amount}"
+    puts "risk5-> fraud detected -> #{first.amount}"
+    puts "risk5-> fraud detected -> #{second.amount}"
   end
 
   when_start do
@@ -659,44 +646,44 @@ end
 Durable.ruleset :risk6 do
   # matching primitive array
   when_all m.payments.allItems(item > 2000) do
-    puts "Should not match #{m.payments}"
+    puts "risk6-> Should not match #{m.payments}"
   end
   
   # matching primitive array
   when_all m.payments.allItems(item > 1000) do
-    puts "risk6 fraud 1 detected #{m.payments}"
+    puts "risk6-> fraud 1 detected #{m.payments}"
   end
 
   # matching object array
   when_all m.payments.allItems((item.amount < 250) | (item.amount >= 300)) do
-    puts "risk6 fraud 2 detected #{m.payments}"
+    puts "risk6-> fraud 2 detected #{m.payments}"
   end
 
   # matching object array
   when_all m.cards.anyItem(item.matches("three.*")) do
-    puts "risk6 fraud 3 detected #{m.cards}"
+    puts "risk6-> fraud 3 detected #{m.cards}"
   end
 
   # matching nested arrays
   when_all m.payments.anyItem(item.allItems(item < 100)) do
-    puts "risk6 fraud 4 detected #{m.payments}"
+    puts "risk6-> fraud 4 detected #{m.payments}"
   end
 
   # matching array and value
   when_all (m.payments.allItems(item > 100) & (m.cash == true)) do
-    puts "risk6 fraud 5 detected #{m.payments}"
+    puts "risk6-> fraud 5 detected #{m.payments}"
   end
 
   when_all (m.field == 1) & m.payments.allItems(item.allItems((item > 100) & (item < 1000))) do
-    puts "risk6 fraud 6 detected #{m.payments}"
+    puts "risk6-> fraud 6 detected #{m.payments}"
   end
 
   when_all (m.field == 1) & m.payments.allItems(item.anyItem((item > 100) | (item < 50))) do
-    puts "risk6 fraud 7 detected #{m.payments}"
+    puts "risk6-> fraud 7 detected #{m.payments}"
   end
 
   when_all m.payments.anyItem(-item.field1 & (item.field2 == 2)) do
-    puts "risk6 fraud 8 detected #{m.payments}"
+    puts "risk6-> fraud 8 detected #{m.payments}"
   end
 
   when_start do
@@ -714,30 +701,6 @@ Durable.ruleset :risk6 do
     post :risk6, { :payments => [ { :field1 => 1 , :field2 => 1 } ] }
   end
 end
-
-
-# Durable.ruleset :flow do
-
-#   when_all m.status == "start" do
-#     post :status => "next"
-#     puts "start"
-#   end
-#   # the process will always exit here every time the action is run
-#   # when restarting the process this action will be retried after a few seconds
-#   when_all m.status == "next" do
-#     post :status => "last"
-#     puts "next"
-#     Process.kill 9, Process.pid
-#   end
-
-#   when_all m.status == "last" do
-#     puts "last"
-#   end
-  
-#   when_start do
-#     post :flow, { :status => "start" }
-#   end
-# end
 
 
 Durable.run_all

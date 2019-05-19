@@ -454,8 +454,8 @@ module Durable
     end
 
     def timeout(name)
-      expression = Expression.new(:$m, :$t)
-      expression == name
+      all(c.base = Expression.new(:$m, "$timerName") == name, 
+          c.timeout = Expression.new(:$m, "$time") >= Arithmetic.new(:base, "$baseTime"))
     end
     
     protected
