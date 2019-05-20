@@ -545,37 +545,37 @@ end
 # curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:4567/risk4/events
 
 
-# Durable.ruleset :flow3 do
+Durable.ruleset :flow3 do
 
-#   # async actions take a callback argument to signal completion
-#   when_all s.state == "first" do |c, complete|
-#     Thread.new do
-#       sleep 3
-#       s.state = "second"
-#       puts "first completed"
-#       complete.call nil
-#     end
-#   end
+  # async actions take a callback argument to signal completion
+  when_all s.state == "first" do |c, complete|
+    Thread.new do
+      sleep 3
+      s.state = "second"
+      puts "first completed"
+      complete.call nil
+    end
+  end
 
-#   when_all s.state == "second" do |c, complete|
-#     Thread.new do
-#       sleep 6
-#       s.state = "third"
-#       puts "second completed"
+  when_all s.state == "second" do |c, complete|
+    Thread.new do
+      sleep 10
+      s.state = "third"
+      puts "second completed"
 
-#       # completes the action after 6 seconds
-#       # use the first argument to signal an error
-#       complete.call Exception('error detected')
-#     end
+      # completes the action after 6 seconds
+      # use the first argument to signal an error
+      complete.call Exception('error detected')
+    end
 
-#     # overrides the 5 second default abandon timeout
-#     10
-#   end
+    # overrides the 5 second default abandon timeout
+    15
+  end
   
-#   when_start do
-#     patch_state :flow3, { :state => "first" }
-#   end
-# end
+  when_start do
+    patch_state :flow3, { :state => "first" }
+  end
+end
 
 
 Durable.ruleset :bookstore do

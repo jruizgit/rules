@@ -2299,7 +2299,6 @@ unsigned int renewActionLease(unsigned int handle, char *sid) {
     return RULES_OK;
 }
 
-
 unsigned int queueMessage(unsigned int handle, unsigned int queueAction, char *sid, char *destination, char *message) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
