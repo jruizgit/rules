@@ -118,15 +118,12 @@ Durable.statechart :waltzdb do
   end
 
   state :duplicate do
-    to :duplicate, when_all(cap(1000),
-                            c.line = (m.t == "line")) do
-      for frame in m do
-        puts "Edge #{frame.line.p1} #{frame.line.p2}"
-        puts "Edge #{frame.line.p2} #{frame.line.p1}"
-        post(:id => s.gid, :t => "edge", :p1 => frame.line.p1, :p2 => frame.line.p2, :joined => false)
-        post(:id => s.gid + 1, :t => "edge", :p1 => frame.line.p2, :p2 => frame.line.p1, :joined => false)
-        s.gid += 2
-      end
+    to :duplicate, when_all(c.line = (m.t == "line")) do |c|
+      puts "Edge #{c.line.p1} #{c.line.p2}"
+      puts "Edge #{c.line.p2} #{c.line.p1}"
+      post(:id => s.gid, :t => "edge", :p1 => c.line.p1, :p2 => c.line.p2, :joined => false)
+      post(:id => s.gid + 1, :t => "edge", :p1 => c.line.p2, :p2 => c.line.p1, :joined => false)
+      s.gid += 2      
     end
 
     to :detect_junctions, when_all(pri(1)) do
@@ -135,34 +132,29 @@ Durable.statechart :waltzdb do
   end
 
   state :detect_junctions do
-    to :detect_junctions, when_all(cap(1000),
-                                   c.e1 = (m.t == "edge") & (m.joined == false),
+    to :detect_junctions, when_all(c.e1 = (m.t == "edge") & (m.joined == false),
                                    c.e2 = (m.t == "edge") & (m.joined == false) & (m.p1 == e1.p1) & (m.p2 != e1.p2),
-                                   c.e3 = (m.t == "edge") & (m.joined == false) & (m.p1 == e1.p1) & (m.p2 != e1.p2) & (m.p2 != e2.p2)) do
-      for frame in m do
-        j = {:id => s.gid, :t => "junction", :base_point => frame.e1.p1, :j_t => "3j", :visited => "no"}
-        make_3j_junction(j, frame.e1.p1, frame.e1.p2, frame.e2.p2, frame.e3.p2)
+                                   c.e3 = (m.t == "edge") & (m.joined == false) & (m.p1 == e1.p1) & (m.p2 != e1.p2) & (m.p2 != e2.p2)) do |c|
+        j = {:id => s.gid, :t => "junction", :base_point => c.e1.p1, :j_t => "3j", :visited => "no"}
+        make_3j_junction(j, c.e1.p1, c.e1.p2, c.e2.p2, c.e3.p2)
         puts "Junction #{j[:name]} #{j[:base_point]} #{j[:p1]} #{j[:p2]} #{j[:p3]}"
         assert j
-        frame.e1.id = s.gid + 1; frame.e1.joined = true; frame.e1.j_t = "3j"; assert frame.e1
-        frame.e2.id = s.gid + 2; frame.e2.joined = true; frame.e2.j_t = "3j"; assert frame.e2
-        frame.e3.id = s.gid + 3; frame.e3.joined = true; frame.e3.j_t = "3j"; assert frame.e3
+        c.e1.id = s.gid + 1; c.e1.joined = true; c.e1.j_t = "3j"; assert c.e1
+        c.e2.id = s.gid + 2; c.e2.joined = true; c.e2.j_t = "3j"; assert c.e2
+        c.e3.id = s.gid + 3; c.e3.joined = true; c.e3.j_t = "3j"; assert c.e3
         s.gid += 4
-      end
+      
     end
 
-    to :detect_junctions, when_all(cap(1000),
-                                   c.e1 = (m.t == "edge") & (m.joined == false),
+    to :detect_junctions, when_all(c.e1 = (m.t == "edge") & (m.joined == false),
                                    c.e2 = (m.t == "edge") & (m.joined == false) & (m.p1 == e1.p1) & (m.p2 != e1.p2),
-                                   none((m.t == "edge") & (m.p1 == e1.p1) & (m.p2 != e1.p2) & (m.p2 != e2.p2))) do
-      for frame in m do
-        j = {:id => s.gid, :t => "junction", :base_point => frame.e1.p1, :j_t => "2j", :visited => "no", :name => "L", :p1 => frame.e1.p2, :p2 => frame.e2.p2}
-        puts "Junction L #{frame.e1.p1} #{frame.e1.p2} #{frame.e2.p2}"
-        assert j
-        frame.e1.id = s.gid + 1; frame.e1.joined = true; frame.e1.j_t = "2j"; assert frame.e1
-        frame.e2.id = s.gid + 2; frame.e2.joined = true; frame.e2.j_t = "2j"; assert frame.e2
-        s.gid += 3
-      end
+                                   none((m.t == "edge") & (m.p1 == e1.p1) & (m.p2 != e1.p2) & (m.p2 != e2.p2))) do |c|
+      j = {:id => s.gid, :t => "junction", :base_point => c.e1.p1, :j_t => "2j", :visited => "no", :name => "L", :p1 => c.e1.p2, :p2 => c.e2.p2}
+      puts "Junction L #{c.e1.p1} #{c.e1.p2} #{c.e2.p2}"
+      assert j
+      c.e1.id = s.gid + 1; c.e1.joined = true; c.e1.j_t = "2j"; assert c.e1
+      c.e2.id = s.gid + 2; c.e2.joined = true; c.e2.j_t = "2j"; assert c.e2
+      s.gid += 3
     end
 
     to :find_initial_boundary, when_all(pri(1)) do
