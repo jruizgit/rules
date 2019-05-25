@@ -1797,7 +1797,6 @@ static unsigned int handleMessages(ruleset *tree,
     char *first = messages;
     char *last = NULL;
     char lastTemp;
-
     while (*first != '{' && *first != '\0' ) {
         ++first;
     }
@@ -2267,7 +2266,6 @@ unsigned int completeAndStartAction(unsigned int handle,
     resultState->context.resultFrameOffset = resultFrameOffset;
     resultState->lockExpireTime = time(NULL) + STATE_LEASE_TIME;
     *messages  = resultState->context.messages;
-    
     return RULES_OK;
 }
 

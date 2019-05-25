@@ -682,7 +682,6 @@ static unsigned int copyMessage(jsonObject *targetMessage,
         return ERR_OUT_OF_MEMORY;
     }
     memcpy(targetMessage->content, sourceMessage->content, messageLength);
-    
     for (unsigned int i = 0; i < targetMessage->propertiesLength; ++i) {
         if (targetMessage->properties[i].type == JSON_STRING &&
             targetMessage->properties[i].hash != HASH_SID && 
@@ -1443,7 +1442,6 @@ unsigned int getStateVersion(void *tree, char *sid, unsigned long *stateVersion)
     return getSessionVersion(rulesBinding, sid, stateVersion);
 }
 
-
 unsigned int deleteState(unsigned int handle, char *sid) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
@@ -1460,6 +1458,10 @@ unsigned int deleteState(unsigned int handle, char *sid) {
              ((ruleset*)tree)->statePool, 
              sidHash, 
              nodeOffset);
+
+    if (nodeOffset == UNDEFINED_HASH_OFFSET) {
+      return ERR_SID_NOT_FOUND;
+    }
 
     stateNode *node = STATE_NODE(tree, nodeOffset); 
     free(node->sid);

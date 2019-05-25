@@ -39,7 +39,7 @@ module Engine
   end
 
   class Closure
-    attr_reader :host, :handle, :ruleset_name, :_timers, :_cancelled_timers, :_branches, :_messages, :_queues, :_facts, :_retract, :_deletes, :_deleted
+    attr_reader :host, :handle, :ruleset_name, :_timers, :_cancelled_timers, :_branches, :_messages, :_queues, :_facts, :_retract, :_deleted
     attr_accessor :s
 
     def initialize(host, state, message, handle, ruleset_name)
@@ -51,7 +51,6 @@ module Engine
       @_cancelled_timers = {}
       @_messages = {}
       @_queues = {}
-      @_deletes = {}
       @_branches = {}
       @_facts = {}
       @_retract = {}
@@ -98,26 +97,8 @@ module Engine
       message_list << message
     end
 
-    def delete(ruleset_name = nil, sid = nil)
-      if !ruleset_name
-        ruleset_name = @ruleset_name
-      end
-
-      if !sid
-        sid = @s.sid
-      end
-
-      if (ruleset_name == @ruleset_name) && (sid == @s.sid)
-        @_deleted = true
-      end
-
-      sid_list = []
-      if @_deletes.key? ruleset_name
-        sid_list = @_deletes[ruleset_name]
-      else
-        @_deletes[ruleset_name] = sid_list
-      end
-      sid_list << sid
+    def delete()
+      @_deleted = true
     end
 
     def get_queue(ruleset_name)
@@ -410,7 +391,6 @@ module Engine
         end
       end
 
-      puts JSON.generate(ruleset_definition)
       @handle = Rules.create_ruleset name, JSON.generate(ruleset_definition)
       @definition = ruleset_definition
     end
@@ -628,10 +608,6 @@ module Engine
                 end
               end
 
-              for ruleset_name, sid in c._deletes do
-                @host.delete_state ruleset_name, sid
-              end
-
               offset  = 0
               replies = 0
               pending = {state_offset => 0}
@@ -639,7 +615,7 @@ module Engine
                 if facts.length == 1
                   offset, replies = @host.start_retract ruleset_name, facts[0]
                 else
-                  offset, replies = @host.start_retract_facts ruleset_name, facts
+                  offset, replies = @host.start_retract_facts ruleset_name, *facts
                 end
                 if pending.key? offset
                   pending[offset] = pending[offset] + replies
@@ -651,7 +627,7 @@ module Engine
                 if facts.length == 1
                   offset, replies = @host.start_assert ruleset_name, facts[0]
                 else
-                  offset, replies = @host.start_assert_facts ruleset_name, facts
+                  offset, replies = @host.start_assert_facts ruleset_name, *facts
                 end
                 if pending.key? offset
                   pending[offset] = pending[offset] + replies
@@ -663,7 +639,7 @@ module Engine
                 if messages.length == 1
                   offset, replies = @host.start_post ruleset_name, messages[0]
                 else
-                  offset, replies = @host.start_post_batch ruleset_name, messages
+                  offset, replies = @host.start_post_batch ruleset_name, *messages
                 end
                 if pending.key? offset
                   pending[offset] = pending[offset] + replies
