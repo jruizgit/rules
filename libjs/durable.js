@@ -1873,14 +1873,13 @@ exports = module.exports = durableEngine = function () {
 
     var rulesets = [];
 
-    var createHost = function(databases) {
+    var createHost = function() {
         var definitions = {};
         for (var i = 0; i < rulesets.length; ++ i) {
             definitions[rulesets[i].getName()] = rulesets[i].define(); 
         }
 
-        var rulesHost = d.host(databases);
-        // console.log(JSON.stringify(definitions, 2, 2));
+        var rulesHost = d.host();
         rulesHost.registerRulesets(null, definitions);
         for (var i = 0; i < rulesets.length; ++ i) {
             if (rulesets[i].getStart()) {
@@ -1891,12 +1890,8 @@ exports = module.exports = durableEngine = function () {
         return rulesHost;
     } 
 
-    var createQueue = function(rulesetName, database) {
-        return d.queue(rulesetName, database);
-    }
-
-    var runAll = function(databases, port, basePath, run) {
-        var rulesHost = createHost(databases);
+    var runAll = function(port, basePath, run) {
+        var rulesHost = createHost();
         var app = d.application(rulesHost, port, basePath);
         if (run) {
             run(rulesHost, app);
@@ -1912,7 +1907,6 @@ exports = module.exports = durableEngine = function () {
         flowchart: flowchart,
         ruleset: ruleset,
         createHost: createHost,
-        createQueue: createQueue,
         runAll: runAll,
     }; 
     extend(ex);

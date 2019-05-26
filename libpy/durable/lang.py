@@ -658,27 +658,24 @@ _ruleset_stack = []
 _rulesets = []
 _start_functions = []
 
-def create_queue(ruleset_name, database = None):
-    return engine.Queue(ruleset_name, database)
-
-def create_host(databases = None):
+def create_host():
     ruleset_definitions = {}
     for rset in _rulesets:
         ruleset_name, ruleset_definition = rset.define()
         ruleset_definitions[ruleset_name] = ruleset_definition
         
-    main_host = engine.Host(ruleset_definitions, databases)
+    main_host = engine.Host(ruleset_definitions)
     for start in _start_functions:
         start(main_host)
 
     main_host.run()
     return main_host
 
-def run_all(databases = None, host_name = '127.0.0.1', port = 5000, routing_rules = None, run = None):
-    main_host = create_host(databases)
+def run_all(host_name = '127.0.0.1', port = 5000, routing_rules = None, run = None):
+    main_host = create_host()
     main_app = interface.Application(main_host, host_name, port, routing_rules, run)
     main_app.run()
 
-def run_server(run, databases = None, routing_rules = None):
-    run_all(databases, None, None, routing_rules, run)
+def run_server(run, routing_rules = None):
+    run_all(None, None, routing_rules, run)
 

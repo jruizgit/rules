@@ -225,12 +225,6 @@ unsigned int cancelTimer(unsigned int handle,
                          char *sid, 
                          char *timerName);
 
-unsigned int queueMessage(unsigned int handle,
-                          unsigned int queueAction, 
-                          char *sid, 
-                          char *destination, 
-                          char *message);
-
 unsigned int assertTimers(unsigned int handle);
 
 unsigned int getState(unsigned int handle, 

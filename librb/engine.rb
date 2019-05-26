@@ -4,42 +4,8 @@ require_relative "../src/rulesrb/rules"
 
 module Engine
 
-  class Closure_Queue
-    attr_reader :_queued_posts, :_queued_asserts, :_queued_retracts
-
-    def initialize()
-      @_queued_posts = []
-      @_queued_asserts = []
-      @_queued_retracts = []
-    end
-
-    def post(message)
-      if message.kind_of? Content
-        message = message._d
-      end
-
-      @_queued_posts << message
-    end
-
-    def assert(message)
-      if message.kind_of? Content
-        message = message._d
-      end
-
-      @_queued_asserts << message
-    end
-
-    def retract(message)
-      if message.kind_of? Content
-        message = message._d
-      end
-
-      @_queued_retracts << message
-    end
-  end
-
   class Closure
-    attr_reader :host, :handle, :ruleset_name, :_timers, :_cancelled_timers, :_branches, :_messages, :_queues, :_facts, :_retract, :_deleted
+    attr_reader :host, :handle, :ruleset_name, :_timers, :_cancelled_timers, :_messages, :_facts, :_retract, :_deleted
     attr_accessor :s
 
     def initialize(host, state, message, handle, ruleset_name)
@@ -50,8 +16,6 @@ module Engine
       @_timers = {}
       @_cancelled_timers = {}
       @_messages = {}
-      @_queues = {}
-      @_branches = {}
       @_facts = {}
       @_retract = {}
       @_start_time = Time.now
@@ -395,30 +359,8 @@ module Engine
       @definition = ruleset_definition
     end
 
-    def bind(databases)
-      for db in databases do
-        if db.kind_of? String
-          Rules.bind_ruleset @handle, db, 0, nil, 0
-        else
-          if !db.key? :password
-            db[:password] = nil
-          end
-
-          if !db.key? :db
-            db[:db] = 0
-          end
-          
-          Rules.bind_ruleset @handle, db[:host], db[:port], db[:password], db[:db]
-        end
-      end
-    end
-
     def assert_event(message)
       Rules.assert_event @handle, JSON.generate(message)
-    end
-
-    def queue_assert_event(sid, ruleset_name, message)
-      Rules.queue_assert_event @handle, sid.to_s, ruleset_name.to_s, JSON.generate(message)
     end
 
     def start_assert_event(message)
@@ -445,10 +387,6 @@ module Engine
       Rules.assert_fact @handle, JSON.generate(fact)
     end
 
-    def queue_assert_fact(sid, ruleset_name, message)
-      Rules.queue_assert_fact @handle, sid.to_s, ruleset_name.to_s, JSON.generate(message)
-    end
-
     def start_assert_fact(fact)
       Rules.start_assert_fact @handle, JSON.generate(fact)
     end
@@ -463,10 +401,6 @@ module Engine
 
     def retract_fact(fact)
       Rules.retract_fact @handle, JSON.generate(fact)
-    end
-
-    def queue_retract_fact(sid, ruleset_name, message)
-      Rules.queue_retract_fact @handle, sid.to_s, ruleset_name.to_s, JSON.generate(message)
     end
 
     def start_retract_fact(fact)
@@ -589,23 +523,6 @@ module Engine
 
               for timer_id, timer_tuple in c._timers do
                 start_timer c.s.sid, timer_tuple[0], timer_tuple[1], timer_tuple[2]
-              end
-
-              for ruleset_name, q in c._queues do
-                for message in q._queued_posts do
-                  sid = (message.key? :sid) ? message[:sid]: message['sid']
-                  queue_assert_event sid.to_s, ruleset_name, message
-                end
-
-                for message in q._queued_asserts do
-                  sid = (message.key? :sid) ? message[:sid]: message['sid']
-                  queue_assert_fact sid.to_s, ruleset_name, message
-                end
-
-                for message in q._queued_retracts do
-                  sid = (message.key? :sid) ? message[:sid]: message['sid']
-                  queue_retract_fact sid.to_s, ruleset_name, message
-                end
               end
 
               offset  = 0
@@ -1056,10 +973,9 @@ module Engine
 
   class Host
 
-    def initialize(ruleset_definitions = nil, databases = [{:host => 'localhost', :port => 6379, :password => nil, :db => 0}])
+    def initialize(ruleset_definitions = nil)
       @ruleset_directory = {}
       @ruleset_list = []
-      @databases = databases
       register_rulesets nil, ruleset_definitions if ruleset_definitions
     end
 
@@ -1178,7 +1094,6 @@ module Engine
 
         @ruleset_directory[ruleset_name] = ruleset
         @ruleset_list << ruleset
-        ruleset.bind @databases
       end
 
       rulesets.keys
@@ -1266,57 +1181,6 @@ module Engine
       end
     end
 
-  end
-
-  class Queue
-
-    def initialize(ruleset_name, database = {:host => "localhost", :port => 6379, :password => nil, :db => 0})
-      @_ruleset_name = ruleset_name.to_s
-      @handle = Rules.create_client @_ruleset_name
-      if database.kind_of? String
-        Rules.bind_ruleset @handle, database, 0, nil, 0
-      else
-        Rules.bind_ruleset @handle, database[:host], database[:port], database[:password], database[:db]
-      end
-    end
-
-    def isClosed()
-      @handle == 0
-    end
-
-    def post(message)
-      if @handle == 0
-        raise "Queue has already been closed"
-      end
-
-      sid = (message.key? :sid) ? message[:sid]: message['sid']
-      Rules.queue_assert_event @handle, sid.to_s, @_ruleset_name, JSON.generate(message)
-    end
-
-    def assert(message)
-      if @handle == 0
-        raise "Queue has already been closed"
-      end
-
-      sid = (message.key? :sid) ? message[:sid]: message['sid']
-      Rules.queue_assert_fact @handle, sid.to_s, @_ruleset_name, JSON.generate(message)
-    end
-
-    def retract(message)
-      if @handle == 0
-        raise "Queue has already been closed"
-      end
-
-      sid = (message.key? :sid) ? message[:sid]: message['sid']
-      Rules.queue_retract_fact @handle, sid.to_s, @_ruleset_name, JSON.generate(message)
-    end
-
-    def close()
-      if @handle != 0
-        Rules.delete_client @handle
-        @handle = 0
-      end
-    end
   end
 
 end

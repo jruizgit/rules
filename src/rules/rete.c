@@ -4,9 +4,9 @@
 #include <time.h>
 #include <string.h>
 #include "rules.h"
-#include "net.h"
 #include "json.h"
 #include "regex.h"
+#include "rete.h"
 
 #define HASH_ALL 321211332 // all
 #define HASH_ANY 740945997 // any
@@ -1856,54 +1856,10 @@ unsigned int deleteRuleset(unsigned int handle) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    deleteBindingsList(tree);
     free(tree->nodePool);
     free(tree->nextPool);
     free(tree->stringPool);
     free(tree->expressionPool);
-    free(tree->statePool.content);
-    free(tree);
-    DELETE_HANDLE(handle);
-    return RULES_OK;
-}
-
-unsigned int createClient(unsigned int *handle, char *name) {
-    INITIALIZE_ENTRIES;
-
-    ruleset *tree = malloc(sizeof(ruleset));
-    if (!tree) {
-        return ERR_OUT_OF_MEMORY;
-    }
-    
-    tree->stringPool = NULL;
-    tree->stringPoolLength = 0;
-    tree->nodePool = NULL;
-    tree->nodeOffset = 0;
-    tree->nextPool = NULL;
-    tree->nextOffset = 0;
-    tree->expressionPool = NULL;
-    tree->expressionOffset = 0;
-    tree->actionCount = 0;
-    tree->betaCount = 0;
-    tree->bindingsList = NULL;
-    memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
-    initStatePool(tree);
-    
-    CHECK_RESULT(storeString(tree, 
-                             name, 
-                             &tree->nameOffset, 
-                             strlen(name)));
-    
-    CREATE_HANDLE(tree, handle);
-    return RULES_OK;
-}
-
-unsigned int deleteClient(unsigned int handle) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-    
-    deleteBindingsList(tree);
-    free(tree->stringPool);
     free(tree->statePool.content);
     free(tree);
     DELETE_HANDLE(handle);

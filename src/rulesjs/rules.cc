@@ -75,83 +75,6 @@ void jsDeleteRuleset(const FunctionCallbackInfo<Value>& args) {
     }
 }
 
-void jsCreateClient(const FunctionCallbackInfo<Value>& args) {
-    Isolate* isolate;
-    isolate = args.GetIsolate();
-    unsigned int output = 0;
-    if (args.Length() < 1) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
-    } else {
-        unsigned int result = createClient(&output, TO_STRING(args[0]));
-        if (result != RULES_OK) {
-            char *message = NULL;
-            if (asprintf(&message, "Could not create client, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
-            } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-            }
-        } else {
-            args.GetReturnValue().Set(output);
-        }
-    } 
-}
-
-void jsDeleteClient(const FunctionCallbackInfo<Value>& args) {
-    v8::Isolate* isolate;
-    isolate = args.GetIsolate();
-    if (args.Length() < 1) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsNumber()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
-    } else {
-        unsigned int result = deleteClient(args[0]->IntegerValue()); 
-        if (result != RULES_OK) {
-            char *message = NULL;
-            if (asprintf(&message, "Could not delete client, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
-            } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-            }
-        }
-    }
-}
-
-void jsBindRuleset(const FunctionCallbackInfo<v8::Value>& args) {
-    v8::Isolate* isolate;
-    isolate = args.GetIsolate();
-    if (args.Length() < 5) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[1]->IsString() || !args[2]->IsNumber() || !args[4]->IsNumber()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
-    } else {
-        unsigned int result;
-        if (args[3]->IsString()) {
-            result = bindRuleset(args[0]->IntegerValue(), 
-                                 TO_STRING(args[1]), 
-                                 args[2]->IntegerValue(), 
-                                 TO_STRING(args[3]),
-                                 args[4]->IntegerValue());
-        } else {
-            result = bindRuleset(args[0]->IntegerValue(), 
-                                 TO_STRING(args[1]), 
-                                 args[2]->IntegerValue(), 
-                                 NULL,
-                                 args[4]->IntegerValue());
-        }
-
-        if (result != RULES_OK) {
-            char *message = NULL;
-            if (asprintf(&message, "Could not create connection, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
-            } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-            }
-        } 
-    }
-}
-
 void jsComplete(const FunctionCallbackInfo<v8::Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
@@ -220,31 +143,6 @@ void jsAssertEvent(const FunctionCallbackInfo<Value>& args) {
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not assert event, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
-            } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-            }
-        } 
-    }
-}
-
-void jsQueueAssertEvent(const FunctionCallbackInfo<Value>& args) {
-    Isolate* isolate;
-    isolate = args.GetIsolate();
-    if (args.Length() < 4) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[3]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
-    } else {
-        unsigned int result = queueMessage(args[0]->IntegerValue(),
-                                           QUEUE_ASSERT_EVENT,
-                                           TO_STRING(args[1]),
-                                           TO_STRING(args[2]),
-                                           TO_STRING(args[3]));
-        
-        if (result != RULES_OK) {
-            char *message = NULL;
-            if (asprintf(&message, "Could not queue assert event, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
@@ -395,31 +293,6 @@ void jsAssertFact(const FunctionCallbackInfo<Value>& args) {
     }
 }
 
-void jsQueueAssertFact(const FunctionCallbackInfo<Value>& args) {
-    Isolate* isolate;
-    isolate = args.GetIsolate();
-    if (args.Length() < 4) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[3]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
-    } else {
-        unsigned int result = queueMessage(args[0]->IntegerValue(),
-                                           QUEUE_ASSERT_FACT,
-                                           TO_STRING(args[1]),
-                                           TO_STRING(args[2]),
-                                           TO_STRING(args[3]));
-        
-        if (result != RULES_OK) {
-            char *message = NULL;
-            if (asprintf(&message, "Could not queue assert fact, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
-            } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-            }
-        } 
-    }
-}
-
 void jsStartAssertFacts(const FunctionCallbackInfo<v8::Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
@@ -529,31 +402,6 @@ void jsRetractFact(const FunctionCallbackInfo<Value>& args) {
         } else {
             char * message;
             if (asprintf(&message, "Could not retract fact, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
-            } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-            }
-        } 
-    }
-}
-
-void jsQueueRetractFact(const FunctionCallbackInfo<Value>& args) {
-    Isolate* isolate;
-    isolate = args.GetIsolate();
-    if (args.Length() < 4) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[3]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
-    } else {
-        unsigned int result = queueMessage(args[0]->IntegerValue(),
-                                           QUEUE_RETRACT_FACT,
-                                           TO_STRING(args[1]),
-                                           TO_STRING(args[2]),
-                                           TO_STRING(args[3]));
-        
-        if (result != RULES_OK) {
-            char *message = NULL;
-            if (asprintf(&message, "Could not queue retract fact, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
@@ -965,15 +813,6 @@ void init(Handle<Object> exports) {
     exports->Set(String::NewFromUtf8(isolate, "deleteRuleset", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsDeleteRuleset)->GetFunction());
 
-    exports->Set(String::NewFromUtf8(isolate, "createClient", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsCreateClient)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "deleteClient", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsDeleteClient)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "bindRuleset", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsBindRuleset)->GetFunction());
-
     exports->Set(String::NewFromUtf8(isolate, "complete", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsComplete)->GetFunction());
 
@@ -982,9 +821,6 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewFromUtf8(isolate, "assertEvent", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsAssertEvent)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "queueAssertEvent", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsQueueAssertEvent)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "startAssertEvents", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsStartAssertEvents)->GetFunction());
@@ -1001,9 +837,6 @@ void init(Handle<Object> exports) {
     exports->Set(String::NewFromUtf8(isolate, "assertFact", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsAssertFact)->GetFunction());
 
-    exports->Set(String::NewFromUtf8(isolate, "queueAssertFact", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsQueueAssertFact)->GetFunction());
-
     exports->Set(String::NewFromUtf8(isolate, "startAssertFacts", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsStartAssertFacts)->GetFunction());
 
@@ -1015,9 +848,6 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewFromUtf8(isolate, "retractFact", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsRetractFact)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "queueRetractFact", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsQueueRetractFact)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "startRetractFacts", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsStartRetractFacts)->GetFunction());

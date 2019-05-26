@@ -35,63 +35,6 @@ static VALUE rbDeleteRuleset(VALUE self, VALUE handle) {
     return Qnil;
 }
 
-static VALUE rbCreateClient(VALUE self, VALUE name) {
-    Check_Type(name, T_STRING);
-    
-    void *output = NULL;
-    unsigned int result = createClient(&output, RSTRING_PTR(name));
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not create client, error code: %d", result);
-        }
-    }
-
-    return INT2FIX(output);
-}
-
-static VALUE rbDeleteClient(VALUE self, VALUE handle) {
-    Check_Type(handle, T_FIXNUM);
-
-    unsigned int result = deleteClient((void *)FIX2LONG(handle));
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not delete client, error code: %d", result);
-        }
-    }
-
-    return Qnil;
-}
-
-static VALUE rbBindRuleset(VALUE self, VALUE handle, VALUE host, VALUE port, VALUE password, VALUE db) {
-    Check_Type(handle, T_FIXNUM);
-    Check_Type(host, T_STRING);
-    Check_Type(port, T_FIXNUM);
-    Check_Type(db, T_FIXNUM);
-
-    unsigned int result;
-    if (TYPE(password) == T_STRING) {
-        result = bindRuleset(FIX2INT(handle), RSTRING_PTR(host), FIX2INT(port), RSTRING_PTR(password), FIX2INT(db));
-    } else if (TYPE(password) == T_NIL) {
-        result = bindRuleset(FIX2INT(handle), RSTRING_PTR(host), FIX2INT(port), NULL, FIX2INT(db));
-    } else {
-        rb_raise(rb_eTypeError, "Wrong argument type for password");   
-    }
-
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not create connection, error code: %d", result);
-        }
-    }
-
-    return Qnil;
-}
-
 static VALUE rbComplete(VALUE self, VALUE stateOffset, VALUE replyCount) {
     Check_Type(stateOffset, T_FIXNUM);
     Check_Type(replyCount, T_FIXNUM);
@@ -143,24 +86,6 @@ static VALUE rbAssertEvent(VALUE self, VALUE handle, VALUE event) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
             rb_raise(rb_eException, "Could not assert event, error code: %d", result);
-        }
-    }
-
-    return Qnil;
-}
-
-static VALUE rbQueueAssertEvent(VALUE self, VALUE handle, VALUE sid, VALUE destination, VALUE event) {
-    Check_Type(handle, T_FIXNUM);
-    Check_Type(sid, T_STRING);
-    Check_Type(destination, T_STRING);
-    Check_Type(event, T_STRING);
-
-    unsigned int result = queueMessage(FIX2INT(handle), QUEUE_ASSERT_EVENT, RSTRING_PTR(sid), RSTRING_PTR(destination), RSTRING_PTR(event));
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not queue assert event, error code: %d", result);
         }
     }
 
@@ -267,24 +192,6 @@ static VALUE rbAssertFact(VALUE self, VALUE handle, VALUE fact) {
     return Qnil;
 }
 
-static VALUE rbQueueAssertFact(VALUE self, VALUE handle, VALUE sid, VALUE destination, VALUE event) {
-    Check_Type(handle, T_FIXNUM);
-    Check_Type(sid, T_STRING);
-    Check_Type(destination, T_STRING);
-    Check_Type(event, T_STRING);
-
-    unsigned int result = queueMessage(FIX2INT(handle), QUEUE_ASSERT_FACT, RSTRING_PTR(sid), RSTRING_PTR(destination), RSTRING_PTR(event));
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not queue assert fact, error code: %d", result);
-        }
-    }
-
-    return Qnil;
-}
-
 static VALUE rbStartAssertFacts(VALUE self, VALUE handle, VALUE facts) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(facts, T_STRING);
@@ -361,24 +268,6 @@ static VALUE rbRetractFact(VALUE self, VALUE handle, VALUE fact) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
             rb_raise(rb_eException, "Could not retract fact, error code: %d", result);
-        }
-    }
-
-    return Qnil;
-}
-
-static VALUE rbQueueRetractFact(VALUE self, VALUE handle, VALUE sid, VALUE destination, VALUE event) {
-    Check_Type(handle, T_FIXNUM);
-    Check_Type(sid, T_STRING);
-    Check_Type(destination, T_STRING);
-    Check_Type(event, T_STRING);
-
-    unsigned int result = queueMessage(FIX2INT(handle), QUEUE_RETRACT_FACT, RSTRING_PTR(sid), RSTRING_PTR(destination), RSTRING_PTR(event));
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not queue retract fact, error code: %d", result);
         }
     }
 
@@ -637,24 +526,18 @@ void Init_rules() {
     rulesModule = rb_define_module("Rules");
     rb_define_singleton_method(rulesModule, "create_ruleset", rbCreateRuleset, 2);
     rb_define_singleton_method(rulesModule, "delete_ruleset", rbDeleteRuleset, 1);
-    rb_define_singleton_method(rulesModule, "create_client", rbCreateClient, 1);
-    rb_define_singleton_method(rulesModule, "delete_client", rbDeleteClient, 1);
-    rb_define_singleton_method(rulesModule, "bind_ruleset", rbBindRuleset, 5);
     rb_define_singleton_method(rulesModule, "complete", rbComplete, 2);
     rb_define_singleton_method(rulesModule, "assert_event", rbAssertEvent, 2);
-    rb_define_singleton_method(rulesModule, "queue_assert_event", rbQueueAssertEvent, 4);
     rb_define_singleton_method(rulesModule, "start_assert_event", rbStartAssertEvent, 2);
     rb_define_singleton_method(rulesModule, "assert_events", rbAssertEvents, 2);
     rb_define_singleton_method(rulesModule, "start_assert_events", rbStartAssertEvents, 2);
     rb_define_singleton_method(rulesModule, "retract_event", rbRetractEvent, 2);
     rb_define_singleton_method(rulesModule, "start_assert_fact", rbStartAssertFact, 2);
     rb_define_singleton_method(rulesModule, "assert_fact", rbAssertFact, 2);
-    rb_define_singleton_method(rulesModule, "queue_assert_fact", rbQueueAssertFact, 4);
     rb_define_singleton_method(rulesModule, "start_assert_facts", rbStartAssertFacts, 2);
     rb_define_singleton_method(rulesModule, "assert_facts", rbAssertFacts, 2);
     rb_define_singleton_method(rulesModule, "start_retract_fact", rbStartRetractFact, 2);
     rb_define_singleton_method(rulesModule, "retract_fact", rbRetractFact, 2);
-    rb_define_singleton_method(rulesModule, "queue_retract_fact", rbQueueRetractFact, 4);
     rb_define_singleton_method(rulesModule, "start_retract_facts", rbStartRetractFacts, 2);
     rb_define_singleton_method(rulesModule, "retract_facts", rbRetractFacts, 2);
     rb_define_singleton_method(rulesModule, "update_state", rbUpdateState, 3);

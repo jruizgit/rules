@@ -63,90 +63,6 @@ static PyObject *pyDeleteRuleset(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
-static PyObject *pyCreateClient(PyObject *self, PyObject *args) {
-    char *name;
-    if (!PyArg_ParseTuple(args, "s", &name)) {
-        PyErr_SetString(RulesError, "pyCreateRuleset Invalid argument");
-        return NULL;
-    }
-
-    unsigned int output = 0;
-    unsigned int result = createClient(&output, name);
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            PyErr_NoMemory();
-        } else { 
-            char *message;
-            if (asprintf(&message, "Could not create client, error code: %d", result) == -1) {
-                PyErr_NoMemory();
-            } else {
-                PyErr_SetString(RulesError, message);
-                free(message);
-            }
-        }
-        return NULL;
-    }
-
-    return Py_BuildValue("I", output);
-}
-
-static PyObject *pyDeleteClient(PyObject *self, PyObject *args) {
-    unsigned int handle;
-    if (!PyArg_ParseTuple(args, "I", &handle)) {
-        PyErr_SetString(RulesError, "pyDeleteClient Invalid argument");
-        return NULL;
-    }
-
-    unsigned int result = deleteClient(handle);
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            PyErr_NoMemory();
-        } else { 
-            char *message;
-            if (asprintf(&message, "Could not delete client, error code: %d", result) == -1) {
-                PyErr_NoMemory();
-            } else {
-                PyErr_SetString(RulesError, message);
-                free(message);
-            }
-        }
-        return NULL;
-    }
-
-    Py_RETURN_NONE;
-}
-
-static PyObject *pyBindRuleset(PyObject *self, PyObject *args) {
-    unsigned int handle;
-    char *host;
-    unsigned int port;
-    char *password = NULL;
-    unsigned int db;
-    unsigned int result;
-    if (PyArg_ParseTuple(args, "IIszI", &port, &db, &host, &password, &handle)) {
-        result = bindRuleset(handle, host, port, password, db);
-    } else {
-        PyErr_SetString(RulesError, "pyBindRuleset Invalid argument");
-        return NULL;
-    }
-
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            PyErr_NoMemory();
-        } else { 
-            char *message;
-            if (asprintf(&message, "Could not create connection, error code: %d", result) == -1) {
-                PyErr_NoMemory();
-            } else {
-                PyErr_SetString(RulesError, message);
-                free(message);
-            }
-        }
-        return NULL;
-    }
-    Py_RETURN_NONE;
-}
-
 static PyObject *pyComplete(PyObject *self, PyObject *args) {
     unsigned int stateOffset;
     unsigned int replyCount = 0;
@@ -201,35 +117,6 @@ static PyObject *pyAssertEvent(PyObject *self, PyObject *args) {
         }
         return NULL;
     }
-}
-
-static PyObject *pyQueueAssertEvent(PyObject *self, PyObject *args) {
-    unsigned int handle;
-    char *sid = NULL;
-    char *destination = NULL;
-    char *event = NULL;
-    if (!PyArg_ParseTuple(args, "Izss", &handle, &sid, &destination, &event)) {
-        PyErr_SetString(RulesError, "pyQueueAssertEvent Invalid argument");
-        return NULL;
-    }
-
-    unsigned int result = queueMessage(handle, QUEUE_ASSERT_EVENT, sid, destination, event);
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            PyErr_NoMemory();
-        } else { 
-            char *resultMessage;
-            if (asprintf(&resultMessage, "Could not queue assert event, error code: %d", result) == -1) {
-                PyErr_NoMemory();
-            } else {
-                PyErr_SetString(RulesError, resultMessage);
-                free(resultMessage);
-            }
-        }
-        return NULL;
-    }
-
-    Py_RETURN_NONE;
 }
 
 static PyObject *pyStartAssertEvent(PyObject *self, PyObject *args) {
@@ -371,35 +258,6 @@ static PyObject *pyAssertFact(PyObject *self, PyObject *args) {
     }
 }
 
-static PyObject *pyQueueAssertFact(PyObject *self, PyObject *args) {
-    unsigned int handle;
-    char *sid = NULL;
-    char *destination = NULL;
-    char *event = NULL;
-    if (!PyArg_ParseTuple(args, "Izss", &handle, &sid, &destination, &event)) {
-        PyErr_SetString(RulesError, "pyQueueAssertFact Invalid argument");
-        return NULL;
-    }
-
-    unsigned int result = queueMessage(handle, QUEUE_ASSERT_FACT, sid, destination, event);
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            PyErr_NoMemory();
-        } else { 
-            char *resultMessage;
-            if (asprintf(&resultMessage, "Could not queue assert fact, error code: %d", result) == -1) {
-                PyErr_NoMemory();
-            } else {
-                PyErr_SetString(RulesError, resultMessage);
-                free(resultMessage);
-            }
-        }
-        return NULL;
-    }
-
-    Py_RETURN_NONE;
-}
-
 static PyObject *pyStartAssertFact(PyObject *self, PyObject *args) {
     unsigned int handle;
     char *fact;
@@ -510,35 +368,6 @@ static PyObject *pyRetractFact(PyObject *self, PyObject *args) {
         }
         return NULL;
     }
-}
-
-static PyObject *pyQueueRetractFact(PyObject *self, PyObject *args) {
-    unsigned int handle;
-    char *sid = NULL;
-    char *destination = NULL;
-    char *event = NULL;
-    if (!PyArg_ParseTuple(args, "Izss", &handle, &sid, &destination, &event)) {
-        PyErr_SetString(RulesError, "pyQueueRetractFact Invalid argument");
-        return NULL;
-    }
-
-    unsigned int result = queueMessage(handle, QUEUE_RETRACT_FACT, sid, destination, event);
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            PyErr_NoMemory();
-        } else { 
-            char *resultMessage;
-            if (asprintf(&resultMessage, "Could not queue retract fact, error code: %d", result) == -1) {
-                PyErr_NoMemory();
-            } else {
-                PyErr_SetString(RulesError, resultMessage);
-                free(resultMessage);
-            }
-        }
-        return NULL;
-    }
-
-    Py_RETURN_NONE;
 }
 
 static PyObject *pyStartRetractFact(PyObject *self, PyObject *args) {
@@ -945,23 +774,17 @@ static PyObject *pyRenewActionLease(PyObject *self, PyObject *args) {
 static PyMethodDef myModule_methods[] = {
     {"create_ruleset", pyCreateRuleset, METH_VARARGS},
     {"delete_ruleset", pyDeleteRuleset, METH_VARARGS},
-    {"create_client", pyCreateClient, METH_VARARGS},
-    {"delete_client", pyDeleteClient, METH_VARARGS},
-    {"bind_ruleset", pyBindRuleset, METH_VARARGS},
     {"complete", pyComplete, METH_VARARGS},
     {"assert_event", pyAssertEvent, METH_VARARGS},
-    {"queue_assert_event", pyQueueAssertEvent, METH_VARARGS},
     {"start_assert_event", pyStartAssertEvent, METH_VARARGS},
     {"assert_events", pyAssertEvents, METH_VARARGS},
     {"start_assert_events", pyStartAssertEvents, METH_VARARGS},
     {"retract_event", pyRetractEvent, METH_VARARGS},
     {"start_assert_fact", pyStartAssertFact, METH_VARARGS},
     {"assert_fact", pyAssertFact, METH_VARARGS},
-    {"queue_assert_fact", pyQueueAssertFact, METH_VARARGS},
     {"start_assert_facts", pyStartAssertFacts, METH_VARARGS},
     {"assert_facts", pyAssertFacts, METH_VARARGS},
     {"retract_fact", pyRetractFact, METH_VARARGS},
-    {"queue_retract_fact", pyQueueRetractFact, METH_VARARGS},
     {"start_retract_fact", pyStartRetractFact, METH_VARARGS},
     {"retract_facts", pyRetractFacts, METH_VARARGS},
     {"start_retract_facts", pyStartRetractFacts, METH_VARARGS},

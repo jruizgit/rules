@@ -3,9 +3,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include "rules.h"
-#include "net.h"
 #include "json.h"
 #include "regex.h"
+#include "rete.h"
+
+#define ACTION_ASSERT_FACT 1
+#define ACTION_ASSERT_EVENT 2
+#define ACTION_RETRACT_FACT 3
+#define ACTION_RETRACT_EVENT 4
+#define ACTION_UPDATE_STATE 5
+
 
 #define MAX_RESULT_NODES 32
 #define MAX_NODE_RESULTS 16
@@ -49,21 +56,9 @@
 
 #define ONE_HASH 873244444
 
-typedef struct jsonResult {
-    unsigned int hash;
-    char *firstName;
-    char *lastName;
-    char *messages[MAX_MESSAGE_BATCH];
-    unsigned short messagesLength;
-    unsigned char childrenCount;
-    unsigned char children[MAX_NODE_RESULTS];
-} jsonResult;
-
 static unsigned int handleMessage(ruleset *tree,
                                   char *message, 
                                   unsigned char actionType, 
-                                  char **commands,
-                                  unsigned int *commandCount,
                                   unsigned int *messageOffset,
                                   unsigned int *stateOffset);
 
@@ -743,13 +738,6 @@ static unsigned int isAlphaMatch(ruleset *tree,
     }
 
     return RULES_OK;
-}
-
-static void freeCommands(char **commands,
-                         unsigned int commandCount) {
-    for (unsigned int i = 0; i < commandCount; ++i) {
-        free(commands[i]);
-    }
 }
 
 static unsigned char isDistinct(leftFrameNode *currentFrame, unsigned int currentMessageOffset) {
@@ -1637,8 +1625,6 @@ static unsigned int handleAlpha(ruleset *tree,
 static unsigned int handleMessageCore(ruleset *tree,
                                       jsonObject *jo, 
                                       unsigned char actionType,
-                                      char **commands,
-                                      unsigned int *commandCount,
                                       unsigned int *messageOffset,
                                       unsigned int *stateOffset) {
     stateNode *sidState;
@@ -1738,8 +1724,6 @@ static unsigned int handleMessageCore(ruleset *tree,
                 unsigned int stateResult = handleMessage(tree,
                                                          stateMessage,  
                                                          ACTION_ASSERT_FACT,
-                                                         commands,
-                                                         commandCount,
                                                          &stateMessageOffset,
                                                          stateOffset);
                 if (stateResult != RULES_OK && stateResult != ERR_EVENT_NOT_HANDLED) {
@@ -1761,8 +1745,6 @@ static unsigned int handleMessageCore(ruleset *tree,
 static unsigned int handleMessage(ruleset *tree,
                                   char *message, 
                                   unsigned char actionType, 
-                                  char **commands,
-                                  unsigned int *commandCount,
                                   unsigned int *messageOffset,
                                   unsigned int *stateOffset) {
     char *next;
@@ -1777,8 +1759,6 @@ static unsigned int handleMessage(ruleset *tree,
     return handleMessageCore(tree, 
                              &jo,
                              actionType,
-                             commands,
-                             commandCount,
                              messageOffset,
                              stateOffset);
 }
@@ -1786,8 +1766,6 @@ static unsigned int handleMessage(ruleset *tree,
 static unsigned int handleMessages(ruleset *tree, 
                                    unsigned char actionType,
                                    char *messages, 
-                                   char **commands,
-                                   unsigned int *commandCount,
                                    unsigned int *stateOffset) {
     unsigned int result;
     unsigned int returnResult = RULES_OK;
@@ -1821,8 +1799,6 @@ static unsigned int handleMessages(ruleset *tree,
         result = handleMessageCore(tree,
                                    &jo, 
                                    actionType, 
-                                   commands,
-                                   commandCount,
                                    &messageOffset,
                                    stateOffset);
         
@@ -1849,54 +1825,24 @@ static unsigned int startHandleMessage(ruleset *tree,
                                        unsigned char actionType,
                                        unsigned int *stateOffset,
                                        unsigned int *replyCount) {
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
     unsigned int messageOffset;
-    unsigned int result = handleMessage(tree, 
-                                        message, 
-                                        actionType, 
-                                        commands,
-                                        &commandCount,
-                                        &messageOffset,
-                                        stateOffset);
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    unsigned int batchResult = startNonBlockingBatch(NULL, commands, commandCount, replyCount);
-    if (batchResult != RULES_OK) {
-        return batchResult;
-    }
-
-    return result;
+    return handleMessage(tree, 
+                         message, 
+                         actionType, 
+                         &messageOffset,
+                         stateOffset);
 }
 
 static unsigned int executeHandleMessage(ruleset *tree, 
                                          char *message, 
                                          unsigned char actionType) {
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
     unsigned int stateOffset;
     unsigned int messageOffset;
-    unsigned int result = handleMessage(tree, 
-                                        message, 
-                                        actionType, 
-                                        commands,
-                                        &commandCount,
-                                        &messageOffset,
-                                        &stateOffset);
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    unsigned int batchResult = executeBatch(NULL, commands, commandCount);
-    if (batchResult != RULES_OK) {
-        return batchResult;
-    }
-
-    return result;
+    return handleMessage(tree, 
+                         message, 
+                         actionType, 
+                         &messageOffset,
+                         &stateOffset);
 }
 
 static unsigned int startHandleMessages(ruleset *tree, 
@@ -1904,58 +1850,23 @@ static unsigned int startHandleMessages(ruleset *tree,
                                         unsigned char actionType,
                                         unsigned int *stateOffset,
                                         unsigned int *replyCount) {
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
-    unsigned int result = handleMessages(tree,
-                                         actionType,
-                                         messages,
-                                         commands,
-                                         &commandCount,
-                                         stateOffset);
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    unsigned int batchResult = startNonBlockingBatch(NULL, commands, commandCount, replyCount);
-    if (batchResult != RULES_OK) {
-        return batchResult;
-    }
-
-    return result;
+    return handleMessages(tree,
+                          actionType,
+                          messages,
+                          stateOffset);
 }
 
 static unsigned int executeHandleMessages(ruleset *tree, 
                                           char *messages, 
                                           unsigned char actionType) {
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
     unsigned int stateOffset;
-    unsigned int result = handleMessages(tree,
-                                         actionType,
-                                         messages,
-                                         commands,
-                                         &commandCount,
-                                         &stateOffset);
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    unsigned int batchResult = executeBatch(NULL, commands, commandCount);
-    if (batchResult != RULES_OK) {
-        return batchResult;
-    }
-
-    return result;
+    return handleMessages(tree,
+                          actionType,
+                          messages,
+                          &stateOffset);
 }
 
 unsigned int complete(unsigned int stateOffset, unsigned int replyCount) {
-    unsigned int result = completeNonBlockingBatch(NULL, replyCount);
-    if (result != RULES_OK && result != ERR_EVENT_OBSERVED) {
-        return result;
-    }
-
     return RULES_OK;
 }
 
@@ -2075,28 +1986,13 @@ unsigned int updateState(unsigned int handle, char *sid, char *state) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
     unsigned int stateOffset;
     unsigned int messageOffset;
-    unsigned int result = handleMessage(tree, 
-                                        state, 
-                                        ACTION_UPDATE_STATE,
-                                        commands,
-                                        &commandCount,
-                                        &messageOffset,
-                                        &stateOffset);
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    unsigned int batchResult = executeBatch(NULL, commands, commandCount);
-    if (batchResult != RULES_OK) {
-        return batchResult;
-    }
-
-    return result;
+    return handleMessage(tree, 
+                         state, 
+                         ACTION_UPDATE_STATE,
+                         &messageOffset,
+                         &stateOffset);
 }
 
 unsigned int startUpdateState(unsigned int handle, 
@@ -2105,28 +2001,18 @@ unsigned int startUpdateState(unsigned int handle,
                               unsigned int *replyCount) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int result = RULES_OK;
-    unsigned int commandCount = 0;
     unsigned int messageOffset;
-    result = handleMessage(tree, 
-                           state,
-                           ACTION_UPDATE_STATE,
-                           commands,
-                           &commandCount,
-                           &messageOffset,
-                           stateOffset);
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        freeCommands(commands, commandCount);
-        return result;
+    *replyCount = 1;
+    unsigned int result = handleMessage(tree, 
+                                        state,
+                                        ACTION_UPDATE_STATE,
+                                        &messageOffset,
+                                        stateOffset);
+    if (result == ERR_EVENT_NOT_HANDLED) {
+        return RULES_OK;
     }
 
-    result = startNonBlockingBatch(NULL, commands, commandCount, replyCount);
-
-    //TODO: Durable store
-    *replyCount = 1;
     return result;
-
 }
 
 unsigned int startAction(unsigned int handle, 
@@ -2296,24 +2182,6 @@ unsigned int renewActionLease(unsigned int handle, char *sid) {
     state->lockExpireTime = time(NULL) + STATE_LEASE_TIME;
     return RULES_OK;
 }
-
-unsigned int queueMessage(unsigned int handle, unsigned int queueAction, char *sid, char *destination, char *message) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    void *rulesBinding;
-    if (!sid) {
-        sid = "0";
-    }
-
-    unsigned int result = resolveBinding(tree, sid, &rulesBinding);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    return registerMessage(rulesBinding, queueAction, destination, message);
-}
-
 
 unsigned int assertTimers(unsigned int handle) {
     ruleset *tree;

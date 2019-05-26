@@ -4,42 +4,6 @@ exports = module.exports = durableEngine = function () {
     var stat = require('node-static');
     var r = require('bindings')('rulesjs.node');
 
-    var closureQueue = function () {
-        var that = {};
-        var queuedPosts = [];
-        var queuedAsserts = [];
-        var queuedRetracts = [];
-
-        that.getQueuedPosts = function () {
-            return queuedPosts;
-        };
-
-        that.getQueuedAsserts = function () {
-            return queuedAsserts;
-        };
-
-        that.getQueuedRetracts = function () {
-            return queuedRetracts;
-        };
-
-        that.post = function (message) {
-            message = copy(message);
-            queuedPosts.push(message);
-        };
-
-        that.assert = function (message) {
-            message = copy(message);
-            queuedAsserts.push(message);
-        };
-
-        that.retract = function (message) {
-            message = copy(message);
-            queuedRetracts.push(message);
-        };
-
-        return that;
-    } 
-
     var closure = function (host, document, output, handle, rulesetName) {
         var that = {};
         var targetRulesets = {};
@@ -106,10 +70,6 @@ exports = module.exports = durableEngine = function () {
             return eventDirectory;
         };
 
-        that.getQueues = function () {
-            return queueDirectory;
-        };
-
         that.getFacts = function () {
             return factDirectory;
         };
@@ -125,14 +85,6 @@ exports = module.exports = durableEngine = function () {
         that.getCancelledTimers = function () {
             return cancelledTimerDirectory;
         };
-
-        that.getQueue = function (rules) {
-            if (!queueDirectory[rules]) {
-                queueDirectory[rules] = closureQueue();
-            }
-            
-            return queueDirectory[rules];
-        }
 
         that.post = function (rules, message) {
             if (!message) {
@@ -387,29 +339,12 @@ exports = module.exports = durableEngine = function () {
         var actions = {};
         var handle;
         
-        that.bind = function (databases) {
-            for (var i = 0; i < databases.length; ++i) {
-                var db = databases[i];
-                if (typeof(db) === 'string') {
-                    r.bindRuleset(handle, db, 0, null, 0);
-                } else {
-                    db.db = db.db || 0;
-                    db.password = db.password || null;
-                    r.bindRuleset(handle, db.host, db.port, db.password, db.db);
-                }
-            }
-        };
-
         that.startAssertEvent = function (message) {
             return r.startAssertEvent(handle, JSON.stringify(message));
         };
 
         that.assertEvent = function (message) {
             return r.assertEvent(handle, JSON.stringify(message));
-        };
-
-        that.queueAssertEvent = function (sid, rulesetName, message) {
-            return r.queueAssertEvent(handle, sid, rulesetName, JSON.stringify(message));
         };
 
         that.startAssertEvents = function (messages) {
@@ -428,10 +363,6 @@ exports = module.exports = durableEngine = function () {
             return r.assertFact(handle, JSON.stringify(fact));
         };
 
-        that.queueAssertFact = function (sid, rulesetName, message) {
-            return r.queueAssertFact(handle, sid, rulesetName, JSON.stringify(message));
-        };
-
         that.startAssertFacts = function (facts) {
             return r.startAssertFacts(handle, JSON.stringify(facts));
         };
@@ -446,10 +377,6 @@ exports = module.exports = durableEngine = function () {
 
         that.retractFact = function (fact) {
             return r.retractFact(handle, JSON.stringify(fact));
-        };
-
-        that.queueRetractFact = function (sid, rulesetName, message) {
-            return r.queueRetractFact(handle, sid, rulesetName, JSON.stringify(message));
         };
 
         that.startRetractFacts = function (facts) {
@@ -577,32 +504,11 @@ exports = module.exports = durableEngine = function () {
                                 for (var timerName in timers) {
                                     that.cancelTimer(c.s.sid, timerName);
                                 }
-
                                 timers = c.getTimers();
                                 for (var timerName in timers) {
                                     var timerTuple = timers[timerName];
                                     that.startTimer(c.s.sid, timerTuple[0], timerTuple[1], timerTuple[2]);
-                                }
-
-                                var queues = c.getQueues();
-                                for (var targetRuleset in queues) {
-                                    var q = queues[targetRuleset];
-                                    var messages = q.getQueuedPosts();
-                                    for (var i = 0; i < messages.length; ++i) {
-                                        that.queueAssertEvent(messages[i].sid, targetRuleset, messages[i]);
-                                    }
-
-                                    var messages = q.getQueuedAsserts();
-                                    for (var i = 0; i < messages.length; ++i) {
-                                        that.queueAssertFact(messages[i].sid, targetRuleset, messages[i]);
-                                    }
-
-                                    var messages = q.getQueuedRetracts();
-                                    for (var i = 0; i < messages.length; ++i) {
-                                        that.queueRetractFact(messages[i].sid, targetRuleset, messages[i]);
-                                    }
-                                }
-
+                                }                 
                                 var retractFacts = c.getRetract();
                                 pending[stateOffset] = 0;
                                 for (rulesetName in retractFacts) {
@@ -1059,12 +965,11 @@ exports = module.exports = durableEngine = function () {
         return branches;
     };
 
-    var host = function (databases) {
+    var host = function () {
         var that = {};
         var rulesDirectory = {};
         var instanceDirectory = {};
         var rulesList = [];
-        databases = databases || [{host: 'localhost', port: 6379, password:null, db:0}];
         
         that.getAction = function (actionName) {
             throw 'Action ' + actionName + ' not found';
@@ -1125,7 +1030,6 @@ exports = module.exports = durableEngine = function () {
                 } else {
                     rulesDirectory[rulesetName] = rulesetDefinition;
                     rulesList.push(rulesetDefinition);
-                    rulesetDefinition.bind(databases);
                     names.push(rulesetName);
                 }
             }
@@ -1272,56 +1176,6 @@ exports = module.exports = durableEngine = function () {
 
         setTimeout(dispatchRules, 100, 0);
         setTimeout(dispatchTimers, 100, 0);
-        return that;
-    }
-
-    var queue = function(rulesetName, database) {
-        var that = {};
-        var handle;
-        database = database || {host: 'localhost', port: 6379, password: null, db: 0};
-        
-        that.isClosed = function() {
-            return (handle == 0);
-        }
-
-        that.post = function (message) {
-            if (handle == 0) {
-                throw 'Queue has already been closed';
-            }
-
-            return r.queueAssertEvent(handle, message.sid, rulesetName, JSON.stringify(message));
-        };
-
-        that.assert = function (message) {
-            if (handle == 0) {
-                throw 'Queue has already been closed';
-            }
-
-            return r.queueAssertFact(handle, message.sid, rulesetName, JSON.stringify(message));
-        };
-
-        that.retract = function (message) {
-            if (handle == 0) {
-                throw 'Queue has already been closed';
-            }
-
-            return r.queueRetractFact(handle, message.sid, rulesetName, JSON.stringify(message));
-        };
-
-        that.close = function() {
-            if (handle != 0) {
-                r.deleteClient(handle);
-                handle = 0;
-            }
-        };
-
-        handle = r.createClient(rulesetName)
-        if (typeof(database) === 'string') {
-            r.bindRuleset(handle, database, 0, null, 0);
-        } else {
-            r.bindRuleset(handle, database.host, database.port, database.password, database.db);
-        }
-
         return that;
     }
 
@@ -1520,7 +1374,6 @@ exports = module.exports = durableEngine = function () {
         closure: closure,
         promise: promise,
         host: host,
-        queue: queue,
         application: application
     };
 }();

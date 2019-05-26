@@ -4,7 +4,7 @@
 #include <time.h>
 #include "rules.h"
 #include "json.h"
-#include "net.h"
+#include "rete.h"
 
 #define MAX_STATE_NODES 8
 #define MAX_MESSAGE_NODES 16
@@ -775,10 +775,6 @@ unsigned int ensureStateNode(void *tree,
         }
         memcpy(node->sid, sid, sidLength);
 
-        CHECK_RESULT(getBindingIndex(tree, 
-                                     sidHash, 
-                                     &node->bindingIndex));
-
         INIT(messageNode, 
              node->messagePool, 
              MAX_MESSAGE_NODES);
@@ -1409,37 +1405,30 @@ unsigned int constructObject(char *root,
     return (result == PARSE_END ? RULES_OK: result);
 }
 
-unsigned int resolveBinding(void *tree, 
-                            char *sid, 
-                            void **rulesBinding) {  
-    return RULES_OK;
-}
-
 unsigned int getState(unsigned int handle, char *sid, char **state) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    void *rulesBinding = NULL;
     if (!sid) {
         sid = "0";
     }
+    unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
+    unsigned int nodeOffset;
 
-    unsigned int result = resolveBinding(tree, sid, &rulesBinding);
-    if (result != RULES_OK) {
-      return result;
+    GET_FIRST(stateNode, 
+             tree->stateIndex, 
+             MAX_STATE_INDEX_LENGTH, 
+             ((ruleset*)tree)->statePool, 
+             sidHash, 
+             nodeOffset);
+
+    if (nodeOffset == UNDEFINED_HASH_OFFSET) {
+      return ERR_SID_NOT_FOUND;
     }
 
-    return getSession(rulesBinding, sid, state);
-}
+    stateNode *node = STATE_NODE(tree, nodeOffset); 
 
-unsigned int getStateVersion(void *tree, char *sid, unsigned long *stateVersion) {
-    void *rulesBinding = NULL;
-    unsigned int result = resolveBinding(tree, sid, &rulesBinding);
-    if (result != RULES_OK) {
-      return result;
-    }
-
-    return getSessionVersion(rulesBinding, sid, stateVersion);
+    return serializeState(node, state);
 }
 
 unsigned int deleteState(unsigned int handle, char *sid) {

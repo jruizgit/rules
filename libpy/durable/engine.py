@@ -17,40 +17,6 @@ def _unix_now():
     return delta.total_seconds()
 
 
-class Closure_Queue(object):
-
-    def __init__(self):
-        self._queued_posts = []
-        self._queued_asserts = []
-        self._queued_retracts = []
-
-    def get_queued_posts(self):
-        return self._queued_posts
-
-    def get_queued_asserts(self):
-        return self._queued_posts
-
-    def get_queued_retracts(self):
-        return self._queued_posts      
-
-    def post(self, message):
-        if isinstance(message, Content):
-            message = message._d
-
-        self._queued_posts.append(message)
-
-    def assert_fact(self, message):
-        if isinstance(message, Content):
-            message = message._d
-
-        self._queued_asserts.append(message)
-
-    def retract_fact(self, message):
-        if isinstance(message, Content):
-            message = message._d
-
-        self._queued_retracts.append(message)
-
 class Closure(object):
 
     def __init__(self, host, state, message, handle, ruleset_name):
@@ -90,20 +56,11 @@ class Closure(object):
     def get_messages(self):
         return self._message_directory
 
-    def get_queues(self):
-        return self._queue_directory
-
     def get_facts(self):
         return self._fact_directory
 
     def get_retract_facts(self):
         return self._retract_directory
-
-    def get_queue(self, ruleset_name):
-        if not ruleset_name in self._queue_directory:
-            self._queue_directory[ruleset_name] = Closure_Queue()
-        
-        return self._queue_directory[ruleset_name]
 
     def post(self, ruleset_name, message = None):
         if not message: 
@@ -372,28 +329,9 @@ class Ruleset(object):
 
         self._handle = rules.create_ruleset(name, json.dumps(ruleset_definition, ensure_ascii=False))
         self._definition = ruleset_definition
-        
-    def bind(self, databases):
-        for db in databases:
-            if isinstance(db, str):
-                rules.bind_ruleset(0, 0, db, None, self._handle)
-            else:
-                if not 'password' in db:
-                    db['password'] = None
-
-                if not 'db' in db:
-                    db['db'] = 0
-
-                rules.bind_ruleset(db['port'], db['db'], db['host'], db['password'], self._handle)
 
     def assert_event(self, message):
         return rules.assert_event(self._handle, json.dumps(message, ensure_ascii=False))
-
-    def queue_assert_event(self, sid, ruleset_name, message):
-        if sid != None: 
-            sid = str(sid)
-
-        rules.queue_assert_event(self._handle, sid, ruleset_name, json.dumps(message, ensure_ascii=False))
 
     def start_assert_event(self, message):
         return rules.start_assert_event(self._handle, json.dumps(message, ensure_ascii=False))
@@ -407,12 +345,6 @@ class Ruleset(object):
     def assert_fact(self, fact):
         return rules.assert_fact(self._handle, json.dumps(fact, ensure_ascii=False))
 
-    def queue_assert_fact(self, sid, ruleset_name, message):
-        if sid != None: 
-            sid = str(sid)
-
-        rules.queue_assert_fact(self._handle, sid, ruleset_name, json.dumps(message, ensure_ascii=False))
-
     def start_assert_fact(self, fact):
         return rules.start_assert_fact(self._handle, json.dumps(fact, ensure_ascii=False))
 
@@ -425,12 +357,6 @@ class Ruleset(object):
     def retract_fact(self, fact):
         return rules.retract_fact(self._handle, json.dumps(fact, ensure_ascii=False))
         
-    def queue_retract_fact(self, sid, ruleset_name, message):
-        if sid != None: 
-            sid = str(sid)
-
-        rules.queue_retract_fact(self._handle, sid, ruleset_name, json.dumps(message, ensure_ascii=False))
-
     def start_retract_fact(self, fact):
         return rules.start_retract_fact(self._handle, json.dumps(fact, ensure_ascii=False))
 
@@ -563,16 +489,6 @@ class Ruleset(object):
 
                         for timer_id, timer_tuple in c.get_timers().items():
                             self.start_timer(c.s['sid'], timer_tuple[0], timer_tuple[1], timer_tuple[2])
-
-                        for ruleset_name, q in c.get_queues().items():
-                            for message in q.get_queued_posts():
-                                self.queue_assert_event(message['sid'], ruleset_name, message)
-
-                            for message in q.get_queued_asserts():
-                                self.queue_assert_fact(message['sid'], ruleset_name, message)
-
-                            for message in q.get_queued_retracts():
-                                self.queue_retract_fact(message['sid'], ruleset_name, message)
 
                         offset  = 0
                         replies = 0
@@ -887,13 +803,9 @@ class Flowchart(Ruleset):
 
 class Host(object):
 
-    def __init__(self, ruleset_definitions = None, databases = None):
-        if not databases:
-            databases = [{'host': 'localhost', 'port': 6379, 'password': None, 'db': 0}]
-            
+    def __init__(self, ruleset_definitions = None):    
         self._ruleset_directory = {}
         self._ruleset_list = []
-        self._databases = databases
         if ruleset_definitions:
             self.register_rulesets(None, ruleset_definitions)
 
@@ -986,7 +898,6 @@ class Host(object):
             else:    
                 self._ruleset_directory[ruleset_name] = ruleset
                 self._ruleset_list.append(ruleset)
-                ruleset.bind(self._databases)
 
         return list(rulesets.keys())
 
@@ -1044,58 +955,4 @@ class Host(object):
         self._t_timer.daemon = True
         self._t_timer.start()
 
-
-class Queue(object):
-
-    def __init__(self, ruleset_name, database = None):
-        if not database:
-            database = {'host': 'localhost', 'port': 6379, 'password':None, 'db': 0}
-
-        self._ruleset_name = ruleset_name
-        self._handle = rules.create_client(ruleset_name)
-        if isinstance(database, str):
-            rules.bind_ruleset(0, 0, database, None, self._handle)
-        else:
-            if not 'password' in database:
-                database['password'] = None
-
-            if not 'db' in database:
-                database['db'] = 0
-
-            rules.bind_ruleset(database['port'], database['db'], database['host'], database['password'], self._handle)
-        
-    def isClosed(self):
-        return self._handle == 0
-
-    def post(self, message):
-        if self._handle == 0:
-            raise Exception('Queue has already been closed')
-
-        if 'sid' in message:
-            rules.queue_assert_event(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
-        else:
-            rules.queue_assert_event(self._handle, None, self._ruleset_name, json.dumps(message, ensure_ascii=False))
-
-    def assert_fact(self, message):
-        if self._handle == 0:
-            raise Exception('Queue has already been closed')
-
-        if 'sid' in message:
-            rules.queue_assert_fact(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
-        else: 
-            rules.queue_assert_fact(self._handle, None, self._ruleset_name, json.dumps(message, ensure_ascii=False))
-
-    def retract_fact(self, message):
-        if self._handle == 0:
-            raise Exception('Queue has already been closed')
-
-        if 'sid' in message:
-            rules.queue_retract_fact(self._handle, str(message['sid']), self._ruleset_name, json.dumps(message, ensure_ascii=False))
-        else:
-            rules.queue_retract_fact(self._handle, None, self._ruleset_name, json.dumps(message, ensure_ascii=False))
-
-    def close(self):
-        if self._handle != 0:
-            rules.delete_client(self._handle)
-            self._handle = 0
 

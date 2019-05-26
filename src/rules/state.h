@@ -169,7 +169,6 @@ typedef struct stateNode {
     unsigned int factOffset;
     unsigned int hash;
     unsigned char isActive;
-    unsigned int bindingIndex;
     pool messagePool;
     unsigned int messageIndex[MAX_MESSAGE_INDEX_LENGTH * 2];
     betaStateNode *betaState;
