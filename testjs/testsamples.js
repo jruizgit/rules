@@ -6,25 +6,20 @@ d.ruleset('test', function() {
     whenAll: m.subject == 'World'
     // consequent
     run: console.log('Hello ' + m.subject)
-
-    whenStart: {
-        post('test', {subject: 'World'});
-    }
 });
+
+d.post('test', {subject: 'World'}, function(err, state){});
 
 d.ruleset('risk0', function() {
     whenAll: {
         first = m.t == 'purchase'
         second = m.location != first.location
     }
-
-    run: console.log('fraud detected ->' + first.location + ', ' + second.location)
-   
-    whenStart: {
-        post('risk0', {t: 'purchase', location: 'US'});
-        post('risk0', {t: 'purchase', location: 'CA'});
-    }
+    run: console.log('risk0 fraud detected ->' + first.location + ', ' + second.location)
 });
+
+d.post('risk0', {t: 'purchase', location: 'US'}, function(err, state){});
+d.post('risk0', {t: 'purchase', location: 'CA'}, function(err, state){});
 
 d.ruleset('indistinct', function() {
     whenAll: {
@@ -38,13 +33,11 @@ d.ruleset('indistinct', function() {
         console.log('               -> ' + second.amount);
         console.log('               -> ' + third.amount);
     }
-
-    whenStart: {
-        host.post('indistinct', {amount: 200});
-        host.post('indistinct', {amount: 500});
-        host.post('indistinct', {amount: 1000});
-    }
 });
+
+d.post('indistinct', {amount: 200}, function(err, state){});
+d.post('indistinct', {amount: 500}, function(err, state){});
+d.post('indistinct', {amount: 1000}, function(err, state){});
 
 d.ruleset('distinct', function() {
     whenAll: {
@@ -57,33 +50,29 @@ d.ruleset('distinct', function() {
         console.log('               -> ' + second.amount);
         console.log('               -> ' + third.amount);
     }
-
-    whenStart: {
-        host.post('distinct', {amount: 50});
-        host.post('distinct', {amount: 200});
-        host.post('distinct', {amount: 251});
-    }
 });
+
+d.post('distinct', {amount: 50}, function(err, state){});
+d.post('distinct', {amount: 200}, function(err, state){});
+d.post('distinct', {amount: 251}, function(err, state){});
 
 d.ruleset('expense0', function() {
     whenAll: m.subject == 'approve' || m.subject == 'ok'
     run: console.log('expense0 Approved');
-
-    whenStart: post('expense0', { subject: 'approve' })
 });
+
+d.post('expense0', { subject: 'approve' }, function(err, state){});
 
 d.ruleset('match', function() {
     whenAll: m.url.matches('(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*') 
     run: console.log('match url ' + m.url)
-        
-    whenStart: {
-        post('match', {url: 'https://github.com'});
-        post('match', {url: 'http://github.com/jruizgit/rul!es'});
-        post('match', {url: 'https://github.com/jruizgit/rules/reference.md'});
-        post('match', {url: '//rules'});
-        post('match', {url: 'https://github.c/jruizgit/rules'});
-    }
 });
+
+d.post('match', {url: 'https://github.com'}, function(err, state){});
+d.post('match', {url: 'http://github.com/jruizgit/rul!es'}, function(err, state){});
+d.post('match', {url: 'https://github.com/jruizgit/rules/reference.md'}, function(err, state){});
+d.post('match', {url: '//rules'}, function(err, state){});
+d.post('match', {url: 'https://github.c/jruizgit/rules'}, function(err, state){});
 
 d.ruleset('strings', function() {
     whenAll: m.subject.matches('hello.*')
@@ -94,15 +83,13 @@ d.ruleset('strings', function() {
 
     whenAll: m.subject.imatches('.*hello.*')
     run: console.log('string contains hello (case insensitive): ' + m.subject)
-
-    whenStart: {
-        assert('strings', { subject: 'HELLO world' });
-        assert('strings', { subject: 'world hello' });
-        assert('strings', { subject: 'hello hi' });
-        assert('strings', { subject: 'has Hello string' });
-        assert('strings', { subject: 'does not match' });
-    }
 });
+
+d.assert('strings', { subject: 'HELLO world' }, function(err, state){});
+d.assert('strings', { subject: 'world hello' }, function(err, state){});
+d.assert('strings', { subject: 'hello hi' }, function(err, state){});
+d.assert('strings', { subject: 'has Hello string' }, function(err, state){});
+d.assert('strings', { subject: 'does not match' }, function(err, state){ console.log(err.message)});
 
 d.ruleset('risk2_0', function() {
     whenAll: {
@@ -168,12 +155,12 @@ d.ruleset('expense2', function() {
     run: console.log('expense2 rejected ' + JSON.stringify(m));
 
     whenStart: {
-        postBatch('expense2', { amount: 10 },
-                             { amount: 20 },
-                             { amount: 100 },
-                             { amount: 30 },
-                             { amount: 200 },
-                             { amount: 400 });
+        postEvents('expense2', { amount: 10 },
+                               { amount: 20 },
+                               { amount: 100 },
+                               { amount: 30 },
+                               { amount: 200 },
+                               { amount: 400 });
         assert('expense2', { review: true })
     }
 });
@@ -310,56 +297,56 @@ d.flowchart('expense4', function() {
 });
 
 
-d.ruleset('bookstore', function() {
-    // this rule will trigger for events with status
-    whenAll: +m.status
-    run: console.log('bookstore reference ' + m.reference + ' status ' + m.status)
+// d.ruleset('bookstore', function() {
+//     // this rule will trigger for events with status
+//     whenAll: +m.status
+//     run: console.log('bookstore reference ' + m.reference + ' status ' + m.status)
 
-    whenAll: +m.name
-    run: { 
-        console.log('bookstore added: ' + m.name);
-        retract({
-            name: 'The new book',
-            reference: '75323',
-            price: 500,
-            seller: 'bookstore'
-        });
-    }
+//     whenAll: +m.name
+//     run: { 
+//         console.log('bookstore added: ' + m.name);
+//         retract({
+//             name: 'The new book',
+//             reference: '75323',
+//             price: 500,
+//             seller: 'bookstore'
+//         });
+//     }
 
-    // this rule will be triggered when the fact is retracted
-    whenAll: none(+m.name)
-    run: console.log('bookstore no books');
+//     // this rule will be triggered when the fact is retracted
+//     whenAll: none(+m.name)
+//     run: console.log('bookstore no books');
 
-    whenStart: {
-        // will return 0 because the fact assert was successful 
-        console.log('bookstore result ' + assert('bookstore', {
-            name: 'The new book',
-            seller: 'bookstore',
-            reference: '75323',
-            price: 500
-        }));
+//     whenStart: {
+//         // will return 0 because the fact assert was successful 
+//         console.log('bookstore result ' + assert('bookstore', {
+//             name: 'The new book',
+//             seller: 'bookstore',
+//             reference: '75323',
+//             price: 500
+//         }));
 
-        // will return 212 because the fact has already been asserted 
-        console.log('bookstore result ' + assert('bookstore', {
-            reference: '75323',
-            name: 'The new book',
-            price: 500,
-            seller: 'bookstore'
-        }));
+//         // will return 212 because the fact has already been asserted 
+//         console.log('bookstore result ' + assert('bookstore', {
+//             reference: '75323',
+//             name: 'The new book',
+//             price: 500,
+//             seller: 'bookstore'
+//         }));
 
-        // will return 0 because a new event is being posted
-        console.log('bookstore result ' + post('bookstore', {
-            reference: '75323',
-            status: 'Active'
-        }));
+//         // will return 0 because a new event is being posted
+//         console.log('bookstore result ' + post('bookstore', {
+//             reference: '75323',
+//             status: 'Active'
+//         }));
 
-        // will return 0 because a new event is being posted
-        console.log('bookstore result ' + post('bookstore', {
-            reference: '75323',
-            status: 'Active'
-        }));
-    }
-});
+//         // will return 0 because a new event is being posted
+//         console.log('bookstore result ' + post('bookstore', {
+//             reference: '75323',
+//             status: 'Active'
+//         }));
+//     }
+// });
 
 
 d.ruleset('attributes', function() {
@@ -520,262 +507,262 @@ d.ruleset('risk6', function() {
     run: console.log('risk6 fraud 8 detected ' + JSON.stringify(m.payments));
 
     whenStart: {
-        post('risk6', { payments: [ 2500, 150, 450 ] });
-        post('risk6', { payments: [ 1500, 3500, 4500 ] });
-        post('risk6', { payments: [ { amount: 200 }, { amount: 300 }, { amount: 400 } ] });
-        post('risk6', { cards: [ 'one card', 'two cards', 'three cards' ] });
-        post('risk6', { payments: [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]});
-        post('risk6', { payments: [ 150, 350, 450 ], cash : true});    
-        post('risk6', { field: 1, payments: [ [ 200, 300 ], [ 150, 200 ] ]}); 
-        post('risk6', { field: 1, payments: [ [ 20, 180 ], [ 90, 190 ] ]}); 
-        post('risk6', { payments: [{field2: 2}]}); 
-        post('risk6', { payments: [{field2: 1}]}); 
-        post('risk6', { payments: [{field1: 1, field2: 2}]});  
-        post('risk6', { payments: [{field1: 1, field2: 1}]});  
+        post('risk6', { payments: [ 2500, 150, 450 ] }, function(err, state) { if (err) { console.log(err); } });
+        post('risk6', { payments: [ 1500, 3500, 4500 ] }, function(err, state) { if (err) { console.log(err); } });
+        post('risk6', { payments: [ { amount: 200 }, { amount: 300 }, { amount: 400 } ] }, function(err, state) { console.log(err); });
+        post('risk6', { cards: [ 'one card', 'two cards', 'three cards' ] }, function(err, state) { console.log(err); });
+        post('risk6', { payments: [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]}, function(err, state) { console.log(err); });
+        post('risk6', { payments: [ 150, 350, 450 ], cash : true}, function(err, state) { console.log(err); });    
+        post('risk6', { field: 1, payments: [ [ 200, 300 ], [ 150, 200 ] ]}, function(err, state) { console.log(err); }); 
+        post('risk6', { field: 1, payments: [ [ 20, 180 ], [ 90, 190 ] ]}, function(err, state) { console.log(err); }); 
+        post('risk6', { payments: [{field2: 2}]}, function(err, state) { console.log(err); }); 
+        post('risk6', { payments: [{field2: 1}]}, function(err, state) { console.log(err); }); 
+        post('risk6', { payments: [{field1: 1, field2: 2}]}, function(err, state) { console.log(err); });  
+        post('risk6', { payments: [{field1: 1, field2: 1}]}, function(err, state) { console.log(err); });  
     }
 });
 
-d.ruleset('expense1', function() {
-    whenAny: {
-        whenAll: {
-            first = m.subject == 'approve'
-            second = m.amount == 1000
-        }
-        whenAll: { 
-            third = m.subject == 'jumbo'
-            fourth = m.amount == 10000
-        }
-    }
-    run: {
-        if (first) {
-            console.log('expense1 Approved ' + first.subject + ' ' + second.amount);     
-        } else {
-            console.log('expense1 Approved ' + third.subject + ' ' + fourth.amount);        
-        }
-    }
+// d.ruleset('expense1', function() {
+//     whenAny: {
+//         whenAll: {
+//             first = m.subject == 'approve'
+//             second = m.amount == 1000
+//         }
+//         whenAll: { 
+//             third = m.subject == 'jumbo'
+//             fourth = m.amount == 10000
+//         }
+//     }
+//     run: {
+//         if (first) {
+//             console.log('expense1 Approved ' + first.subject + ' ' + second.amount);     
+//         } else {
+//             console.log('expense1 Approved ' + third.subject + ' ' + fourth.amount);        
+//         }
+//     }
 
-    whenStart: {
-        post('expense1', {subject: 'approve'});
-        post('expense1', {amount: 1000});
-        post('expense1', {subject: 'jumbo'});
-        post('expense1', {amount: 10000});
-    }
-});
+//     whenStart: {
+//         post('expense1', {subject: 'approve'});
+//         post('expense1', {amount: 1000});
+//         post('expense1', {subject: 'jumbo'});
+//         post('expense1', {amount: 10000});
+//     }
+// });
 
-d.ruleset('expense6', function() {
-    whenAny: {
-        first = m.subject == 'approve' || m.subject == 'jumbo'
-        second = m.amount <= 1000
-    }   
-    run: {
-        console.log('expense 6 Approved')
-        if (first) {
-            console.log('expense6 ' + first.subject);     
-        } 
+// d.ruleset('expense6', function() {
+//     whenAny: {
+//         first = m.subject == 'approve' || m.subject == 'jumbo'
+//         second = m.amount <= 1000
+//     }   
+//     run: {
+//         console.log('expense 6 Approved')
+//         if (first) {
+//             console.log('expense6 ' + first.subject);     
+//         } 
 
-        if (second) {
-            console.log('expense6 ' + second.amount);     
-        }
-    }
+//         if (second) {
+//             console.log('expense6 ' + second.amount);     
+//         }
+//     }
 
-    whenStart: {
-        post('expense6', {subject: 'approve'});
-        assert('expense6', {amount: 1000});
-        assert('expense6', {subject: 'jumbo'});
-        post('expense6', {amount: 100});
-    }
-});
+//     whenStart: {
+//         post('expense6', {subject: 'approve'});
+//         assert('expense6', {amount: 1000});
+//         assert('expense6', {subject: 'jumbo'});
+//         post('expense6', {amount: 100});
+//     }
+// });
 
-d.ruleset('expense7', function() {
-    whenAll: {
-        whenAny: {
-            first = m.subject == 'approve'
-            second = m.amount == 1000
-        }
-        whenAny: { 
-            third = m.subject == 'jumbo'
-            fourth = m.amount == 10000
-        }
-    }
-    run: {
-        console.log('expense 7 Approved')
-        if (first) {
-            console.log('expense7 ' + first.subject);     
-        } 
+// d.ruleset('expense7', function() {
+//     whenAll: {
+//         whenAny: {
+//             first = m.subject == 'approve'
+//             second = m.amount == 1000
+//         }
+//         whenAny: { 
+//             third = m.subject == 'jumbo'
+//             fourth = m.amount == 10000
+//         }
+//     }
+//     run: {
+//         console.log('expense 7 Approved')
+//         if (first) {
+//             console.log('expense7 ' + first.subject);     
+//         } 
 
-        if (second) {
-            console.log('expense7 ' + second.amount);     
-        }
+//         if (second) {
+//             console.log('expense7 ' + second.amount);     
+//         }
 
-        if (third) {
-            console.log('expense7 ' + third.subject);     
-        } 
+//         if (third) {
+//             console.log('expense7 ' + third.subject);     
+//         } 
 
-        if (fourth) {
-            console.log('expense7 ' + fourth.amount);     
-        } 
-    }
+//         if (fourth) {
+//             console.log('expense7 ' + fourth.amount);     
+//         } 
+//     }
 
-    whenStart: {
-        post('expense7', {subject: 'approve'});
-        assert('expense7', {amount: 1000});
-        assert('expense7', {subject: 'jumbo'});
-        post('expense7', {amount: 10000});
-    }
-});
+//     whenStart: {
+//         post('expense7', {subject: 'approve'});
+//         assert('expense7', {amount: 1000});
+//         assert('expense7', {subject: 'jumbo'});
+//         post('expense7', {amount: 10000});
+//     }
+// });
 
-d.ruleset('timer1', function() {
+// d.ruleset('timer1', function() {
     
-    whenAll: m.subject == 'start'
-    run: startTimer('MyTimer', 5);
+//     whenAll: m.subject == 'start'
+//     run: startTimer('MyTimer', 5);
 
-    whenAll: {
-        timeout('MyTimer')    
-    }
-    run: {
-        console.log('timer1 timeout'); 
-    }
+//     whenAll: {
+//         timeout('MyTimer')    
+//     }
+//     run: {
+//         console.log('timer1 timeout'); 
+//     }
 
-    whenStart: {
-        post('timer1', {subject: 'start'});
-    }
-});
+//     whenStart: {
+//         post('timer1', {subject: 'start'});
+//     }
+// });
 
 
-d.ruleset('timer2', function() {
-    whenAny: {
-        whenAll: s.count == 0
-        // will trigger when MyTimer expires
-        whenAll: {
-            s.count < 5 
-            timeout('MyTimer')
-        }
-    }
-    run: {
-        s.count += 1;
-        // MyTimer will expire in 1 second
-        startTimer('MyTimer', 1);
-        console.log('timer2 Pusle ->' + new Date());
-    }
+// d.ruleset('timer2', function() {
+//     whenAny: {
+//         whenAll: s.count == 0
+//         // will trigger when MyTimer expires
+//         whenAll: {
+//             s.count < 5 
+//             timeout('MyTimer')
+//         }
+//     }
+//     run: {
+//         s.count += 1;
+//         // MyTimer will expire in 1 second
+//         startTimer('MyTimer', 1);
+//         console.log('timer2 Pusle ->' + new Date());
+//     }
 
-    whenAll: {
-        m.cancel == true
-    }
-    run: {
-        cancelTimer('MyTimer');
-        console.log('timer2 canceled timer');
-    }
+//     whenAll: {
+//         m.cancel == true
+//     }
+//     run: {
+//         cancelTimer('MyTimer');
+//         console.log('timer2 canceled timer');
+//     }
 
-    whenStart: {
-        patchState('timer2', { count: 0 }); 
-    }
-});
+//     whenStart: {
+//         patchState('timer2', { count: 0 }); 
+//     }
+// });
 
-d.statechart('risk3', function() {
-    start: {
-        to: 'meter'
-        run: startTimer('RiskTimer', 5)
-    }
+// d.statechart('risk3', function() {
+//     start: {
+//         to: 'meter'
+//         run: startTimer('RiskTimer', 5)
+//     }
 
-    meter: {
-        to: 'fraud'
-        whenAll: message = m.amount > 100
-        count: 3
-        run: m.forEach(function(e, i){ console.log('risk3 ' + JSON.stringify(e.message)) })
+//     meter: {
+//         to: 'fraud'
+//         whenAll: message = m.amount > 100
+//         count: 3
+//         run: m.forEach(function(e, i){ console.log('risk3 ' + JSON.stringify(e.message)) })
 
-        to: 'exit'
-        whenAll: timeout('RiskTimer')
-        run: console.log('risk3 exit for ' + c.s.sid)
-    }
+//         to: 'exit'
+//         whenAll: timeout('RiskTimer')
+//         run: console.log('risk3 exit for ' + c.s.sid)
+//     }
 
-    fraud: {}
-    exit:{}
+//     fraud: {}
+//     exit:{}
 
-    whenStart: {
-        // three events in a row will trigger the fraud rule
-        post('risk3', { amount: 200 }); 
-        post('risk3', { amount: 300 }); 
-        post('risk3', { amount: 400 }); 
+//     whenStart: {
+//         // three events in a row will trigger the fraud rule
+//         post('risk3', { amount: 200 }); 
+//         post('risk3', { amount: 300 }); 
+//         post('risk3', { amount: 400 }); 
 
-        // two events will exit after 5 seconds
-        post('risk3', { sid: 1, amount: 500 }); 
-        post('risk3', { sid: 1, amount: 600 }); 
+//         // two events will exit after 5 seconds
+//         post('risk3', { sid: 1, amount: 500 }); 
+//         post('risk3', { sid: 1, amount: 600 }); 
         
-    }
-});
+//     }
+// });
 
-// curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:5000/timer2/events
+// // curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:5000/timer2/events
 
-d.statechart('risk4', function() {
-    start: {
-        to: 'meter'
-        // will start a manual reset timer
-        run: startTimer('VelocityTimer', 5, true)
-    }
+// d.statechart('risk4', function() {
+//     start: {
+//         to: 'meter'
+//         // will start a manual reset timer
+//         run: startTimer('VelocityTimer', 5, true)
+//     }
 
-    meter: {
-        to: 'meter'
-        whenAll: { 
-            message = m.amount > 100
-            timeout('VelocityTimer')
-        }
-        cap: 100
-        run: {
-            console.log('risk4 velocity: ' + m.length + ' events in 5 seconds');
-            // resets and restarts the manual reset timer
-            startTimer('VelocityTimer', 5, true);
-        }  
+//     meter: {
+//         to: 'meter'
+//         whenAll: { 
+//             message = m.amount > 100
+//             timeout('VelocityTimer')
+//         }
+//         cap: 100
+//         run: {
+//             console.log('risk4 velocity: ' + m.length + ' events in 5 seconds');
+//             // resets and restarts the manual reset timer
+//             startTimer('VelocityTimer', 5, true);
+//         }  
 
-        to: 'meter'
-        whenAll: {
-            timeout('VelocityTimer')
-        }
-        run: {
-            console.log('risk4 velocity: no events in 5 seconds');
-            cancelTimer('VelocityTimer');
-        }
-    }
+//         to: 'meter'
+//         whenAll: {
+//             timeout('VelocityTimer')
+//         }
+//         run: {
+//             console.log('risk4 velocity: no events in 5 seconds');
+//             cancelTimer('VelocityTimer');
+//         }
+//     }
 
-    whenStart: {
-        // the velocity will 4 events in 5 seconds
-        post('risk4', { amount: 200 }); 
-        post('risk4', { amount: 300 }); 
-        post('risk4', { amount: 50 }); 
-        post('risk4', { amount: 500 }); 
-        post('risk4', { amount: 600 }); 
-    }
-});
+//     whenStart: {
+//         // the velocity will 4 events in 5 seconds
+//         post('risk4', { amount: 200 }); 
+//         post('risk4', { amount: 300 }); 
+//         post('risk4', { amount: 50 }); 
+//         post('risk4', { amount: 500 }); 
+//         post('risk4', { amount: 600 }); 
+//     }
+// });
 
-// curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk4/events
+// // curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk4/events
 
-d.ruleset('flow1', function() {
-    whenAll: s.state == 'first'
-    // runAsync labels an async action
-    runAsync: {
-        setTimeout(function() {
-            s.state = 'second';
-            console.log('flow1 first completed');
+// d.ruleset('flow1', function() {
+//     whenAll: s.state == 'first'
+//     // runAsync labels an async action
+//     runAsync: {
+//         setTimeout(function() {
+//             s.state = 'second';
+//             console.log('flow1 first completed');
             
-            // completes the async action
-            complete();
-        }, 3000);
-    }
+//             // completes the async action
+//             complete();
+//         }, 3000);
+//     }
 
-    whenAll: s.state == 'second'
-    runAsync: {
-        setTimeout(function() {
-            console.log('flow1 second completed');
-            s.state = 'last'
-            complete();
-        }, 10000);
+//     whenAll: s.state == 'second'
+//     runAsync: {
+//         setTimeout(function() {
+//             console.log('flow1 second completed');
+//             s.state = 'last'
+//             complete();
+//         }, 10000);
         
-        // overrides the 5 second default abandon timeout
-        return 15;
-    }
+//         // overrides the 5 second default abandon timeout
+//         return 15;
+//     }
 
-    whenStart: {
-        patchState('flow1', { state: 'first' });
-    }
-});
+//     whenStart: {
+//         patchState('flow1', { state: 'first' });
+//     }
+// });
 
 d.runAll();

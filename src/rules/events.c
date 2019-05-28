@@ -1820,195 +1820,75 @@ static unsigned int handleMessages(ruleset *tree,
     return returnResult;
 }
 
-static unsigned int startHandleMessage(ruleset *tree, 
-                                       char *message, 
-                                       unsigned char actionType,
-                                       unsigned int *stateOffset,
-                                       unsigned int *replyCount) {
-    unsigned int messageOffset;
-    return handleMessage(tree, 
-                         message, 
-                         actionType, 
-                         &messageOffset,
-                         stateOffset);
-}
-
-static unsigned int executeHandleMessage(ruleset *tree, 
-                                         char *message, 
-                                         unsigned char actionType) {
-    unsigned int stateOffset;
-    unsigned int messageOffset;
-    return handleMessage(tree, 
-                         message, 
-                         actionType, 
-                         &messageOffset,
-                         &stateOffset);
-}
-
-static unsigned int startHandleMessages(ruleset *tree, 
-                                        char *messages, 
-                                        unsigned char actionType,
-                                        unsigned int *stateOffset,
-                                        unsigned int *replyCount) {
-    return handleMessages(tree,
-                          actionType,
-                          messages,
-                          stateOffset);
-}
-
-static unsigned int executeHandleMessages(ruleset *tree, 
-                                          char *messages, 
-                                          unsigned char actionType) {
-    unsigned int stateOffset;
-    return handleMessages(tree,
-                          actionType,
-                          messages,
-                          &stateOffset);
-}
-
-unsigned int complete(unsigned int stateOffset, unsigned int replyCount) {
+unsigned int complete(unsigned int stateOffset) {
     return RULES_OK;
 }
 
-unsigned int assertEvent(unsigned int handle, char *message) {
+unsigned int assertEvent(unsigned int handle, 
+                         char *message, 
+                         unsigned int *stateOffset) {
     ruleset *tree;
+    unsigned int messageOffset;
     RESOLVE_HANDLE(handle, &tree);
 
-    return executeHandleMessage(tree, message, ACTION_ASSERT_EVENT);
-}
-
-unsigned int startAssertEvent(unsigned int handle, 
-                             char *message, 
-                             unsigned int *stateOffset, 
-                             unsigned int *replyCount) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    return startHandleMessage(tree, message, ACTION_ASSERT_EVENT, stateOffset, replyCount);
+    return handleMessage(tree, message, ACTION_ASSERT_EVENT, &messageOffset, stateOffset);
 }
 
 unsigned int assertEvents(unsigned int handle, 
-                          char *messages) {
+                          char *messages, 
+                          unsigned int *stateOffset) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    return executeHandleMessages(tree, messages, ACTION_ASSERT_EVENT);
+    return handleMessages(tree, ACTION_ASSERT_EVENT, messages, stateOffset);
 }
 
-unsigned int startAssertEvents(unsigned int handle, 
-                              char *messages, 
-                              unsigned int *stateOffset, 
-                              unsigned int *replyCount) {
+unsigned int assertFact(unsigned int handle, 
+                        char *message, 
+                        unsigned int *stateOffset) {
     ruleset *tree;
+    unsigned int messageOffset;
     RESOLVE_HANDLE(handle, &tree);
 
-    return startHandleMessages(tree, messages, ACTION_ASSERT_EVENT, stateOffset, replyCount);
-}
-
-unsigned int retractEvent(unsigned int handle, char *message) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    return executeHandleMessage(tree, message, ACTION_RETRACT_EVENT);
-}
-
-unsigned int startAssertFact(unsigned int handle, 
-                             char *message, 
-                             unsigned int *stateOffset, 
-                             unsigned int *replyCount) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    return startHandleMessage(tree, message, ACTION_ASSERT_FACT, stateOffset, replyCount);
-}
-
-unsigned int assertFact(unsigned int handle, char *message) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    return executeHandleMessage(tree, message, ACTION_ASSERT_FACT);
-}
-
-unsigned int startAssertFacts(unsigned int handle, 
-                              char *messages, 
-                              unsigned int *stateOffset, 
-                              unsigned int *replyCount) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    return startHandleMessages(tree, messages, ACTION_ASSERT_FACT, stateOffset, replyCount);
+    return handleMessage(tree, message, ACTION_ASSERT_FACT, &messageOffset, stateOffset);
 }
 
 unsigned int assertFacts(unsigned int handle, 
-                         char *messages) {
+                         char *messages, 
+                         unsigned int *stateOffset) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    return executeHandleMessages(tree, messages, ACTION_ASSERT_FACT);
+    return handleMessages(tree, ACTION_ASSERT_EVENT, messages, stateOffset);
 }
 
-unsigned int retractFact(unsigned int handle, char *message) {
+unsigned int retractFact(unsigned int handle, 
+                         char *message, 
+                         unsigned int *stateOffset) {
     ruleset *tree;
+    unsigned int messageOffset;
     RESOLVE_HANDLE(handle, &tree);
 
-    return executeHandleMessage(tree, message, ACTION_RETRACT_FACT);
-}
-
-unsigned int startRetractFact(unsigned int handle, 
-                             char *message, 
-                             unsigned int *stateOffset, 
-                             unsigned int *replyCount) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    return startHandleMessage(tree, message, ACTION_RETRACT_FACT, stateOffset, replyCount);
+    return handleMessage(tree, message, ACTION_RETRACT_FACT, &messageOffset, stateOffset);
 }
 
 unsigned int retractFacts(unsigned int handle, 
-                          char *messages) {
+                          char *messages, 
+                          unsigned int *stateOffset) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    return executeHandleMessages(tree, messages, ACTION_RETRACT_FACT);
+    return handleMessages(tree, ACTION_ASSERT_EVENT, messages, stateOffset);
 }
 
-unsigned int startRetractFacts(unsigned int handle, 
-                              char *messages, 
-                              unsigned int *stateOffset, 
-                              unsigned int *replyCount) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    return startHandleMessages(tree, messages, ACTION_RETRACT_FACT, stateOffset, replyCount);
-}
-
-unsigned int updateState(unsigned int handle, char *sid, char *state) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    unsigned int stateOffset;
-    unsigned int messageOffset;
-    return handleMessage(tree, 
-                         state, 
-                         ACTION_UPDATE_STATE,
-                         &messageOffset,
-                         &stateOffset);
-}
-
-unsigned int startUpdateState(unsigned int handle, 
-                              char *state,
-                              unsigned int *stateOffset,
-                              unsigned int *replyCount) {
+unsigned int updateState(unsigned int handle, 
+                         char *state,
+                         unsigned int *stateOffset) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
     unsigned int messageOffset;
-    *replyCount = 1;
-    unsigned int result = handleMessage(tree, 
-                                        state,
-                                        ACTION_UPDATE_STATE,
-                                        &messageOffset,
-                                        stateOffset);
-    if (result == ERR_EVENT_NOT_HANDLED) {
+    unsigned int result = handleMessage(tree, state, ACTION_UPDATE_STATE, &messageOffset, stateOffset);
+    if (result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
         return RULES_OK;
     }
 
@@ -2054,6 +1934,40 @@ unsigned int startAction(unsigned int handle,
     *messages  = resultState->context.messages;
     *stateFact = resultState->context.stateFact;
     
+    return RULES_OK;
+}
+
+unsigned int startActionForState(unsigned int handle, 
+                                 unsigned int stateOffset,
+                                 char **stateFact,
+                                 char **messages) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+    stateNode *resultState = STATE_NODE(tree, stateOffset);
+
+    actionStateNode *resultAction;
+    unsigned int actionStateIndex;
+    unsigned int resultCount;
+    unsigned int resultFrameOffset;
+    
+    CHECK_RESULT(getNextResultInState(tree,
+                                      resultState,
+                                      &actionStateIndex,
+                                      &resultCount,
+                                      &resultFrameOffset, 
+                                      &resultAction));
+
+    CHECK_RESULT(serializeResult(tree, 
+                                 resultState, 
+                                 resultAction, 
+                                 resultCount,
+                                 &resultState->context.messages));
+
+    resultState->context.actionStateIndex = actionStateIndex;
+    resultState->context.resultCount = resultCount;
+    resultState->context.resultFrameOffset = resultFrameOffset;
+    resultState->lockExpireTime = time(NULL) + STATE_LEASE_TIME;
+    *messages = resultState->context.messages;
     return RULES_OK;
 }
 
@@ -2113,7 +2027,6 @@ static void freeActionContext(stateNode *resultState) {
 }
 
 unsigned int completeAndStartAction(unsigned int handle, 
-                                    unsigned int expectedReplies,
                                     unsigned int stateOffset, 
                                     char **messages) {
     ruleset *tree;
@@ -2176,7 +2089,7 @@ unsigned int renewActionLease(unsigned int handle, char *sid) {
 
     CHECK_RESULT(ensureStateNode(tree, 
                                  sid,
-                                 &isNewState, 
+                                 &isNewState,
                                  &state));    
 
     state->lockExpireTime = time(NULL) + STATE_LEASE_TIME;
@@ -2191,6 +2104,7 @@ unsigned int assertTimers(unsigned int handle) {
     time_t pulseTime = time(NULL);
     for (unsigned int i = 0; i < tree->statePool.count; ++i) {
         stateNode *state = STATE_NODE(tree, tree->reverseStateIndex[i]);
+        unsigned int stateOffset;
         unsigned int messageOffset;
         CHECK_RESULT(getMessage(state,
                                 "$pulse",
@@ -2198,9 +2112,11 @@ unsigned int assertTimers(unsigned int handle) {
         
         if (messageOffset != UNDEFINED_HASH_OFFSET) {
             messageNode *message = MESSAGE_NODE(state, messageOffset);
-            CHECK_RESULT(executeHandleMessage(tree, 
-                                              message->jo.content, 
-                                              ACTION_RETRACT_FACT));
+            CHECK_RESULT(handleMessage(tree, 
+                                       message->jo.content, 
+                                       ACTION_RETRACT_FACT,
+                                       &messageOffset,
+                                       &stateOffset));
         }
 
         int messageSize = sizeof(char) * (100 + strlen(state->sid));
@@ -2219,9 +2135,11 @@ unsigned int assertTimers(unsigned int handle) {
                 state->sid, 
                 pulseTime);
 #endif
-        result = executeHandleMessage(tree, 
-                                      pulseMessage, 
-                                      ACTION_ASSERT_EVENT);
+        result = handleMessage(tree, 
+                               pulseMessage, 
+                               ACTION_ASSERT_EVENT,
+                               &messageOffset,
+                               &stateOffset);
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
             return result;
         }
@@ -2234,6 +2152,7 @@ unsigned int cancelTimer(unsigned int handle, char *sid, char *timerName) {
     ruleset *tree;
     unsigned char isNewState;
     unsigned int messageOffset;
+    unsigned int stateOffset;
     stateNode *state = NULL;
 
     RESOLVE_HANDLE(handle, &tree);
@@ -2252,9 +2171,11 @@ unsigned int cancelTimer(unsigned int handle, char *sid, char *timerName) {
     
     if (messageOffset != UNDEFINED_HASH_OFFSET) {
         messageNode *message = MESSAGE_NODE(state, messageOffset);
-        CHECK_RESULT(executeHandleMessage(tree, 
-                                          message->jo.content, 
-                                          ACTION_RETRACT_FACT));
+        CHECK_RESULT(handleMessage(tree, 
+                                   message->jo.content, 
+                                   ACTION_RETRACT_FACT,
+                                   &messageOffset,
+                                   &stateOffset));
     }
     
     return RULES_OK;
@@ -2299,9 +2220,14 @@ unsigned int startTimer(unsigned int handle,
              timer, 
              baseTime);
 #endif
-    return executeHandleMessage(tree, 
-                                baseMessage, 
-                                manualReset ? ACTION_ASSERT_FACT : ACTION_ASSERT_EVENT);
+    unsigned int messageOffset;
+    unsigned int stateOffset;
+
+    return handleMessage(tree, 
+                         baseMessage, 
+                         manualReset ? ACTION_ASSERT_FACT : ACTION_ASSERT_EVENT,
+                         &messageOffset,
+                         &stateOffset);
 }
 
 

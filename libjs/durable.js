@@ -6,6 +6,7 @@ exports = module.exports = durableEngine = function () {
     var dh = d.host();
     var dc = d.closure();
 
+   
     var omap = {
         '+': 'add',
         '==': 'eq',
@@ -1507,8 +1508,7 @@ exports = module.exports = durableEngine = function () {
         }
 
         extend(that);
-        rulesets.push(that);
-
+        
         for (var i = 1; i < arguments.length; ++i) {
             if (typeof(arguments[i]) === 'object') {
                 rules.push(rule(arguments[i]));
@@ -1535,6 +1535,9 @@ exports = module.exports = durableEngine = function () {
             }   
         }
 
+        var definitions = {};
+        definitions[that.getName()] = that.define();
+        createHost().registerRulesets(definitions);
         return that;
     };
 
@@ -1692,7 +1695,6 @@ exports = module.exports = durableEngine = function () {
         }
 
         extend(that);
-        rulesets.push(that);
         if (stateObjects) {
             if (typeof(stateObjects) === 'function') {
                 var ast = ep.parse('var fn = ' + stateObjects);
@@ -1718,6 +1720,10 @@ exports = module.exports = durableEngine = function () {
               
         }
         
+        
+        var definitions = {};
+        definitions[that.getName()] = that.define();
+        createHost().registerRulesets(definitions);
         return that;
     };
 
@@ -1847,7 +1853,6 @@ exports = module.exports = durableEngine = function () {
         }
 
         extend(that);
-        rulesets.push(that);
         if (stageObjects) {
             if (typeof(stageObjects) === 'function') {
                 var ast = ep.parse('var fn = ' + stageObjects);
@@ -1868,27 +1873,53 @@ exports = module.exports = durableEngine = function () {
             } 
         }
 
+        var definitions = {};
+        definitions[that.getName()] = that.define();
+        createHost().registerRulesets(definitions);
         return that;
     };
 
-    var rulesets = [];
-
+    var host;
     var createHost = function() {
-        var definitions = {};
-        for (var i = 0; i < rulesets.length; ++ i) {
-            definitions[rulesets[i].getName()] = rulesets[i].define(); 
+        if (host) {
+            return host;
         }
-
-        var rulesHost = d.host();
-        rulesHost.registerRulesets(null, definitions);
-        for (var i = 0; i < rulesets.length; ++ i) {
-            if (rulesets[i].getStart()) {
-                rulesets[i].getStart()(rulesHost);
-            }
-        }
-
-        return rulesHost;
+        
+        host = d.host();
+        return host;
     } 
+
+    var postEvents = function (rulesetName, messages, complete) { 
+        return createHost().postEvents(rulesetName, messages, complete);
+    }
+
+    var post = function (rulesetName, message, complete) {
+        return createHost().post(rulesetName, message, complete);
+    }
+
+    var assertFacts = function (rulesetName, facts, complete) { 
+        return createHost().assertFacts(rulesetName, facts, complete);
+    }
+
+    var assert = function (rulesetName, fact, complete) { 
+        return createHost().assert(rulesetName, fact, complete);
+    }           
+
+    var retractFacts = function (rulesetName, facts, complete) { 
+        return createHost().retractFacts(rulesetName, facts, complete);
+    } 
+     
+    var retract = function (rulesetName, fact, complete) { 
+        return createHost().retract(rulesetName, fact, complete);
+    }  
+
+    var updateState = function (rulesetName, state, complete) { 
+        return createHost().updateState(rulesetName, state, complete);
+    }
+
+    var getState = function (rulesetName, sid) { 
+        return createHost().getState(rulesetName, sid);
+    }
 
     var runAll = function(port, basePath, run) {
         var rulesHost = createHost();
@@ -1906,8 +1937,17 @@ exports = module.exports = durableEngine = function () {
         stage: stage,
         flowchart: flowchart,
         ruleset: ruleset,
+        postEvents: postEvents,
+        post: post,
+        assertFacts: assertFacts,
+        assert: assert,
+        retractFacts: retractFacts,
+        retract: retract,
+        updateState: updateState,
+        getState: getState,
         createHost: createHost,
         runAll: runAll,
+
     }; 
     extend(ex);
 

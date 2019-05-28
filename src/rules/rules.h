@@ -139,76 +139,51 @@ unsigned int bindRuleset(unsigned int handle,
                          char *password,
                          unsigned char db);
 
-unsigned int complete(unsigned int stateOffset, 
-                      unsigned int replyCount);
+unsigned int complete(unsigned int stateOffset);
 
 unsigned int assertEvent(unsigned int handle, 
-                         char *message);
-
-unsigned int startAssertEvent(unsigned int handle, 
-                             char *message, 
-                             unsigned int *stateOffset, 
-                             unsigned int *replyCount);
+                         char *message,
+                          unsigned int *stateOffset);
 
 unsigned int assertEvents(unsigned int handle, 
-                          char *messages);
-
-unsigned int startAssertEvents(unsigned int handle, 
-                              char *messages, 
-                              unsigned int *stateOffset, 
-                              unsigned int *replyCount);
+                          char *messages,
+                          unsigned int *stateOffset);
 
 unsigned int retractEvent(unsigned int handle, 
-                          char *message);
-
-unsigned int startAssertFact(unsigned int handle, 
-                             char *message, 
-                             unsigned int *stateOffset, 
-                             unsigned int *replyCount);
+                          char *message,
+                          unsigned int *stateOffset);
 
 unsigned int assertFact(unsigned int handle, 
-                        char *message);
-
-unsigned int startAssertFacts(unsigned int handle, 
-                              char *messages, 
-                              unsigned int *stateOffset, 
-                              unsigned int *replyCount);
+                        char *message,
+                          unsigned int *stateOffset);
 
 unsigned int assertFacts(unsigned int handle, 
-                         char *messages);
+                         char *messages,
+                          unsigned int *stateOffset);
 
 unsigned int retractFact(unsigned int handle, 
-                         char *message);
-
-unsigned int startRetractFact(unsigned int handle, 
-                             char *message, 
-                             unsigned int *stateOffset, 
-                             unsigned int *replyCount);
+                         char *message,
+                          unsigned int *stateOffset);
 
 unsigned int retractFacts(unsigned int handle, 
-                          char *messages);
-
-unsigned int startRetractFacts(unsigned int handle, 
-                               char *messages, 
-                               unsigned int *stateOffset, 
-                               unsigned int *replyCount);
+                          char *messages,
+                          unsigned int *stateOffset);
 
 unsigned int updateState(unsigned int handle,
-                         char *sid, 
-                         char *state);
-
-unsigned int startUpdateState(unsigned int handle, 
-                              char *state,
-                              unsigned int *stateOffset,
-                              unsigned int *replyCount);
+                         char *state,
+                         unsigned int *stateOffset);
 
 unsigned int startAction(unsigned int handle, 
                          char **stateFact, 
                          char **messages, 
                          unsigned int *stateOffset);
 
+unsigned int startActionForState(unsigned int handle, 
+                                 unsigned int stateOffset,
+                                 char **stateFact,
+                                 char **messages);
+
 unsigned int completeAndStartAction(unsigned int handle, 
-                                    unsigned int expectedReplies,
                                     unsigned int stateOffset, 
                                     char **messages);
 

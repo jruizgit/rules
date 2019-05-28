@@ -339,48 +339,24 @@ exports = module.exports = durableEngine = function () {
         var actions = {};
         var handle;
         
-        that.startAssertEvent = function (message) {
-            return r.startAssertEvent(handle, JSON.stringify(message));
-        };
-
         that.assertEvent = function (message) {
             return r.assertEvent(handle, JSON.stringify(message));
-        };
-
-        that.startAssertEvents = function (messages) {
-            return r.startAssertEvents(handle, JSON.stringify(messages));
         };
 
         that.assertEvents = function (messages) {
             return r.assertEvents(handle, JSON.stringify(messages));
         };
 
-        that.startAssertFact = function (fact) {
-            return r.startAssertFact(handle, JSON.stringify(fact));
-        };
-
         that.assertFact = function (fact) {
             return r.assertFact(handle, JSON.stringify(fact));
-        };
-
-        that.startAssertFacts = function (facts) {
-            return r.startAssertFacts(handle, JSON.stringify(facts));
         };
 
         that.assertFacts = function (facts) {
             return r.assertFacts(handle, JSON.stringify(facts));
         };
 
-        that.startRetractFact = function (fact) {
-            return r.startRetractFact(handle, JSON.stringify(fact));
-        };
-
         that.retractFact = function (fact) {
             return r.retractFact(handle, JSON.stringify(fact));
-        };
-
-        that.startRetractFacts = function (facts) {
-            return r.startRetractFacts(handle, JSON.stringify(facts));
         };
 
         that.retractFacts = function (facts) {
@@ -389,7 +365,7 @@ exports = module.exports = durableEngine = function () {
 
         that.updateState = function (state) {
             state['$s'] = 1;
-            return r.updateState(handle, state.sid, JSON.stringify(state));
+            return r.updateState(handle, JSON.stringify(state));
         };
 
         that.startTimer = function (sid, timer, timerDuration, manualReset) {
@@ -412,10 +388,6 @@ exports = module.exports = durableEngine = function () {
             return r.renewActionLease(handle, sid);
         }
 
-        that.getRulesetState = function (sid, complete) {
-            return JSON.parse(r.getRulesetState(handle));
-        }
-
         that.dispatchTimers = function () { 
             return r.assertTimers(handle);
         };
@@ -433,33 +405,10 @@ exports = module.exports = durableEngine = function () {
                     }
                 });
             }
-        }
+        };
 
-        that.dispatch = function (complete, asyncResult) {
-            var state = null;
-            var stateOffset = null;
-            var resultContainer = {};
-            if (asyncResult) {
-                state = asyncResult[0];
-                resultContainer = {'message': JSON.parse(asyncResult[1])};
-                stateOffset = asyncResult[2];
-            } else {
-                try {
-                    var result = r.startAction(handle);
-                    if (!result) {
-                        complete(null);
-                        return;
-                    } else { 
-                        state = JSON.parse(result[0]);
-                        resultContainer = {'message': JSON.parse(result[1])};
-                        stateOffset = result[2];
-                    }
-                } catch (reason) {
-                    complete(reason);
-                    return;
-                }
-            }
-        
+        var flushActions = function (state, resultContainer, stateOffset, complete) {
+            
             while (resultContainer['message']) {
                 var actionName = null;
                 var message = null;
@@ -468,10 +417,6 @@ exports = module.exports = durableEngine = function () {
                     break;
                 }
                 resultContainer['message'] = null;
-                if (resultContainer['async']) {
-                    resultContainer['async'] = null;
-                }
-
                 var c = closure(host, state, message, stateOffset, name);
                 actions[actionName].run(c, function (err, c) {
                     if (err) {
@@ -495,96 +440,100 @@ exports = module.exports = durableEngine = function () {
                             try {
                                 var rulesetName;
                                 var facts;
-                                var stateReplies;
                                 var currentStateOffset = 0;
                                 var replies = 0;
                                 var pending = {};
                                 
                                 var timers = c.getCancelledTimers();
                                 for (var timerName in timers) {
-                                    that.cancelTimer(c.s.sid, timerName);
+                                    try {
+                                        that.cancelTimer(c.s.sid, timerName);
+                                    } catch (reason) {
+                                        c.s.rulesetException = { action: 'cancelTimer', timer: timerName, reason: reason};
+                                    }
                                 }
                                 timers = c.getTimers();
                                 for (var timerName in timers) {
                                     var timerTuple = timers[timerName];
-                                    that.startTimer(c.s.sid, timerTuple[0], timerTuple[1], timerTuple[2]);
+                                    try {   
+                                        that.startTimer(c.s.sid, timerTuple[0], timerTuple[1], timerTuple[2]);
+                                    } catch (reason) {
+                                        c.s.rulesetException = { action: 'startTimer', timer: timerName, reason: reason};
+                                    }
                                 }                 
                                 var retractFacts = c.getRetract();
                                 pending[stateOffset] = 0;
                                 for (rulesetName in retractFacts) {
                                     facts = retractFacts[rulesetName];
-                                    if (facts.length == 1) {
-                                        stateReplies = host.startRetract(rulesetName, facts[0]);
-                                    } else {
-                                        stateReplies = host.startRetractFacts(rulesetName, facts);
-                                    }
-                                    currentStateOffset = stateReplies[0];
-                                    replies = stateReplies[1];
-
-                                    if (pending[currentStateOffset]) {
-                                        pending[currentStateOffset] = pending[currentStateOffset] + replies;
-                                    } else {
-                                        pending[currentStateOffset] = replies;
+                                    try {                   
+                                        if (facts.length == 1) {
+                                            currentStateOffset = host.retract(rulesetName, facts[0]);
+                                        } else {
+                                            currentStateOffset = host.retractFacts(rulesetName, facts);
+                                        }
+                                        
+                                        if (!pending[currentStateOffset]) {
+                                            pending[currentStateOffset] = true;
+                                        }
+                                    } catch (reason) {
+                                        c.s.rulesetException = { action: 'retract', facts: facts, reason: reason};
                                     }
                                 }
                                 var assertFacts = c.getFacts();
                                 for (rulesetName in assertFacts) {
                                     facts = assertFacts[rulesetName];
-                                    if (facts.length == 1) {
-                                        stateReplies = host.startAssert(rulesetName, facts[0]);
-                                    } else {
-                                        stateReplies = host.startAssertFacts(rulesetName, facts);
-                                    }
-                                    currentStateOffset = stateReplies[0];
-                                    replies = stateReplies[1];
-
-                                    if (pending[currentStateOffset]) {
-                                        pending[currentStateOffset] = pending[currentStateOffset] + replies;
-                                    } else {
-                                        pending[currentStateOffset] = replies;
+                                    try {
+                                        if (facts.length == 1) {
+                                            currentStateOffset = host.assert(rulesetName, facts[0]);
+                                        } else {
+                                            currentStateOffset = host.assertFacts(rulesetName, facts);
+                                        }
+                                       
+                                        if (!pending[currentStateOffset]) {
+                                            pending[currentStateOffset] = true;
+                                        }
+                                    } catch (reason) {
+                                        c.s.rulesetException = { action: 'assert', facts: facts, reason: reason};
                                     }
                                 }
                                 var postEvents = c.getEvents();
                                 for (rulesetName in postEvents) {
                                     var events = postEvents[rulesetName];
-                                    if (events.length == 1) {
-                                        stateReplies = host.startPost(rulesetName, events[0]);
-                                    } else {
-                                        stateReplies = host.startPostBatch(rulesetName, events);
-                                    }
-                                    currentStateOffset = stateReplies[0];
-                                    replies = stateReplies[1];
-
-                                    if (pending[currentStateOffset]) {
-                                        pending[currentStateOffset] = pending[currentStateOffset] + replies;
-                                    } else {
-                                        pending[currentStateOffset] = replies;
+                                    try {
+                                        if (events.length == 1) {
+                                            currentStateOffset = host.post(rulesetName, events[0]);
+                                        } else {
+                                            currentStateOffset = host.postEvents(rulesetName, events);
+                                        }
+                                        
+                                        if (!pending[currentStateOffset]) {
+                                            pending[currentStateOffset] = true;
+                                        }
+                                    } catch (reason) {
+                                        c.s.rulesetException = { action: 'post', events: events, reason: reason};
                                     }
                                 }
-                                stateReplies = r.startUpdateState(handle, JSON.stringify(c.s));
-                                currentStateOffset = stateReplies[0];
-                                replies = stateReplies[1];
 
-                                if (pending[currentStateOffset]) {
-                                    pending[currentStateOffset] = pending[currentStateOffset] + replies;
-                                } else {
-                                    pending[currentStateOffset] = replies;
+                                try {
+                                    currentStateOffset = r.updateState(handle, JSON.stringify(c.s));
+
+                                    if (!pending[currentStateOffset]) {
+                                        pending[currentStateOffset] = true;
+                                    }
+                                } catch (reason) {
+                                    c.s.rulesetException = { action: 'updateState', events: events, reason: reason};
                                 }
-
+    
                                 for (currentStateOffset in pending) {
-                                    replies = pending[currentStateOffset];
-                                    currentStateOffset = parseInt(currentStateOffset);
                                     if (currentStateOffset) {
                                         if (currentStateOffset != stateOffset) {
-                                            r.complete(currentStateOffset, replies);
+                                            r.complete(currentStateOffset);
                                         } else {
-                                            var newResult = r.completeAndStartAction(handle, replies, c.getHandle());
+                                            var newResult = r.completeAndStartAction(handle, c.getHandle());
                                             if (newResult) {
-                                                if (resultContainer['async']) {
-                                                    that.dispatch(function (e) {}, [state, newResult, stateOffset]);
-                                                } else {
-                                                    resultContainer['message'] = JSON.parse(newResult);
-                                                }
+                                                resultContainer['message'] = JSON.parse(newResult);
+                                            } else {
+                                                complete(null, state);
                                             }
                                         }
                                     }                                    
@@ -604,10 +553,31 @@ exports = module.exports = durableEngine = function () {
                         });
                     }
                 });
-                resultContainer['async'] = true;
             }
+        };
 
-            complete(null);
+        that.doActions = function (stateHandle, complete) {
+            try {
+                var result = r.startActionForState(handle, stateHandle);
+                if (!result) {
+                    complete(null);
+                } else {
+                    flushActions(JSON.parse(result[0]), {'message': JSON.parse(result[1])}, stateHandle, complete);
+                }
+            } catch (reason) {
+                complete(reason);
+            }
+        };        
+
+        that.dispatch = function () {            
+            var result = r.startAction(handle);
+            if (result) {
+                flushActions(JSON.parse(result[0]), {'message': JSON.parse(result[1])}, result[2], function(reason, state) {
+                    if (reason) {
+                       console.log(reason);
+                   }
+                });
+            }
         };
 
         that.getDefinition = function () {
@@ -929,7 +899,7 @@ exports = module.exports = durableEngine = function () {
         return that;
     };
 
-    var createRulesets = function (parentName, host, rulesetDefinitions) {
+    var createRulesets = function (host, rulesetDefinitions) {
         
         var branches = {};
         for (var name in rulesetDefinitions) {
@@ -938,25 +908,13 @@ exports = module.exports = durableEngine = function () {
             var index = name.indexOf('$state');
             if (index !== -1) {
                 name = name.slice(0, index);
-                if (parentName) {
-                    name = parentName + '.' + name;
-                }
-
                 branches[name] = stateChart(name, host, currentDefinition);
             } else {
                 index = name.indexOf('$flow');
                 if (index !== -1) {
                     name = name.slice(0, index);
-                    if (parentName) {
-                        name = parentName + '.' + name;
-                    }
-
                     branches[name] = flowChart(name, host, currentDefinition);
                 } else {
-                    if (parentName) {
-                        name = parentName + '.' + name;
-                    }
-
                     branches[name] = ruleset(name, host, currentDefinition);
                 }
             }
@@ -1011,17 +969,17 @@ exports = module.exports = durableEngine = function () {
             return rules;
         }
 
-        that.setRuleset = function (rulesetName, rulesetDefinition, complete) {
+        that.setRuleset = function (rulesetDefinition, complete) {
             try {
-                that.registerRulesets(null, rulesetDefinition);
+                that.registerRulesets(rulesetDefinition);
                 that.saveRuleset(rulesetName, rulesetDefinition, complete);
             } catch (reason) {
                 complete(reason);
             }
         };
 
-        that.registerRulesets = function (parentName, rulesetDefinitions) {
-            var rulesets = createRulesets(parentName, that, rulesetDefinitions);
+        that.registerRulesets = function (rulesetDefinitions) {
+            var rulesets = createRulesets(that, rulesetDefinitions);
             var names = [];
             for (var rulesetName in rulesets) {
                 var rulesetDefinition = rulesets[rulesetName];
@@ -1037,81 +995,95 @@ exports = module.exports = durableEngine = function () {
             return names;
         };
 
-        that.startPostBatch = function (rulesetName, messages) {
-            return that.getRuleset(rulesetName).startAssertEvents(messages);
-        };
-
-        that.postBatch = function () {
-            var rulesetName = arguments[0];
-            var messages = [];
-            var complete;
-            if (arguments[1].constructor === Array) {
-                messages = arguments[1];
-            }
-            else {
-                for (var i = 1; i < arguments.length; ++ i) {
-                    messages.push(arguments[i]);
+        that.postEvents = function (rulesetName, messages, complete) { 
+            if (!complete) {
+                return that.getRuleset(rulesetName).assertEvents(messages);
+            } else {
+                try {
+                    var rules = that.getRuleset(rulesetName);
+                    rules.doActions(rules.assertEvents(messages), complete);
+                } catch (reason) {
+                    complete(reason);
                 }
             }
-
-            var rules = that.getRuleset(rulesetName);
-            return rules.assertEvents(messages);
         };
 
-        that.startPost = function (rulesetName, message) {
-            if (message.constructor === Array) {
-                return that.startPostBatch(rulesetName, message);
+        that.post = function (rulesetName, message, complete) {
+            if (!complete) {
+                return that.getRuleset(rulesetName).assertEvent(message);
+            } else {
+                try {
+                    var rules = that.getRuleset(rulesetName);
+                    rules.doActions(rules.assertEvent(message), complete);
+                } catch (reason) {
+                    complete(reason);
+                }
             }
-
-            return that.getRuleset(rulesetName).startAssertEvent(message);
         };
 
-        that.post = function (rulesetName, message) {
-            if (message.constructor === Array) {
-                return that.postBatch(rulesetName, message);
+        that.assertFacts = function (rulesetName, facts, complete) {
+            if (!complete) {
+                return that.getRuleset(rulesetName).assertFacts(facts);
+            } else {
+                try {
+                    var rules = that.getRuleset(rulesetName);
+                    rules.doActions(rules.assertFacts(facts), complete);
+                } catch (reason) {
+                    complete(reason);
+                }
             }
-
-            return that.getRuleset(rulesetName).assertEvent(message);
         };
 
-        that.startAssert = function (rulesetName, fact) {
-            if (fact.constructor === Array) {
-                return that.startAssertFacts(rulesetName, fact);
+        that.assert = function (rulesetName, fact, complete) {
+            if (!complete) {
+                return that.getRuleset(rulesetName).assertFact(fact);
+            } else {
+                try {
+                    var rules = that.getRuleset(rulesetName);
+                    rules.doActions(rules.assertFact(fact), complete);
+                } catch (reason) {
+                    complete(reason);
+                }
             }
-
-            return that.getRuleset(rulesetName).startAssertFact(fact);
         };
 
-        that.assert = function (rulesetName, fact) {
-            if (fact.constructor === Array) {
-                return that.assertFacts(rulesetName, fact);
+        that.retractFacts = function (rulesetName, facts, complete) {
+            if (!complete) {
+                return that.getRuleset(rulesetName).retractFacts(facts);
+            } else {
+                try {
+                    var rules = that.getRuleset(rulesetName);
+                    rules.doActions(rules.retractFacts(facts), complete);
+                } catch (reason) {
+                    complete(reason);
+                }
             }
-
-            return that.getRuleset(rulesetName).assertFact(fact);
         };
 
-        that.startAssertFacts = function (rulesetName, facts) {
-            return that.getRuleset(rulesetName).startAssertFacts(facts);
+        that.retract = function (rulesetName, fact, complete) {
+           if (!complete) {
+                return that.getRuleset(rulesetName).retractFact(fact);
+            } else {
+                try {
+                    var rules = that.getRuleset(rulesetName);
+                    rules.doActions(rules.retractFact(fact), complete);
+                } catch (reason) {
+                    complete(reason);
+                }
+            }
         };
 
-        that.assertFacts = function (rulesetName, facts) {
-            return that.getRuleset(rulesetName).assertFacts(facts);
-        };
-
-        that.startRetract = function (rulesetName, fact) {
-            return that.getRuleset(rulesetName).startRetractFact(fact);
-        };
-
-        that.retract = function (rulesetName, fact) {
-            return that.getRuleset(rulesetName).retractFact(fact);
-        };
-
-        that.startRetractFacts = function (rulesetName, facts) {
-            return that.getRuleset(rulesetName).startRetractFacts(facts);
-        };
-
-        that.retractFacts = function (rulesetName, facts) {
-            return that.getRuleset(rulesetName).retractFacts(facts);
+        that.updateState = function (rulesetName, state, complete) {
+            if (!complete) {
+                return that.getRuleset(rulesetName).updateState(fact);
+            } else {
+                try {
+                    var rules = that.getRuleset(rulesetName);
+                    rules.doActions(rules.updateState(state), complete);
+                } catch (reason) {
+                    complete(reason);
+                }
+            }
         };
 
         that.getState = function (rulesetName, sid) {
@@ -1120,10 +1092,6 @@ exports = module.exports = durableEngine = function () {
 
         that.deleteState = function (rulesetName, sid) {
             return that.getRuleset(rulesetName).deleteState(sid);
-        };
-
-        that.patchState = function (rulesetName, state) {
-            return that.getRuleset(rulesetName).updateState(state);
         };
 
         that.renewActionLease = function (rulesetName, sid) {
@@ -1135,22 +1103,18 @@ exports = module.exports = durableEngine = function () {
                 setTimeout(dispatchRules, 500, index);
             } else {
                 var rules = rulesList[index];
-                rules.dispatch(function (err) {
-                    if (err) {
-                        console.log(err);
-                        if (String(err).search('306') == -1) {
-                            console.log('Exiting ' + err);
-                            process.exit(1);
-                        }
-                    } 
+                try {
+                    rules.dispatch();
+                } catch (reason) {
+                    console.log(reason);
+                }
 
-                    var timeout = 0;
-                    if (index === (rulesList.length -1)) {
-                        timeout = 200;
-                    }
+                var timeout = 0;
+                if (index === (rulesList.length -1)) {
+                    timeout = 200;
+                }
 
-                    setTimeout(dispatchRules, timeout, (index + 1) % rulesList.length);
-                });
+                setTimeout(dispatchRules, timeout, (index + 1) % rulesList.length);
             }
         };
 
