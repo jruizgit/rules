@@ -1,6 +1,6 @@
 {
   "name": "durable",
-  "version": "0.36.93",
+  "version": "0.36.94",
   "description": "A lightweight rules engine for real-time, consistent and scalable coordination of events.",
   "keywords": [
     "business rules",

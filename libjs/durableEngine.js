@@ -400,24 +400,36 @@ exports = module.exports = durableEngine = function () {
         return that;
     };
 
-    var copy = function (object, filter) {
-        var newObject = {};
-        for (var pName in object) {
-            if (!filter || filter(pName)) {
-                var propertyType = typeof(object[pName]);
-                if (propertyType !== 'function') {
-                    if (propertyType === 'object' && object[pName] !== null) {
-                        newObject[pName] = copy(object[pName]);
-                    }
-                    else {
-                        newObject[pName] = object[pName];
-                    }
-                }
-            }
+    var copy = function (obj) {
+        var clone;
+
+        // Handle the 3 simple types, and null or undefined
+        if (null == obj || "object" != typeof obj) return obj;
+
+        if (obj instanceof Date) {
+            clone = new Date();
+            clone.setTime(obj.getTime());
+            return clone;
         }
 
-        return newObject;
-    };
+        if (obj instanceof Array) {
+            clone = [];
+            for (var i = 0, len = obj.length; i < len; i++) {
+                clone[i] = copy(obj[i]);
+            }
+            return clone;
+        }
+
+        if (obj instanceof Object) {
+            clone = {};
+            for (var attr in obj) {
+                if (obj.hasOwnProperty(attr)) clone[attr] = copy(obj[attr]);
+            }
+            return clone;
+        }
+
+        throw new Error("Unable to copy obj! Its type isn't supported.");
+    }
 
     var ruleset = function (name, host, rulesetDefinition, stateCacheSize) {
         var that = {};
