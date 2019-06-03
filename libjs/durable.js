@@ -1293,12 +1293,12 @@ exports = module.exports = durableEngine = function () {
                 }
 
                 expObject = {};
-                if (name === undefined) {
-                    expDefinition = newArray[i].define(refName);   
-                } else {
-                    expDefinition = newArray[i].define(name + '.' + refName);      
+                if (name !== undefined) {
+                    refName = name + '.' + refName;      
                 }
 
+                expDefinition = newArray[i].define(refName);  
+    
                 if (expDefinition[refName + '$all']) {
                     expObject[refName + '$all'] = expDefinition[refName + '$all'];
                 } else if (expDefinition[refName + '$any']) {
@@ -1322,7 +1322,6 @@ exports = module.exports = durableEngine = function () {
                 newDefinition['run'] = func;
             }   
             
-
             return newDefinition;
         };
 
