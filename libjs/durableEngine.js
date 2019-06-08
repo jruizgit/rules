@@ -4,16 +4,32 @@ exports = module.exports = durableEngine = function () {
     var stat = require('node-static');
     var r = require('bindings')('rulesjs.node');
 
-    var closure = function (host, document, output, handle, rulesetName) {
+    class MessageNotHandledError extends Error {
+      constructor(message) {
+        super('Could not handle message: ' + message);
+
+        if (Error.captureStackTrace) {
+          Error.captureStackTrace(this, MessageNotHandledError);
+        }
+
+        this.name = 'MessageNotHandledError';
+      }
+    }
+
+    class MessageObservedError extends Error {
+      constructor(message) {
+        super('Message has already been observed: ' + message);
+
+        if (Error.captureStackTrace) {
+          Error.captureStackTrace(this, MessageObservedError);
+        }
+
+        this.name = 'MessageObservedError';
+      }
+    }
+
+    var closure = function (host, ruleset, document, output, handle) {
         var that = {};
-        var targetRulesets = {};
-        var eventDirectory = {};
-        var queueDirectory = {};
-        var factDirectory = {};
-        var retractDirectory = {};
-        var timerDirectory = {};
-        var cancelledTimerDirectory = {};
-        var branchDirectory = {};
         var startTime = new Date().getTime();
         var ended = false;
         var deleted = false;
@@ -45,11 +61,7 @@ exports = module.exports = durableEngine = function () {
                 }
             }
         }            
-
-        that.getRulesetName = function () {
-            return rulesetName;
-        };
-
+        
         that.getHandle = function () {
             return handle;
         };
@@ -58,102 +70,55 @@ exports = module.exports = durableEngine = function () {
             return host;
         };
 
-        that.getTargetRulesets = function () {
-            var rulesetNames = [];
-            for (var rulesetName in targetRulesets) {
-                rulesetNames.push(rulesetName);
-            }
-            return rulesetNames;
-        };
-
-        that.getEvents = function () {
-            return eventDirectory;
-        };
-
-        that.getFacts = function () {
-            return factDirectory;
-        };
-
-        that.getRetract = function () {
-            return retractDirectory;
-        };
-
-        that.getTimers = function () {
-            return timerDirectory;
-        };
-
-        that.getCancelledTimers = function () {
-            return cancelledTimerDirectory;
-        };
-
         that.post = function (rules, message) {
-            if (!message) {
-                message = rules;
-                rules = rulesetName;
-            }
+            if (message) {
+                if (!message.sid) {
+                    message.sid = that.s.sid;
+                }
 
-            message = copy(message);
-
-            if (!message.sid) {
-                message.sid = that.s.sid;
-            }
-
-            var eventsList;
-            if (eventDirectory[rules]) {
-                eventsList = eventDirectory[rules];
+                host.getRuleset(rules).assertEvent(message);
             } else {
-                eventsList = [];
-                targetRulesets[rules] = true;
-                eventDirectory[rules] = eventsList;
-            }
+                message = rules;
+                if (!message.sid) {
+                    message.sid = that.s.sid;
+                }
 
-            eventsList.push(message);
+                ruleset.assertEvent(message);
+            }   
         };
 
         that.assert = function (rules, fact) {
-            if (!fact) {
-                fact = rules;
-                rules = rulesetName;
-            }
+            if (fact) {
+                if (!fact.sid) {
+                    fact.sid = that.s.sid;
+                }
 
-            fact = copy(fact);
-
-            if (!fact.sid) {
-                fact.sid = that.s.sid;
-            }
-            
-            var factsList;
-            if (factDirectory[rules]) {
-                factsList = factDirectory[rules];
+                host.getRuleset(rules).assertFact(fact);
             } else {
-                factsList = [];
-                targetRulesets[rules] = true;
-                factDirectory[rules] = factsList;
+                fact = rules;
+                if (!fact.sid) {
+                    fact.sid = that.s.sid;
+                }
+
+                ruleset.assertFact(fact);
             }
-            factsList.push(fact);
         };
 
         that.retract = function (rules, fact) {
-            if (!fact) {
-                fact = rules;
-                rules = rulesetName;
-            }
+            if (fact) {
+                if (!fact.sid) {
+                    fact.sid = that.s.sid;
+                }
 
-            fact = copy(fact);
-
-            if (!fact.sid) {
-                fact.sid = that.s.sid;
-            }
-            
-            var retractList;
-            if (retractDirectory[rules]) {
-                retractList = retractDirectory[rules];
+                host.getRuleset(rules).retractFact(fact);
             } else {
-                retractList = [];
-                targetRulesets[rules] = true;
-                retractDirectory[rules] = retractList;
+                fact = rules;
+                if (!fact.sid) {
+                    fact.sid = that.s.sid;
+                }
+
+                ruleset.retractFact(fact);
             }
-            retractList.push(fact);
         };
 
         that.deleteState = function () {
@@ -162,25 +127,17 @@ exports = module.exports = durableEngine = function () {
 
         that.startTimer = function (name, duration, manualReset) {
             manualReset = manualReset ? 1 : 0;
-            if (timerDirectory[name]) {
-                throw 'timer with name ' + name + ' already added';
-            } else {
-                timerDirectory[name] = [name, duration, manualReset];
-            }
+            ruleset.startTimer(that.s.sid, name, duration, manualReset);      
         };
 
         that.cancelTimer = function (name) {
-            if (cancelledTimerDirectory[name]) {
-                throw 'timer with name ' + name + ' already cancelled';
-            } else {
-                cancelledTimerDirectory[name] = true;
-            }
+            ruleset.cancelTimer(that.s.sid, name);
         };
 
         that.renewActionLease = function() {
             if ((new Date().getTime() - startTime) < 10000) {
                 startTime = new Date().getTime();
-                host.renewActionLease(rulesetName, that.s.sid);
+                ruleset.renewActionLease(that.s.sid);
             }
         };
 
@@ -281,7 +238,6 @@ exports = module.exports = durableEngine = function () {
                         setTimeout(timeoutCallback, 5000, new Date().getTime() + timeLeft * 1000);
                     }
                 } catch (reason) {
-                    console.log(reason.stack);
                     c.s.exception = String(reason);
                     complete(null, c);
                 }
@@ -315,52 +271,49 @@ exports = module.exports = durableEngine = function () {
         return that;
     };
 
-    var copy = function (object, filter) {
-        var newObject = {};
-        for (var pName in object) {
-            if (!filter || filter(pName)) {
-                var propertyType = typeof(object[pName]);
-                if (propertyType !== 'function') {
-                    if (propertyType === 'object' && object[pName] !== null) {
-                        newObject[pName] = copy(object[pName]);
-                    }
-                    else {
-                        newObject[pName] = object[pName];
-                    }
-                }
-            }
-        }
-
-        return newObject;
-    };
-
     var ruleset = function (name, host, rulesetDefinition) {
         var that = {};
         var actions = {};
         var handle;
         
+        var handleResult = function(result, message) {
+            if (result[0] === 1) {
+                throw new MessageNotHandledError(message);
+            } else if (result[0] === 2) {
+                throw new MessageObservedError(message);  
+            }
+
+            return result[1];
+        };
+
         that.assertEvent = function (message) {
-            return r.assertEvent(handle, JSON.stringify(message));
+            var json = JSON.stringify(message);
+            return handleResult(r.assertEvent(handle, json), json);
         };
 
         that.assertEvents = function (messages) {
-            return r.assertEvents(handle, JSON.stringify(messages));
+            var json = JSON.stringify(messages);
+            return handleResult(r.assertEvents(handle, json), json);
         };
 
         that.assertFact = function (fact) {
-            return r.assertFact(handle, JSON.stringify(fact));
+            var json = JSON.stringify(fact);
+            return handleResult(r.assertFact(handle, json), json);
         };
 
         that.assertFacts = function (facts) {
-            return r.assertFacts(handle, JSON.stringify(facts));
+            var json = JSON.stringify(facts);
+            return handleResult(r.assertFacts(handle, json), json);
         };
 
         that.retractFact = function (fact) {
-            return r.retractFact(handle, JSON.stringify(fact));
+            var json = JSON.stringify(fact);
+            return handleResult(r.retractFact(handle, json), json);
         };
 
         that.retractFacts = function (facts) {
-            return r.retractFacts(handle, JSON.stringify(facts));
+            var json = JSON.stringify(facts);
+            return handleResult(r.retractFacts(handle, json), json);
         };
 
         that.updateState = function (state) {
@@ -392,21 +345,6 @@ exports = module.exports = durableEngine = function () {
             return r.assertTimers(handle);
         };
 
-        var ensureRulesets = function (names, index, c, complete) {
-            if (index == names.length) {
-                complete(null, c);
-            } else {
-                var rulesetName = names[index];
-                host.ensureRuleset(rulesetName, function (err) {
-                    if (err) {
-                        complete(err, c);
-                    } else {
-                        ensureRulesets(names, ++index, c, complete);
-                    }
-                });
-            }
-        };
-
         var flushActions = function (state, resultContainer, stateOffset, complete) {
             
             while (resultContainer['message']) {
@@ -417,140 +355,50 @@ exports = module.exports = durableEngine = function () {
                     break;
                 }
                 resultContainer['message'] = null;
-                var c = closure(host, state, message, stateOffset, name);
+                var c = closure(host, that, state, message, stateOffset, name);
                 actions[actionName].run(c, function (err, c) {
                     if (err) {
                         r.abandonAction(handle, c.getHandle());
                         complete(err);
                     } else {
-                        var rulesetNames = c.getTargetRulesets();
-                        ensureRulesets(rulesetNames, 0, c, function(err, c) {
-                            if (c.hasEnded()) {
-                                return;
-                            } else {
-                                c.end();
-                            }
+                        if (c.hasEnded()) {
+                            return;
+                        } else {
+                            c.end();
+                        }
 
-                            if (err) {
-                                r.abandonAction(handle, c.getHandle());
-                                complete(err);
-                                return;
-                            }
+                        if (err) {
+                            r.abandonAction(handle, c.getHandle());
+                            complete(err);
+                            return;
+                        }
 
+                        try {
                             try {
-                                var rulesetName;
-                                var facts;
-                                var currentStateOffset = 0;
-                                var replies = 0;
-                                var pending = {};
-                                
-                                var timers = c.getCancelledTimers();
-                                for (var timerName in timers) {
-                                    try {
-                                        that.cancelTimer(c.s.sid, timerName);
-                                    } catch (reason) {
-                                        c.s.rulesetException = { action: 'cancelTimer', timer: timerName, reason: reason};
-                                    }
-                                }
-                                timers = c.getTimers();
-                                for (var timerName in timers) {
-                                    var timerTuple = timers[timerName];
-                                    try {   
-                                        that.startTimer(c.s.sid, timerTuple[0], timerTuple[1], timerTuple[2]);
-                                    } catch (reason) {
-                                        c.s.rulesetException = { action: 'startTimer', timer: timerName, reason: reason};
-                                    }
-                                }                 
-                                var retractFacts = c.getRetract();
-                                pending[stateOffset] = 0;
-                                for (rulesetName in retractFacts) {
-                                    facts = retractFacts[rulesetName];
-                                    try {                   
-                                        if (facts.length == 1) {
-                                            currentStateOffset = host.retract(rulesetName, facts[0]);
-                                        } else {
-                                            currentStateOffset = host.retractFacts(rulesetName, facts);
-                                        }
-                                        
-                                        if (!pending[currentStateOffset]) {
-                                            pending[currentStateOffset] = true;
-                                        }
-                                    } catch (reason) {
-                                        c.s.rulesetException = { action: 'retract', facts: facts, reason: reason};
-                                    }
-                                }
-                                var assertFacts = c.getFacts();
-                                for (rulesetName in assertFacts) {
-                                    facts = assertFacts[rulesetName];
-                                    try {
-                                        if (facts.length == 1) {
-                                            currentStateOffset = host.assert(rulesetName, facts[0]);
-                                        } else {
-                                            currentStateOffset = host.assertFacts(rulesetName, facts);
-                                        }
-                                       
-                                        if (!pending[currentStateOffset]) {
-                                            pending[currentStateOffset] = true;
-                                        }
-                                    } catch (reason) {
-                                        c.s.rulesetException = { action: 'assert', facts: facts, reason: reason};
-                                    }
-                                }
-                                var postEvents = c.getEvents();
-                                for (rulesetName in postEvents) {
-                                    var events = postEvents[rulesetName];
-                                    try {
-                                        if (events.length == 1) {
-                                            currentStateOffset = host.post(rulesetName, events[0]);
-                                        } else {
-                                            currentStateOffset = host.postEvents(rulesetName, events);
-                                        }
-                                        
-                                        if (!pending[currentStateOffset]) {
-                                            pending[currentStateOffset] = true;
-                                        }
-                                    } catch (reason) {
-                                        c.s.rulesetException = { action: 'post', events: events, reason: reason};
-                                    }
-                                }
-
-                                try {
-                                    currentStateOffset = r.updateState(handle, JSON.stringify(c.s));
-
-                                    if (!pending[currentStateOffset]) {
-                                        pending[currentStateOffset] = true;
-                                    }
-                                } catch (reason) {
-                                    c.s.rulesetException = { action: 'updateState', events: events, reason: reason};
-                                }
-    
-                                for (currentStateOffset in pending) {
-                                    if (currentStateOffset) {
-                                        if (currentStateOffset != stateOffset) {
-                                            r.complete(currentStateOffset);
-                                        } else {
-                                            var newResult = r.completeAndStartAction(handle, c.getHandle());
-                                            if (newResult) {
-                                                resultContainer['message'] = JSON.parse(newResult);
-                                            } else {
-                                                complete(null, state);
-                                            }
-                                        }
-                                    }                                    
-                                }
+                                r.updateState(handle, JSON.stringify(c.s));
                             } catch (reason) {
-                                r.abandonAction(handle, c.getHandle());
+                                c.s.rulesetException = { action: 'updateState', events: events, reason: reason};
+                            }
+
+                            var newResult = r.completeAndStartAction(handle, c.getHandle());
+                            if (newResult) {
+                                resultContainer['message'] = JSON.parse(newResult);
+                            } else {
+                                complete(null, state);
+                            }
+
+                        } catch (reason) {
+                            r.abandonAction(handle, c.getHandle());
+                            complete(reason);
+                        }
+
+                        if (c.isDeleted()) {
+                            try {
+                                host.deleteState(name, c.s.sid);
+                            } catch (reason) {
                                 complete(reason);
                             }
-
-                            if (c.isDeleted()) {
-                                try {
-                                    host.deleteState(name, c.s.sid);
-                                } catch (reason) {
-                                    complete(reason);
-                                }
-                            }   
-                        });
+                        }   
                     }
                 });
             }
@@ -572,11 +420,7 @@ exports = module.exports = durableEngine = function () {
         that.dispatch = function () {            
             var result = r.startAction(handle);
             if (result) {
-                flushActions(JSON.parse(result[0]), {'message': JSON.parse(result[1])}, result[2], function(reason, state) {
-                    if (reason) {
-                       console.log(reason);
-                   }
-                });
+                flushActions(JSON.parse(result[0]), {'message': JSON.parse(result[1])}, result[2], function(reason, state) {});
             }
         };
 
@@ -995,95 +839,66 @@ exports = module.exports = durableEngine = function () {
             return names;
         };
 
-        that.postEvents = function (rulesetName, messages, complete) { 
+        handleFunction = function(rules, func, args, complete) {
             if (!complete) {
-                return that.getRuleset(rulesetName).assertEvents(messages);
+                var error = null;
+                var result = null;
+                rules.doActions(func(args), function(reason, state) {
+                    if (reason) {
+                        error = reason;
+                    } else {
+                        result = state;
+                    }
+                });
+
+                if (error) {
+                    throw error;
+                }
+
+                return result;
+
             } else {
                 try {
-                    var rules = that.getRuleset(rulesetName);
-                    rules.doActions(rules.assertEvents(messages), complete);
+                    rules.doActions(func(args), complete);
                 } catch (reason) {
                     complete(reason);
                 }
             }
+        }
+
+        that.postEvents = function (rulesetName, messages, complete) { 
+            var rules = that.getRuleset(rulesetName);
+            return handleFunction(rules, rules.assertEvents, messages, complete);
         };
 
         that.post = function (rulesetName, message, complete) {
-            if (!complete) {
-                return that.getRuleset(rulesetName).assertEvent(message);
-            } else {
-                try {
-                    var rules = that.getRuleset(rulesetName);
-                    rules.doActions(rules.assertEvent(message), complete);
-                } catch (reason) {
-                    complete(reason);
-                }
-            }
+            var rules = that.getRuleset(rulesetName);
+            return handleFunction(rules, rules.assertEvent, message, complete);
         };
 
         that.assertFacts = function (rulesetName, facts, complete) {
-            if (!complete) {
-                return that.getRuleset(rulesetName).assertFacts(facts);
-            } else {
-                try {
-                    var rules = that.getRuleset(rulesetName);
-                    rules.doActions(rules.assertFacts(facts), complete);
-                } catch (reason) {
-                    complete(reason);
-                }
-            }
+            var rules = that.getRuleset(rulesetName);
+            return handleFunction(rules, rules.assertFacts, facts, complete);
         };
 
         that.assert = function (rulesetName, fact, complete) {
-            if (!complete) {
-                return that.getRuleset(rulesetName).assertFact(fact);
-            } else {
-                try {
-                    var rules = that.getRuleset(rulesetName);
-                    rules.doActions(rules.assertFact(fact), complete);
-                } catch (reason) {
-                    complete(reason);
-                }
-            }
+            var rules = that.getRuleset(rulesetName);
+            return handleFunction(rules, rules.assertFact, fact, complete);
         };
 
         that.retractFacts = function (rulesetName, facts, complete) {
-            if (!complete) {
-                return that.getRuleset(rulesetName).retractFacts(facts);
-            } else {
-                try {
-                    var rules = that.getRuleset(rulesetName);
-                    rules.doActions(rules.retractFacts(facts), complete);
-                } catch (reason) {
-                    complete(reason);
-                }
-            }
+            var rules = that.getRuleset(rulesetName);
+            return handleFunction(rules, rules.retractFacts, facts, complete);
         };
 
         that.retract = function (rulesetName, fact, complete) {
-           if (!complete) {
-                return that.getRuleset(rulesetName).retractFact(fact);
-            } else {
-                try {
-                    var rules = that.getRuleset(rulesetName);
-                    rules.doActions(rules.retractFact(fact), complete);
-                } catch (reason) {
-                    complete(reason);
-                }
-            }
+            var rules = that.getRuleset(rulesetName);
+            return handleFunction(rules, rules.retractFact, fact, complete);
         };
 
         that.updateState = function (rulesetName, state, complete) {
-            if (!complete) {
-                return that.getRuleset(rulesetName).updateState(fact);
-            } else {
-                try {
-                    var rules = that.getRuleset(rulesetName);
-                    rules.doActions(rules.updateState(state), complete);
-                } catch (reason) {
-                    complete(reason);
-                }
-            }
+            var rules = that.getRuleset(rulesetName);
+            return handleFunction(rules, rules.updateState, state, complete);
         };
 
         that.getState = function (rulesetName, sid) {
@@ -1141,203 +956,11 @@ exports = module.exports = durableEngine = function () {
         setTimeout(dispatchRules, 100, 0);
         setTimeout(dispatchTimers, 100, 0);
         return that;
-    }
-
-    var application = function (host, port, basePath) {
-        var that = express();
-        var fileServer = new stat.Server(__dirname);
-        basePath = basePath || '';
-        port = port || 5000;
-        if (basePath !== '' && basePath.indexOf('/') !== 0) {
-            basePath = '/' + basePath;
-        }
-
-        that.use(bodyParser.json());
-        that.run = function () {
-
-            that.get(basePath + '/:rulesetName/state/:sid', function (request, response) {
-                response.contentType = 'application/json; charset=utf-8';
-                host.ensureRuleset(request.params.rulesetName, function (err, result) {
-                    if (err) {
-                        response.status(500).send({ error: err });
-                    }
-                    else {
-                        try {
-                            response.status(200).send(host.getState(request.params.rulesetName, request.params.sid));
-                        } catch (reason) {
-                            response.status(500).send({ error: reason });
-                        }
-                    }
-                });
-            });
-
-            that.get(basePath + '/:rulesetName/state', function (request, response) {
-                response.contentType = 'application/json; charset=utf-8';
-                host.ensureRuleset(request.params.rulesetName, function (err, result) {
-                    if (err) {
-                        response.status(500).send({ error: err });
-                    }
-                    else {
-                        try {
-                            response.status(200).send(host.getState(request.params.rulesetName, null));
-                        } catch (reason) {
-                            response.status(500).send({ error: reason });
-                        }
-                    }
-                });
-            });
-
-
-            that.post(basePath + '/:rulesetName/state/:sid', function (request, response) {
-                response.contentType = 'application/json; charset=utf-8';
-                var document = request.body;
-                document.id = request.params.sid;
-                host.ensureRuleset(request.params.rulesetName, function (err, result) {
-                    if (err)
-                        response.status(500).send({ error: err });
-                    else {
-                        try {
-                            var result = host.patchState(request.params.rulesetName, document);
-                            response.status(200).send({ outcome: result });
-                        } catch (reason) {
-                            response.status(500).send({ error: reason });
-                        }
-                    }
-                });
-            });
-
-            that.post(basePath + '/:rulesetName/state', function (request, response) {
-                response.contentType = 'application/json; charset=utf-8';
-                var document = request.body;
-                host.ensureRuleset(request.params.rulesetName, function (err, result) {
-                    if (err)
-                        response.status(500).send({ error: err });
-                    else {
-                        try {
-                            var result = host.patchState(request.params.rulesetName, document);
-                            response.status(200).send({ outcome: result });
-                        } catch (reason) {
-                            response.status(500).send({ error: reason });
-                        }
-                    }
-                });
-            });
-
-            that.post(basePath + '/:rulesetName/events/:sid', function (request, response) {
-                response.contentType = "application/json; charset=utf-8";
-                var message = request.body;
-                message.sid = request.params.sid;
-
-                host.ensureRuleset(request.params.rulesetName, function (err, result) {
-                    if (err) {
-                        response.status(500).send({ error: err });
-                    }
-                    else {
-                        try {
-                            var result = host.post(request.params.rulesetName, message);
-                            response.status(200).send({ outcome: result });
-                        } catch (reason) {
-                            response.status(500).send({ error: reason });
-                        }
-                    }
-                });
-            });
-
-            that.post(basePath + '/:rulesetName/events', function (request, response) {
-                response.contentType = "application/json; charset=utf-8";
-                var message = request.body;
-                host.ensureRuleset(request.params.rulesetName, function (err, result) {
-                    if (err) {
-                        response.status(500).send({ error: err });
-                    }
-                    else {
-                        try {
-                            var result = host.post(request.params.rulesetName, message);
-                            response.status(200).send({ outcome: result });
-                        } catch (reason) {
-                            response.status(500).send({ error: reason });
-                        }
-                    }
-                });
-            });
-
-            that.post(basePath + '/:rulesetName/facts/:sid', function (request, response) {
-                response.contentType = "application/json; charset=utf-8";
-                var message = request.body;
-                message.sid = request.params.sid;
-
-                host.ensureRuleset(request.params.rulesetName, function (err, result) {
-                    if (err) {
-                        response.status(500).send({ error: err });
-                    }
-                    else {
-                        try {
-                            var result = host.assert(request.params.rulesetName, message);
-                            response.status(200).send({ outcome: result });
-                        } catch (reason) {
-                            response.status(500).send({ error: reason });
-                        }
-                    }
-                });
-            });
-
-            that.post(basePath + '/:rulesetName/facts', function (request, response) {
-                response.contentType = "application/json; charset=utf-8";
-                var message = request.body;
-                host.ensureRuleset(request.params.rulesetName, function (err, result) {
-                    if (err) {
-                        response.status(500).send({ error: err });
-                    }
-                    else {
-                        try {
-                            var result = host.assert(request.params.rulesetName, message);
-                            response.status(200).send({ outcome: result });
-                        } catch (reason) {
-                            response.status(500).send({ error: reason });
-                        }
-                    }
-                });
-            });
-
-            that.get(basePath + '/:rulesetName/definition', function (request, response) {
-                response.contentType = 'application/json; charset=utf-8';
-                host.ensureRuleset(request.params.rulesetName, function (err, result) {
-                    if (err)
-                        response.status(500).send({ error: err });
-                    else {
-                        try {
-                            response.status(200).send(host.getRuleset(request.params.rulesetName).getDefinition());
-                        } catch (reason) {
-                            response.status(500).send({ error: reason });
-                        }
-                    }
-                });
-            });
-
-            that.post(basePath + '/:rulesetName/definition', function (request, response) {
-                response.contentType = "application/json; charset=utf-8";
-                host.setRuleset(request.params.rulesetName, request.body, function (err, result) {
-                    if (err) {
-                        response.status(500).send({ error: err });
-                    }
-                    else {
-                        response.status(200).send();
-                    }
-                });
-            });
-
-            return that.listen(port, function () {
-                console.log('Listening on ' + port);
-            });    
-        };
-
-        return that;
     };
 
     return {
         closure: closure,
         promise: promise,
-        host: host,
-        application: application
+        host: host
     };
 }();

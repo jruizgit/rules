@@ -1288,11 +1288,11 @@ exports = module.exports = durableEngine = function () {
                 }
 
                 expObject = {};
-                if (name === undefined) {
-                    expDefinition = newArray[i].define(refName);   
-                } else {
-                    expDefinition = newArray[i].define(name + '.' + refName);      
+                if (name !== undefined) {
+                    refName = name + '.' + refName;      
                 }
+
+                expDefinition = newArray[i].define(refName);  
 
                 if (expDefinition[refName + '$all']) {
                     expObject[refName + '$all'] = expDefinition[refName + '$all'];
@@ -1537,7 +1537,7 @@ exports = module.exports = durableEngine = function () {
 
         var definitions = {};
         definitions[that.getName()] = that.define();
-        createHost().registerRulesets(definitions);
+        getHost().registerRulesets(definitions);
         return that;
     };
 
@@ -1723,7 +1723,7 @@ exports = module.exports = durableEngine = function () {
         
         var definitions = {};
         definitions[that.getName()] = that.define();
-        createHost().registerRulesets(definitions);
+        getHost().registerRulesets(definitions);
         return that;
     };
 
@@ -1875,12 +1875,12 @@ exports = module.exports = durableEngine = function () {
 
         var definitions = {};
         definitions[that.getName()] = that.define();
-        createHost().registerRulesets(definitions);
+        getHost().registerRulesets(definitions);
         return that;
     };
 
     var host;
-    var createHost = function() {
+    var getHost = function() {
         if (host) {
             return host;
         }
@@ -1890,46 +1890,36 @@ exports = module.exports = durableEngine = function () {
     } 
 
     var postEvents = function (rulesetName, messages, complete) { 
-        return createHost().postEvents(rulesetName, messages, complete);
+        return getHost().postEvents(rulesetName, messages, complete);
     }
 
     var post = function (rulesetName, message, complete) {
-        return createHost().post(rulesetName, message, complete);
+        return getHost().post(rulesetName, message, complete);
     }
 
     var assertFacts = function (rulesetName, facts, complete) { 
-        return createHost().assertFacts(rulesetName, facts, complete);
+        return getHost().assertFacts(rulesetName, facts, complete);
     }
 
     var assert = function (rulesetName, fact, complete) { 
-        return createHost().assert(rulesetName, fact, complete);
+        return getHost().assert(rulesetName, fact, complete);
     }           
 
     var retractFacts = function (rulesetName, facts, complete) { 
-        return createHost().retractFacts(rulesetName, facts, complete);
+        return getHost().retractFacts(rulesetName, facts, complete);
     } 
      
     var retract = function (rulesetName, fact, complete) { 
-        return createHost().retract(rulesetName, fact, complete);
+        return getHost().retract(rulesetName, fact, complete);
     }  
 
     var updateState = function (rulesetName, state, complete) { 
-        return createHost().updateState(rulesetName, state, complete);
+        return getHost().updateState(rulesetName, state, complete);
     }
 
     var getState = function (rulesetName, sid) { 
-        return createHost().getState(rulesetName, sid);
+        return getHost().getState(rulesetName, sid);
     }
-
-    var runAll = function(port, basePath, run) {
-        var rulesHost = createHost();
-        var app = d.application(rulesHost, port, basePath);
-        if (run) {
-            run(rulesHost, app);
-        } else {
-            app.run(); 
-        }
-    } 
 
     var ex = {
         state: state,
@@ -1945,8 +1935,7 @@ exports = module.exports = durableEngine = function () {
         retract: retract,
         updateState: updateState,
         getState: getState,
-        createHost: createHost,
-        runAll: runAll,
+        getHost: getHost
 
     }; 
     extend(ex);

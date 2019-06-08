@@ -109,8 +109,11 @@ void jsAssertEvent(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int result = assertEvent(TO_NUMBER(isolate, args[0]),
                                           TO_STRING(isolate, args[1]),
                                           &stateOffset);
-        if (result == RULES_OK) {
-            args.GetReturnValue().Set(stateOffset);
+        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, result));
+            array->Set(1, Number::New(isolate, stateOffset));
+            args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not start assert event, error code: %d", result) == -1) {
@@ -134,8 +137,11 @@ void jsAssertEvents(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int result = assertEvents(TO_NUMBER(isolate, args[0]), 
                                            TO_STRING(isolate, args[1]),
                                            &stateOffset);
-        if (result == RULES_OK) {
-            args.GetReturnValue().Set(stateOffset);
+        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, result));
+            array->Set(1, Number::New(isolate, stateOffset));
+            args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not start assert events, error code: %d", result) == -1) {
@@ -159,8 +165,11 @@ void jsRetractEvent(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int result = retractEvent(TO_NUMBER(isolate, args[0]), 
                                            TO_STRING(isolate, args[1]),
                                            &stateOffset);
-        if (result == RULES_OK) {
-            args.GetReturnValue().Set(stateOffset);
+        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, result));
+            array->Set(1, Number::New(isolate, stateOffset));
+            args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not start assert events, error code: %d", result) == -1) {
@@ -184,8 +193,11 @@ void jsAssertFact(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int result = assertFact(TO_NUMBER(isolate, args[0]), 
                                          TO_STRING(isolate, args[1]),
                                          &stateOffset);
-        if (result == RULES_OK) {
-            args.GetReturnValue().Set(stateOffset);
+        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, result));
+            array->Set(1, Number::New(isolate, stateOffset));
+            args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not start assert events, error code: %d", result) == -1) {
@@ -209,8 +221,11 @@ void jsAssertFacts(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int result = assertFacts(TO_NUMBER(isolate, args[0]), 
                                           TO_STRING(isolate, args[1]),
                                           &stateOffset);
-        if (result == RULES_OK) {
-            args.GetReturnValue().Set(stateOffset);
+        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, result));
+            array->Set(1, Number::New(isolate, stateOffset));
+            args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not start assert events, error code: %d", result) == -1) {
@@ -234,8 +249,11 @@ void jsRetractFact(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int result = retractFact(TO_NUMBER(isolate, args[0]), 
                                           TO_STRING(isolate, args[1]),
                                           &stateOffset);
-        if (result == RULES_OK) {
-            args.GetReturnValue().Set(stateOffset);
+        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, result));
+            array->Set(1, Number::New(isolate, stateOffset));
+            args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not start assert events, error code: %d", result) == -1) {
@@ -259,8 +277,11 @@ void jsRetractFacts(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int result = retractFacts(TO_NUMBER(isolate, args[0]), 
                                            TO_STRING(isolate, args[1]),
                                            &stateOffset);
-        if (result == RULES_OK) {
-            args.GetReturnValue().Set(stateOffset);
+        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, result));
+            array->Set(1, Number::New(isolate, stateOffset));
+            args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not start assert events, error code: %d", result) == -1) {
@@ -286,7 +307,7 @@ void jsUpdateState(const FunctionCallbackInfo<Value>& args) {
                                           &stateOffset);
         
         if (result == RULES_OK) {
-            args.GetReturnValue().Set(stateOffset);
+            args.GetReturnValue().Set(Number::New(isolate, stateOffset));
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not update state, error code: %d", result) == -1) {
@@ -317,7 +338,7 @@ void jsStartAction(const FunctionCallbackInfo<Value>& args) {
             Handle<Array> array = Array::New(isolate, 4);
             array->Set(0, String::NewFromUtf8(isolate, session));
             array->Set(1, String::NewFromUtf8(isolate, messages));
-            array->Set(2, Number::New(isolate, (long long)stateOffset));
+            array->Set(2, Number::New(isolate, stateOffset));
             args.GetReturnValue().Set(array);
         } else if (result != ERR_NO_ACTION_AVAILABLE) {
             char *message = NULL;
@@ -464,12 +485,7 @@ void jsAssertTimers(const FunctionCallbackInfo<Value>& args) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         unsigned int result = assertTimers(TO_NUMBER(isolate, args[0]));
-        
-        if (result == RULES_OK) {
-            args.GetReturnValue().Set(1);
-        } else if (result == ERR_NO_TIMERS_AVAILABLE) {
-            args.GetReturnValue().Set(0);
-        } else {
+        if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not assert timers, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
@@ -495,7 +511,7 @@ void jsGetState(const FunctionCallbackInfo<Value>& args) {
         if (result == RULES_OK) {
             args.GetReturnValue().Set(String::NewFromUtf8(isolate, state));
             free(state);
-        } else if (result != ERR_NEW_SESSION) {
+        } else if (result != ERR_SID_NOT_FOUND) {
             char *message = NULL;
             if (asprintf(&message, "Could not get state, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
