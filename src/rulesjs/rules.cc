@@ -76,27 +76,6 @@ void jsDeleteRuleset(const FunctionCallbackInfo<Value>& args) {
     }
 }
 
-void jsComplete(const FunctionCallbackInfo<v8::Value>& args) {
-    Isolate* isolate;
-    isolate = args.GetIsolate();
-    if (args.Length() < 1) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsNumber()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
-    } else {
-        unsigned int result = complete(TO_NUMBER(isolate, args[0]));
-        if (result != RULES_OK) {
-            char *message = NULL;
-            if (asprintf(&message, "Could not complete, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
-            } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-            }
-        } 
-    }
-
-}
-
 void jsAssertEvent(const FunctionCallbackInfo<v8::Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
@@ -335,7 +314,7 @@ void jsStartAction(const FunctionCallbackInfo<Value>& args) {
                                           &messages, 
                                           &stateOffset); 
         if (result == RULES_OK) {
-            Handle<Array> array = Array::New(isolate, 4);
+            Handle<Array> array = Array::New(isolate, 3);
             array->Set(0, String::NewFromUtf8(isolate, session));
             array->Set(1, String::NewFromUtf8(isolate, messages));
             array->Set(2, Number::New(isolate, stateOffset));
@@ -356,7 +335,7 @@ void jsStartActionForState(const FunctionCallbackInfo<Value>& args) {
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
+    } else if (!args[0]->IsNumber() || !args[1]->IsNumber()) {
         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
     } else {
         char *session;
@@ -366,7 +345,7 @@ void jsStartActionForState(const FunctionCallbackInfo<Value>& args) {
                                                   &session, 
                                                   &messages); 
         if (result == RULES_OK) {
-            Handle<Array> array = Array::New(isolate, 4);
+            Handle<Array> array = Array::New(isolate, 2);
             array->Set(0, String::NewFromUtf8(isolate, session));
             array->Set(1, String::NewFromUtf8(isolate, messages));
             args.GetReturnValue().Set(array);
@@ -511,7 +490,7 @@ void jsGetState(const FunctionCallbackInfo<Value>& args) {
         if (result == RULES_OK) {
             args.GetReturnValue().Set(String::NewFromUtf8(isolate, state));
             free(state);
-        } else if (result != ERR_SID_NOT_FOUND) {
+        } else {
             char *message = NULL;
             if (asprintf(&message, "Could not get state, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
@@ -626,9 +605,6 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewFromUtf8(isolate, "deleteRuleset", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsDeleteRuleset)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "complete", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsComplete)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "assertEvent", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsAssertEvent)->GetFunction());

@@ -1820,10 +1820,6 @@ static unsigned int handleMessages(ruleset *tree,
     return returnResult;
 }
 
-unsigned int complete(unsigned int stateOffset) {
-    return RULES_OK;
-}
-
 unsigned int assertEvent(unsigned int handle, 
                          char *message, 
                          unsigned int *stateOffset) {

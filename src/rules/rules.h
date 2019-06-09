@@ -125,8 +125,6 @@ unsigned int bindRuleset(unsigned int handle,
                          char *password,
                          unsigned char db);
 
-unsigned int complete(unsigned int stateOffset);
-
 unsigned int assertEvent(unsigned int handle, 
                          char *message,
                           unsigned int *stateOffset);
