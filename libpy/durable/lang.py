@@ -1,5 +1,4 @@
 from . import engine
-from . import interface
 
 class avalue(object):
 
@@ -393,7 +392,7 @@ class ruleset(object):
         self.name = name
         self.rules = []
         if not len(_ruleset_stack):
-            _rulesets.append(self)
+            _rulesets[name] = self
         elif len(_rule_stack) > 0:
 
             _rule_stack[-1].func.append(self)
@@ -410,11 +409,8 @@ class ruleset(object):
         index = 0
         new_definition = {}
         for rule in self.rules:
-            if isinstance(rule, when_start):
-                _start_functions.append(rule.func)
-            else:
-                new_definition['r_{0}'.format(index)] = rule.define()
-                index += 1   
+            new_definition['r_{0}'.format(index)] = rule.define()
+            index += 1   
         
         return self.name, new_definition
         
@@ -516,7 +512,7 @@ class statechart(object):
         self.states = []
         self.root = True
         if not len(_ruleset_stack):
-            _rulesets.append(self)
+            _rulesets[name] = self
         elif len(_rule_stack) > 0:
             _rule_stack[-1].func.append(self)
         else:
@@ -531,11 +527,8 @@ class statechart(object):
     def define(self):
         new_definition = {}
         for state in self.states:
-            if isinstance(state, when_start):
-                _start_functions.append(state.func)
-            else:
-                state_name, state_definition = state.define()
-                new_definition[state_name] = state_definition
+            state_name, state_definition = state.define()
+            new_definition[state_name] = state_definition
 
         return '{0}$state'.format(self.name), new_definition
 
@@ -601,7 +594,7 @@ class flowchart(object):
         self.name = name
         self.stages = []
         if not len(_ruleset_stack):
-            _rulesets.append(self)
+            _rulesets[name] = self
         elif len(_rule_stack) > 0:
             _rule_stack[-1].func.append(self)
         else:
@@ -616,11 +609,8 @@ class flowchart(object):
     def define(self):
         new_definition = {}
         for stage in self.stages:
-            if isinstance(stage, when_start):
-                _start_functions.append(stage.func)
-            else:
-                stage_name, stage_definition = stage.define()
-                new_definition[stage_name] = stage_definition
+            stage_name, stage_definition = stage.define()
+            new_definition[stage_name] = stage_definition
 
         return '{0}$flow'.format(self.name), new_definition
 
@@ -642,9 +632,8 @@ def distinct(value):
     return {'dist': value}
 
 def select(name):
-    for rset in _rulesets:
-        if rset.name == name:
-            return rset
+    if name in _rulesets:
+        return _rulesets[name]
 
     raise Exception('Ruleset {0} not found'.format(name))
 
@@ -655,27 +644,65 @@ c = closure()
 
 _rule_stack = []
 _ruleset_stack = []
-_rulesets = []
-_start_functions = []
+_rulesets = {}
+_defined_rulesets = {}
+_main_host = None
 
-def create_host():
-    ruleset_definitions = {}
-    for rset in _rulesets:
+def _ensure_host():
+    global _main_host
+    if not _main_host:
+        _main_host = engine.Host()
+
+def _ensure_ruleset(ruleset_name, rset = None):
+    _ensure_host()
+    if not ruleset_name in _defined_rulesets:
+        if not rset:
+            rset = _rulesets[ruleset_name]
+
         ruleset_name, ruleset_definition = rset.define()
-        ruleset_definitions[ruleset_name] = ruleset_definition
+        _main_host.set_ruleset(ruleset_name, ruleset_definition)
+        _defined_rulesets[ruleset_name] = True
+
+def get_host():
+    for name, rset in _rulesets.items():
+        _ensure_ruleset(name, rset)
+            
+    return _main_host
+
+def post(ruleset_name, message, complete = None):
+    _ensure_ruleset(ruleset_name)
+    _main_host.post(ruleset_name, message, complete)
         
-    main_host = engine.Host(ruleset_definitions)
-    for start in _start_functions:
-        start(main_host)
+def post_batch(ruleset_name, messages, complete = None):
+    _ensure_ruleset(ruleset_name)
+    _main_host.post_batch(ruleset_name, messages, complete)
+    
+def assert_fact(ruleset_name, fact, complete = None):
+    _ensure_ruleset(ruleset_name)
+    _main_host.assert_fact(ruleset_name, fact, complete)
+    
+def assert_facts(ruleset_name, facts, complete = None):
+    _ensure_ruleset(ruleset_name)
+    _main_host.assert_facts(ruleset_name, facts, complete)
+    
+def retract_fact(ruleset_name, fact, complete = None):
+    _ensure_ruleset(ruleset_name)
+    _main_host.retract_fact(ruleset_name, fact, complete)
+    
+def retract_facts(ruleset_name, facts, complete = None):
+    _ensure_ruleset(ruleset_name)
+    _main_host.retract_facts(ruleset_name, facts, complete)
+    
+def update_state(ruleset_name, state, complete = None):
+    _ensure_ruleset(ruleset_name)
+    _main_host.update_state(ruleset_name, state, complete)
 
-    main_host.run()
-    return main_host
+def get_state(ruleset_name, sid):
+    _ensure_ruleset(ruleset_name)
+    _main_host.get_state(ruleset_name, sid)
 
-def run_all(host_name = '127.0.0.1', port = 5000, routing_rules = None, run = None):
-    main_host = create_host()
-    main_app = interface.Application(main_host, host_name, port, routing_rules, run)
-    main_app.run()
+def delete_state(ruleset_name, sid):
+    _ensure_ruleset(ruleset_name)
+    _main_host.delete_state(ruleset_name, sid)
 
-def run_server(run, routing_rules = None):
-    run_all(None, None, routing_rules, run)
 

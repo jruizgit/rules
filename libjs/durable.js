@@ -1921,6 +1921,10 @@ exports = module.exports = durableEngine = function () {
         return getHost().getState(rulesetName, sid);
     }
 
+    var deleteState = function (rulesetName, sid) { 
+        return getHost().deleteState(rulesetName, sid);
+    }
+
     var ex = {
         state: state,
         statechart: statechart,
@@ -1935,6 +1939,7 @@ exports = module.exports = durableEngine = function () {
         retract: retract,
         updateState: updateState,
         getState: getState,
+        deleteState: deleteState,
         getHost: getHost
 
     }; 

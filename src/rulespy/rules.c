@@ -581,7 +581,7 @@ static PyMethodDef myModule_methods[] = {
     {"delete_ruleset", pyDeleteRuleset, METH_VARARGS},
     {"assert_event", pyAssertEvent, METH_VARARGS},
     {"assert_events", pyAssertEvents, METH_VARARGS},
-    {"retract_event", pyRetractEvent, METH_VARARGS},
+    //{"retract_event", pyRetractEvent, METH_VARARGS},
     {"assert_fact", pyAssertFact, METH_VARARGS},
     {"assert_facts", pyAssertFacts, METH_VARARGS},
     {"retract_fact", pyRetractFact, METH_VARARGS},

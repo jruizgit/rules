@@ -16,21 +16,23 @@ def _unix_now():
     delta = dt - epoch
     return delta.total_seconds()
 
+class MessageNotHandledException(Exception):
+
+    def __init__(self, message):
+        self.message = 'Could not handle message: {0}'.format(json.dumps(message, ensure_ascii=False))
+
+class MessageObservedException(Exception):
+
+    def __init__(self, message):
+        self.message = 'Message has already been observed: {0}'.format(json.dumps(message, ensure_ascii=False))
 
 class Closure(object):
 
-    def __init__(self, host, state, message, handle, ruleset_name):
-        self.ruleset_name = ruleset_name
+    def __init__(self, host, ruleset, state, message, handle):
         self.host = host
         self.s = Content(state)
         self._handle = handle
-        self._timer_directory = {}
-        self._cancelled_timer_directory = {}
-        self._message_directory = {}
-        self._queue_directory = {}
-        self._branch_directory = {}
-        self._fact_directory = {}
-        self._retract_directory = {}
+        self._ruleset = ruleset
         self._completed = False
         self._deleted = False
         self._start_time = _unix_now()
@@ -44,100 +46,79 @@ class Closure(object):
 
                 self.m.append(Content(one_message))
 
-    def get_timers(self):
-        return self._timer_directory
-
-    def get_cancelled_timers(self):
-        return self._cancelled_timer_directory
-
-    def get_branches(self):
-        return self._branch_directory
-
-    def get_messages(self):
-        return self._message_directory
-
-    def get_facts(self):
-        return self._fact_directory
-
-    def get_retract_facts(self):
-        return self._retract_directory
-
     def post(self, ruleset_name, message = None):
-        if not message: 
-            message = ruleset_name
-            ruleset_name = self.ruleset_name
+        if message: 
+            if not 'sid' in message:
+                message['sid'] = self.s.sid
 
-        if not 'sid' in message:
-            message['sid'] = self.s.sid
+            if isinstance(message, Content):
+                message = message._d
 
-        if isinstance(message, Content):
-            message = message._d
-
-        message_list = []
-        if  ruleset_name in self._message_directory:
-            message_list = self._message_directory[ruleset_name]
+            self.host.assert_event(ruleset_name, message) 
         else:
-            self._message_directory[ruleset_name] = message_list
+            message = ruleset_name 
+            if not 'sid' in message:
+                message['sid'] = self.s.sid
 
-        message_list.append(message)
+            if isinstance(message, Content):
+                message = message._d
 
-    def delete(self):
-        self._deleted = True
+            self._ruleset.assert_event(message)
 
-    def start_timer(self, timer_name, duration, manual_reset = False):
-        if timer_name in self._timer_directory:
-            raise Exception('Timer with name {0} already added'.format(timer_name))
-        else:
-            self._timer_directory[timer_name] = (timer_name, duration, manual_reset)
-        
-    def cancel_timer(self, timer_name):
-        if timer_name in self._cancelled_timer_directory:
-            raise Exception('Timer with name {0} already cancelled'.format(timer_name))
-        else:
-            self._cancelled_timer_directory[timer_name] = True
 
     def assert_fact(self, ruleset_name, fact = None):
-        if not fact: 
-            fact = ruleset_name
-            ruleset_name = self.ruleset_name
+        if fact: 
+            if not 'sid' in fact:
+                fact['sid'] = self.s.sid
 
-        if not 'sid' in fact:
-            fact['sid'] = self.s.sid
+            if isinstance(fact, Content):
+                fact = fact._d
 
-        if isinstance(fact, Content):
-            fact = copy.deepcopy(fact._d)
-
-        fact_list = []
-        if  ruleset_name in self._fact_directory:
-            fact_list = self._fact_directory[ruleset_name]
+            self.host.assert_fact(ruleset_name, fact) 
         else:
-            self._fact_directory[ruleset_name] = fact_list
+            fact = ruleset_name 
+            if not 'sid' in fact:
+                fact['sid'] = self.s.sid
 
-        fact_list.append(fact)
+            if isinstance(fact, Content):
+                fact = fact._d
+
+            self._ruleset.assert_fact(fact)
+
+
 
     def retract_fact(self, ruleset_name, fact = None):
-        if not fact: 
-            fact = ruleset_name
-            ruleset_name = self.ruleset_name
+        if fact: 
+            if not 'sid' in fact:
+                fact['sid'] = self.s.sid
 
-        if not 'sid' in fact:
-            fact['sid'] = self.s.sid
+            if isinstance(fact, Content):
+                fact = fact._d
 
-        if isinstance(fact, Content):
-            fact = copy.deepcopy(fact._d)
-
-        retract_list = []
-        if  ruleset_name in self._retract_directory:
-            retract_list = self._retract_directory[ruleset_name]
+            self.host.retract_fact(ruleset_name, fact) 
         else:
-            self._retract_directory[ruleset_name] = retract_list
+            fact = ruleset_name 
+            if not 'sid' in fact:
+                fact['sid'] = self.s.sid
 
-        retract_list.append(fact)
+            if isinstance(fact, Content):
+                fact = fact._d
 
+            self._ruleset.retract_fact(fact)
+
+    def start_timer(self, timer_name, duration, manual_reset = False):
+        self._ruleset.start_timer(self.s.sid, timer_name, duration, manual_reset)
+        
+    def cancel_timer(self, timer_name):
+        self._ruleset.cancel_timer(self.s.sid, timer_name)
+        
     def renew_action_lease(self):
         if _unix_now() - self._start_time < 10:
             self._start_time = _unix_now()
-            self.host.renew_action_lease(self.ruleset_name, self.s.sid) 
+            self._ruleset.renew_action_lease(self.s.sid) 
+
+    def delete(self):
+        self._deleted = True
 
     def _has_completed(self):
         if _unix_now() - self._start_time > 10:
@@ -330,41 +311,31 @@ class Ruleset(object):
         self._handle = rules.create_ruleset(name, json.dumps(ruleset_definition, ensure_ascii=False))
         self._definition = ruleset_definition
 
-    def assert_event(self, message):
-        return rules.assert_event(self._handle, json.dumps(message, ensure_ascii=False))
+    def _handle_result(self, result, message):
+        if result[0] == 1:
+            raise MessageNotHandledException(message)
+        elif result[0] == 2:
+            raise MessageObservedException(message)
 
-    def start_assert_event(self, message):
-        return rules.start_assert_event(self._handle, json.dumps(message, ensure_ascii=False))
+        return result[1] 
+
+    def assert_event(self, message):
+        return self._handle_result(rules.assert_event(self._handle, json.dumps(message, ensure_ascii=False)), message)
 
     def assert_events(self, messages):
-        return rules.assert_events(self._handle, json.dumps(messages, ensure_ascii=False))
-    
-    def start_assert_events(self, messages):
-        return rules.start_assert_events(self._handle, json.dumps(messages, ensure_ascii=False))
+        return self._handle_result(rules.assert_events(self._handle, json.dumps(messages, ensure_ascii=False)), messages)
 
     def assert_fact(self, fact):
-        return rules.assert_fact(self._handle, json.dumps(fact, ensure_ascii=False))
-
-    def start_assert_fact(self, fact):
-        return rules.start_assert_fact(self._handle, json.dumps(fact, ensure_ascii=False))
+        return self._handle_result(rules.assert_fact(self._handle, json.dumps(fact, ensure_ascii=False)), fact)
 
     def assert_facts(self, facts):
-        return rules.assert_facts(self._handle, json.dumps(facts, ensure_ascii=False))
-
-    def start_assert_facts(self, facts):
-        return rules.start_assert_facts(self._handle, json.dumps(facts, ensure_ascii=False))
+        return self._handle_result(rules.assert_facts(self._handle, json.dumps(facts, ensure_ascii=False)), facts)
 
     def retract_fact(self, fact):
-        return rules.retract_fact(self._handle, json.dumps(fact, ensure_ascii=False))
-        
-    def start_retract_fact(self, fact):
-        return rules.start_retract_fact(self._handle, json.dumps(fact, ensure_ascii=False))
+        return self._handle_result(rules.retract_fact(self._handle, json.dumps(fact, ensure_ascii=False)), fact)
 
     def retract_facts(self, facts):
-        return rules.retract_facts(self._handle, json.dumps(facts, ensure_ascii=False))
-
-    def start_retract_facts(self, facts):
-        return rules.start_retract_facts(self._handle, json.dumps(facts, ensure_ascii=False))
+        return self._handle_result(rules.retract_facts(self._handle, json.dumps(facts, ensure_ascii=False)), facts)
 
     def start_timer(self, sid, timer, timer_duration, manual_reset):
         if sid != None: 
@@ -380,10 +351,7 @@ class Ruleset(object):
 
     def update_state(self, state):
         state['$s'] = 1
-        if 'sid' in state:
-            return rules.update_state(self._handle, str(state['sid']), json.dumps(state, ensure_ascii=False))
-        else:
-            return rules.update_state(self._handle, None, json.dumps(state, ensure_ascii=False))
+        return rules.update_state(self._handle, json.dumps(state, ensure_ascii=False))
 
     def get_state(self, sid):
         if sid != None: 
@@ -430,50 +398,17 @@ class Ruleset(object):
 
         return branches
 
-    def dispatch_timers(self, complete):
-        try:
-            rules.assert_timers(self._handle)
-            complete(None) 
-        except Exception as error:
-            complete(error)
-            return
-
-    def dispatch(self, complete, async_result = None):
-        state = None
-        state_offset = None
-        result_container = {}
-        if async_result:
-            state = async_result[0]
-            result_container = {'message': json.loads(async_result[1])}
-            state_offset = async_result[2]
-        else:
-            try:
-                result = rules.start_action(self._handle)
-                if not result:
-                    complete(None)
-                    return
-                else: 
-                    state = json.loads(result[0])
-                    result_container = {'message': json.loads(result[1])}
-                    state_offset = result[2]
-            except BaseException as error:
-                t, v, tb = sys.exc_info()
-                print('start action base exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
-                complete(error)
-                return
-            except:
-                t, v, tb = sys.exc_info()
-                print('start action unknown exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
-                complete('unknown error')
-                return
+    def dispatch_timers(self):
+        return rules.assert_timers(self._handle)
         
+    def _flush_actions(self, result_container, state_offset, complete):
         while 'message' in result_container:
             action_name = None
             for action_name, message in result_container['message'].items():
                 break
 
             del(result_container['message'])
-            c = Closure(self._host, state, message, state_offset, self._name)
+            c = Closure(self._host, self, state, message, state_offset)
             
             def action_callback(e):
                 if c._has_completed():
@@ -481,73 +416,17 @@ class Ruleset(object):
 
                 if e:
                     rules.abandon_action(self._handle, c._handle)
-                    complete(e, True)
+                    complete(e, None)
                 else:
                     try:
-                        for timer_name, timer in c.get_cancelled_timers().items():
-                            self.cancel_timer(c.s['sid'], timer_name)
-
-                        for timer_id, timer_tuple in c.get_timers().items():
-                            self.start_timer(c.s['sid'], timer_tuple[0], timer_tuple[1], timer_tuple[2])
-
-                        offset  = 0
-                        replies = 0
-                        pending = {state_offset: 0}
-        
-                        for ruleset_name, facts in c.get_retract_facts().items():
-                            if len(facts) == 1:
-                                offset, replies = self._host.start_retract_fact(ruleset_name, facts[0])
-                            else:
-                                offset, replies = self._host.start_retract_facts(ruleset_name, facts)
-                           
-                            if offset in pending:
-                                pending[offset] = pending[offset] + replies
-                            else:
-                                pending[offset] = replies
+                        rules.update_state(self._handle, json.dumps(c.s._d, ensure_ascii=False))
                         
-                        for ruleset_name, facts in c.get_facts().items():
-                            if len(facts) == 1:
-                                offset, replies = self._host.start_assert_fact(ruleset_name, facts[0])
-                            else:
-                                offset, replies = self._host.start_assert_facts(ruleset_name, facts)
-                            
-                            if offset in pending:
-                                pending[offset] = pending[offset] + replies
-                            else:
-                                pending[offset] = replies
-
-                        for ruleset_name, messages in c.get_messages().items():
-                            if len(messages) == 1:
-                                offset, replies = self._host.start_post(ruleset_name, messages[0])
-                            else:
-                                offset, replies = self._host.start_post_batch(ruleset_name, messages)
-                            
-                            if offset in pending:
-                                pending[offset] = pending[offset] + replies
-                            else:
-                                pending[offset] = replies
-
-                        offset, replies = rules.start_update_state(self._handle, json.dumps(c.s._d, ensure_ascii=False))
-                        if offset in pending:
-                            pending[offset] = pending[offset] + replies
+                        new_result = rules.complete_and_start_action(self._handle, c._handle)
+                        if new_result:
+                            result_container['message'] = json.loads(new_result)
                         else:
-                            pending[offset] = replies
-                        
-                        for offset, replies in pending.items():
-                            if offset != 0:
-                                if offset != state_offset:
-                                    rules.complete(offset, replies)
-                                else:
-                                    new_result = rules.complete_and_start_action(self._handle, replies, c._handle)
-                                    if new_result:
-                                        if 'async' in result_container:
-                                            def terminal(e):
-                                                return
-
-                                            self.dispatch(terminal, [state, new_result, state_offset])
-                                        else:
-                                            result_container['message'] = json.loads(new_result)
-
+                            complete(None, state)
+                                    
                     except BaseException as error:
                         t, v, tb = sys.exc_info()
                         print('base exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
@@ -561,16 +440,29 @@ class Ruleset(object):
                     if c._is_deleted():
                         try:
                             self.delete_state(c.s['sid'])
-                        except BaseException as error:
-                            complete(error)
-
-            if 'async' in result_container:
-                del result_container['async']
+                        except:
+                           pass 
                 
             self._actions[action_name].run(c, action_callback) 
-            result_container['async'] = True 
-           
-        complete(None)
+
+    def do_actions(self, state_handle, complete):
+        try:
+            result = rules.start_action_for_state(self._handle, state_handle)
+            if not result:
+                complete(None, None)
+            else:
+                self._flush_actions(json.loads(result[0]), {'message': json.loads(result[1])}, state_handle, complete)
+        except Exception as error:
+            complete(error, None)
+
+    def dispatch(self):
+        def callback(error, result):
+            pass 
+
+        result = r.start_action(self._handle)
+        if result:
+            self._flush_actions(json.loads(result[0]), {'message': json.loads(result[1])}, result[2], callback)
+
 
 class Statechart(Ruleset):
 
@@ -809,6 +701,8 @@ class Host(object):
         if ruleset_definitions:
             self.register_rulesets(None, ruleset_definitions)
 
+        self._run()
+
     def get_action(self, action_name):
         raise Exception('Action with name {0} not found'.format(action_name))
 
@@ -827,65 +721,69 @@ class Host(object):
             return self._ruleset_directory[ruleset_name]
 
     def set_ruleset(self, ruleset_name, ruleset_definition):
-        self.register_rulesets(None, ruleset_definition)
+        self.register_rulesets(None, {ruleset_name: ruleset_definition})
         self.save_ruleset(ruleset_name, ruleset_definition)
+
+    def _handle_function(self, rules, func, args, complete):
+        error = None
+        result = None
+        def callback(e, state):
+            error = e
+            result = state
+
+        if not complete:
+            rules.do_actions(func(args), callback)
+            if error:
+                raise error
+
+            return result
+        else:
+            try:
+                rules.do_actions(func(args), callback)
+            except BaseException as e:
+                complete(e, None)
+
+    
+
+    def post(self, ruleset_name, message, complete = None):
+        if isinstance(message, list):
+            return self.post_batch(ruleset_name, message)
+
+        rules = self.get_ruleset(ruleset_name)
+        return self._handle_function(rules, rules.assert_event, message, complete)
+
+    def post_batch(self, ruleset_name, messages, complete = None):
+        rules = self.get_ruleset(ruleset_name)
+        return self._handle_function(rules, rules.assert_events, messages, complete)
+
+    def assert_fact(self, ruleset_name, fact, complete = None):
+        if isinstance(fact, list):
+            return self.assert_facts(ruleset_name, fact)
+
+        rules = self.get_ruleset(ruleset_name)
+        return self._handle_function(rules, rules.assert_fact, fact, complete)
+
+    def assert_facts(self, ruleset_name, facts, complete = None):
+        rules = self.get_ruleset(ruleset_name)
+        return self._handle_function(rules, rules.assert_facts, facts, complete)
+
+    def retract_fact(self, ruleset_name, fact, complete = None):
+        rules = self.get_ruleset(ruleset_name)
+        return self._handle_function(rules, rules.retract_fact, fact, complete)
+
+    def retract_facts(self, ruleset_name, facts, complete = None):
+        rules = self.get_ruleset(ruleset_name)
+        return self._handle_function(rules, rules.retract_facts, facts, complete)
+
+    def update_state(self, ruleset_name, state, complete = None):
+        rules = self.get_ruleset(ruleset_name)
+        return self._handle_function(rules, rules.update_state, state, complete)
 
     def get_state(self, ruleset_name, sid):
         return self.get_ruleset(ruleset_name).get_state(sid)
 
     def delete_state(self, ruleset_name, sid):
         self.get_ruleset(ruleset_name).delete_state(sid)
-
-    def post_batch(self, ruleset_name, messages):
-        return self.get_ruleset(ruleset_name).assert_events(messages)
-
-    def start_post_batch(self, ruleset_name, messages):
-        return self.get_ruleset(ruleset_name).start_assert_events(messages)
-
-    def post(self, ruleset_name, message):
-        if isinstance(message, list):
-            return self.post_batch(ruleset_name, message)
-
-        return self.get_ruleset(ruleset_name).assert_event(message)
-
-    def start_post(self, ruleset_name, message):
-        if isinstance(message, list):
-            return self.start_post_batch(ruleset_name, message)
-
-        return self.get_ruleset(ruleset_name).start_assert_event(message)
-
-    def assert_fact(self, ruleset_name, fact):
-        if isinstance(fact, list):
-            return self.assert_facts(ruleset_name, fact)
-
-        return self.get_ruleset(ruleset_name).assert_fact(fact)
-
-    def start_assert_fact(self, ruleset_name, fact):
-        if isinstance(fact, list):
-            return self.start_assert_facts(ruleset_name, fact)
-
-        return self.get_ruleset(ruleset_name).start_assert_fact(fact)
-
-    def assert_facts(self, ruleset_name, facts):
-        return self.get_ruleset(ruleset_name).assert_facts(facts)
-
-    def start_assert_facts(self, ruleset_name, facts):
-        return self.get_ruleset(ruleset_name).start_assert_facts(facts)
-
-    def retract_fact(self, ruleset_name, fact):
-        return self.get_ruleset(ruleset_name).retract_fact(fact)
-
-    def start_retract_fact(self, ruleset_name, fact):
-        return self.get_ruleset(ruleset_name).start_retract_fact(fact)
-
-    def retract_facts(self, ruleset_name, facts):
-        return self.get_ruleset(ruleset_name).retract_facts(facts)
-
-    def start_retract_facts(self, ruleset_name, facts):
-        return self.get_ruleset(ruleset_name).start_retract_facts(facts)
-
-    def patch_state(self, ruleset_name, state):
-        return self.get_ruleset(ruleset_name).update_state(state)
 
     def renew_action_lease(self, ruleset_name, sid):
         self.get_ruleset(ruleset_name).renew_action_lease(sid)
@@ -901,52 +799,48 @@ class Host(object):
 
         return list(rulesets.keys())
 
-    def run(self):
-        def dispatch_ruleset(index):
-            def callback(e):
-                if e:
-                    if str(e).find('306') == -1:
-                        print('Exiting {0}'.format(str(e)))
-                        os._exit(1)
-                
-                if (index == (len(self._ruleset_list) -1)):
-                    self._d_timer = threading.Timer(0.2, dispatch_ruleset, ((index + 1) % len(self._ruleset_list), ))
-                    self._d_timer.daemon = True
-                    self._d_timer.start()
-                else:
-                    self._d_timer = threading.Thread(target = dispatch_ruleset, args = ((index + 1) % len(self._ruleset_list), ))
-                    self._d_timer.daemon = True
-                    self._d_timer.start()
+    def _run(self):
 
+        def dispatch_ruleset(index):
             if not len(self._ruleset_list):
                 self._d_timer = threading.Timer(0.5, dispatch_ruleset, (0, ))
                 self._d_timer.daemon = True
                 self._d_timer.start()
             else: 
                 ruleset = self._ruleset_list[index]
-                ruleset.dispatch(callback)
+                try: 
+                    ruleset.dispatch()
+                except BaseException as e:
+                    print('Error {0}'.format(str(e)))
+
+                timeout = 0
+                if (index == (len(self._ruleset_list) -1)):
+                    timeour = 0.2
+
+                self._d_timer = threading.Timer(timeout, dispatch_ruleset, ((index + 1) % len(self._ruleset_list), ))
+                self._d_timer.daemon = True
+                self._d_timer.start()
 
         def dispatch_timers(index):
-            def callback(e):
-                if e:
-                    print('Error {0}'.format(str(e)))
-                
-                if (index == (len(self._ruleset_list) -1)):
-                    self._t_timer = threading.Timer(0.2, dispatch_timers, ((index + 1) % len(self._ruleset_list), ))
-                    self._t_timer.daemon = True
-                    self._t_timer.start()
-                else:
-                    self._t_timer = threading.Thread(target = dispatch_timers, args = ((index + 1) % len(self._ruleset_list), ))
-                    self._t_timer.daemon = True
-                    self._t_timer.start()
-
             if not len(self._ruleset_list):
                 self._t_timer = threading.Timer(0.5, dispatch_timers, (0, ))
                 self._t_timer.daemon = True
                 self._t_timer.start()
             else: 
                 ruleset = self._ruleset_list[index]
-                ruleset.dispatch_timers(callback)
+                try: 
+                    ruleset.dispatch_timers()
+                except BaseException as e:
+                    print('Error {0}'.format(str(e)))
+
+                timeout = 0
+                if (index == (len(self._ruleset_list) -1)):
+                    timeour = 0.2
+
+                self._t_timer = threading.Timer(timeout, dispatch_timers, ((index + 1) % len(self._ruleset_list), ))
+                self._t_timer.daemon = True
+                self._t_timer.start()
+
 
         self._d_timer = threading.Timer(0.1, dispatch_ruleset, (0, ))
         self._d_timer.daemon = True

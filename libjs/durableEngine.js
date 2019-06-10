@@ -346,7 +346,6 @@ exports = module.exports = durableEngine = function () {
         };
 
         var flushActions = function (state, resultContainer, stateOffset, complete) {
-            
             while (resultContainer['message']) {
                 var actionName = null;
                 var message = null;
@@ -355,7 +354,7 @@ exports = module.exports = durableEngine = function () {
                     break;
                 }
                 resultContainer['message'] = null;
-                var c = closure(host, that, state, message, stateOffset, name);
+                var c = closure(host, that, state, message, stateOffset);
                 actions[actionName].run(c, function (err, c) {
                     if (err) {
                         r.abandonAction(handle, c.getHandle());
@@ -365,12 +364,6 @@ exports = module.exports = durableEngine = function () {
                             return;
                         } else {
                             c.end();
-                        }
-
-                        if (err) {
-                            r.abandonAction(handle, c.getHandle());
-                            complete(err);
-                            return;
                         }
 
                         try {
@@ -396,7 +389,6 @@ exports = module.exports = durableEngine = function () {
                             try {
                                 host.deleteState(name, c.s.sid);
                             } catch (reason) {
-                                complete(reason);
                             }
                         }   
                     }
@@ -844,11 +836,8 @@ exports = module.exports = durableEngine = function () {
                 var error = null;
                 var result = null;
                 rules.doActions(func(args), function(reason, state) {
-                    if (reason) {
-                        error = reason;
-                    } else {
-                        result = state;
-                    }
+                    error = reason;
+                    result = state;
                 });
 
                 if (error) {
