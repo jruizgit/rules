@@ -394,7 +394,6 @@ class ruleset(object):
         if not len(_ruleset_stack):
             _rulesets[name] = self
         elif len(_rule_stack) > 0:
-
             _rule_stack[-1].func.append(self)
         else:
             raise Exception('Invalid rule context')
@@ -659,8 +658,8 @@ def _ensure_ruleset(ruleset_name, rset = None):
         if not rset:
             rset = _rulesets[ruleset_name]
 
-        ruleset_name, ruleset_definition = rset.define()
-        _main_host.set_ruleset(ruleset_name, ruleset_definition)
+        full_name, ruleset_definition = rset.define()
+        _main_host.set_ruleset(full_name, ruleset_definition)
         _defined_rulesets[ruleset_name] = True
 
 def get_host():
@@ -671,27 +670,27 @@ def get_host():
 
 def post(ruleset_name, message, complete = None):
     _ensure_ruleset(ruleset_name)
-    _main_host.post(ruleset_name, message, complete)
+    return _main_host.post(ruleset_name, message, complete)
         
 def post_batch(ruleset_name, messages, complete = None):
     _ensure_ruleset(ruleset_name)
-    _main_host.post_batch(ruleset_name, messages, complete)
+    return _main_host.post_batch(ruleset_name, messages, complete)
     
 def assert_fact(ruleset_name, fact, complete = None):
     _ensure_ruleset(ruleset_name)
-    _main_host.assert_fact(ruleset_name, fact, complete)
+    return _main_host.assert_fact(ruleset_name, fact, complete)
     
 def assert_facts(ruleset_name, facts, complete = None):
     _ensure_ruleset(ruleset_name)
-    _main_host.assert_facts(ruleset_name, facts, complete)
+    return _main_host.assert_facts(ruleset_name, facts, complete)
     
 def retract_fact(ruleset_name, fact, complete = None):
     _ensure_ruleset(ruleset_name)
-    _main_host.retract_fact(ruleset_name, fact, complete)
+    return _main_host.retract_fact(ruleset_name, fact, complete)
     
 def retract_facts(ruleset_name, facts, complete = None):
     _ensure_ruleset(ruleset_name)
-    _main_host.retract_facts(ruleset_name, facts, complete)
+    return _main_host.retract_facts(ruleset_name, facts, complete)
     
 def update_state(ruleset_name, state, complete = None):
     _ensure_ruleset(ruleset_name)
@@ -699,7 +698,7 @@ def update_state(ruleset_name, state, complete = None):
 
 def get_state(ruleset_name, sid):
     _ensure_ruleset(ruleset_name)
-    _main_host.get_state(ruleset_name, sid)
+    return _main_host.get_state(ruleset_name, sid)
 
 def delete_state(ruleset_name, sid):
     _ensure_ruleset(ruleset_name)

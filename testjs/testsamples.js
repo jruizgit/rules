@@ -89,7 +89,12 @@ d.assert('strings', { subject: 'HELLO world' });
 d.assert('strings', { subject: 'world hello' });
 d.assert('strings', { subject: 'hello hi' });
 d.assert('strings', { subject: 'has Hello string' });
-d.assert('strings', { subject: 'does not match' }, function(err, state){ console.log('string: ' + err.message)});
+
+try {
+    d.assert('strings', { subject: 'does not match' });
+} catch (err) {
+    console.log('strings: ' + err.message);  
+}
 
 d.ruleset('risk2_0', function() {
     whenAll: {

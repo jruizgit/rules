@@ -117,7 +117,7 @@ class Closure(object):
             self._start_time = _unix_now()
             self._ruleset.renew_action_lease(self.s.sid) 
 
-    def delete(self):
+    def delete_state(self):
         self._deleted = True
 
     def _has_completed(self):
@@ -401,7 +401,7 @@ class Ruleset(object):
     def dispatch_timers(self):
         return rules.assert_timers(self._handle)
         
-    def _flush_actions(self, result_container, state_offset, complete):
+    def _flush_actions(self, state, result_container, state_offset, complete):
         while 'message' in result_container:
             action_name = None
             for action_name, message in result_container['message'].items():
@@ -431,11 +431,11 @@ class Ruleset(object):
                         t, v, tb = sys.exc_info()
                         print('base exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                         rules.abandon_action(self._handle, c._handle)
-                        complete(error)
+                        complete(error, None)
                     except:
                         print('unknown exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                         rules.abandon_action(self._handle, c._handle)
-                        complete('unknown error')
+                        complete('unknown error', None)
 
                     if c._is_deleted():
                         try:
@@ -452,14 +452,14 @@ class Ruleset(object):
                 complete(None, None)
             else:
                 self._flush_actions(json.loads(result[0]), {'message': json.loads(result[1])}, state_handle, complete)
-        except Exception as error:
+        except BaseException as error:
             complete(error, None)
 
     def dispatch(self):
         def callback(error, result):
             pass 
 
-        result = r.start_action(self._handle)
+        result = rules.start_action(self._handle)
         if result:
             self._flush_actions(json.loads(result[0]), {'message': json.loads(result[1])}, result[2], callback)
 
@@ -725,25 +725,23 @@ class Host(object):
         self.save_ruleset(ruleset_name, ruleset_definition)
 
     def _handle_function(self, rules, func, args, complete):
-        error = None
-        result = None
+        error = [0]
+        result = [0]
         def callback(e, state):
-            error = e
-            result = state
-
+            error[0] = e
+            result[0] = state
+            
         if not complete:
             rules.do_actions(func(args), callback)
-            if error:
-                raise error
+            if error[0]:
+                raise error[0]
 
-            return result
+            return result[0]
         else:
             try:
                 rules.do_actions(func(args), callback)
             except BaseException as e:
                 complete(e, None)
-
-    
 
     def post(self, ruleset_name, message, complete = None):
         if isinstance(message, list):
@@ -777,7 +775,7 @@ class Host(object):
 
     def update_state(self, ruleset_name, state, complete = None):
         rules = self.get_ruleset(ruleset_name)
-        return self._handle_function(rules, rules.update_state, state, complete)
+        self._handle_function(rules, rules.update_state, state, complete)
 
     def get_state(self, ruleset_name, sid):
         return self.get_ruleset(ruleset_name).get_state(sid)
@@ -815,7 +813,7 @@ class Host(object):
 
                 timeout = 0
                 if (index == (len(self._ruleset_list) -1)):
-                    timeour = 0.2
+                    timeout = 0.2
 
                 self._d_timer = threading.Timer(timeout, dispatch_ruleset, ((index + 1) % len(self._ruleset_list), ))
                 self._d_timer.daemon = True
@@ -835,7 +833,7 @@ class Host(object):
 
                 timeout = 0
                 if (index == (len(self._ruleset_list) -1)):
-                    timeour = 0.2
+                    timeout = 0.2
 
                 self._t_timer = threading.Timer(timeout, dispatch_timers, ((index + 1) % len(self._ruleset_list), ))
                 self._t_timer.daemon = True

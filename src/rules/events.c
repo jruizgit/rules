@@ -1959,11 +1959,16 @@ unsigned int startActionForState(unsigned int handle,
                                  resultCount,
                                  &resultState->context.messages));
 
+    CHECK_RESULT(serializeState(resultState, 
+                                &resultState->context.stateFact));
+
     resultState->context.actionStateIndex = actionStateIndex;
     resultState->context.resultCount = resultCount;
     resultState->context.resultFrameOffset = resultFrameOffset;
     resultState->lockExpireTime = time(NULL) + STATE_LEASE_TIME;
     *messages = resultState->context.messages;
+    *stateFact = resultState->context.stateFact;
+    
     return RULES_OK;
 }
 

@@ -119,34 +119,6 @@ static PyObject *pyAssertEvents(PyObject *self, PyObject *args) {
     }
 }
 
-static PyObject *pyRetractEvent(PyObject *self, PyObject *args) {
-    unsigned int handle;
-    char *event;
-    if (!PyArg_ParseTuple(args, "Is", &handle, &event)) {
-        PyErr_SetString(RulesError, "pyRetractEvent Invalid argument");
-        return NULL;
-    }
-
-    unsigned int stateOffset;
-    unsigned int result = retractEvent(handle, event, &stateOffset);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return Py_BuildValue("II", result, stateOffset);
-    } else {
-        if (result == ERR_OUT_OF_MEMORY) {
-            PyErr_NoMemory();
-        } else { 
-            char *message;
-            if (asprintf(&message, "Could not retract event, error code: %d", result) == -1) {
-                PyErr_NoMemory();
-            } else {
-                PyErr_SetString(RulesError, message);
-                free(message);
-            }
-        }
-        return NULL;
-    }
-}
-
 static PyObject *pyAssertFact(PyObject *self, PyObject *args) {
     unsigned int handle;
     char *fact;
@@ -262,9 +234,8 @@ static PyObject *pyRetractFacts(PyObject *self, PyObject *args) {
 static PyObject *pyUpdateState(PyObject *self, PyObject *args) {
     unsigned int handle;
     char *state;
-    char *sid;
-    if (!PyArg_ParseTuple(args, "Izs", &handle, &sid, &state)) {
-        PyErr_SetString(RulesError, "pyAssertState Invalid argument");
+    if (!PyArg_ParseTuple(args, "Is", &handle, &state)) {
+        PyErr_SetString(RulesError, "pyUpdateState Invalid argument");
         return NULL;
     }
 
@@ -328,8 +299,8 @@ static PyObject *pyStartActionForState(PyObject *self, PyObject *args) {
         return NULL;
     }
     
-    char *state;
-    char *messages;
+    char *state = NULL;
+    char *messages = NULL;
     unsigned int result = startActionForState(handle, stateOffset, &state, &messages);
     if (result == ERR_NO_ACTION_AVAILABLE) {
         Py_RETURN_NONE;
@@ -386,7 +357,7 @@ static PyObject *pyCompleteAndStartAction(PyObject *self, PyObject *args) {
 static PyObject *pyAbandonAction(PyObject *self, PyObject *args) {
     unsigned int handle;
     unsigned int stateOffset;
-    if (!PyArg_ParseTuple(args, "IK", &handle, &stateOffset)) {
+    if (!PyArg_ParseTuple(args, "II", &handle, &stateOffset)) {
         PyErr_SetString(RulesError, "pyAbandonAction Invalid argument");
         return NULL;
     }
@@ -581,7 +552,6 @@ static PyMethodDef myModule_methods[] = {
     {"delete_ruleset", pyDeleteRuleset, METH_VARARGS},
     {"assert_event", pyAssertEvent, METH_VARARGS},
     {"assert_events", pyAssertEvents, METH_VARARGS},
-    //{"retract_event", pyRetractEvent, METH_VARARGS},
     {"assert_fact", pyAssertFact, METH_VARARGS},
     {"assert_facts", pyAssertFacts, METH_VARARGS},
     {"retract_fact", pyRetractFact, METH_VARARGS},

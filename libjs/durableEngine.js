@@ -322,11 +322,11 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.startTimer = function (sid, timer, timerDuration, manualReset) {
-            return r.startTimer(handle, sid, timerDuration, manualReset, timer);
+            r.startTimer(handle, sid, timerDuration, manualReset, timer);
         };
 
         that.cancelTimer = function (sid, timer_name) {
-            return r.cancelTimer(handle, sid, timer_name);
+            r.cancelTimer(handle, sid, timer_name);
         };        
 
         that.getState = function (sid) {
@@ -334,15 +334,15 @@ exports = module.exports = durableEngine = function () {
         }
 
         that.deleteState = function (sid) {
-            return r.deleteState(handle, sid);
+            r.deleteState(handle, sid);
         }
 
         that.renewActionLease = function (sid) {
-            return r.renewActionLease(handle, sid);
+            r.renewActionLease(handle, sid);
         }
 
         that.dispatchTimers = function () { 
-            return r.assertTimers(handle);
+            r.assertTimers(handle);
         };
 
         var flushActions = function (state, resultContainer, stateOffset, complete) {
@@ -895,11 +895,11 @@ exports = module.exports = durableEngine = function () {
         };
 
         that.deleteState = function (rulesetName, sid) {
-            return that.getRuleset(rulesetName).deleteState(sid);
+            that.getRuleset(rulesetName).deleteState(sid);
         };
 
         that.renewActionLease = function (rulesetName, sid) {
-            return that.getRuleset(rulesetName).renewActionLease(sid);
+            that.getRuleset(rulesetName).renewActionLease(sid);
         };
 
         var dispatchRules = function (index) {

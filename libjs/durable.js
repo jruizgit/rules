@@ -1914,7 +1914,7 @@ exports = module.exports = durableEngine = function () {
     }  
 
     var updateState = function (rulesetName, state, complete) { 
-        return getHost().updateState(rulesetName, state, complete);
+        getHost().updateState(rulesetName, state, complete);
     }
 
     var getState = function (rulesetName, sid) { 
@@ -1922,7 +1922,7 @@ exports = module.exports = durableEngine = function () {
     }
 
     var deleteState = function (rulesetName, sid) { 
-        return getHost().deleteState(rulesetName, sid);
+        getHost().deleteState(rulesetName, sid);
     }
 
     var ex = {
