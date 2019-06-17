@@ -4,6 +4,49 @@ require_relative "interface"
 module Durable
   @@rulesets = {}
   @@start_blocks = []
+  @@main_host = nil
+
+  def self.get_host()
+    if !@@main_host
+      @@main_host = Engine::Host.new
+    end
+
+    for name, ruleset in @@rulesets
+      @@main_host.set_ruleset name, ruleset
+    end
+
+    @@rulesets = {}
+    @@main_host 
+  end
+
+  def post(ruleset_name, message, complete = nil)
+    self.getHost().post ruleset_name, message, complete
+  end
+     
+  def post_batch(ruleset_name, messages, complete = nil)
+    self.getHost().post_batch ruleset_name, message, complete
+  end
+
+  def assert_fact(ruleset_name, fact, complete = nil)
+    self.getHost().assert_fact ruleset_name, fact, complete
+  end
+
+  def assert_facts(ruleset_name, facts, complete = nil)
+    self.getHost().assert_facts ruleset_name, facts, complete
+  end
+  
+  def retract_fact(ruleset_name, fact, complete = nil)
+    self.getHost().retract_fact ruleset_name, fact, complete
+  end
+    
+  def retract_facts(ruleset_name, facts, complete = nil)
+    self.getHost().retract_facts ruleset_name, facts, complete
+  end
+  
+  def update_state(ruleset_name, state, complete = nil)
+    self.getHost().update_state ruleset_name, state, complete
+  end
+
 
   def self.create_host()
     main_host = Engine::Host.new @@rulesets

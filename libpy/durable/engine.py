@@ -739,7 +739,7 @@ class Host(object):
             return result[0]
         else:
             try:
-                rules.do_actions(func(args), callback)
+                rules.do_actions(func(args), complete)
             except BaseException as e:
                 complete(e, None)
 

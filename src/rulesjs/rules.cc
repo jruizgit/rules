@@ -95,7 +95,7 @@ void jsAssertEvent(const FunctionCallbackInfo<v8::Value>& args) {
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
-            if (asprintf(&message, "Could not start assert event, error code: %d", result) == -1) {
+            if (asprintf(&message, "Could not assert event, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
@@ -123,7 +123,7 @@ void jsAssertEvents(const FunctionCallbackInfo<v8::Value>& args) {
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
-            if (asprintf(&message, "Could not start assert events, error code: %d", result) == -1) {
+            if (asprintf(&message, "Could not assert events, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
@@ -151,7 +151,7 @@ void jsRetractEvent(const FunctionCallbackInfo<v8::Value>& args) {
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
-            if (asprintf(&message, "Could not start assert events, error code: %d", result) == -1) {
+            if (asprintf(&message, "Could not assert events, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
@@ -179,7 +179,7 @@ void jsAssertFact(const FunctionCallbackInfo<v8::Value>& args) {
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
-            if (asprintf(&message, "Could not start assert events, error code: %d", result) == -1) {
+            if (asprintf(&message, "Could not assert events, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
@@ -207,7 +207,7 @@ void jsAssertFacts(const FunctionCallbackInfo<v8::Value>& args) {
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
-            if (asprintf(&message, "Could not start assert events, error code: %d", result) == -1) {
+            if (asprintf(&message, "Could not assert facts, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
@@ -235,7 +235,7 @@ void jsRetractFact(const FunctionCallbackInfo<v8::Value>& args) {
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
-            if (asprintf(&message, "Could not start assert events, error code: %d", result) == -1) {
+            if (asprintf(&message, "Could not retract fact, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
@@ -263,7 +263,7 @@ void jsRetractFacts(const FunctionCallbackInfo<v8::Value>& args) {
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
-            if (asprintf(&message, "Could not start assert events, error code: %d", result) == -1) {
+            if (asprintf(&message, "Could not retract facts, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));

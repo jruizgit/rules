@@ -35,52 +35,17 @@ static VALUE rbDeleteRuleset(VALUE self, VALUE handle) {
     return Qnil;
 }
 
-static VALUE rbComplete(VALUE self, VALUE stateOffset, VALUE replyCount) {
-    Check_Type(stateOffset, T_FIXNUM);
-    Check_Type(replyCount, T_FIXNUM);
-    
-    unsigned int result = complete(FIX2LONG(stateOffset), FIX2LONG(replyCount));
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not complete action, error code: %d", result);
-        }
-    }
-
-    return Qnil;
-}
-
-static VALUE rbStartAssertEvent(VALUE self, VALUE handle, VALUE event) {
-    Check_Type(handle, T_FIXNUM);
-    Check_Type(event, T_STRING);
-
-    unsigned int replyCount;
-    unsigned int stateOffset;
-    unsigned int result = startAssertEvent(FIX2INT(handle), RSTRING_PTR(event), &stateOffset, &replyCount);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-        VALUE output = rb_ary_new(); 
-        rb_ary_push(output, INT2FIX(stateOffset));
-        rb_ary_push(output, INT2FIX(replyCount));
-        return output;  
-    } else {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not assert event, error code: %d", result);
-        }
-    }
-
-    return Qnil;
-}
-
 static VALUE rbAssertEvent(VALUE self, VALUE handle, VALUE event) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(event, T_STRING);
 
-    unsigned int result = assertEvent(FIX2INT(handle), RSTRING_PTR(event));
+    unsigned int stateOffset;
+    unsigned int result = assertEvent(FIX2INT(handle), RSTRING_PTR(event), &stateOffset);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return INT2FIX(result);    
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(result));
+        rb_ary_push(output, INT2FIX(stateOffset));
+        return output; 
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -92,82 +57,23 @@ static VALUE rbAssertEvent(VALUE self, VALUE handle, VALUE event) {
     return Qnil;
 }
 
-static VALUE rbStartAssertEvents(VALUE self, VALUE handle, VALUE events) {
-    Check_Type(handle, T_FIXNUM);
-    Check_Type(events, T_STRING);
-
-    unsigned int replyCount;
-    unsigned int stateOffset;
-    unsigned int result = startAssertEvents(FIX2INT(handle), RSTRING_PTR(events), &stateOffset, &replyCount);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-        VALUE output = rb_ary_new(); 
-        rb_ary_push(output, INT2FIX(stateOffset));
-        rb_ary_push(output, INT2FIX(replyCount));
-        return output;  
-    } else {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not assert events, error code: %d", result);
-        }
-    }
-
-    return Qnil;
-}
 
 static VALUE rbAssertEvents(VALUE self, VALUE handle, VALUE events) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(events, T_STRING);
 
-    unsigned int result = assertEvents(FIX2INT(handle), RSTRING_PTR(events));
+    unsigned int stateOffset;
+    unsigned int result = assertEvents(FIX2INT(handle), RSTRING_PTR(events), &stateOffset);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return INT2FIX(result);    
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(result));
+        rb_ary_push(output, INT2FIX(stateOffset));
+        return output; 
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
             rb_raise(rb_eException, "Could not assert events, error code: %d", result);
-        }
-    }
-
-    return Qnil;
-}
-
-static VALUE rbRetractEvent(VALUE self, VALUE handle, VALUE event) {
-    Check_Type(handle, T_FIXNUM);
-    Check_Type(event, T_STRING);
-
-    unsigned int result = retractEvent(FIX2INT(handle), RSTRING_PTR(event));
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return INT2FIX(result);    
-    } else {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not retract event, error code: %d", result);
-        }
-    }
-
-    return Qnil;
-}
-
-static VALUE rbStartAssertFact(VALUE self, VALUE handle, VALUE fact) {
-    Check_Type(handle, T_FIXNUM);
-    Check_Type(fact, T_STRING);
-
-    unsigned int replyCount;
-    unsigned int stateOffset;
-    unsigned int result = startAssertFact(FIX2INT(handle), RSTRING_PTR(fact), &stateOffset, &replyCount);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-        VALUE output = rb_ary_new(); 
-        rb_ary_push(output, INT2FIX(stateOffset));
-        rb_ary_push(output, INT2FIX(replyCount));
-        return output;  
-    } else {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not assert fact, error code: %d", result);
         }
     }
 
@@ -178,9 +84,13 @@ static VALUE rbAssertFact(VALUE self, VALUE handle, VALUE fact) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(fact, T_STRING);
 
-    unsigned int result = assertFact(FIX2INT(handle), RSTRING_PTR(fact));
+    unsigned int stateOffset;
+    unsigned int result = assertFact(FIX2INT(handle), RSTRING_PTR(fact), &stateOffset);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return INT2FIX(result);    
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(result));
+        rb_ary_push(output, INT2FIX(stateOffset));
+        return output; 
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -192,64 +102,22 @@ static VALUE rbAssertFact(VALUE self, VALUE handle, VALUE fact) {
     return Qnil;
 }
 
-static VALUE rbStartAssertFacts(VALUE self, VALUE handle, VALUE facts) {
-    Check_Type(handle, T_FIXNUM);
-    Check_Type(facts, T_STRING);
-
-    unsigned int replyCount;
-    unsigned int stateOffset;
-    unsigned int result = startAssertFacts(FIX2INT(handle), RSTRING_PTR(facts), &stateOffset, &replyCount);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-        VALUE output = rb_ary_new(); 
-        rb_ary_push(output, INT2FIX(stateOffset));
-        rb_ary_push(output, INT2FIX(replyCount));
-        return output;  
-    } else {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not assert facts, error code: %d", result);
-        }
-    }
-
-    return Qnil;
-}
-
 static VALUE rbAssertFacts(VALUE self, VALUE handle, VALUE facts) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(facts, T_STRING);
 
-    unsigned int result = assertFacts(FIX2INT(handle), RSTRING_PTR(facts));
+    unsigned int stateOffset;
+    unsigned int result = assertFacts(FIX2INT(handle), RSTRING_PTR(facts), &stateOffset);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return INT2FIX(result);    
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(result));
+        rb_ary_push(output, INT2FIX(stateOffset));
+        return output; 
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
             rb_raise(rb_eException, "Could not assert facts, error code: %d", result);
-        }
-    }
-
-    return Qnil;
-}
-
-static VALUE rbStartRetractFact(VALUE self, VALUE handle, VALUE fact) {
-    Check_Type(handle, T_FIXNUM);
-    Check_Type(fact, T_STRING);
-
-    unsigned int replyCount;
-    unsigned int stateOffset;
-    unsigned int result = startRetractFact(FIX2INT(handle), RSTRING_PTR(fact), &stateOffset, &replyCount);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-        VALUE output = rb_ary_new(); 
-        rb_ary_push(output, INT2FIX(stateOffset));
-        rb_ary_push(output, INT2FIX(replyCount));
-        return output;  
-    } else {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not retract fact, error code: %d", result);
         }
     }
 
@@ -260,9 +128,13 @@ static VALUE rbRetractFact(VALUE self, VALUE handle, VALUE fact) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(fact, T_STRING);
 
-    unsigned int result = retractFact(FIX2INT(handle), RSTRING_PTR(fact));
+    unsigned int stateOffset;
+    unsigned int result = retractFact(FIX2INT(handle), RSTRING_PTR(fact), &stateOffset);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return INT2FIX(result);    
+        VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(result));
+        rb_ary_push(output, INT2FIX(stateOffset));
+        return output; 
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -274,18 +146,17 @@ static VALUE rbRetractFact(VALUE self, VALUE handle, VALUE fact) {
     return Qnil;
 }
 
-static VALUE rbStartRetractFacts(VALUE self, VALUE handle, VALUE facts) {
+static VALUE rbRetractFacts(VALUE self, VALUE handle, VALUE facts) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(facts, T_STRING);
 
-    unsigned int replyCount;
     unsigned int stateOffset;
-    unsigned int result = startRetractFacts(FIX2INT(handle), RSTRING_PTR(facts), &stateOffset, &replyCount);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
+    unsigned int result = retractFacts(FIX2INT(handle), RSTRING_PTR(facts), &stateOffset);
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
         VALUE output = rb_ary_new(); 
+        rb_ary_push(output, INT2FIX(result));
         rb_ary_push(output, INT2FIX(stateOffset));
-        rb_ary_push(output, INT2FIX(replyCount));
-        return output;  
+        return output; 
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -297,58 +168,19 @@ static VALUE rbStartRetractFacts(VALUE self, VALUE handle, VALUE facts) {
     return Qnil;
 }
 
-static VALUE rbRetractFacts(VALUE self, VALUE handle, VALUE facts) {
+static VALUE rbUpdateState(VALUE self, VALUE handle, VALUE state) {
     Check_Type(handle, T_FIXNUM);
-    Check_Type(facts, T_STRING);
-
-    unsigned int result = retractFacts(FIX2INT(handle), RSTRING_PTR(facts));
-    if (result != RULES_OK) {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not retract facts, error code: %d", result);
-        }
-    }
-
-    return Qnil;
-}
-
-static VALUE rbUpdateState(VALUE self, VALUE handle, VALUE sid, VALUE state) {
-    Check_Type(handle, T_FIXNUM);
-    Check_Type(sid, T_STRING);
     Check_Type(state, T_STRING);
 
-    unsigned int result = updateState(FIX2INT(handle), RSTRING_PTR(sid), RSTRING_PTR(state));
+    unsigned int stateOffset;
+    unsigned int result = updateState(FIX2INT(handle), RSTRING_PTR(state), &stateOffset);
     if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
-        return INT2FIX(result);    
+        return INT2FIX(stateOffset);    
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
             rb_raise(rb_eException, "Could not assert event, error code: %d", result);
-        }
-    }
-
-    return Qnil;
-}
-
-static VALUE rbStartUpdateState(VALUE self, VALUE handle, VALUE state) {
-    Check_Type(handle, T_FIXNUM);
-    Check_Type(state, T_STRING);
-
-    unsigned int replyCount;
-    unsigned int stateOffset;
-    unsigned int result = startUpdateState(FIX2INT(handle), RSTRING_PTR(state), &stateOffset, &replyCount);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-        VALUE output = rb_ary_new(); 
-        rb_ary_push(output, INT2FIX(stateOffset));
-        rb_ary_push(output, INT2FIX(replyCount));
-        return output;  
-    } else {
-        if (result == ERR_OUT_OF_MEMORY) {
-            rb_raise(rb_eNoMemError, "Out of memory");
-        } else { 
-            rb_raise(rb_eException, "Could not start update state, error code: %d", result);
         }
     }
 
@@ -379,13 +211,35 @@ static VALUE rbStartAction(VALUE self, VALUE handle) {
     return output;
 }
 
-static VALUE rbCompleteAndStartAction(VALUE self, VALUE handle, VALUE expectedReplies, VALUE stateOffset) {
+static VALUE rbStartActionForState(VALUE self, VALUE handle, VALUE stateOffset) {
     Check_Type(handle, T_FIXNUM);
-    Check_Type(expectedReplies, T_FIXNUM);
+    Check_Type(stateOffset, T_FIXNUM);
+
+    char *state;
+    char *messages;
+    unsigned int result = startActionForState(FIX2INT(handle), FIX2INT(stateOffset), &state, &messages);
+    if (result == ERR_NO_ACTION_AVAILABLE) {
+        return Qnil;
+    } else if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not start action, error code: %d", result);
+        }
+    }
+
+    VALUE output = rb_ary_new(); 
+    rb_ary_push(output, rb_str_new2(state));
+    rb_ary_push(output, rb_str_new2(messages));
+    return output;
+}
+
+static VALUE rbCompleteAndStartAction(VALUE self, VALUE handle, VALUE stateOffset) {
+    Check_Type(handle, T_FIXNUM);
     Check_Type(stateOffset, T_FIXNUM);
 
     char *messages;
-    unsigned int result = completeAndStartAction(FIX2INT(handle), FIX2INT(expectedReplies), FIX2INT(stateOffset), &messages);
+    unsigned int result = completeAndStartAction(FIX2INT(handle), FIX2INT(stateOffset), &messages);
     if (result == ERR_NO_ACTION_AVAILABLE) {
         return Qnil;
     } else if (result != RULES_OK) {
@@ -398,7 +252,6 @@ static VALUE rbCompleteAndStartAction(VALUE self, VALUE handle, VALUE expectedRe
 
     return rb_str_new2(messages);
 }
-
 
 static VALUE rbAbandonAction(VALUE self, VALUE handle, VALUE stateOffset) {
     Check_Type(handle, T_FIXNUM);
@@ -526,24 +379,17 @@ void Init_rules() {
     rulesModule = rb_define_module("Rules");
     rb_define_singleton_method(rulesModule, "create_ruleset", rbCreateRuleset, 2);
     rb_define_singleton_method(rulesModule, "delete_ruleset", rbDeleteRuleset, 1);
-    rb_define_singleton_method(rulesModule, "complete", rbComplete, 2);
     rb_define_singleton_method(rulesModule, "assert_event", rbAssertEvent, 2);
-    rb_define_singleton_method(rulesModule, "start_assert_event", rbStartAssertEvent, 2);
     rb_define_singleton_method(rulesModule, "assert_events", rbAssertEvents, 2);
-    rb_define_singleton_method(rulesModule, "start_assert_events", rbStartAssertEvents, 2);
     rb_define_singleton_method(rulesModule, "retract_event", rbRetractEvent, 2);
-    rb_define_singleton_method(rulesModule, "start_assert_fact", rbStartAssertFact, 2);
     rb_define_singleton_method(rulesModule, "assert_fact", rbAssertFact, 2);
-    rb_define_singleton_method(rulesModule, "start_assert_facts", rbStartAssertFacts, 2);
     rb_define_singleton_method(rulesModule, "assert_facts", rbAssertFacts, 2);
-    rb_define_singleton_method(rulesModule, "start_retract_fact", rbStartRetractFact, 2);
     rb_define_singleton_method(rulesModule, "retract_fact", rbRetractFact, 2);
-    rb_define_singleton_method(rulesModule, "start_retract_facts", rbStartRetractFacts, 2);
     rb_define_singleton_method(rulesModule, "retract_facts", rbRetractFacts, 2);
-    rb_define_singleton_method(rulesModule, "update_state", rbUpdateState, 3);
-    rb_define_singleton_method(rulesModule, "start_update_state", rbStartUpdateState, 2);
+    rb_define_singleton_method(rulesModule, "update_state", rbUpdateState, 2);
     rb_define_singleton_method(rulesModule, "start_action", rbStartAction, 1);
-    rb_define_singleton_method(rulesModule, "complete_and_start_action", rbCompleteAndStartAction, 3);
+    rb_define_singleton_method(rulesModule, "start_action_for_state", rbStartActionForState, 2);
+    rb_define_singleton_method(rulesModule, "complete_and_start_action", rbCompleteAndStartAction, 2);
     rb_define_singleton_method(rulesModule, "abandon_action", rbAbandonAction, 2);
     rb_define_singleton_method(rulesModule, "start_timer", rbStartTimer, 5);
     rb_define_singleton_method(rulesModule, "cancel_timer", rbCancelTimer, 3);
