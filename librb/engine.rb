@@ -356,27 +356,27 @@ module Engine
     end
 
     def assert_event(message)
-      handle_result Rules.assert_event(@handle, JSON.generate(message))
+      handle_result Rules.assert_event(@handle, JSON.generate(message)), message
     end
 
     def assert_events(messages)
-      handle_result Rules.assert_events(@handle, JSON.generate(messages))
+      handle_result Rules.assert_events(@handle, JSON.generate(messages)), messages
     end
 
     def assert_fact(fact)
-      handle_result Rules.assert_fact(@handle, JSON.generate(fact))
+      handle_result Rules.assert_fact(@handle, JSON.generate(fact)), fact
     end
 
     def assert_facts(facts)
-      handle_result Rules.assert_facts(@handle, JSON.generate(facts))
+      handle_result Rules.assert_facts(@handle, JSON.generate(facts)), facts
     end
 
     def retract_fact(fact)
-      handle_result Rules.retract_fact(@handle, JSON.generate(fact))
+      handle_result Rules.retract_fact(@handle, JSON.generate(fact)), fact
     end
 
     def retract_facts(facts)
-      handle_result Rules.assert_facts(@handle, JSON.generate(facts))
+      handle_result Rules.assert_facts(@handle, JSON.generate(facts)), facts
     end
 
     def start_timer(sid, timer, timer_duration, manual_reset)
@@ -389,11 +389,7 @@ module Engine
 
     def update_state(state)
       state["$s"] = 1
-      if state.key? :sid 
-        Rules.update_state @handle, state[:sid].to_s, JSON.generate(state)
-      else state.key? "sid" 
-        Rules.update_state @handle, state["sid"].to_s, JSON.generate(state)
-      end
+      Rules.update_state @handle, JSON.generate(state)
     end
 
     def get_state(sid)
@@ -429,7 +425,7 @@ module Engine
       branches
     end
 
-    def dispatch_timers(complete)
+    def dispatch_timers()
       Rules.assert_timers @handle
     end
 
@@ -450,8 +446,8 @@ module Engine
       end
     end
 
-    def dispatch()
-      result = rules.start_action(self._handle)
+    def dispatch_ruleset()
+      result = Rules.start_action(@handle)
       if result
         flush_actions JSON.parse(result[0]), {:message => JSON.parse(result[1])}, result[2], -> e, s { }
       end
@@ -495,7 +491,7 @@ module Engine
             begin
               Rules.update_state @handle, JSON.generate(c.s._d)
               
-              new_result = Rules.complete_and_start_action @handle, replies, c.handle
+              new_result = Rules.complete_and_start_action @handle, c.handle
               if new_result
                 result_container[:message] = JSON.parse new_result
               else
@@ -883,6 +879,35 @@ module Engine
     def initialize(ruleset_definitions = nil)
       @ruleset_directory = {}
       @ruleset_list = []
+      
+      @assert_event_func = Proc.new do |rules, arg|
+        rules.assert_event arg
+      end
+
+      @assert_events_func = Proc.new do |rules, arg|
+        rules.assert_events arg
+      end
+
+      @assert_fact_func = Proc.new do |rules, arg|
+        rules.assert_fact arg
+      end
+
+      @assert_facts_func = Proc.new do |rules, arg|
+        rules.assert_facts arg
+      end
+
+      @retract_fact_func = Proc.new do |rules, arg|
+        rules.retract_fact arg
+      end
+
+      @retract_facts_func = Proc.new do |rules, arg|
+        rules.retract_facts arg
+      end
+
+      @update_state_func = Proc.new do |rules, arg|
+        rules.update_state arg
+      end
+
       register_rulesets nil, ruleset_definitions if ruleset_definitions
       start_dispatch_ruleset_thread
       start_dispatch_timers_thread
@@ -920,12 +945,12 @@ module Engine
       end
 
       rules = get_ruleset(ruleset_name) 
-      handle_function rules, rules.assert_event, event, complete
+      handle_function rules, @assert_event_func, event, complete
     end
 
     def post_batch(ruleset_name, events, complete = nil)
       rules = get_ruleset(ruleset_name) 
-      handle_function rules, rules.assert_events, events, complete
+      handle_function rules, @assert_events_func, events, complete
     end
 
     def assert(ruleset_name, fact, complete = nil)
@@ -934,12 +959,12 @@ module Engine
       end
 
       rules = get_ruleset(ruleset_name) 
-      handle_function rules, rules.assert_fact, fact, complete
+      handle_function rules, @assert_fact_func, fact, complete
     end
 
     def assert_facts(ruleset_name, facts, complete = nil)
       rules = get_ruleset(ruleset_name) 
-      handle_function rules, rules.assert_facts, facts, complete
+      handle_function rules, @assert_facts_func, facts, complete
     end
 
     def retract(ruleset_name, fact, complete = nil)
@@ -948,17 +973,17 @@ module Engine
       end
 
       rules = get_ruleset(ruleset_name) 
-      handle_function rules, rules.retract_fact, fact, complete
+      handle_function rules, @retract_fact_func, fact, complete
     end
 
     def retract_facts(ruleset_name, facts, complete = nil)
       rules = get_ruleset(ruleset_name) 
-      handle_function rules, rules.retract_facts, facts, complete
+      handle_function rules, @retract_facts_func, facts, complete
     end
 
     def update_state(ruleset_name, state, complete = nil)
       rules = get_ruleset(ruleset_name) 
-      handle_function rules, rules.update_state, state, complete
+      handle_function rules, @update_state_func, state, complete
     end
 
     def get_state(ruleset_name, sid)
@@ -994,7 +1019,7 @@ module Engine
       result = nil
 
       if not complete
-        rules.do_actions func.call(args), -> e, s {
+        rules.do_actions func.call(rules, args), -> e, s {
           error = e
           result = s
         }
@@ -1006,7 +1031,7 @@ module Engine
         result
       else
         begin
-          rules.do_actions func.call(args), complete
+          rules.do_actions func.call(rules, args), complete
         rescue Exception => e
           complete.call e, nil
         end
@@ -1025,6 +1050,7 @@ module Engine
           begin
             ruleset.dispatch_timers
           rescue Exception => e
+            puts e.backtrace
             puts "Error #{e}"
           end
       
@@ -1057,6 +1083,7 @@ module Engine
           begin
             ruleset.dispatch_ruleset
           rescue Exception => e
+            puts e.backtrace
             puts "Error #{e}"
           end
       

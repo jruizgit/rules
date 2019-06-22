@@ -7,7 +7,7 @@ static VALUE rbCreateRuleset(VALUE self, VALUE name, VALUE rules) {
     Check_Type(name, T_STRING);
     Check_Type(rules, T_STRING);
 
-    void *output = NULL;
+    unsigned int output = 0;
     unsigned int result = createRuleset(&output, RSTRING_PTR(name), RSTRING_PTR(rules));
     if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
@@ -257,7 +257,7 @@ static VALUE rbAbandonAction(VALUE self, VALUE handle, VALUE stateOffset) {
     Check_Type(handle, T_FIXNUM);
     Check_Type(stateOffset, T_FIXNUM);
 
-    unsigned int result = abandonAction(FIX2INT(handle), (void *)FIX2LONG(stateOffset));
+    unsigned int result = abandonAction(FIX2INT(handle), FIX2INT(stateOffset));
     if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
@@ -309,11 +309,7 @@ static VALUE rbAssertTimers(VALUE self, VALUE handle) {
     Check_Type(handle, T_FIXNUM);
 
     unsigned int result = assertTimers(FIX2INT(handle));
-    if (result == RULES_OK) {
-        return INT2FIX(1);    
-    } else if (result == ERR_NO_TIMERS_AVAILABLE) {
-        return INT2FIX(0);    
-    } else {
+    if (result != RULES_OK) {
         if (result == ERR_OUT_OF_MEMORY) {
             rb_raise(rb_eNoMemError, "Out of memory");
         } else { 
@@ -381,7 +377,6 @@ void Init_rules() {
     rb_define_singleton_method(rulesModule, "delete_ruleset", rbDeleteRuleset, 1);
     rb_define_singleton_method(rulesModule, "assert_event", rbAssertEvent, 2);
     rb_define_singleton_method(rulesModule, "assert_events", rbAssertEvents, 2);
-    rb_define_singleton_method(rulesModule, "retract_event", rbRetractEvent, 2);
     rb_define_singleton_method(rulesModule, "assert_fact", rbAssertFact, 2);
     rb_define_singleton_method(rulesModule, "assert_facts", rbAssertFacts, 2);
     rb_define_singleton_method(rulesModule, "retract_fact", rbRetractFact, 2);

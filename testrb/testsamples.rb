@@ -1,5 +1,15 @@
 require "durable"
 
+Durable.ruleset :test do
+  # antecedent
+  when_all m.subject == "World" do
+    # consequent
+    puts "test-> Hello #{m.subject}"
+  end
+end
+
+Durable.post :test, { :subject => "World" }
+
 Durable.ruleset :animal1 do
   when_all c.first = (m.predicate == "eats") & (m.object == "flies"),  
           (m.predicate == "lives") & (m.object == "water") & (m.subject == first.subject) do
@@ -30,28 +40,13 @@ Durable.ruleset :animal1 do
   when_all +m.subject, count(11) do
     m.each { |f| puts "animal1-> fact: #{f.subject} #{f.predicate} #{f.object}" }
   end
-    
-  when_start do
-    assert :animal1, { :subject => "Kermit", :predicate => "eats", :object => "flies" }
-    assert :animal1, { :subject => "Kermit", :predicate => "lives", :object => "water" }
-    assert :animal1, { :subject => "Greedy", :predicate => "eats", :object => "flies" }
-    assert :animal1, { :subject => "Greedy", :predicate => "lives", :object => "land" }
-    assert :animal1, { :subject => "Tweety", :predicate => "eats", :object => "worms" }
-  end
 end
 
-
-Durable.ruleset :test do
-  # antecedent
-  when_all m.subject == "World" do
-    # consequent
-    puts "test-> Hello #{m.subject}"
-  end
-  # on ruleset start
-  when_start do
-    post :test, { :subject => "World" }
-  end
-end
+Durable.assert :animal1, { :subject => "Kermit", :predicate => "eats", :object => "flies" }
+Durable.assert :animal1, { :subject => "Kermit", :predicate => "lives", :object => "water" }
+Durable.assert :animal1, { :subject => "Greedy", :predicate => "eats", :object => "flies" }
+Durable.assert :animal1, { :subject => "Greedy", :predicate => "lives", :object => "land" }
+Durable.assert :animal1, { :subject => "Tweety", :predicate => "eats", :object => "worms" }
 
 Durable.ruleset :animal do
   # will be triggered by 'Kermit eats flies'
@@ -75,13 +70,9 @@ Durable.ruleset :animal do
   when_all +m.subject do
     puts "animal-> fact: #{m.subject} #{m.predicate} #{m.object}"
   end
-    
-  when_start do
-    assert :animal, { :subject => "Kermit", :predicate => "eats", :object => "flies" }
-  end
 end
 
-#curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "predicate": "eats", "object": "worms"}' http://localhost:4567/animal/facts
+Durable.assert :animal, { :subject => "Kermit", :predicate => "eats", :object => "flies" }
 
 Durable.ruleset :risk1 do
   when_all c.first = m.t == "purchase",
@@ -89,17 +80,10 @@ Durable.ruleset :risk1 do
     # the event pair will only be observed once
     puts "riks1-> fraud detected: #{first.location}, #{second.location}"
   end
-
-  when_start do
-    # 'post' submits events, try 'assert' instead and to see differt behavior
-    post :risk1, { :t => "purchase", :location => "US" }
-    post :risk1, { :t => "purchase", :location => "CA" }
-  end
 end
 
-
-# curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:4567/risk/events
-# curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:4567/risk/events
+Durable.post :risk1, { :t => "purchase", :location => "US" }
+Durable.post :risk1, { :t => "purchase", :location => "CA" }
 
 Durable.ruleset :flow1 do
   # state condition uses 's'
@@ -120,14 +104,9 @@ Durable.ruleset :flow1 do
     # deletes state at the end
     delete_state
   end
-  # modifies context state
-  when_start do
-    patch_state :flow1, { :status => "start"}
-  end
 end
 
-
-# curl -H "content-type: application/json" -X POST -d '{"status": "next"}' http://localhost:4567/flow/state
+Durable.update_state :flow1, { :status => "start"}
 
 Durable.ruleset :expense2 do
   when_all (m.subject == "approve") | (m.subject == "ok") do
@@ -143,15 +122,24 @@ Durable.ruleset :match do
   when_all (m.url.matches("(https?://)?([0-9a-z.-]+)%.[a-z]{2,6}(/[A-z0-9_.-]+/?)*")) do
     puts "match -> #{m.url}"
   end
-
-  when_start do
-    post :match, { :url => "https://github.com" }
-    post :match, { :url => "http://github.com/jruizgit/rul!es" }
-    post :match, { :url => "https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md" }
-    post :match, { :url => "//rules" }
-    post :match, { :url => "https://github.c/jruizgit/rules" }
-  end
 end
+
+Durable.post :match, { :url => "https://github.com" }
+begin
+  Durable.post :match, { :url => "http://github.com/jruizgit/rul!es" }
+rescue Exception => e
+  puts "match expected:#{e}"
+end
+
+Durable.post :match, { :url => "https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md" }
+
+Durable.post :match, { :url => "//rules" }, -> e, state {
+  puts "match expected:#{e}"
+}
+
+Durable.post :match, { :url => "https://github.c/jruizgit/rules" }, -> e, state {
+  puts "match expected:#{e}"
+}
 
 Durable.ruleset :strings do
   when_all m.subject.matches("hello.*") do
@@ -165,15 +153,15 @@ Durable.ruleset :strings do
   when_all m.subject.imatches(".*Hello.*") do
     puts "string contains hello (case insensitive): #{m.subject}"
   end
-
-  when_start do
-    assert :strings, { :subject => "HELLO world" }
-    assert :strings, { :subject => "world hello" }
-    assert :strings, { :subject => "hello hi" }
-    assert :strings, { :subject => "has Hello string" }
-    assert :strings, { :subject => "does not match" }
-  end
 end
+
+Durable.assert :strings, { :subject => "HELLO world" }
+Durable.assert :strings, { :subject => "world hello" }
+Durable.assert :strings, { :subject => "hello hi" }
+Durable.assert :strings, { :subject => "has Hello string" }
+Durable.assert :strings, { :subject => "does not match" }, -> e, state {
+  puts "strings expected:#{e}"
+}
 
 Durable.ruleset :indistinct do
   when_all distinct(false),
@@ -184,13 +172,11 @@ Durable.ruleset :indistinct do
     puts "           -> #{second.amount}"
     puts "           -> #{third.amount}"
   end
-
-  when_start do
-    post :indistinct, { :t => "purchase", :amount => 50 }
-    post :indistinct, { :t => "purchase", :amount => 200 }
-    post :indistinct, { :t => "purchase", :amount => 251 } 
-  end
 end
+
+Durable.post :indistinct, { :t => "purchase", :amount => 50 }
+Durable.post :indistinct, { :t => "purchase", :amount => 200 }
+Durable.post :indistinct, { :t => "purchase", :amount => 251 } 
 
 Durable.ruleset :distinct do
   when_all c.first = m.amount > 10,
@@ -200,13 +186,11 @@ Durable.ruleset :distinct do
     puts "         -> #{second.amount}"
     puts "         -> #{third.amount}"
   end
-
-  when_start do
-    post :distinct, { :t => "purchase", :amount => 50 }
-    post :distinct, { :t => "purchase", :amount => 200 }
-    post :distinct, { :t => "purchase", :amount => 251 } 
-  end
 end
+
+Durable.post :distinct, { :t => "purchase", :amount => 50 }
+Durable.post :distinct, { :t => "purchase", :amount => 200 }
+Durable.post :distinct, { :t => "purchase", :amount => 251 } 
 
 Durable.ruleset :expense3 do
   when_all c.bill = (m.t == "bill") & (m.invoice.amount > 50),
@@ -228,13 +212,11 @@ Durable.ruleset :risk do
            c.fourth = m.t == "chargeback" do
     puts "risk-> fraud detected: #{first.t} #{third.t} #{fourth.t}"
   end
-
-  when_start do
-    post :risk, { :t => "deposit" }
-    post :risk, { :t => "withrawal" }
-    post :risk, { :t => "chargeback" }
-  end
 end
+
+Durable.post :risk, { :t => "deposit" }
+Durable.post :risk, { :t => "withrawal" }
+Durable.post :risk, { :t => "chargeback" }
 
 Durable.ruleset :expense4 do
   when_any all(c.first = m.subject == "approve", 
@@ -247,14 +229,12 @@ Durable.ruleset :expense4 do
       puts "expense4-> Approved #{third.subject} #{fourth.amount}"
     end
   end
-
-  when_start do
-    post :expense4, { :subject => "approve" }
-    post :expense4, { :amount => 1000 }
-    post :expense4, { :subject => "jumbo" }
-    post :expense4, { :amount => 10000 }
-  end
 end
+
+Durable.post :expense4, { :subject => "approve" }
+Durable.post :expense4, { :amount => 1000 }
+Durable.post :expense4, { :subject => "jumbo" }
+Durable.post :expense4, { :amount => 10000 }
 
 Durable.ruleset :attributes do
   when_all pri(3), m.amount < 300 do
@@ -268,13 +248,11 @@ Durable.ruleset :attributes do
   when_all pri(1), m.amount < 100  do
     puts "attributes-> P1: #{m.amount}"
   end
-
-  when_start do
-    assert :attributes, { :amount => 50 }
-    assert :attributes, { :amount => 150 }
-    assert :attributes, { :amount => 250 }
-  end
 end
+
+Durable.assert :attributes, { :amount => 50 }
+Durable.assert :attributes, { :amount => 150 }
+Durable.assert :attributes, { :amount => 250 }
 
 Durable.ruleset :flow2 do
   when_all m.action == "start" do
@@ -286,11 +264,9 @@ Durable.ruleset :flow2 do
     puts "flow2-> expected #{s.exception}"
     s.exception = nil
   end
-
-  when_start do
-    post :flow2, { :action => "start" }
-  end
 end
+
+Durable.post :flow2, { :action => "start" }
 
 Durable.statechart :expense5 do
   # initial state :input with two triggers
@@ -319,20 +295,18 @@ Durable.statechart :expense5 do
 
   state :approved
   state :denied
-
-  when_start do
-    # events directed to default statechart instance
-    post :expense5, { :subject => 'approve', :amount => 100 }
-    post :expense5, { :subject => 'approved' }
-
-    # events directed to statechart instance with id '1'
-    post :expense5, { :sid => 1, :subject => 'approve', :amount => 100 }
-    post :expense5, { :sid => 1, :subject => 'denied' }
-
-    # events directed to statechart instance with id '2'
-    post :expense5, { :sid => 2, :subject => 'approve', :amount => 10000 }
-  end
 end
+
+# events directed to default statechart instance
+Durable.post :expense5, { :subject => 'approve', :amount => 100 }
+Durable.post :expense5, { :subject => 'approved' }
+
+# events directed to statechart instance with id '1'
+Durable.post :expense5, { :sid => 1, :subject => 'approve', :amount => 100 }
+Durable.post :expense5, { :sid => 1, :subject => 'denied' }
+
+# events directed to statechart instance with id '2'
+Durable.post :expense5, { :sid => 2, :subject => 'approve', :amount => 10000 }
 
 Durable.statechart :worker do
   # super-state :work has two states and one trigger
@@ -357,19 +331,17 @@ Durable.statechart :worker do
   end
 
   state :canceled
-  
-  when_start do
-    # will move the statechart to the 'work.process' sub-state
-    post :worker, { :subject => "enter" }
-
-     # will keep the statechart to the 'work.process' sub-state
-    post :worker, { :subject => "continue" }
-    post :worker, { :subject => "continue" }
-
-    # will move the statechart out of the work state
-    post :worker, { :subject => "cancel" }
-  end
 end
+
+# will move the statechart to the 'work.process' sub-state
+Durable.post :worker, { :subject => "enter" }
+
+# will keep the statechart to the 'work.process' sub-state
+Durable.post :worker, { :subject => "continue" }
+Durable.post :worker, { :subject => "continue" }
+
+# will move the statechart out of the work state
+Durable.post :worker, { :subject => "cancel" }
 
 Durable.flowchart :expense do
   # initial stage :input has two conditions
@@ -393,21 +365,20 @@ Durable.flowchart :expense do
   stage :deny do
     puts "expense-> denied"
   end
-
-  when_start do
-    # events for the default flowchart instance, approved after retry
-    post :expense, { :subject => "approve", :amount => 100 }
-    post :expense, { :subject => "retry" }
-    post :expense, { :subject => "approved" }
-
-    # events for the flowchart instance '1', denied after first try
-    post :expense, {:sid => 1, :subject => "approve", :amount => 100}
-    post :expense, {:sid => 1, :subject => "denied"}
-
-     # event for the flowchart instance '2' immediately denied    
-    post :expense, {:sid => 2, :subject => "approve", :amount => 10000}
-  end
 end
+
+# events for the default flowchart instance, approved after retry
+Durable.post :expense, { :subject => "approve", :amount => 100 }
+Durable.post :expense, { :subject => "retry" }
+Durable.post :expense, { :subject => "approved" }
+
+# events for the flowchart instance '1', denied after first try
+Durable.post :expense, {:sid => 1, :subject => "approve", :amount => 100}
+Durable.post :expense, {:sid => 1, :subject => "denied"}
+
+ # event for the flowchart instance '2' immediately denied    
+Durable.post :expense, {:sid => 2, :subject => "approve", :amount => 10000}
+
 
 Durable.ruleset :expense6 do
   # this rule will trigger as soon as three events match the condition
@@ -425,17 +396,15 @@ Durable.ruleset :expense6 do
       puts "expense6-> rejected ->#{f}"
     end
   end
+end
 
-  when_start do
-    post_batch :expense6, { :amount => 10 },
+Durable.post_batch :expense6, [{ :amount => 10 },
                          { :amount => 20 },
                          { :amount => 100 },
                          { :amount => 30 },
                          { :amount => 200 },
-                         { :amount => 400 }
-    assert :expense6, { :review => true }
-  end
-end
+                         { :amount => 400 }]
+Durable.assert :expense6, { :review => true }
 
 Durable.ruleset :timer1 do
   when_all m.subject == "start" do
@@ -445,11 +414,9 @@ Durable.ruleset :timer1 do
   when_all timeout("MyTimer") do
     puts "timer1-> timeout"
   end
-
-  when_start do
-    post :timer1, { :subject => "start" }
-  end
 end
+
+Durable.post :timer1, { :subject => "start" }
 
 Durable.ruleset :timer do
   when_any all(s.count == 0),
@@ -466,13 +433,9 @@ Durable.ruleset :timer do
     cancel_timer "MyTimer"
     puts "timer-> canceled timer"
   end
-
-  when_start do
-    patch_state :timer, { :count => 0 }
-  end
 end
 
-# curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:4567/timer/events
+Durable.update_state :timer, { :count => 0 }
 
 Durable.statechart :risk3 do
   state :start do
@@ -484,30 +447,27 @@ Durable.statechart :risk3 do
   state :meter do
     to :fraud, when_all(count(3), c.message = m.amount > 100) do
       for e in m do
-        puts "risk3-> #{e.message}"
+        puts "risk3-> #{s.sid}, #{e.message}"
       end
     end
 
     to :exit, when_all(timeout("RiskTimer")) do
-      puts "risk3-> exit"
+      puts "risk3-> exit #{s.sid}"
     end
   end
 
   state :fraud
   state :exit
-
-  when_start do
-    # three events in a row will trigger the fraud rule
-    post 'risk3', { :amount => 200 } 
-    post 'risk3', { :amount => 300 } 
-    post 'risk3', { :amount => 400 }
-
-    # two events will exit after 5 seconds
-    post 'risk3', { :sid => 1, :amount => 500 } 
-    post 'risk3', { :sid => 1, :amount => 600 } 
-  end
 end
 
+# three events in a row will trigger the fraud rule
+Durable.post 'risk3', { :amount => 200 } 
+Durable.post 'risk3', { :amount => 300 } 
+Durable.post 'risk3', { :amount => 400 }
+
+# two events will exit after 5 seconds
+Durable.post 'risk3', { :sid => 1, :amount => 500 } 
+Durable.post 'risk3', { :sid => 1, :amount => 600 } 
 
 Durable.statechart :risk4 do
   state :start do
@@ -531,19 +491,13 @@ Durable.statechart :risk4 do
       cancel_timer "VelocityTimer"
     end
   end
-
-  when_start do
-    # the velocity will 4 events in 5 seconds
-    post 'risk4', { :amount => 200 } 
-    post 'risk4', { :amount => 350 } 
-    post 'risk4', { :amount => 50 }
-    post 'risk4', { :amount => 300 } 
-    post 'risk4', { :amount => 400 }
-  end
 end
 
-# curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:4567/risk4/events
-
+# the velocity will 4 events in 5 seconds
+Durable.post 'risk4', { :amount => 200 } 
+Durable.post 'risk4', { :amount => 350 } 
+Durable.post 'risk4', { :amount => 300 } 
+Durable.post 'risk4', { :amount => 400 }
 
 Durable.ruleset :flow3 do
 
@@ -552,7 +506,7 @@ Durable.ruleset :flow3 do
     Thread.new do
       sleep 3
       s.state = "second"
-      puts "first completed"
+      puts "flow3: first completed"
       complete.call nil
     end
   end
@@ -561,7 +515,7 @@ Durable.ruleset :flow3 do
     Thread.new do
       sleep 10
       s.state = "third"
-      puts "second completed"
+      puts "flow3: second completed"
 
       # completes the action after 6 seconds
       # use the first argument to signal an error
@@ -571,12 +525,9 @@ Durable.ruleset :flow3 do
     # overrides the 5 second default abandon timeout
     15
   end
-  
-  when_start do
-    patch_state :flow3, { :state => "first" }
-  end
 end
 
+Durable.update_state :flow3, { :state => "first" }
 
 Durable.ruleset :bookstore do
   # this rule will trigger for events with status
@@ -586,42 +537,46 @@ Durable.ruleset :bookstore do
 
   when_all +m.name do
     puts "bookstore-> Added: #{m.name}"
-    retract(:name => 'The new book',
-            :reference => '75323',
-            :price => 500,
-            :seller => 'bookstore')
   end
 
   when_all none(+m.name) do
     puts "bookstore-> No books"
   end  
-
-  when_start do
-    # will return 0 because the fact assert was successful 
-    puts assert :bookstore, {
-                :name => 'The new book',
-                :seller => 'bookstore',
-                :reference => '75323',
-                :price => 500}
-
-    # will return 212 because the fact has already been asserted 
-    puts assert :bookstore, {
-                :reference => '75323',
-                :name => 'The new book',
-                :price => 500,
-                :seller => 'bookstore'}
-
-    # will return 0 because a new event is being posted
-    puts post :bookstore, {
-              :reference => '75323',
-              :status => 'Active'}
-
-    # will return 0 because a new event is being posted
-    puts post :bookstore, {
-              :reference => '75323',
-              :status => 'Active'}
-  end
 end
+
+# will return 0 because the fact assert was successful 
+puts Durable.assert :bookstore, {
+            :name => 'The new book',
+            :seller => 'bookstore',
+            :reference => '75323',
+            :price => 500}
+
+# will return 212 because the fact has already been asserted 
+begin
+  Durable.assert :bookstore, {
+              :reference => '75323',
+              :name => 'The new book',
+              :price => 500,
+              :seller => 'bookstore'}
+rescue Exception => e
+  puts "bookstore expected: #{e}"
+end
+
+# will return 0 because a new event is being posted
+Durable.post :bookstore, {
+             :reference => '75323',
+             :status => 'Active'}
+
+# will return 0 because a new event is being posted
+Durable.post :bookstore, {
+             :reference => '75323',
+             :status => 'Active'}
+
+Durable.retract :bookstore, {
+            :name => 'The new book',
+            :reference => '75323',
+            :price => 500,
+            :seller => 'bookstore'}
 
 Durable.ruleset :risk5 do
   # compares properties in the same event, this expression is evaluated in the client 
@@ -634,14 +589,12 @@ Durable.ruleset :risk5 do
     puts "risk5-> fraud detected -> #{first.amount}"
     puts "risk5-> fraud detected -> #{second.amount}"
   end
-
-  when_start do
-    post :risk5, { :debit => 220, :credit => 100 }
-    post :risk5, { :debit => 150, :credit => 100 }
-    post :risk5, { :amount => 200 }
-    post :risk5, { :amount => 500 }
-  end
 end
+
+Durable.post :risk5, { :debit => 220, :credit => 100 }
+Durable.post :risk5, { :debit => 150, :credit => 100 }
+Durable.post :risk5, { :amount => 200 }
+Durable.post :risk5, { :amount => 500 }
 
 Durable.ruleset :risk6 do
   # matching primitive array
@@ -685,22 +638,28 @@ Durable.ruleset :risk6 do
   when_all m.payments.anyItem(-item.field1 & (item.field2 == 2)) do
     puts "risk6-> fraud 8 detected #{m.payments}"
   end
-
-  when_start do
-    post :risk6, { :payments => [ 2500, 150, 450 ] }
-    post :risk6, { :payments => [ 1500, 3500, 4500 ] }
-    post :risk6, { :payments => [ { :amount => 200 }, { :amount => 300 }, { :amount => 400 } ] }
-    post :risk6, { :cards => [ "one card", "two cards", "three cards" ] }
-    post :risk6, { :payments => [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ] }
-    post :risk6, { :payments => [ 150, 350, 450 ], :cash => true }
-    post :risk6, { :field => 1, :payments => [ [ 200, 300 ], [ 150, 200 ] ] }
-    post :risk6, { :field => 1, :payments => [ [ 20, 180 ], [ 90, 190 ] ] }
-    post :risk6, { :payments => [ { :field2 => 2 } ] }
-    post :risk6, { :payments => [ { :field2 => 1 } ] }
-    post :risk6, { :payments => [ { :field1 => 1 , :field2 => 2 } ] }
-    post :risk6, { :payments => [ { :field1 => 1 , :field2 => 1 } ] }
-  end
 end
 
+Durable.post :risk6, { :payments => [ 2500, 150, 450 ] }, -> e, state {
+  puts "risk6 expected:#{e}"
+}
 
-Durable.run_all
+Durable.post :risk6, { :payments => [ 1500, 3500, 4500 ] }
+Durable.post :risk6, { :payments => [ { :amount => 200 }, { :amount => 300 }, { :amount => 400 } ] }
+Durable.post :risk6, { :cards => [ "one card", "two cards", "three cards" ] }
+Durable.post :risk6, { :payments => [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ] }
+Durable.post :risk6, { :payments => [ 150, 350, 450 ], :cash => true }
+Durable.post :risk6, { :field => 1, :payments => [ [ 200, 300 ], [ 150, 200 ] ] }
+Durable.post :risk6, { :field => 1, :payments => [ [ 20, 180 ], [ 90, 190 ] ] }
+Durable.post :risk6, { :payments => [ { :field2 => 2 } ] }
+Durable.post :risk6, { :payments => [ { :field2 => 1 } ] }, -> e, state {
+  puts "risk6 expected:#{e}"
+}
+Durable.post :risk6, { :payments => [ { :field1 => 1 , :field2 => 2 } ] }, -> e, state {
+  puts "risk6 expected:#{e}"
+}
+Durable.post :risk6, { :payments => [ { :field1 => 1 , :field2 => 1 } ] }, -> e, state {
+  puts "risk6 expected:#{e}"
+}
+
+sleep(30)

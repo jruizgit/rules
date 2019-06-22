@@ -644,64 +644,48 @@ c = closure()
 _rule_stack = []
 _ruleset_stack = []
 _rulesets = {}
-_defined_rulesets = {}
 _main_host = None
 
-def _ensure_host():
+def get_host():
     global _main_host
+    global _rulesets
+
     if not _main_host:
         _main_host = engine.Host()
 
-def _ensure_ruleset(ruleset_name, rset = None):
-    _ensure_host()
-    if not ruleset_name in _defined_rulesets:
-        if not rset:
-            rset = _rulesets[ruleset_name]
-
+    for name, rset in _rulesets.items():
         full_name, ruleset_definition = rset.define()
         _main_host.set_ruleset(full_name, ruleset_definition)
-        _defined_rulesets[ruleset_name] = True
 
-def get_host():
-    for name, rset in _rulesets.items():
-        _ensure_ruleset(name, rset)
-            
+
+    _rulesets = {}
     return _main_host
 
 def post(ruleset_name, message, complete = None):
-    _ensure_ruleset(ruleset_name)
-    return _main_host.post(ruleset_name, message, complete)
+    return get_host().post(ruleset_name, message, complete)
         
 def post_batch(ruleset_name, messages, complete = None):
-    _ensure_ruleset(ruleset_name)
-    return _main_host.post_batch(ruleset_name, messages, complete)
+    return get_host().post_batch(ruleset_name, messages, complete)
     
 def assert_fact(ruleset_name, fact, complete = None):
-    _ensure_ruleset(ruleset_name)
-    return _main_host.assert_fact(ruleset_name, fact, complete)
+    return get_host().assert_fact(ruleset_name, fact, complete)
     
 def assert_facts(ruleset_name, facts, complete = None):
-    _ensure_ruleset(ruleset_name)
-    return _main_host.assert_facts(ruleset_name, facts, complete)
+    return get_host().assert_facts(ruleset_name, facts, complete)
     
 def retract_fact(ruleset_name, fact, complete = None):
-    _ensure_ruleset(ruleset_name)
-    return _main_host.retract_fact(ruleset_name, fact, complete)
+    return get_host().retract_fact(ruleset_name, fact, complete)
     
 def retract_facts(ruleset_name, facts, complete = None):
-    _ensure_ruleset(ruleset_name)
-    return _main_host.retract_facts(ruleset_name, facts, complete)
+    return get_host().retract_facts(ruleset_name, facts, complete)
     
 def update_state(ruleset_name, state, complete = None):
-    _ensure_ruleset(ruleset_name)
-    _main_host.update_state(ruleset_name, state, complete)
+    get_host().update_state(ruleset_name, state, complete)
 
 def get_state(ruleset_name, sid):
-    _ensure_ruleset(ruleset_name)
-    return _main_host.get_state(ruleset_name, sid)
+    return get_host().get_state(ruleset_name, sid)
 
 def delete_state(ruleset_name, sid):
-    _ensure_ruleset(ruleset_name)
-    _main_host.delete_state(ruleset_name, sid)
+    get_host().delete_state(ruleset_name, sid)
 
 

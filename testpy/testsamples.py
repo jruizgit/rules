@@ -119,10 +119,7 @@ with ruleset('expense0'):
     def approved(c):
         print ('expense0-> Approved subject: {0}'.format(c.m.subject))
         
-    @when_start
-    def start(host):
-        host.post('expense0', { 'subject': 'approve'})
-
+post('expense0', { 'subject': 'approve'})
 
 with ruleset('match'):
     @when_all(m.url.matches('(https?://)?([0-9a-z.-]+)%.[a-z]{2,6}(/[A-z0-9_.-]+/?)*'))

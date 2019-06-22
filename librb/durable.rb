@@ -1,9 +1,7 @@
 require_relative "engine"
-require_relative "interface"
 
 module Durable
   @@rulesets = {}
-  @@start_blocks = []
   @@main_host = nil
 
   def self.get_host()
@@ -19,70 +17,55 @@ module Durable
     @@main_host 
   end
 
-  def post(ruleset_name, message, complete = nil)
-    self.getHost().post ruleset_name, message, complete
+  def self.post(ruleset_name, message, complete = nil)
+    self.get_host().post ruleset_name, message, complete
   end
      
-  def post_batch(ruleset_name, messages, complete = nil)
-    self.getHost().post_batch ruleset_name, message, complete
+  def self.post_batch(ruleset_name, messages, complete = nil)
+    self.get_host().post_batch ruleset_name, messages, complete
   end
 
-  def assert_fact(ruleset_name, fact, complete = nil)
-    self.getHost().assert_fact ruleset_name, fact, complete
+  def self.assert(ruleset_name, fact, complete = nil)
+    self.get_host().assert ruleset_name, fact, complete
   end
 
-  def assert_facts(ruleset_name, facts, complete = nil)
-    self.getHost().assert_facts ruleset_name, facts, complete
+  def self.assert_facts(ruleset_name, facts, complete = nil)
+    self.get_host().assert_facts ruleset_name, facts, complete
   end
   
-  def retract_fact(ruleset_name, fact, complete = nil)
-    self.getHost().retract_fact ruleset_name, fact, complete
+  def self.retract(ruleset_name, fact, complete = nil)
+    self.get_host().retract ruleset_name, fact, complete
   end
     
-  def retract_facts(ruleset_name, facts, complete = nil)
-    self.getHost().retract_facts ruleset_name, facts, complete
+  def self.retract_facts(ruleset_name, facts, complete = nil)
+    self.get_host().retract_facts ruleset_name, facts, complete
   end
   
-  def update_state(ruleset_name, state, complete = nil)
-    self.getHost().update_state ruleset_name, state, complete
+  def self.update_state(ruleset_name, state, complete = nil)
+    self.get_host().update_state ruleset_name, state, complete
   end
 
-
-  def self.create_host()
-    main_host = Engine::Host.new @@rulesets
-    for block in @@start_blocks
-      main_host.instance_exec main_host, &block
-    end
-    main_host.start!
-    main_host
+  def self.get_state(ruleset_name, sid)
+    self.get_host().get_state ruleset_name, sid
   end
 
-  def self.run_all(host_name = nil, port = nil, run = nil)
-    main_host = self.create_host
-    Interface::Application.set_host main_host
-    if run
-      run(main_host, Interface::Application)
-    else
-      Interface::Application.run!
-    end
+  def self.delete_state(ruleset_name, sid)
+    self.get_host().delete_state ruleset_name, sid
   end
 
   def self.ruleset(name, &block) 
     ruleset = Ruleset.new name, block
     @@rulesets[name] = ruleset.rules
-    @@start_blocks << ruleset.start if ruleset.start
   end
 
   def self.statechart(name, &block)
     statechart = Statechart.new name, block
     @@rulesets[name.to_s + "$state"] = statechart.states
-    @@start_blocks << statechart.start if statechart.start
   end
 
   def self.flowchart(name, &block)
     flowchart = Flowchart.new name, block
     @@rulesets[name.to_s + "$flow"] = flowchart.stages
-    @@start_blocks << flowchart.start if flowchart.start
   end
 
   class Arithmetic
