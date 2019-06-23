@@ -22,7 +22,7 @@ Durable.statechart :miss_manners do
              :right_guest_name => m.name)
       assert(:t => "path",
              :id => s.g_count + 1,
-             :s_id => s.count,
+             :p_id => s.count,
              :seat => 1, 
              :guest_name => m.name)
       s.count += 1
@@ -70,6 +70,15 @@ Durable.statechart :miss_manners do
   end
 
   state :make do
+    to :check, when_all(pri(1), (m.t == "seating") & (m.path == false)) do
+      retract(m)
+      m.id = s.g_count
+      m.path = true
+      assert(m)
+      s.g_count += 1
+      puts("path sid: #{m.s_id}, pid: #{m.p_id}, left guest: #{m.left_guest_name}, right guest: #{m.right_guest_name}")
+    end
+
     to :make, when_all(cap(1000),
                        c.seating = (m.t == "seating") &
                                    (m.path == false),
@@ -87,14 +96,6 @@ Durable.statechart :miss_manners do
         s.g_count += 1
       end
     end
-    to :check, when_all(pri(1), (m.t == "seating") & (m.path == false)) do
-      retract(m)
-      m.id = s.g_count
-      m.path = true
-      assert(m)
-      s.g_count += 1
-      puts("path sid: #{m.s_id}, pid: #{m.p_id}, left guest: #{m.left_guest_name}, right guest: #{m.right_guest_name}")
-    end
   end
 
   state :check do
@@ -106,7 +107,7 @@ Durable.statechart :miss_manners do
     end
     to :assign
   end
-  
+
   state :end
 
 end

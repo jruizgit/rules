@@ -47,48 +47,48 @@ module Engine
 
     def post(ruleset_name, message = nil)
       if message
-        if !(message.key? :sid) && !(message.key? "sid")
-          message[:sid] = @s.sid
-        end
- 
         if message.kind_of? Content
           message = message._d
         end
 
+        if !(message.key? :sid) && !(message.key? "sid")
+          message[:sid] = @s.sid
+        end
+ 
         @host.assert_event ruleset_name, message
       else
         message = ruleset_name
-        if !(message.key? :sid) && !(message.key? "sid")
-          message[:sid] = @s.sid
-        end
- 
         if message.kind_of? Content
           message = message._d
         end
 
+        if !(message.key? :sid) && !(message.key? "sid")
+          message[:sid] = @s.sid
+        end
+ 
         @_ruleset.assert_event message
       end
     end
 
     def assert(ruleset_name, fact = nil)
       if fact
-        if !(fact.key? :sid) && !(fact.key? "sid")
-          fact[:sid] = @s.sid
-        end
- 
         if fact.kind_of? Content
           fact = fact._d
         end
 
-        @host.assert_fact ruleset_name, fact
-      else
-        fact = ruleset_name
         if !(fact.key? :sid) && !(fact.key? "sid")
           fact[:sid] = @s.sid
         end
  
+        @host.assert_fact ruleset_name, fact
+      else
+        fact = ruleset_name
         if fact.kind_of? Content
           fact = fact._d
+        end
+
+        if !(fact.key? :sid) && !(fact.key? "sid")
+          fact[:sid] = @s.sid
         end
 
         @_ruleset.assert_fact fact
@@ -97,25 +97,24 @@ module Engine
 
     def retract(ruleset_name, fact = nil)
       if fact
-        if !(fact.key? :sid) && !(fact.key? "sid")
-          fact[:sid] = @s.sid
-        end
- 
         if fact.kind_of? Content
           fact = fact._d
         end
 
+        if !(fact.key? :sid) && !(fact.key? "sid")
+          fact[:sid] = @s.sid
+        end
+ 
         @host.retract_fact ruleset_name, fact
       else
         fact = ruleset_name
-        if !(fact.key? :sid) && !(fact.key? "sid")
-          fact[:sid] = @s.sid
-        end
- 
         if fact.kind_of? Content
           fact = fact._d
         end
 
+        if !(fact.key? :sid) && !(fact.key? "sid")
+          fact[:sid] = @s.sid
+        end
         @_ruleset.retract_fact fact
       end
     end
@@ -247,7 +246,7 @@ module Engine
         begin
           @func.call c
         rescue Exception => e
-          c.s.exception = e.to_s
+          c.s.exception = "#{e.to_s}, #{e.backtrace}"
         end
 
         if @next
@@ -376,7 +375,7 @@ module Engine
     end
 
     def retract_facts(facts)
-      handle_result Rules.assert_facts(@handle, JSON.generate(facts)), facts
+      handle_result Rules.retract_facts(@handle, JSON.generate(facts)), facts
     end
 
     def start_timer(sid, timer, timer_duration, manual_reset)
@@ -475,10 +474,6 @@ module Engine
         result_container.delete :message
         c = Closure.new @host, self, state, message, state_offset
 
-        if result_container.key? :async
-          result_container.delete :async
-        end
-
         @actions[action_name].run c, -> e {
           if c.has_completed
             return
@@ -486,7 +481,7 @@ module Engine
 
           if e
             Rules.abandon_action @handle, c.handle
-            complete.call e, true
+            complete.call e, nil
           else
             begin
               Rules.update_state @handle, JSON.generate(c.s._d)
