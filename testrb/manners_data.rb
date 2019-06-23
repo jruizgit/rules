@@ -165,7 +165,7 @@ Durable.assert :miss_manners, {:id => 16, :sid => 1, :t => "guest", :name => "4"
 Durable.assert :miss_manners, {:id => 17, :sid => 1, :t => "guest", :name => "4", :sex => "m", :hobby => "h4"}
 Durable.assert :miss_manners, {:id => 18, :sid => 1, :t => "guest", :name => "5", :sex => "m", :hobby => "h2"}
 Durable.assert :miss_manners, {:id => 19, :sid => 1, :t => "guest", :name => "5", :sex => "m", :hobby => "h5"}
-Durable.assert :miss_manners, {:id => 10, :sid => 1, :t => "guest", :name => "5", :sex => "m", :hobby => "h3"}
+Durable.assert :miss_manners, {:id => 20, :sid => 1, :t => "guest", :name => "5", :sex => "m", :hobby => "h3"}
 Durable.assert :miss_manners, {:id => 21, :sid => 1, :t => "guest", :name => "6", :sex => "f", :hobby => "h1"}
 Durable.assert :miss_manners, {:id => 22, :sid => 1, :t => "guest", :name => "6", :sex => "f", :hobby => "h4"}
 Durable.assert :miss_manners, {:id => 23, :sid => 1, :t => "guest", :name => "6", :sex => "f", :hobby => "h2"}

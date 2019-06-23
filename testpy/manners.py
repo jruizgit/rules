@@ -131,7 +131,7 @@ assert_fact('miss_manners', {'id': 6, 'sid': 1, 't': 'guest', 'name': '2', 'sex'
 assert_fact('miss_manners', {'id': 7, 'sid': 1, 't': 'guest', 'name': '2', 'sex': 'f', 'hobby': 'h2'})
 assert_fact('miss_manners', {'id': 8, 'sid': 1, 't': 'guest', 'name': '2', 'sex': 'f', 'hobby': 'h1'})
 assert_fact('miss_manners', {'id': 9, 'sid': 1, 't': 'guest', 'name': '2', 'sex': 'f', 'hobby': 'h4'})
-assert_fact('miss_manners', {'id': 10, 'sid': 1, 't': 'guest', 'name': '2', 'sex': 'f', 'hobby': 'h5'})
+assert_fact('miss_manners', {'id': 20, 'sid': 1, 't': 'guest', 'name': '2', 'sex': 'f', 'hobby': 'h5'})
 assert_fact('miss_manners', {'id': 11, 'sid': 1, 't': 'guest', 'name': '3', 'sex': 'f', 'hobby': 'h5'})
 assert_fact('miss_manners', {'id': 12, 'sid': 1, 't': 'guest', 'name': '3', 'sex': 'f', 'hobby': 'h4'})
 assert_fact('miss_manners', {'id': 13, 'sid': 1, 't': 'guest', 'name': '3', 'sex': 'f', 'hobby': 'h2'})
@@ -141,7 +141,7 @@ assert_fact('miss_manners', {'id': 16, 'sid': 1, 't': 'guest', 'name': '4', 'sex
 assert_fact('miss_manners', {'id': 17, 'sid': 1, 't': 'guest', 'name': '4', 'sex': 'm', 'hobby': 'h4'})
 assert_fact('miss_manners', {'id': 18, 'sid': 1, 't': 'guest', 'name': '5', 'sex': 'm', 'hobby': 'h2'})
 assert_fact('miss_manners', {'id': 19, 'sid': 1, 't': 'guest', 'name': '5', 'sex': 'm', 'hobby': 'h5'})
-assert_fact('miss_manners', {'id': 20, 'sid': 1, 't': 'guest', 'name': '5', 'sex': 'm', 'hobby': 'h3'})
+assert_fact('miss_manners', {'id': 10, 'sid': 1, 't': 'guest', 'name': '5', 'sex': 'm', 'hobby': 'h3'})
 assert_fact('miss_manners', {'id': 21, 'sid': 1, 't': 'guest', 'name': '6', 'sex': 'f', 'hobby': 'h1'})
 assert_fact('miss_manners', {'id': 22, 'sid': 1, 't': 'guest', 'name': '6', 'sex': 'f', 'hobby': 'h4'})
 assert_fact('miss_manners', {'id': 23, 'sid': 1, 't': 'guest', 'name': '6', 'sex': 'f', 'hobby': 'h2'})
@@ -561,5 +561,6 @@ assert_fact('miss_manners', {'id': 436, 'sid': 1, 't': 'guest', 'name': '128', '
 assert_fact('miss_manners', {'id': 437, 'sid': 1, 't': 'guest', 'name': '128', 'sex': 'f', 'hobby': 'h1'})
 assert_fact('miss_manners', {'id': 438, 'sid': 1, 't': 'guest', 'name': '128', 'sex': 'f', 'hobby': 'h3'})
 assert_fact('miss_manners', {'id': 439, 'sid': 1, 't': 'last_seat', 'seat': 128})
+
 
 
