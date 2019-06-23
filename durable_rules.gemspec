@@ -26,5 +26,4 @@ Gem::Specification.new do |s|
   s.add_development_dependency "rake", "10.4.2"
   s.add_development_dependency "rake-compiler", "~> 0.9.5"
   s.add_runtime_dependency "timers", "~> 4.0"
-  s.add_runtime_dependency "sinatra", "~> 1.4"
 end
