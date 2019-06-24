@@ -32,30 +32,13 @@ Reference Manual
   * [Timers](reference.md#timers)
 
 ## Setup
-durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
-### Redis install
-durable_rules relies on Redis version 2.8  
- 
-_Mac_  
-1. Download [Redis](http://download.redis.io/releases/redis-2.8.4.tar.gz)   
-2. Extract code, compile and start Redis
-
-For more information go to: http://redis.io/download  
-
-_Windows_  
-1. Download Redis binaries from [MSTechOpen](https://github.com/MSOpenTech/redis/releases)  
-2. Extract binaries and start Redis  
-
-For more information go to: https://github.com/MSOpenTech/redis  
-
-Note: To test applications locally you can also use a Redis [cloud service](reference.md#cloud-setup) 
 
 ### First App
-Now that your cache ready, let's write a simple rule:  
+Let's write a simple rule:  
 
 1. Start a terminal  
 2. Create a directory for your app: `mkdir firstapp` `cd firstapp`  
-3. In the new directory `sudo pip install durable_rules` (this will download durable_rules and its dependencies)  
+3. In the new directory `pip install durable_rules` (this will download durable_rules and its dependencies)  
 4. In that same directory create a test.py file using your favorite editor  
 5. Copy/Paste and save the following code:
   ```python
@@ -65,19 +48,10 @@ Now that your cache ready, let's write a simple rule:
       def say_hello(c):
           print ('Hello {0}'.format(c.m.subject))
 
-      @when_start
-      def start(host):
-          host.post('test', { 'subject': 'World' })
-
-  run_all()
+  post('test', { 'subject': 'World' })
   ```
 7. In the terminal type `python test.py`  
 8. You should see the message: `Hello World`  
-
-Note 1: If you are using a redis service outside your local host, replace the last line with:
-  ```python
-  run_all([{'host': 'host_name', 'port': port, 'password': 'password'}]);
-  ```
 
 [top](reference.md#table-of-contents) 
 ## Basics

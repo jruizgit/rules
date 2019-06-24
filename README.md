@@ -12,16 +12,17 @@ A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts a
 
 The durable_rules core engine is implemented in C, which enables fast rule evaluation as well as muti-language support.  
 
-*What is new in V2?
-- No dependendcy on Redis nor web frameworks
-- Up to 10x faster than the previous version
-- Simpler programming model with synchronous verbs*
+
+*In durable_rules V2, less is more: The Rete tree is fully evaluated in C. Thus, the framework is 5x to 10x faster (depending on the scenario) and does not require Redis. The programming model for posting events, asserting and retracting facts is synchronous and does not prescribe any web framework.*
 
 ## Getting Started  
 
 Using your scripting language of choice, simply describe the event to match (antecedent) and the action to take (consequent). 
 
 ### Node.js
+
+To install the framework do: `npm install durable`
+
 ```javascript
 var d = require('durable');
 
@@ -35,6 +36,9 @@ d.ruleset('test', function() {
 d.post('test', {subject: 'World'});
 ```  
 ### Python
+
+To install the framework do: `pip install durable_rules`
+
 ```python
 from durable.lang import *
 
@@ -48,6 +52,9 @@ with ruleset('test'):
 post('test', { 'subject': 'World' })
 ```  
 ### Ruby
+
+To install the framework do: `gem install durable_rules`
+
 ```ruby
 require "durable"
 
@@ -257,38 +264,38 @@ Durable.assert :test, { :subject => "2228345634567898" }
 
 durable_rules can also be used to solve traditional Production Business Rules problems. This example is an industry benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent people are of opposite sex and share at least one hobby. 
 
-Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance nor altering the combinatorics required by the benchmark. For 128 guests, 438 facts, the execution time is 450 ms in JavaScript and 600 ms in Python and Ruby. 
+Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance nor altering the combinatorics required by the benchmark. For 128 guests, 438 facts, the execution time is 450 ms in node.js and 600 ms in Python and Ruby. 
 
 <div align="center"><img src="https://github.com/jruizgit/rules/blob/v2/docs/manners.png" width="700px" height="400px" /></div>  
 
 _IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive_    
 
-* [Ruby](https://github.com/jruizgit/rules/blob/master/testrb/manners.rb)  
-* [Python](https://github.com/jruizgit/rules/blob/master/testpy/manners.py)  
-* [Node.js](https://github.com/jruizgit/rules/blob/master/testjs/manners.js)
+* [Ruby](https://github.com/jruizgit/rules/blob/v2/testrb/manners.rb)  
+* [Python](https://github.com/jruizgit/rules/blob/v2/testpy/manners.py)  
+* [Node.js](https://github.com/jruizgit/rules/blob/v2/testjs/manners.js)
 
 ## Image recognition and Waltzdb
 
 Waltzdb is a constraint propagation problem for image recognition: given a set of lines in a 2D space, the system needs to interpret the 3D depth of the image. The first part of the algorithm consists of identifying four types of junctions, then labeling the junctions following Huffman-Clowes notation. Pairs of adjacent junctions constraint each other’s edge labeling. So, after choosing the labeling for an initial junction, the second part of the algorithm iterates through the graph, propagating the labeling constraints by removing inconsistent labels.  
 
-In this case too, the benchmark flow structure is defined using a statechart to improve code readability. The benchmark requirements are not altered. Execution time is around 450 ms for the case of 4 regions. 
+In this case too, the benchmark flow structure is defined using a statechart to improve code readability. The benchmark requirements are not altered. The execution time, for the case of 4 regions, is 430 ms in node.js, 654 ms in Python and 552 ms in Ruby.
 
 <div align="center"><img src="https://github.com/jruizgit/rules/blob/v2/docs/waltzdb.png" width="700px" height="400px" /></div>  
 
 _IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive_    
 
-* [Node.js](https://github.com/jruizgit/rules/blob/master/testjs/waltzdb.js)  
-* [Ruby](https://github.com/jruizgit/rules/blob/master/testrb/waltzdb.rb)  
-* [Python](https://github.com/jruizgit/rules/blob/master/testpy/waltzdb.py)  
+* [Node.js](https://github.com/jruizgit/rules/blob/v2/testjs/waltzdb.js)  
+* [Ruby](https://github.com/jruizgit/rules/blob/v2/testrb/waltzdb.rb)  
+* [Python](https://github.com/jruizgit/rules/blob/v2/testpy/waltzdb.py)  
 
 
 ## To Learn More  
 Reference Manual:  
-### [Ruby](https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md)  
+### [Ruby](https://github.com/jruizgit/rules/blob/v2/docs/rb/reference.md)  
 
-### [Python](https://github.com/jruizgit/rules/blob/master/docs/py/reference.md)  
+### [Python](https://github.com/jruizgit/rules/blob/v2/docs/py/reference.md)  
 
-### [Node.js](https://github.com/jruizgit/rules/blob/master/docs/js/reference.md)  
+### [Node.js](https://github.com/jruizgit/rules/blob/v2/docs/js/reference.md)  
 
-### [JSON](https://github.com/jruizgit/rules/blob/master/docs/json/reference.md)  
+### [JSON](https://github.com/jruizgit/rules/blob/v2/docs/json/reference.md)  
 
