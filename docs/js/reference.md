@@ -63,7 +63,6 @@ A rule is the basic building block of the framework. The rule antecendent define
 
 * `whenAll` and `whenAny` label the antecendent definition of a rule
 * `run` and `runAsync` label the consequent definition of a rule 
-* `whenStart` labels the action to be taken when starting the ruleset  
   
 ```javascript
 var d = require('durable');
@@ -245,7 +244,7 @@ d.retract('bookstore', {
 When asserting a fact, retracting a fact, posting an event or updating state context, the following errors can be thrown:
 
 * MessageObservedError: The fact has already been asserted or the event has already been posted.
-* MessageNotHandledError: The event or fact was not captured because it did not match any rule
+* MessageNotHandledError: The event or fact was not captured because it did not match any rule.
 
 [top](reference.md#table-of-contents) 
 
@@ -270,7 +269,7 @@ d.post('expense', { subject: 'approve' });
 ```  
 [top](reference.md#table-of-contents)
 ### Pattern Matching
-durable_rules implements a simple pattern matching dialect. Similar to lua, it uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. Event processing is O(n) guaranteed (n being the size of the event).  
+durable_rules implements a simple pattern matching dialect. It uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. Event processing is O(n) guaranteed (n being the size of the event).  
 
 **Repetition**  
 \+ 1 or more repetitions  

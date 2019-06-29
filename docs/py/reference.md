@@ -24,7 +24,6 @@ Reference Manual
   * [Action Batches](reference.md#action-batches)
   * [Async Actions](reference.md#async-actions)
   * [Unhandled Exceptions](reference.md#unhandled-exceptions)
-  * [Fault Tolerance](reference.md#fault-tolerance)
 * [Flow Structures](reference.md#flow-structures) 
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
@@ -59,7 +58,6 @@ Let's write a simple rule:
 A rule is the basic building block of the framework. The rule antecendent defines the conditions that need to be satisfied to execute the rule consequent (action). By convention `m` represents the data to be evaluated by a given rule.
 
 * `when_all` and `when_any` annotate the antecendent definition of a rule
-* `when_start` annotates the action to be taken when starting the ruleset  
   
 ```python
 from durable.lang import *
@@ -71,12 +69,7 @@ with ruleset('test'):
         # consequent
         print('Hello {0}'.format(c.m.subject))
 
-    # on ruleset start
-    @when_start
-    def start(host):    
-        host.post('test', { 'subject': 'World' })
-
-run_all()
+post('test', { 'subject': 'World' })
 ```
 ### Facts
 Facts represent the data that defines a knowledge base. After facts are asserted as JSON objects. Facts are stored until they are retracted. When a fact satisfies a rule antecedent, the rule consequent is executed.
@@ -107,16 +100,8 @@ with ruleset('animal'):
     def output(c):
         print('Fact: {0} {1} {2}'.format(c.m.subject, c.m.predicate, c.m.object))
 
-    @when_start
-    def start(host):
-        host.assert_fact('animal', { 'subject': 'Kermit', 'predicate': 'eats', 'object': 'flies' })
-
-run_all()
+assert_fact('animal', { 'subject': 'Kermit', 'predicate': 'eats', 'object': 'flies' })
 ```
-
-Facts can also be asserted using the http API. For the example above, run the following command:  
-
-<sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "predicate": "eats", "object": "worms"}' http://localhost:5000/animal/facts`</sub>
 
 [top](reference.md#table-of-contents)  
 
@@ -135,17 +120,11 @@ with ruleset('risk'):
 
     @when_start
     def start(host):
-        # 'post' submits events, try 'assert' instead and to see differt behavior
-        host.post('risk', {'t': 'purchase', 'location': 'US'});
-        host.post('risk', {'t': 'purchase', 'location': 'CA'});
+        
+post('risk', {'t': 'purchase', 'location': 'US'});
+post('risk', {'t': 'purchase', 'location': 'CA'});
 
-run_all()
 ```
-
-Events can be posted using the http API. When the example above is listening, run the following commands:  
-
-<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:5000/risk/events`</sub>  
-<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:5000/risk/events`</sub>  
 
 **Note:**  
 
@@ -156,9 +135,9 @@ Events can be posted using the http API. When the example above is listening, ru
 
 *The reason is because both facts satisfy the first condition m.t == 'purchase' and each fact satisfies the second condition m.location != c.first.location in relation to the facts which satisfied the first.*  
 
-*Given that, you might be wondering why post behaves differently: the reason is because an event is an ephemeral fact, as soon as it is scheduled to be dispatched, it is retracted. When using post in the example above, by the time the second pair is calculated the events have already been retracted.*  
+*Events are ephemeral facts, they are retracted before they are dispatched. When using post in the example above, by the time the second pair is calculated the events have already been retracted.*  
 
-*And why is the difference between events and facts important? Retracting events before dispatch reduces the number of combinations to be calculated for dispatch. Thus, processing events is much more efficient (orders of magnitude faster in some cases).*  
+*Retracting events before dispatch reduces the number of combinations to be calculated during action execution.*  
 
 [top](reference.md#table-of-contents)  
 
@@ -188,15 +167,8 @@ with ruleset('flow'):
         # deletes state at the end
         c.delete_state()
 
-    @when_start
-    def on_start(host):
-        # modifies context state
-        host.patch_state('flow', { 'status': 'start' })
-
-run_all()
+update_state('flow', { 'status': 'start' })
 ```
-State can also be retrieved and modified using the http API. When the example above is running, try the following commands:  
-<sub>`curl -H "content-type: application/json" -X POST -d '{"status": "next"}' http://localhost:5000/flow/state`</sub>  
 
 [top](reference.md#table-of-contents)  
 ### Identity
@@ -209,98 +181,63 @@ with ruleset('bookstore'):
     # this rule will trigger for events with status
     @when_all(+m.status)
     def event(c):
-        print('Reference {0} status {1}'.format(c.m.reference, c.m.status))
+        print('bookstore-> Reference {0} status {1}'.format(c.m.reference, c.m.status))
 
     @when_all(+m.name)
     def fact(c):
-        print('Added {0}'.format(c.m.name))
-        c.retract_fact({
-            'name': 'The new book',
-            'reference': '75323',
-            'price': 500,
-            'seller': 'bookstore'
-        })
-
+        print('bookstore-> Added {0}'.format(c.m.name))
+        
     # this rule will be triggered when the fact is retracted
     @when_all(none(+m.name))
     def empty(c):
-        print('No books')
+        print('bookstore-> No books')
 
-    @when_start
-    def start(host):    
-        # will return 0 because the fact assert was successful 
-        print(host.assert_fact('bookstore', {
-            'name': 'The new book',
-            'seller': 'bookstore',
-            'reference': '75323',
-            'price': 500
-        }))
+# will not throw because the fact assert was successful 
+assert_fact('bookstore', {
+    'name': 'The new book',
+    'seller': 'bookstore',
+    'reference': '75323',
+    'price': 500
+})
 
-        # will return 212 because the fact has already been asserted
-        print(host.assert_fact('bookstore', {
-            'reference': '75323',
-            'name': 'The new book',
-            'price': 500,
-            'seller': 'bookstore'
-        }))
+# will throw MessageObservedError because the fact has already been asserted 
+try:
+    assert_fact('bookstore', {
+        'reference': '75323',
+        'name': 'The new book',
+        'price': 500,
+        'seller': 'bookstore'
+    })
+except BaseException as e:
+    print('bookstore expected {0}'.format(e.message))
 
-        # will return 0 because a new event is being posted
-        print(host.post('bookstore', {
-            'reference': '75323',
-            'status': 'Active'
-        }))
+# will not throw because a new event is being posted
+post('bookstore', {
+    'reference': '75323',
+    'status': 'Active'
+})
 
-        # will return 0 because a new event is being posted
-        print(host.post('bookstore', {
-            'reference': '75323',
-            'status': 'Active'
-        }))
-        
-run_all()
+# will not throw because a new event is being posted
+post('bookstore', {
+    'reference': '75323',
+    'status': 'Active'
+})
+
+retract_fact('bookstore', {
+    'reference': '75323',
+    'name': 'The new book',
+    'price': 500,
+    'seller': 'bookstore'
+})
 ```
 
 [top](reference.md#table-of-contents)  
 ### Error Codes
 
-When the run_all command fails, it can return the following error codes:
+When asserting a fact, retracting a fact, posting an event or updating state context, the following exceptions can be thrown:
 
-* 0 - OK
-* 1 - Out of memory (uncommon)
-* 2 - Unexpected type (uncommon)
-* 5 - Unexpected name (uncommon)
-* 6 - Rule limit exceeded (uncommon)
-* 8 - Rule beta limit exceeded (uncommon)
-* 9 - Rule without qualifier (uncommon)
-* 10 - Invalid rule attribute (uncommon)
-* 101 - Error parsing JSON value (uncommon)
-* 102 - Error parsing JSON string (uncommon)
-* 103 - Error parsing JSON number (uncommon)
-* 104 - Error parsing JSON object (uncommon)
-* 301 - Could not establish Redis connection
-* 302 - Redis returned an error
-* 501 - Could not parse regex
-* 502 - Max regex state transitions reached (uncommon)
-* 503 - Max regex states reached (uncommon)
-* 504 - Regex DFA transform queue full (uncommon)
-* 505 - Regex DFA transform list full (uncommon)
-* 506 - Regex DFA transform set full (uncommon)
-* 507 - Conflict in regex transform (uncommon)
-
-When asserting a fact or posting an event via the when_start function or the web API, these error codes can be returned:
-
-* 0 - OK
-* 101 - Error parsing JSON value (uncommon)
-* 102 - Error parsing JSON string (uncommon)
-* 103 - Error parsing JSON number (uncommon)
-* 104 - Error parsing JSON object (uncommon)
-* 201 - The event or fact was not captured because it did not match any rule
-* 202 - Too many properties in the event or fact
-* 203 - Max rule stack size reached due to complex ruleset (uncommon) 
-* 209 - Max number of command actions reached (uncommon)
-* 210 - Max number of add actions reached (uncommon)
-* 211 - Max number of eval actions reached (uncommon)
-* 212 - The event or fact has already been observed
-* 302 - Redis returned an error
+* MessageObservedException: The fact has already been asserted or the event has already been posted.
+* MessageNotHandledException: The event or fact was not captured because it did not match any rule.
 
 [top](reference.md#table-of-contents) 
 
@@ -321,16 +258,12 @@ with ruleset('expense'):
     def approved(c):
         print ('Approved subject: {0}'.format(c.m.subject))
         
-    @when_start
-    def start(host):
-        host.post('expense', { 'subject': 'approve'})
-        
-run_all()
+post('expense', { 'subject': 'approve'})
 ```  
 [top](reference.md#table-of-contents)  
 
 ### Pattern Matching
-durable_rules implements a simple pattern matching dialect. Similar to lua, it uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. Event processing is O(n) guaranteed (n being the size of the event).  
+durable_rules implements a simple pattern matching dialect. It uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. Event processing is O(n) guaranteed (n being the size of the event).  
 
 **Repetition**  
 \+ 1 or more repetitions  
@@ -361,17 +294,16 @@ from durable.lang import *
 with ruleset('match'):
     @when_all(m.url.matches('(https?://)?([0-9a-z.-]+)%.[a-z]{2,6}(/[A-z0-9_.-]+/?)*'))
     def approved(c):
-        print ('match url ->{0}'.format(c.m.url))
+        print ('match-> url {0}'.format(c.m.url))
 
-    @when_start
-    def start(host):
-        host.post('match', { 'url': 'https://github.com' })
-        host.post('match', { 'url': 'http://github.com/jruizgit/rul!es' })
-        host.post('match', { 'url': 'https://github.com/jruizgit/rules/reference.md' })
-        host.post('match', { 'url': '//rules'})
-        host.post('match', { 'url': 'https://github.c/jruizgit/rules' })
+def match_complete_callback(e, state):
+    print('match -> expected {0}'.format(e.message))
 
-run_all()
+post('match', { 'url': 'https://github.com' })
+post('match', { 'url': 'http://github.com/jruizgit/rul!es' }, match_complete_callback)
+post('match', { 'url': 'https://github.com/jruizgit/rules/reference.md' })
+post('match', { 'url': '//rules'}, match_complete_callback)
+post('match', { 'url': 'https://github.c/jruizgit/rules' }, match_complete_callback)
 ```  
 
 [top](reference.md#table-of-contents)  
@@ -394,16 +326,12 @@ with ruleset('strings'):
     @when_all(m.subject.imatches('.*hello.*'))
     def contains(c):
         print ('string contains hello (case insensitive) -> {0}'.format(c.m.subject))
-
-    @when_start
-    def start(host):
-        host.assert_fact('strings', { 'subject': 'HELLO world' })
-        host.assert_fact('strings', { 'subject': 'world hello' })
-        host.assert_fact('strings', { 'subject': 'hello hi' })
-        host.assert_fact('strings', { 'subject': 'has Hello string' })
-        host.assert_fact('strings', { 'subject': 'does not match' })
-
-run_all()
+    
+assert_fact('strings', { 'subject': 'HELLO world' })
+assert_fact('strings', { 'subject': 'world hello' })
+assert_fact('strings', { 'subject': 'hello hi' })
+assert_fact('strings', { 'subject': 'has Hello string' })
+assert_fact('strings', { 'subject': 'does not match' })
 ```  
 
 [top](reference.md#table-of-contents) 
@@ -429,13 +357,9 @@ with ruleset('risk'):
         print('               -> {0}'.format(c.second.amount))
         print('               -> {0}'.format(c.third.amount))
         
-    @when_start
-    def start(host):
-        host.post('risk', { 'amount': 50 })
-        host.post('risk', { 'amount': 200 })
-        host.post('risk', { 'amount': 251 })
-
-run_all()
+post('risk', { 'amount': 50 })
+post('risk', { 'amount': 200 })
+post('risk', { 'amount': 251 })
 ```  
 
 [top](reference.md#table-of-contents)  
@@ -461,14 +385,11 @@ with ruleset('expense'):
         else:
             print ('Approved {0} {1}'.format(c.third.subject, c.fourth.amount))
     
-    @when_start
-    def start(host):
-        host.post('expense', { 'subject': 'approve' })
-        host.post('expense', { 'amount': 1000 })
-        host.post('expense', { 'subject': 'jumbo' })
-        host.post('expense', { 'amount': 10000 })
 
-run_all()
+post('expense', { 'subject': 'approve' })
+post('expense', { 'amount': 1000 })
+post('expense', { 'subject': 'jumbo' })
+post('expense', { 'amount': 10000 })
 ```
 [top](reference.md#table-of-contents) 
 
@@ -488,12 +409,16 @@ with ruleset('risk'):
     def detected(c):
         print('fraud detected {0} {1} {2}'.format(c.first.t, c.third.t, c.fourth.t))
         
-    @when_start
-    def start(host):
-        host.post('risk', { 't': 'deposit' })
-        host.post('risk', { 't': 'withrawal' })
-        host.post('risk', { 't': 'chargeback' })
-        
+assert_fact('risk', { 't': 'deposit' })
+assert_fact('risk', { 't': 'withrawal' })
+assert_fact('risk', { 't': 'chargeback' })
+
+assert_fact('risk', { 'sid': 1, 't': 'balance' })
+assert_fact('risk', { 'sid': 1, 't': 'deposit' })
+assert_fact('risk', { 'sid': 1, 't': 'withrawal' })
+assert_fact('risk', { 'sid': 1, 't': 'chargeback' })
+retract_fact('risk', { 'sid': 1, 't': 'balance' })
+
 run_all()
 ```
 
@@ -512,16 +437,12 @@ with ruleset('expense'):
     def approved(c):
         print ('bill amount  ->{0}'.format(c.bill.invoice.amount))
         print ('account payment amount ->{0}'.format(c.account.payment.invoice.amount))
+            
+# one level of nesting
+post('expense', {'t': 'bill', 'invoice': {'amount': 100}})
         
-    @when_start
-    def start(host):
-        # one level of nesting
-        host.post('expense', {'t': 'bill', 'invoice': {'amount': 100}})
-        
-        #two levels of nesting
-        host.post('expense', {'t': 'account', 'payment': {'invoice': {'amount': 100}}})
-
-run_all()
+#two levels of nesting
+post('expense', {'t': 'account', 'payment': {'invoice': {'amount': 100}}})
 ```  
 [top](reference.md#table-of-contents)  
 
@@ -550,21 +471,17 @@ with ruleset('risk'):
     @when_all(m.payments.anyItem(item.allItems(item < 100)))
     def rule4(c):
         print('fraud 4 detected {0}'.format(c.m.payments))
-
-    @when_start
-    def start(host):
-        host.post('risk', {'payments': [ 150, 300, 450 ]})
-        host.post('risk', {'payments': [ { 'amount' : 200 }, { 'amount' : 300 }, { 'amount' : 450 } ]})
-        host.post('risk', {'cards': [ 'one card', 'two cards', 'three cards' ]})
-        host.post('risk', {'payments': [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]})  
         
-run_all()
+post('risk', {'payments': [ 150, 300, 450 ]})
+post('risk', {'payments': [ { 'amount' : 200 }, { 'amount' : 300 }, { 'amount' : 450 } ]})
+post('risk', {'cards': [ 'one card', 'two cards', 'three cards' ]})
+post('risk', {'payments': [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]}) 
 ```  
 [top](reference.md#table-of-contents)  
 
 ### Facts and Events as rvalues
 
-Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
+Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression.  
 
 ```python
 from durable.lang import *
@@ -582,14 +499,10 @@ with ruleset('risk'):
         print('fraud detected ->{0}'.format(c.first.amount))
         print('fraud detected ->{0}'.format(c.second.amount))
         
-    @when_start
-    def start(host):    
-        host.post('risk', { 'debit': 220, 'credit': 100 })
-        host.post('risk', { 'debit': 150, 'credit': 100 })
-        host.post('risk', { 'amount': 200 })
-        host.post('risk', { 'amount': 500 })
-        
-run_all()
+post('risk', { 'debit': 220, 'credit': 100 })
+post('risk', { 'debit': 150, 'credit': 100 })
+post('risk', { 'amount': 200 })
+post('risk', { 'amount': 500 })
 ```
 
 [top](reference.md#table-of-contents) 
@@ -614,14 +527,10 @@ with ruleset('attributes'):
     @when_all(pri(1), m.amount < 100)
     def third_detect(c):
         print('attributes P1 ->{0}'.format(c.m.amount))
-        
-    @when_start
-    def start(host):
-        host.assert_fact('attributes', { 'amount': 50 })
-        host.assert_fact('attributes', { 'amount': 150 })
-        host.assert_fact('attributes', { 'amount': 250 })
-        
-run_all()
+                
+assert_fact('attributes', { 'amount': 50 })
+assert_fact('attributes', { 'amount': 150 })
+assert_fact('attributes', { 'amount': 250 })
 ```
 [top](reference.md#table-of-contents)  
 ### Action Batches
@@ -647,17 +556,13 @@ with ruleset('expense'):
     def reject(c):
         print('rejected {0}'.format(c.m))
 
-    @when_start
-    def start(host):
-        host.post_batch('expense', [{ 'amount': 10 },
+post_batch('expense', [{ 'amount': 10 },
                                     { 'amount': 20 },
                                     { 'amount': 100 },
                                     { 'amount': 30 },
                                     { 'amount': 200 },
                                     { 'amount': 400 }])
-        host.assert_fact('expense', { 'review': True })
-
-run_all()
+assert_fact('expense', { 'review': True })
 ```
 [top](reference.md#table-of-contents)  
 ### Async Actions  
@@ -701,12 +606,8 @@ with ruleset('flow'):
 
         # overrides the 5 second default abandon timeout
         return 10
-
-    @when_start
-    def on_start(host):
-        host.patch_state('flow', { 'state': 'first' })
-        
-run_all()
+    
+update_state('flow', { 'state': 'first' })
 ```
 [top](reference.md#table-of-contents)  
 ### Unhandled Exceptions  
@@ -726,47 +627,10 @@ with ruleset('flow'):
     def second(c):
         print(c.s.exception)
         c.s.exception = None
-        
-    @when_start
-    def on_start(host):
-        host.post('flow', { 'action': 'start' })
-        
-run_all()
+            
+post('flow', { 'action': 'start' })
 ```
-[top](reference.md#table-of-contents)  
-
-### Fault Tolerance  
-Consequent execution is transactional and atomic. That is, if the process crashes in the middle of a consequent execution, no facts will be asserted nor retracted, no events will posted and the context state will not be changed. The consequent will be retried a few seconds after process restart.  
-
-```python
-from durable.lang import *
-import os
-
-with ruleset('flow'):
-    @when_all(m.status == 'start')
-    def start(c):
-        c.post({ 'status': 'next' })
-        print('start')
-
-    @when_all(m.status == 'next')
-    # the process will always exit here every time the action is run
-    # when restarting the process this action will be retried after a few seconds
-    def next(c):
-        c.post({ 'status': 'last' })
-        print('next')
-        os._exit(1)
-
-    @when_all(m.status == 'last')
-    def last(c):
-        print('last')
-        
-    @when_start
-    def on_start(host):
-        host.post('flow', { 'status': 'start' })
-        
-run_all()
-```
-[top](reference.md#table-of-contents)  
+[top](reference.md#table-of-contents)   
 
 ## Flow Structures
 ### Statechart
@@ -815,21 +679,17 @@ with statechart('expense'):
     # 'denied' and 'approved' are final states    
     state('denied')
     state('approved')
+        
+# events directed to default statechart instance
+post('expense', { 'subject': 'approve', 'amount': 100 });
+post('expense', { 'subject': 'approved' });
 
-    @when_start
-    def on_start(host):
-        # events directed to default statechart instance
-        host.post('expense', { 'subject': 'approve', 'amount': 100 });
-        host.post('expense', { 'subject': 'approved' });
-        
-        # events directed to statechart instance with id '1'
-        host.post('expense', { 'sid': 1, 'subject': 'approve', 'amount': 100 });
-        host.post('expense', { 'sid': 1, 'subject': 'denied' });
-        
-        # events directed to statechart instance with id '2'
-        host.post('expense', { 'sid': 2, 'subject': 'approve', 'amount': 10000 });
-        
-run_all()
+# events directed to statechart instance with id '1'
+post('expense', { 'sid': 1, 'subject': 'approve', 'amount': 100 });
+post('expense', { 'sid': 1, 'subject': 'denied' });
+
+# events directed to statechart instance with id '2'
+post('expense', { 'sid': 2, 'subject': 'approve', 'amount': 10000 });
 ```
 [top](reference.md#table-of-contents)  
 ### Nested States
@@ -862,19 +722,15 @@ with statechart('worker'):
 
     state('canceled')
 
-    @when_start
-    def start(host):
-        # will move the statechart to the 'work.process' sub-state
-        host.post('worker', { 'subject': 'enter' })
+# will move the statechart to the 'work.process' sub-state
+post('worker', { 'subject': 'enter' })
 
-        # will keep the statechart to the 'work.process' sub-state
-        host.post('worker', { 'subject': 'continue' })
-        host.post('worker', { 'subject': 'continue' })
+# will keep the statechart to the 'work.process' sub-state
+post('worker', { 'subject': 'continue' })
+post('worker', { 'subject': 'continue' })
 
-        # will move the statechart out of the work state
-        host.post('worker', { 'subject': 'cancel' })
-        
-run_all()
+# will move the statechart out of the work state
+post('worker', { 'subject': 'cancel' })
 ```
 [top](reference.md#table-of-contents)
 ### Flowchart
@@ -918,21 +774,17 @@ with flowchart('expense'):
         def denied(c):
             print('expense denied')
 
-    @when_start
-    def start(host):
-        # events for the default flowchart instance, approved after retry
-        host.post('expense', { 'subject': 'approve', 'amount': 100 })
-        host.post('expense', { 'subject': 'retry' })
-        host.post('expense', { 'subject': 'approved' })
+# events for the default flowchart instance, approved after retry
+post('expense', { 'subject': 'approve', 'amount': 100 })
+post('expense', { 'subject': 'retry' })
+post('expense', { 'subject': 'approved' })
 
-        # events for the flowchart instance '1', denied after first try
-        host.post('expense', { 'sid': 1, 'subject': 'approve', 'amount': 100})
-        host.post('expense', { 'sid': 1, 'subject': 'denied'})
+# events for the flowchart instance '1', denied after first try
+post('expense', { 'sid': 1, 'subject': 'approve', 'amount': 100})
+post('expense', { 'sid': 1, 'subject': 'denied'})
 
-        # event for the flowchart instance '2' immediately denied
-        host.post('expense', { 'sid': 2, 'subject': 'approve', 'amount': 10000})
-        
-run_all()
+# event for the flowchart instance '2' immediately denied
+post('expense', { 'sid': 2, 'subject': 'approve', 'amount': 10000})
 ```
 [top](reference.md#table-of-contents)  
 ### Timers
@@ -943,34 +795,20 @@ Events can be scheduled with timers. A timeout condition can be included in the 
 * cancel_timer: cancels ongoing timer.
 * timeout: used as an antecedent condition.
 
-In this example, the timer can be canceled by running the following command:  
-
-<sub>`curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:5000/timer/events`</sub>  
-
 ```python
 from durable.lang import *
 
 with ruleset('timer'):
-    # will trigger when MyTimer expires
-    @when_any(all(s.count == 0),
-              all(s.count < 5,
-                  timeout('MyTimer')))
-    def pulse(c):
-        c.s.count += 1
-        # MyTimer will expire in 5 seconds
+    
+    @when_all(m.subject == 'start')
+    def start(c):
         c.start_timer('MyTimer', 5)
-        print('pulse ->{0}'.format(datetime.datetime.now().strftime('%I:%M:%S%p')))
         
-    @when_all(m.cancel == True)
-    def cancel(c):
-        c.cancel_timer('MyTimer')
-        print('canceled timer')
+    @when_all(timeout('MyTimer'))
+    def timer(c):
+        print('timer timeout')
 
-    @when_start
-    def on_start(host):
-        host.patch_state('timer', { 'count': 0 })
-
-run_all()
+post('timer', { 'subject': 'start' })
 ```
 
 The example below uses a timer to detect higher event rate:  
@@ -999,23 +837,17 @@ with statechart('risk'):
     state('fraud')
     state('exit')
 
-    @when_start
-    def on_start(host):
-        # three events in a row will trigger the fraud rule
-        host.post('risk', { 'amount': 200 })
-        host.post('risk', { 'amount': 300 })
-        host.post('risk', { 'amount': 400 })
+# three events in a row will trigger the fraud rule
+post('risk', { 'amount': 200 })
+post('risk', { 'amount': 300 })
+post('risk', { 'amount': 400 })
 
-        # two events will exit after 5 seconds
-        host.post('risk', { 'sid': 1, 'amount': 500 })
-        host.post('risk', { 'sid': 1, 'amount': 600 })
-        
-run_all()
+# two events will exit after 5 seconds
+post('risk', { 'sid': 1, 'amount': 500 })
+post('risk', { 'sid': 1, 'amount': 600 })
 ```
 
-In this example a manual reset timer is used for measuring velocity. Try issuing the command below multiple times.
-
-<sub>`curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk/events`</sub>  
+In this example a manual reset timer is used for measuring velocity. 
 
 ```python
 from durable.lang import *
@@ -1044,16 +876,11 @@ with statechart('risk'):
             c.reset_timer('VelocityTimer')
             c.start_timer('VelocityTimer', 5, True)
 
-    @when_start
-    def on_start(host):
-        # the velocity will be 4 events in 5 seconds
-        host.post('risk', { 'amount': 200 })
-        host.post('risk', { 'amount': 300 })
-        host.post('risk', { 'amount': 50 })
-        host.post('risk', { 'amount': 500 })
-        host.post('risk', { 'amount': 600 })
-
-run_all()
+post('risk', { 'amount': 200 })
+post('risk', { 'amount': 300 })
+post('risk', { 'amount': 50 })
+post('risk', { 'amount': 500 })
+post('risk', { 'amount': 600 })
 ```
 
 [top](reference.md#table-of-contents)  
