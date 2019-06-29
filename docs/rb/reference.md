@@ -743,10 +743,6 @@ Durable.statechart :worker do
   end
 
   state :canceled
-  
-  when_start do
-    
-  end
 end
 # will move the statechart to the 'work.process' sub-state
 Durable.post :worker, { :subject => "enter" }
