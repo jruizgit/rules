@@ -1,19 +1,20 @@
 =============
 durable_rules
 =============  
+
 durable_rules is a polyglot micro-framework for real-time, consistent and scalable coordination of events. With durable_rules you can track and analyze information about things that happen (events) by combining data from multiple sources to infer more complicated circumstances.
 
-A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts and massive streams of events in real time. A simple, yet powerful meta-liguistic abstraction lets you define simple and complex rulesets as well as control flow structures such as flowcharts, statecharts, nested statecharts and time driven flows. 
+A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts and events in real time. A simple meta-linguistic abstraction lets you define simple and complex rulesets as well as control flow structures such as flowcharts, statecharts, nested statecharts and time driven flows. 
 
-The durable_rules core engine is implemented in C, which enables ultra fast rule evaluation as well as muti-language support. durable_rules relies on state of the art technologies: Werkzeug(http://werkzeug.pocoo.org/ is used to host rulesets). Inference state is cached using Redis(http://www.redis.io), This allows for fault tolerant execution and scale-out without giving up performance.
+The durable_rules core engine is implemented in C, which enables fast rule evaluation as well as muti-language support.  
 
-**Example 1**
+*In durable_rules V2, less is more: The Rete tree is fully evaluated in C. Thus, the framework is 5x to 10x faster (depending on the scenario) and does not require Redis. The programming model for posting events, asserting and retracting facts is synchronous and does not prescribe any web framework.*
 
-durable_rules is simple: to define a rule, all you need to do is describe the event or fact pattern to match (antecedent) and the action to take (consequent). In this example the rule can be triggered by posting `{"subject": "World"}` to url `http://localhost:5000/test/events`
+**Getting Started**
 
-Once the test is running, from a terminal type:   
+durable_rules is simple: to define a rule, all you need to do is describe the event or fact pattern to match (antecedent) and the action to take (consequent). 
 
-`curl -H "Content-type: application/json" -X POST -d '{"subject": "World"}' http://localhost:5000/test/events`
+To install the framework do: `pip install durable_rules`
 
 ::
 
@@ -26,9 +27,9 @@ Once the test is running, from a terminal type:
             # consequent
             print ('Hello {0}'.format(c.m.subject))
 
-    run_all()
+    post('test', { 'subject': 'World' })
 
-**Example 2**
+**Forward Inference**
 
 durable_rules super-power is the foward-chaining evaluation of rules. In other words, the repeated application of logical modus ponens(https://en.wikipedia.org/wiki/Modus_ponens) to a set of facts or observed events to derive a conclusion. The example below shows a set of rules applied to a small knowledge base (set of facts).
 
@@ -63,78 +64,20 @@ durable_rules super-power is the foward-chaining evaluation of rules. In other w
         def black(c):
             c.assert_fact({ 'subject': c.m.subject, 'predicate': 'is', 'object': 'black' })
 
-        @when_all(count(11), +m.subject)
+        @when_all(+m.subject)
         def output(c):
-            for f in c.m:
-                print ('Fact: {0} {1} {2}'.format(f.subject, f.predicate, f.object))
+            print('Fact: {0} {1} {2}'.format(c.m.subject, c.m.predicate, c.m.object))
 
-        @when_start
-        def start(host):
-            host.assert_fact('animal', { 'subject': 'Kermit', 'predicate': 'eats', 'object': 'flies' })
-            host.assert_fact('animal', { 'subject': 'Kermit', 'predicate': 'lives', 'object': 'water' })
-            host.assert_fact('animal', { 'subject': 'Greedy', 'predicate': 'eats', 'object': 'flies' })
-            host.assert_fact('animal', { 'subject': 'Greedy', 'predicate': 'lives', 'object': 'land' })
-            host.assert_fact('animal', { 'subject': 'Tweety', 'predicate': 'eats', 'object': 'worms' })
-            
-    run_all()
 
-**Example 3**
+    assert_fact('animal', { 'subject': 'Kermit', 'predicate': 'eats', 'object': 'flies' })
+    assert_fact('animal', { 'subject': 'Kermit', 'predicate': 'lives', 'object': 'water' })
+    assert_fact('animal', { 'subject': 'Greedy', 'predicate': 'eats', 'object': 'flies' })
+    assert_fact('animal', { 'subject': 'Greedy', 'predicate': 'lives', 'object': 'land' })
+    assert_fact('animal', { 'subject': 'Tweety', 'predicate': 'eats', 'object': 'worms' })    
 
-The combination of forward inference and durable_rules tolerance to failures on rule action dispatch, enables work coordination with data flow structures such as statecharts, nested states and flowcharts. 
-
-Once the test is running, from a terminal type:   
-
-`curl -H "Content-type: application/json" -X POST -d '{"subject": "approve", "amount": 100}' http://localhost:5000/expense/events`  
-
-`curl -H "Content-type: application/json" -X POST -d '{"subject": "approved"}' http://localhost:5000/expense/events`  
-
-`curl -H "Content-type: application/json" -X POST -d '{"subject": "approve", "amount": 100}' http://localhost:5000/expense/events/2`  
-
-`curl -H "Content-type: application/json" -X POST -d '{"subject": "denied"}' http://localhost:5000/expense/events/2`  
-
-::
-
-    from durable.lang import *
-
-    with statechart('expense'):
-        with state('input'):
-            @to('denied')
-            @when_all((m.subject == 'approve') & (m.amount > 1000))
-            def denied(c):
-                print ('expense denied')
-            
-            @to('pending')    
-            @when_all((m.subject == 'approve') & (m.amount <= 1000))
-            def request(c):
-                print ('requesting expense approval')
-            
-        with state('pending'):
-            @to('approved')
-            @when_all(m.subject == 'approved')
-            def approved(c):
-                print ('expense approved')
-                
-            @to('denied')
-            @when_all(m.subject == 'denied')
-            def denied(c):
-                print ('expense denied')
-            
-        state('denied')
-        state('approved')
-        
-    run_all()
-
-**Example 4**
+**Pattern Matching**
 
 durable_rules provides string pattern matching. Expressions are compiled down to a DFA, guaranteeing linear execution time in the order of single digit nano seconds per character (note: backtracking expressions are not supported).
-
-Once the test is running, from a terminal type:  
-
-`curl -H "Content-type: application/json" -X POST -d '{"subject": "375678956789765"}' http://localhost:5000/test/events`  
-
-`curl -H "Content-type: application/json" -X POST -d '{"subject": "4345634566789888"}' http://localhost:5000/test/events`  
-
-`curl -H "Content-type: application/json" -X POST -d '{"subject": "2228345634567898"}' http://localhost:5000/test/events` 
 
 ::
 
@@ -153,132 +96,33 @@ Once the test is running, from a terminal type:
         def mastercard(c):
             print ('Mastercard detected {0}'.format(c.m.subject))
 
-    run_all()
+    assert_fact('test', { 'subject': '375678956789765' })
+    assert_fact('test', { 'subject': '4345634566789888' })
+    assert_fact('test', { 'subject': '2228345634567898' })
 
-**Example 5**
+**Business Rules and Miss Manners**
 
-durable_rules can also be used to solve traditional Production Bussiness Rules problems. The example below is the 'Miss Manners' benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent guests are of opposite sex and share at least one hobby. 
+durable_rules can also be used to solve traditional Production Business Rules problems. This example is an industry benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent people are of opposite sex and share at least one hobby. 
 
-Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance nor altering the combinatorics required by the benchmark. For 128 guests, 438 facts, the execution time is less than 2 seconds. More details documented in this blog post (http://jruizblog.com/2015/07/20/miss-manners-and-waltzdb/).
+Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance nor altering the combinatorics required by the benchmark. For 128 guests, 438 facts, the execution time is 600 ms. 
 
-::
+https://github.com/jruizgit/rules/blob/v2/testpy/manners.py
 
-    from durable.lang import *
+_IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive_    
 
-    with statechart('miss_manners'):
-        with state('start'):
-            @to('assign')
-            @when_all(m.t == 'guest')
-            def assign_first_seating(c):
-                c.s.count = 0
-                c.s.g_count = 1000
-                c.assert_fact({'t': 'seating',
-                               'id': c.s.g_count,
-                               's_id': c.s.count, 
-                               'p_id': 0, 
-                               'path': True, 
-                               'left_seat': 1, 
-                               'left_guest_name': c.m.name,
-                               'right_seat': 1,
-                               'right_guest_name': c.m.name})
-                c.assert_fact({'t': 'path',
-                               'id': c.s.g_count + 1,
-                               'p_id': c.s.count, 
-                               'seat': 1, 
-                               'guest_name': c.m.name})
-                c.s.count += 1
-                c.s.g_count += 2
-                print('assign {0}'.format(c.m.name))
+**Image recognition and Waltzdb**
 
-        with state('assign'):
-            @to('make')
-            @when_all(c.seating << (m.t == 'seating') & 
-                                   (m.path == True),
-                      c.right_guest << (m.t == 'guest') & 
-                                       (m.name == c.seating.right_guest_name),
-                      c.left_guest << (m.t == 'guest') & 
-                                      (m.sex != c.right_guest.sex) & 
-                                      (m.hobby == c.right_guest.hobby),
-                      none((m.t == 'path') & 
-                           (m.p_id == c.seating.s_id) & 
-                           (m.guest_name == c.left_guest.name)),
-                      none((m.t == 'chosen') & 
-                           (m.c_id == c.seating.s_id) & 
-                           (m.guest_name == c.left_guest.name) & 
-                           (m.hobby == c.right_guest.hobby)))
-            def find_seating(c):
-                c.assert_fact({'t': 'seating',
-                               'id': c.s.g_count,
-                               's_id': c.s.count, 
-                               'p_id': c.seating.s_id, 
-                               'path': False, 
-                               'left_seat': c.seating.right_seat, 
-                               'left_guest_name': c.seating.right_guest_name,
-                               'right_seat': c.seating.right_seat + 1,
-                               'right_guest_name': c.left_guest.name})
-                c.assert_fact({'t': 'path',
-                               'id': c.s.g_count + 1,
-                               'p_id': c.s.count, 
-                               'seat': c.seating.right_seat + 1, 
-                               'guest_name': c.left_guest.name})
-                c.assert_fact({'t': 'chosen',
-                               'id': c.s.g_count + 2,
-                               'c_id': c.seating.s_id,
-                               'guest_name': c.left_guest.name,
-                               'hobby': c.right_guest.hobby})
-                c.s.count += 1
-                c.s.g_count += 3
+Waltzdb is a constraint propagation problem for image recognition: given a set of lines in a 2D space, the system needs to interpret the 3D depth of the image. The first part of the algorithm consists of identifying four types of junctions, then labeling the junctions following Huffman-Clowes notation. Pairs of adjacent junctions constraint each other’s edge labeling. So, after choosing the labeling for an initial junction, the second part of the algorithm iterates through the graph, propagating the labeling constraints by removing inconsistent labels.  
 
-        with state('make'):
-            @to('make')
-            @when_all(cap(1000),
-                      c.seating << (m.t == 'seating') & 
-                                   (m.path == False),
-                      c.path << (m.t == 'path') & 
-                                (m.p_id == c.seating.p_id),
-                      none((m.t == 'path') & 
-                           (m.p_id == c.seating.s_id) & 
-                           (m.guest_name == c.path.guest_name)))
-            def make_path(c):
-                for frame in c.m:
-                    c.assert_fact({'t': 'path',
-                                   'id': c.s.g_count,
-                                   'p_id': frame.seating.s_id, 
-                                   'seat': frame.path.seat, 
-                                   'guest_name': frame.path.guest_name})
-                    c.s.g_count += 1
-                
-            @to('check')
-            @when_all(pri(1), (m.t == 'seating') & (m.path == False))
-            def path_done(c):
-                c.retract_fact(c.m)
-                c.m.id = c.s.g_count
-                c.m.path = True
-                c.assert_fact(c.m)
-                c.s.g_count += 1
-                print('path sid: {0}, pid: {1}, left guest: {2}, right guest {3}'.format(c.m.s_id, c.m.p_id, c.m.left_guest_name, c.m.right_guest_name))
+In this case too, the benchmark flow structure is defined using a statechart to improve code readability. The benchmark requirements are not altered. The execution time, for the case of 4 regions 654 ms.
 
-        with state('check'):
-            @to('end')
-            @when_all(c.last_seat << m.t == 'last_seat', 
-                     (m.t == 'seating') & (m.right_seat == c.last_seat.seat))
-            def done(c):
-                print('end')
-            
-            to('assign')
+https://github.com/jruizgit/rules/blob/v2/testrb/waltzdb.rb 
 
-        state('end')
+_IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive_    
 
 **Reference Manual:**
 
-- Python(https://github.com/jruizgit/rules/blob/master/docs/py/reference.md/)
+- https://github.com/jruizgit/rules/blob/v2/docs/py/reference.md
 
-**Blog:** 
 
-- Miss Manners and Waltzdb (07/2015): http://jruizblog.com/2015/07/20/miss-manners-and-waltzdb/
-- Polyglot (03/2015):http://jruizblog.com/2015/03/02/polyglot/
-- Rete_D (02/2015):http://jruizblog.com/2015/02/23/rete_d/
-- Boosting Performance with C (08/2014): http://jruizblog.com/2014/08/19/boosting-performance-with-c/
-- Rete Meets Redis (02/2014):http://jruizblog.com/2014/02/02/rete-meets-redis/
-- From Expert Systems to Cloud Scale Event Processing (01/2014):http://jruizblog.com/2014/01/27/event-processing/
 
