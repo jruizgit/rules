@@ -1,7 +1,4 @@
 exports = module.exports = durableEngine = function () {
-    var bodyParser = require('body-parser');
-    var express = require('express');
-    var stat = require('node-static');
     var r = require('bindings')('rulesjs.node');
 
     class MessageNotHandledError extends Error {
