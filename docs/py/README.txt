@@ -8,13 +8,13 @@ A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts a
 
 The durable_rules core engine is implemented in C, which enables fast rule evaluation as well as muti-language support.  
 
-*In durable_rules V2, less is more: The Rete tree is fully evaluated in C. Thus, the framework is 5x to 10x faster (depending on the scenario) and does not require Redis. The programming model for posting events, asserting and retracting facts is synchronous and does not prescribe any web framework.*
+In durable_rules V2, less is more: The Rete tree is fully evaluated in C. Thus, the framework is 5x to 10x faster (depending on the scenario) and does not require Redis. The programming model for posting events, asserting and retracting facts is synchronous and does not prescribe any web framework.
 
 **Getting Started**
 
-durable_rules is simple: to define a rule, all you need to do is describe the event or fact pattern to match (antecedent) and the action to take (consequent). 
+durable_rules is simple: to define a rule, all you need to do is describe the event or fact pattern to match (antecedent) and the action to take (consequent).  
 
-To install the framework do: `pip install durable_rules`
+To install the framework do: `pip install durable_rules`  
 
 ::
 
@@ -31,7 +31,7 @@ To install the framework do: `pip install durable_rules`
 
 **Forward Inference**
 
-durable_rules super-power is the foward-chaining evaluation of rules. In other words, the repeated application of logical modus ponens(https://en.wikipedia.org/wiki/Modus_ponens) to a set of facts or observed events to derive a conclusion. The example below shows a set of rules applied to a small knowledge base (set of facts).
+durable_rules super-power is the foward-chaining evaluation of rules. In other words, the repeated application of logical modus ponens(https://en.wikipedia.org/wiki/Modus_ponens) to a set of facts or observed events to derive a conclusion. The example below shows a set of rules applied to a small knowledge base (set of facts).  
 
 ::
 
@@ -77,7 +77,7 @@ durable_rules super-power is the foward-chaining evaluation of rules. In other w
 
 **Pattern Matching**
 
-durable_rules provides string pattern matching. Expressions are compiled down to a DFA, guaranteeing linear execution time in the order of single digit nano seconds per character (note: backtracking expressions are not supported).
+durable_rules provides string pattern matching. Expressions are compiled down to a DFA, guaranteeing linear execution time in the order of single digit nano seconds per character (note: backtracking expressions are not supported).  
 
 ::
 
@@ -102,27 +102,27 @@ durable_rules provides string pattern matching. Expressions are compiled down to
 
 **Business Rules and Miss Manners**
 
-durable_rules can also be used to solve traditional Production Business Rules problems. This example is an industry benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent people are of opposite sex and share at least one hobby. 
+durable_rules can also be used to solve traditional Production Business Rules problems. This example is an industry benchmark. Miss Manners has decided to throw a party. She wants to seat her guests such that adjacent people are of opposite sex and share at least one hobby.  
 
-Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance nor altering the combinatorics required by the benchmark. For 128 guests, 438 facts, the execution time is 600 ms. 
+Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance nor altering the combinatorics required by the benchmark. For 128 guests, 438 facts, the execution time is 600 ms.  
 
-https://github.com/jruizgit/rules/blob/v2/testpy/manners.py
+https://github.com/jruizgit/rules/blob/v2/testpy/manners.py  
 
-_IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive_    
+IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive  
 
 **Image recognition and Waltzdb**
 
-Waltzdb is a constraint propagation problem for image recognition: given a set of lines in a 2D space, the system needs to interpret the 3D depth of the image. The first part of the algorithm consists of identifying four types of junctions, then labeling the junctions following Huffman-Clowes notation. Pairs of adjacent junctions constraint each other’s edge labeling. So, after choosing the labeling for an initial junction, the second part of the algorithm iterates through the graph, propagating the labeling constraints by removing inconsistent labels.  
+Waltzdb is a constraint propagation problem for image recognition: given a set of lines in a 2D space, the system needs to interpret the 3D depth of the image. The first part of the algorithm consists of identifying four types of junctions, then labeling the junctions following Huffman-Clowes notation. Pairs of adjacent junctions constraint each other’s edge labeling. So, after choosing the labeling for an initial junction, the second part of the algorithm iterates through the graph, propagating the labeling constraints by removing inconsistent labels.   
 
-In this case too, the benchmark flow structure is defined using a statechart to improve code readability. The benchmark requirements are not altered. The execution time, for the case of 4 regions 654 ms.
+In this case too, the benchmark flow structure is defined using a statechart to improve code readability. The benchmark requirements are not altered. The execution time, for the case of 4 regions 654 ms.  
 
-https://github.com/jruizgit/rules/blob/v2/testrb/waltzdb.rb 
+https://github.com/jruizgit/rules/blob/v2/testrb/waltzdb.rb  
 
-_IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive_    
+IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive    
 
 **Reference Manual:**
 
-- https://github.com/jruizgit/rules/blob/v2/docs/py/reference.md
+https://github.com/jruizgit/rules/blob/v2/docs/py/reference.md  
 
 
 

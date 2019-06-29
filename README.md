@@ -1,7 +1,7 @@
 
 # durable_rules    
 #### for real time analytics (a Ruby, Python and Node.js Rules Engine)
-[![Build Status](https://travis-ci.org/jruizgit/rules.svg?branch=master)](https://travis-ci.org/jruizgit/rules)
+[![Build Status](https://travis-ci.org/jruizgit/rules.svg?branch=v2)](https://travis-ci.org/jruizgit/rules)
 [![Gem Version](https://badge.fury.io/rb/durable_rules.svg)](https://badge.fury.io/rb/durable_rules)
 [![npm version](https://badge.fury.io/js/durable.svg)](https://badge.fury.io/js/durable)
 [![PyPI version](https://badge.fury.io/py/durable_rules.svg)](https://badge.fury.io/py/durable_rules)  
