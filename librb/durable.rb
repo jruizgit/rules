@@ -1,49 +1,71 @@
 require_relative "engine"
-require_relative "interface"
 
 module Durable
   @@rulesets = {}
-  @@start_blocks = []
+  @@main_host = nil
 
-  def self.create_queue(ruleset_name, database = {:host => 'localhost', :port => 6379, :password => nil, :db => 0}, state_cache_size = 1024)
-    Engine::Queue.new ruleset_name, database, state_cache_size
+  def self.get_host()
+    if !@@main_host
+      @@main_host = Engine::Host.new
+    end
+
+    for name, ruleset in @@rulesets
+      @@main_host.set_ruleset name, ruleset
+    end
+
+    @@rulesets = {}
+    @@main_host 
   end
 
-  def self.create_host(databases = [{:host => 'localhost', :port => 6379, :password => nil, :db => 0}], state_cache_size = 1024)
-    main_host = Engine::Host.new @@rulesets, databases, state_cache_size
-    for block in @@start_blocks
-      main_host.instance_exec main_host, &block
-    end
-    main_host.start!
-    main_host
+  def self.post(ruleset_name, message, complete = nil)
+    self.get_host().post ruleset_name, message, complete
+  end
+     
+  def self.post_batch(ruleset_name, messages, complete = nil)
+    self.get_host().post_batch ruleset_name, messages, complete
   end
 
-  def self.run_all(databases = [{:host => 'localhost', :port => 6379, :password => nil, :db => 0}], host_name = nil, port = nil, run = nil, state_cache_size = 1024)
-    main_host = self.create_host databases, state_cache_size
-    Interface::Application.set_host main_host
-    if run
-      run(main_host, Interface::Application)
-    else
-      Interface::Application.run!
-    end
+  def self.assert(ruleset_name, fact, complete = nil)
+    self.get_host().assert ruleset_name, fact, complete
+  end
+
+  def self.assert_facts(ruleset_name, facts, complete = nil)
+    self.get_host().assert_facts ruleset_name, facts, complete
+  end
+  
+  def self.retract(ruleset_name, fact, complete = nil)
+    self.get_host().retract ruleset_name, fact, complete
+  end
+    
+  def self.retract_facts(ruleset_name, facts, complete = nil)
+    self.get_host().retract_facts ruleset_name, facts, complete
+  end
+  
+  def self.update_state(ruleset_name, state, complete = nil)
+    self.get_host().update_state ruleset_name, state, complete
+  end
+
+  def self.get_state(ruleset_name, sid)
+    self.get_host().get_state ruleset_name, sid
+  end
+
+  def self.delete_state(ruleset_name, sid)
+    self.get_host().delete_state ruleset_name, sid
   end
 
   def self.ruleset(name, &block) 
     ruleset = Ruleset.new name, block
     @@rulesets[name] = ruleset.rules
-    @@start_blocks << ruleset.start if ruleset.start
   end
 
   def self.statechart(name, &block)
     statechart = Statechart.new name, block
     @@rulesets[name.to_s + "$state"] = statechart.states
-    @@start_blocks << statechart.start if statechart.start
   end
 
   def self.flowchart(name, &block)
     flowchart = Flowchart.new name, block
     @@rulesets[name.to_s + "$flow"] = flowchart.stages
-    @@start_blocks << flowchart.start if flowchart.start
   end
 
   class Arithmetic
@@ -454,14 +476,10 @@ module Durable
     end
 
     def timeout(name)
-      expression = Expression.new(:$m, :$t)
-      expression == name
+      all(c.base = Expression.new(:$m, "$timerName") == name, 
+          c.timeout = Expression.new(:$m, "$time") >= Arithmetic.new(:base, "$baseTime"))
     end
     
-    def sref(sid = nil)
-      Arithmetic.new :$s, nil, sid
-    end
-
     protected
 
     def get_options(*args)

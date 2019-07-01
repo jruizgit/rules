@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'durable_rules'
-  s.version     = '0.34.57'
+  s.version     = '2.00.002'
   s.summary     = "for real time analytics (a Ruby Rules Engine)"
   s.description = "A lightweight library for real-time, consistent and scalable coordination of events."
   s.authors     = ["Jesus Ruiz"]
@@ -26,5 +26,4 @@ Gem::Specification.new do |s|
   s.add_development_dependency "rake", "10.4.2"
   s.add_development_dependency "rake-compiler", "~> 0.9.5"
   s.add_runtime_dependency "timers", "~> 4.0"
-  s.add_runtime_dependency "sinatra", "~> 1.4"
 end

@@ -27,15 +27,7 @@ class install_lib(_install_lib.install_lib):
         if self.distribution.has_ext_modules():
           self.run_command('build_ext')
 
-if (platform == 'win32'):
-  rules_lib = ('rules_py', 
-             {'sources': ['deps/Win32_Interop/%s' % src for src in ('win32_error.c', 'win32_ansi.c', 'win32_fdapi.cpp', 'win32_fdapi_crt.cpp', 'win32_rfdmap.cpp', 'win32_variadic_functor.cpp', 'win32_common.cpp')] + 
-             ['deps/hiredis_win/%s.c' % src for src in ('hiredis', 'net', 'sds')] + 
-             ['src/rules/%s.c' % src for src in ('json', 'net', 'rete', 'state', 'events', 'regex')]})
-else:
-  rules_lib = ('rules_py', 
-             {'sources': ['deps/hiredis/%s.c' % src for src in ('hiredis', 'net', 'sds', 'read')] + 
-             ['src/rules/%s.c' % src for src in ('json', 'net', 'rete', 'state', 'events', 'regex')]})
+rules_lib = ('rules_py', {'sources': ['src/rules/%s.c' % src for src in ('json', 'rete', 'state', 'events', 'regex')]})
 
 rules = Extension('rules',
                   sources = ['src/rulespy/rules.c'],
@@ -47,7 +39,7 @@ with open(path.join(here, 'README.txt'), encoding='utf-8') as f:
 
 setup (
     name = 'durable_rules',
-    version = '0.33.134',
+    version = '2.00.002',
     description = 'for real time analytics (a Python Rules Engine)',
     long_description=long_description,
     url='https://github.com/jruizgit/rules',
@@ -63,11 +55,12 @@ setup (
         'Programming Language :: C',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
     ],
     keywords='rules engine rete forward chaining event stream state machine workflow streaming analytics',
-    install_requires=['werkzeug'],
     packages = ['durable'],
     package_dir = {'': 'libpy'},
     libraries = [rules_lib],

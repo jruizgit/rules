@@ -6,6 +6,7 @@ exports = module.exports = durableEngine = function () {
     var dh = d.host();
     var dc = d.closure();
 
+   
     var omap = {
         '+': 'add',
         '==': 'eq',
@@ -686,6 +687,7 @@ exports = module.exports = durableEngine = function () {
                 }
             }
         });
+
         return func;
     }
 
@@ -1022,13 +1024,6 @@ exports = module.exports = durableEngine = function () {
 
             var localLeft = left;
             var localType = type;
-            if (type === '$sref') {
-                localType = '$s';
-                if (sid) {
-                    localLeft = {name: left, id: sid};
-                }
-            }
-
             var newDefinition = {};
             if (!op) {
                 newDefinition[localType] = localLeft;
@@ -1298,7 +1293,7 @@ exports = module.exports = durableEngine = function () {
                 }
 
                 expDefinition = newArray[i].define(refName);  
-    
+
                 if (expDefinition[refName + '$all']) {
                     expObject[refName + '$all'] = expDefinition[refName + '$all'];
                 } else if (expDefinition[refName + '$any']) {
@@ -1415,19 +1410,10 @@ exports = module.exports = durableEngine = function () {
     };
 
     var timeout = function(name) {
-        return m.$t.eq(name);
+        return all(c.base = m.$timerName.eq(name), 
+                   c.timeout = m.$time.gte(c.base.$baseTime));
     };
 
-    var sref = function(sid) {
-        return r.createProxy(
-            function(name) {
-                return term('$sref', name, sid);
-            },
-            function(name, value) {
-                return;
-            }
-        )
-    };
 
     var extend = function (obj) {        
         obj.add = add;
@@ -1521,8 +1507,7 @@ exports = module.exports = durableEngine = function () {
         }
 
         extend(that);
-        rulesets.push(that);
-
+        
         for (var i = 1; i < arguments.length; ++i) {
             if (typeof(arguments[i]) === 'object') {
                 rules.push(rule(arguments[i]));
@@ -1549,12 +1534,16 @@ exports = module.exports = durableEngine = function () {
             }   
         }
 
+        var definitions = {};
+        definitions[that.getName()] = that.define();
+        getHost().registerRulesets(definitions);
         return that;
     };
 
     var stateTrigger = function (stateName, run, parent, triggerObject) {
         var that = {};
         var condition;
+        var pri;
 
         that.getName = function() {
             return stateName;
@@ -1573,9 +1562,17 @@ exports = module.exports = durableEngine = function () {
         that.define = function(name)  {
             if (!condition) {
                 if (!run) {
-                    return {to: stateName};
+                    if (pri) {
+                        return {to: stateName, pri: pri}; 
+                    } else {
+                        return {to: stateName};
+                    }
                 } else {
-                    return {to: stateName, run: run};
+                    if (pri) {
+                        return {to: stateName, pri: triggerObject.pri, run: run};
+                    } else {
+                        return {to: stateName, run: run};
+                    }
                 }
             } 
 
@@ -1586,6 +1583,10 @@ exports = module.exports = durableEngine = function () {
 
         if (triggerObject && (triggerObject.whenAll || triggerObject.whenAny)) {
             condition = rule(triggerObject);
+        }
+
+        if (triggerObject && typeof triggerObject.pri !==  "undefined") {
+            pri = triggerObject.pri;
         }
 
         return that;
@@ -1693,7 +1694,6 @@ exports = module.exports = durableEngine = function () {
         }
 
         extend(that);
-        rulesets.push(that);
         if (stateObjects) {
             if (typeof(stateObjects) === 'function') {
                 var ast = ep.parse('var fn = ' + stateObjects);
@@ -1719,6 +1719,10 @@ exports = module.exports = durableEngine = function () {
               
         }
         
+        
+        var definitions = {};
+        definitions[that.getName()] = that.define();
+        getHost().registerRulesets(definitions);
         return that;
     };
 
@@ -1848,7 +1852,6 @@ exports = module.exports = durableEngine = function () {
         }
 
         extend(that);
-        rulesets.push(that);
         if (stageObjects) {
             if (typeof(stageObjects) === 'function') {
                 var ast = ep.parse('var fn = ' + stageObjects);
@@ -1869,42 +1872,57 @@ exports = module.exports = durableEngine = function () {
             } 
         }
 
+        var definitions = {};
+        definitions[that.getName()] = that.define();
+        getHost().registerRulesets(definitions);
         return that;
     };
 
-    var rulesets = [];
-
-    var createHost = function(databases, stateCacheSize) {
-        var definitions = {};
-        for (var i = 0; i < rulesets.length; ++ i) {
-            definitions[rulesets[i].getName()] = rulesets[i].define(); 
+    var host;
+    var getHost = function() {
+        if (host) {
+            return host;
         }
-
-        var rulesHost = d.host(databases, stateCacheSize);
-        // console.log(JSON.stringify(definitions, 2, 2));
-        rulesHost.registerRulesets(null, definitions);
-        for (var i = 0; i < rulesets.length; ++ i) {
-            if (rulesets[i].getStart()) {
-                rulesets[i].getStart()(rulesHost);
-            }
-        }
-
-        return rulesHost;
+        
+        host = d.host();
+        return host;
     } 
 
-    var createQueue = function(rulesetName, database, stateCacheSize) {
-        return d.queue(rulesetName, database, stateCacheSize);
+    var postEvents = function (rulesetName, messages, complete) { 
+        return getHost().postEvents(rulesetName, messages, complete);
     }
 
-    var runAll = function(databases, port, basePath, run, stateCacheSize) {
-        var rulesHost = createHost(databases, stateCacheSize);
-        var app = d.application(rulesHost, port, basePath);
-        if (run) {
-            run(rulesHost, app);
-        } else {
-            app.run(); 
-        }
+    var post = function (rulesetName, message, complete) {
+        return getHost().post(rulesetName, message, complete);
+    }
+
+    var assertFacts = function (rulesetName, facts, complete) { 
+        return getHost().assertFacts(rulesetName, facts, complete);
+    }
+
+    var assert = function (rulesetName, fact, complete) { 
+        return getHost().assert(rulesetName, fact, complete);
+    }           
+
+    var retractFacts = function (rulesetName, facts, complete) { 
+        return getHost().retractFacts(rulesetName, facts, complete);
     } 
+     
+    var retract = function (rulesetName, fact, complete) { 
+        return getHost().retract(rulesetName, fact, complete);
+    }  
+
+    var updateState = function (rulesetName, state, complete) { 
+        getHost().updateState(rulesetName, state, complete);
+    }
+
+    var getState = function (rulesetName, sid) { 
+        return getHost().getState(rulesetName, sid);
+    }
+
+    var deleteState = function (rulesetName, sid) { 
+        getHost().deleteState(rulesetName, sid);
+    }
 
     var ex = {
         state: state,
@@ -1912,9 +1930,17 @@ exports = module.exports = durableEngine = function () {
         stage: stage,
         flowchart: flowchart,
         ruleset: ruleset,
-        createHost: createHost,
-        createQueue: createQueue,
-        runAll: runAll,
+        postEvents: postEvents,
+        post: post,
+        assertFacts: assertFacts,
+        assert: assert,
+        retractFacts: retractFacts,
+        retract: retract,
+        updateState: updateState,
+        getState: getState,
+        deleteState: deleteState,
+        getHost: getHost
+
     }; 
     extend(ex);
 

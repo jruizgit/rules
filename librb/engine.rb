@@ -4,57 +4,27 @@ require_relative "../src/rulesrb/rules"
 
 module Engine
 
-  class Closure_Queue
-    attr_reader :_queued_posts, :_queued_asserts, :_queued_retracts
-
-    def initialize()
-      @_queued_posts = []
-      @_queued_asserts = []
-      @_queued_retracts = []
+  class MessageNotHandledError < StandardError
+    def initialize(message)
+      super("Could not handle message: #{JSON.generate(message)}")
     end
+  end
 
-    def post(message)
-      if message.kind_of? Content
-        message = message._d
-      end
-
-      @_queued_posts << message
-    end
-
-    def assert(message)
-      if message.kind_of? Content
-        message = message._d
-      end
-
-      @_queued_asserts << message
-    end
-
-    def retract(message)
-      if message.kind_of? Content
-        message = message._d
-      end
-
-      @_queued_retracts << message
+  class MessageObservedError < StandardError
+    def initialize(message)
+      super("Message has already been observed: #{JSON.generate(message)}")
     end
   end
 
   class Closure
-    attr_reader :host, :handle, :ruleset_name, :_timers, :_cancelled_timers, :_branches, :_messages, :_queues, :_facts, :_retract, :_deletes, :_deleted
+    attr_reader :host, :handle, :_timers, :_cancelled_timers, :_messages, :_facts, :_retract, :_deleted
     attr_accessor :s
 
-    def initialize(host, state, message, handle, ruleset_name)
+    def initialize(host, ruleset, state, message, handle)
       @s = Content.new(state)
-      @ruleset_name = ruleset_name
       @handle = handle
       @host = host
-      @_timers = {}
-      @_cancelled_timers = {}
-      @_messages = {}
-      @_queues = {}
-      @_deletes = {}
-      @_branches = {}
-      @_facts = {}
-      @_retract = {}
+      @_ruleset = ruleset
       @_start_time = Time.now
       @_completed = false
       @_deleted = false
@@ -69,61 +39,86 @@ module Engine
           @m << Content.new(one_message)
         end
       end
+
+      if !s.sid
+        s.sid = "0" 
+      end
     end
 
     def post(ruleset_name, message = nil)
-      if !message
+      if message
+        if message.kind_of? Content
+          message = message._d
+        end
+
+        if !(message.key? :sid) && !(message.key? "sid")
+          message[:sid] = @s.sid
+        end
+ 
+        @host.assert_event ruleset_name, message
+      else
         message = ruleset_name
-        ruleset_name = @ruleset_name
-      end
+        if message.kind_of? Content
+          message = message._d
+        end
 
-      if message.kind_of? Content
-        message = message._d
+        if !(message.key? :sid) && !(message.key? "sid")
+          message[:sid] = @s.sid
+        end
+ 
+        @_ruleset.assert_event message
       end
+    end
 
-      if !(message.key? :sid) && !(message.key? "sid")
-        message[:sid] = @s.sid
-      end
+    def assert(ruleset_name, fact = nil)
+      if fact
+        if fact.kind_of? Content
+          fact = fact._d
+        end
 
-      message_list = []
-      if @_messages.key? ruleset_name
-        message_list = @_messages[ruleset_name]
+        if !(fact.key? :sid) && !(fact.key? "sid")
+          fact[:sid] = @s.sid
+        end
+ 
+        @host.assert_fact ruleset_name, fact
       else
-        @_messages[ruleset_name] = message_list
+        fact = ruleset_name
+        if fact.kind_of? Content
+          fact = fact._d
+        end
+
+        if !(fact.key? :sid) && !(fact.key? "sid")
+          fact[:sid] = @s.sid
+        end
+
+        @_ruleset.assert_fact fact
       end
-      message_list << message
     end
 
-    def delete(ruleset_name = nil, sid = nil)
-      if !ruleset_name
-        ruleset_name = @ruleset_name
-      end
+    def retract(ruleset_name, fact = nil)
+      if fact
+        if fact.kind_of? Content
+          fact = fact._d
+        end
 
-      if !sid
-        sid = @s.sid
-      end
-
-      if (ruleset_name == @ruleset_name) && (sid == @s.sid)
-        @_deleted = true
-      end
-
-      sid_list = []
-      if @_deletes.key? ruleset_name
-        sid_list = @_deletes[ruleset_name]
+        if !(fact.key? :sid) && !(fact.key? "sid")
+          fact[:sid] = @s.sid
+        end
+ 
+        @host.retract_fact ruleset_name, fact
       else
-        @_deletes[ruleset_name] = sid_list
+        fact = ruleset_name
+        if fact.kind_of? Content
+          fact = fact._d
+        end
+
+        if !(fact.key? :sid) && !(fact.key? "sid")
+          fact[:sid] = @s.sid
+        end
+        @_ruleset.retract_fact fact
       end
-      sid_list << sid
     end
-
-    def get_queue(ruleset_name)
-      if !@_queues.key? ruleset_name
-        @_queues[ruleset_name] = Closure_Queue.new
-      end
-
-      @_queues[ruleset_name]
-    end
-
+    
     def start_timer(timer_name, duration, manual_reset = false)
       if manual_reset
         manual_reset = 1
@@ -131,85 +126,22 @@ module Engine
         manual_reset = 0
       end
 
-      if @_timers.key? timer_name
-        raise ArgumentError, "Timer with name #{timer_name} already added"
-      else
-        timer = {:sid => @s.sid, :$t => timer_name}
-        @_timers[timer_id] = [timer, duration, manual_reset]
-      end
+      @_ruleset.start_timer @s.sid, timer_name, duration, manual_reset
     end
 
     def cancel_timer(timer_name)
-      if @_cancelled_timers.key? timer_name
-        raise ArgumentError, "Timer with id #{timer_name} already cancelled"
-      else
-        @_cancelled_timers[timer_name] = true
-      end
-    end
-
-    def reset_timer(timer_name)
-      if @m.kind_of? Hash 
-        retract_timer timer_name, @m
-      else
-        for m in @m do
-          return true if retract_timer(timer_name, m)
-        end
-
-        return false
-      end
-    end
-
-    def assert(ruleset_name, fact = nil)
-      if !fact
-        fact = ruleset_name
-        ruleset_name = @ruleset_name
-      end
-
-      if fact.kind_of? Content
-        fact = fact._d.dup
-      end
-
-      if !(fact.key? :sid) && !(fact.key? "sid")
-        fact[:sid] = @s.sid
-      end
-
-      fact_list = []
-      if @_facts.key? ruleset_name
-        fact_list = @_facts[ruleset_name]
-      else
-        @_facts[ruleset_name] = fact_list
-      end
-      fact_list << fact
-    end
-
-    def retract(ruleset_name, fact = nil)
-      if !fact
-        fact = ruleset_name
-        ruleset_name = @ruleset_name
-      end
-
-      if fact.kind_of? Content
-        fact = fact._d.dup
-      end
-
-      if !(fact.key? :sid) && !(fact.key? "sid")
-        fact[:sid] = @s.sid
-      end
-
-      fact_list = []
-      if @_retract.key? ruleset_name
-        fact_list = @_retract[ruleset_name]
-      else
-        @_retract[ruleset_name] = fact_list
-      end
-      fact_list << fact
+      @_ruleset.cancel_timer @s.sid, timer_name
     end
 
     def renew_action_lease()
       if Time.now - @_start_time < 10000
         @_start_time = Time.now
-        @host.renew_action_lease @ruleset_name, @s.sid
+        @_ruleset.renew_action_lease @s.sid
       end
+    end
+
+    def delete()
+      @_deleted = true
     end
 
     def has_completed()
@@ -222,22 +154,6 @@ module Engine
     end
 
     private
-
-    def retract_timer(timer_name, message) 
-      if ((message.key? :$t) && (message[:$t] == timer_name)) ||
-         ((message.key? '$t') && (message['$t'] == timer_name))
-         retract(message)
-         return true
-      end
-
-      for property_name, property_value in message do
-        if (property_value.kind_of? Hash) && retract_timer(timer_name, property_value)
-          return true
-        end
-      end
-
-      return false
-    end
 
     def handle_property(name, value=nil)
       name = name.to_s
@@ -258,7 +174,6 @@ module Engine
     alias method_missing handle_property
 
   end
-
 
   class Content
     attr_reader :_d
@@ -331,7 +246,7 @@ module Engine
         begin
           @func.call c
         rescue Exception => e
-          c.s.exception = e.to_s
+          c.s.exception = "#{e.to_s}, #{e.backtrace}"
         end
 
         if @next
@@ -409,7 +324,7 @@ module Engine
   class Ruleset
     attr_reader :definition
 
-    def initialize(name, host, ruleset_definition, state_cache_size)
+    def initialize(name, host, ruleset_definition)
       @actions = {}
       @name = name
       @host = host
@@ -435,102 +350,45 @@ module Engine
         end
       end
 
-      @handle = Rules.create_ruleset name, JSON.generate(ruleset_definition), state_cache_size
+      @handle = Rules.create_ruleset name, JSON.generate(ruleset_definition)
       @definition = ruleset_definition
     end
 
-    def bind(databases)
-      for db in databases do
-        if db.kind_of? String
-          Rules.bind_ruleset @handle, db, 0, nil, 0
-        else
-          if !db.key? :password
-            db[:password] = nil
-          end
-
-          if !db.key? :db
-            db[:db] = 0
-          end
-          
-          Rules.bind_ruleset @handle, db[:host], db[:port], db[:password], db[:db]
-        end
-      end
-    end
-
     def assert_event(message)
-      Rules.assert_event @handle, JSON.generate(message)
-    end
-
-    def queue_assert_event(sid, ruleset_name, message)
-      Rules.queue_assert_event @handle, sid.to_s, ruleset_name.to_s, JSON.generate(message)
-    end
-
-    def start_assert_event(message)
-      Rules.start_assert_event @handle, JSON.generate(message)
+      handle_result Rules.assert_event(@handle, JSON.generate(message)), message
     end
 
     def assert_events(messages)
-      Rules.assert_events @handle, JSON.generate(messages)
+      handle_result Rules.assert_events(@handle, JSON.generate(messages)), messages
     end
 
-    def start_assert_events(messages)
-      Rules.start_assert_events @handle, JSON.generate(messages)
+    def assert_fact(fact)
+      handle_result Rules.assert_fact(@handle, JSON.generate(fact)), fact
+    end
+
+    def assert_facts(facts)
+      handle_result Rules.assert_facts(@handle, JSON.generate(facts)), facts
+    end
+
+    def retract_fact(fact)
+      handle_result Rules.retract_fact(@handle, JSON.generate(fact)), fact
+    end
+
+    def retract_facts(facts)
+      handle_result Rules.retract_facts(@handle, JSON.generate(facts)), facts
     end
 
     def start_timer(sid, timer, timer_duration, manual_reset)
-      Rules.start_timer @handle, sid.to_s, timer_duration, manual_reset, JSON.generate(timer)
+      Rules.start_timer @handle, sid.to_s, timer_duration, manual_reset, timer
     end
 
     def cancel_timer(sid, timer_name)
       Rules.cancel_timer @handle, sid.to_s, timer_name.to_s
     end
 
-    def assert_fact(fact)
-      Rules.assert_fact @handle, JSON.generate(fact)
-    end
-
-    def queue_assert_fact(sid, ruleset_name, message)
-      Rules.queue_assert_fact @handle, sid.to_s, ruleset_name.to_s, JSON.generate(message)
-    end
-
-    def start_assert_fact(fact)
-      Rules.start_assert_fact @handle, JSON.generate(fact)
-    end
-
-    def assert_facts(facts)
-      Rules.assert_facts @handle, JSON.generate(facts)
-    end
-
-    def start_assert_facts(facts)
-      Rules.start_assert_facts @handle, JSON.generate(facts)
-    end
-
-    def retract_fact(fact)
-      Rules.retract_fact @handle, JSON.generate(fact)
-    end
-
-    def queue_retract_fact(sid, ruleset_name, message)
-      Rules.queue_retract_fact @handle, sid.to_s, ruleset_name.to_s, JSON.generate(message)
-    end
-
-    def start_retract_fact(fact)
-      Rules.start_retract_fact @handle, JSON.generate(fact)
-    end
-
-    def retract_facts(facts)
-      Rules.assert_facts @handle, JSON.generate(facts)
-    end
-
-    def start_retract_facts(facts)
-      Rules.start_retract_facts @handle, JSON.generate(facts)
-    end
-
-    def assert_state(state)
-      if state.key? :sid 
-        Rules.assert_state @handle, state[:sid].to_s, JSON.generate(state)
-      else
-        Rules.assert_state @handle, state["sid"].to_s, JSON.generate(state)
-      end
+    def update_state(state)
+      state["$s"] = 1
+      Rules.update_state @handle, JSON.generate(state)
     end
 
     def get_state(sid)
@@ -545,70 +403,68 @@ module Engine
       Rules.renew_action_lease @handle, sid.to_s
     end
 
-    def Ruleset.create_rulesets(parent_name, host, ruleset_definitions, state_cache_size)
+    def Ruleset.create_rulesets(parent_name, host, ruleset_definitions)
       branches = {}
       for name, definition in ruleset_definitions do
         name = name.to_s
         if name.end_with? "$state"
           name = name[0..-7]
           name = "#{parent_name}.#{name}" if parent_name
-          branches[name] = Statechart.new name, host, definition, state_cache_size
+          branches[name] = Statechart.new name, host, definition
         elsif name.end_with? "$flow"
           name = name[0..-6]
           name = "#{parent_name}.#{name}" if parent_name
-          branches[name] = Flowchart.new name, host, definition, state_cache_size
+          branches[name] = Flowchart.new name, host, definition
         else
           name = "#{parent_name}.#{name}" if parent_name
-          branches[name] = Ruleset.new name, host, definition, state_cache_size
+          branches[name] = Ruleset.new name, host, definition
         end
       end
 
       branches
     end
 
-    def dispatch_timers(complete)
+    def dispatch_timers()
+      Rules.assert_timers @handle
+    end
+
+    def to_json
+      JSON.generate @definition
+    end
+
+    def do_actions(state_handle, complete)
       begin
-        if !(Rules.assert_timers @handle)
-          complete.call nil, false
+        result = Rules.start_action_for_state(@handle, state_handle)
+        if !result 
+          complete.call(nil, nil)
         else
-          complete.call nil, true
+          flush_actions JSON.parse(result[0]), {:message => JSON.parse(result[1])}, state_handle, complete
         end
       rescue Exception => e
-        complete.call e, true
-        return
+        complete.call(e, nil)
       end
     end
 
-    def dispatch(complete, async_result = nil)
-      state = nil
-      action_handle = nil
-      action_binding = nil
-      result_container = {}
-      if async_result
-        state = async_result[0]
-        result_container = {:message => JSON.parse(async_result[1])}
-        action_handle = async_result[2]
-        action_binding = async_result[3]
-      else
-        begin
-          result = Rules.start_action @handle
-          if !result
-            complete.call nil, true
-            return
-          else
-            state = JSON.parse result[0]
-            result_container = {:message => JSON.parse(result[1])}
-            action_handle = result[2]
-            action_binding = result[3]
-          end
-        rescue Exception => e
-          puts "start action exception #{e}"
-          puts e.backtrace
-          complete.call e, true
-          return
-        end
+    def dispatch_ruleset()
+      result = Rules.start_action(@handle)
+      if result
+        flush_actions JSON.parse(result[0]), {:message => JSON.parse(result[1])}, result[2], -> e, s { }
+      end
+    end
+
+    private
+
+    def handle_result(result, message)
+      if result[0] == 1
+        raise MessageNotHandledError, message
+      elsif result[0] == 2
+        raise MessageObservedError, message
       end
 
+      result[1]
+    end
+
+    def flush_actions(state, result_container, state_offset, complete)
       while result_container.key? :message do
         action_name = nil
         for action_name, message in result_container[:message] do
@@ -616,11 +472,7 @@ module Engine
         end
 
         result_container.delete :message
-        c = Closure.new @host, state, message, action_handle, @name
-
-        if result_container.key? :async
-          result_container.delete :async
-        end
+        c = Closure.new @host, self, state, message, state_offset
 
         @actions[action_name].run c, -> e {
           if c.has_completed
@@ -629,136 +481,46 @@ module Engine
 
           if e
             Rules.abandon_action @handle, c.handle
-            complete.call e, true
+            complete.call e, nil
           else
             begin
-              for timer_name, timer_value in c._cancelled_timers do
-                cancel_timer c.s.sid, timer_name
-              end
-
-              for timer_id, timer_tuple in c._timers do
-                start_timer c.s.sid, timer_tuple[0], timer_tuple[1], timer_tuple[2]
-              end
-
-              for ruleset_name, q in c._queues do
-                for message in q._queued_posts do
-                  sid = (message.key? :sid) ? message[:sid]: message['sid']
-                  queue_assert_event sid.to_s, ruleset_name, message
-                end
-
-                for message in q._queued_asserts do
-                  sid = (message.key? :sid) ? message[:sid]: message['sid']
-                  queue_assert_fact sid.to_s, ruleset_name, message
-                end
-
-                for message in q._queued_retracts do
-                  sid = (message.key? :sid) ? message[:sid]: message['sid']
-                  queue_retract_fact sid.to_s, ruleset_name, message
-                end
-              end
-
-              for ruleset_name, sid in c._deletes do
-                @host.delete_state ruleset_name, sid
-              end
-
-              binding  = 0
-              replies = 0
-              pending = {action_binding => 0}
-              for ruleset_name, facts in c._retract do
-                if facts.length == 1
-                  binding, replies = @host.start_retract ruleset_name, facts[0]
-                else
-                  binding, replies = @host.start_retract_facts ruleset_name, facts
-                end
-                if pending.key? binding
-                  pending[binding] = pending[binding] + replies
-                else
-                  pending[binding] = replies
-                end
-              end
-              for ruleset_name, facts in c._facts do
-                if facts.length == 1
-                  binding, replies = @host.start_assert ruleset_name, facts[0]
-                else
-                  binding, replies = @host.start_assert_facts ruleset_name, facts
-                end
-                if pending.key? binding
-                  pending[binding] = pending[binding] + replies
-                else
-                  pending[binding] = replies
-                end
-              end
-              for ruleset_name, messages in c._messages do
-                if messages.length == 1
-                  binding, replies = @host.start_post ruleset_name, messages[0]
-                else
-                  binding, replies = @host.start_post_batch ruleset_name, messages
-                end
-                if pending.key? binding
-                  pending[binding] = pending[binding] + replies
-                else
-                  pending[binding] = replies
-                end
-              end
-              binding, replies = Rules.start_update_state @handle, c.handle, JSON.generate(c.s._d)
-              if pending.key? binding
-                pending[binding] = pending[binding] + replies
+              Rules.update_state @handle, JSON.generate(c.s._d)
+              
+              new_result = Rules.complete_and_start_action @handle, c.handle
+              if new_result
+                result_container[:message] = JSON.parse new_result
               else
-                pending[binding] = replies
-              end
-
-              for binding, replies in pending do
-                if binding != 0
-                  if binding != action_binding
-                    Rules.complete(binding, replies)
-                  else
-                    new_result = Rules.complete_and_start_action @handle, replies, c.handle
-                    if new_result
-                      if result_container.key? :async
-                        dispatch -> e, wait {}, [state, new_result, action_handle, action_binding]
-                      else
-                        result_container[:message] = JSON.parse new_result
-                      end
-                    end
-                  end
-                end
+                complete.call nil, state
               end
             rescue Exception => e
-              Rules.abandon_action @handle, c.handle
               puts "unknown exception #{e}"
               puts e.backtrace
-              complete.call e, true
+              Rules.abandon_action @handle, c.handle
+              complete.call e, nil
             end
 
             if c._deleted
               begin
                 delete_state c.s.sid
               rescue Exception => e
-                complete.call e, true
               end
             end
-
           end
         }
         result_container[:async] = true
       end
-      complete.call nil, false
-    end
-
-    def to_json
-      JSON.generate @definition
     end
 
   end
 
   class Statechart < Ruleset
 
-    def initialize(name, host, chart_definition, state_cache_size)
+    def initialize(name, host, chart_definition)
       @name = name
       @host = host
       ruleset_definition = {}
       transform nil, nil, nil, chart_definition, ruleset_definition
-      super name, host, ruleset_definition, state_cache_size
+      super name, host, ruleset_definition
       @definition = chart_definition
       @definition[:$type] = "stateChart"
     end
@@ -933,12 +695,12 @@ module Engine
 
   class Flowchart < Ruleset
 
-    def initialize(name, host, chart_definition, state_cache_size)
+    def initialize(name, host, chart_definition)
       @name = name
       @host = host
       ruleset_definition = {}
       transform chart_definition, ruleset_definition
-      super name, host, ruleset_definition, state_cache_size
+      super name, host, ruleset_definition
       @definition = chart_definition
       @definition["$type"] = "flowChart"
     end
@@ -1109,12 +871,41 @@ module Engine
 
   class Host
 
-    def initialize(ruleset_definitions = nil, databases = [{:host => 'localhost', :port => 6379, :password => nil, :db => 0}], state_cache_size = 1024)
+    def initialize(ruleset_definitions = nil)
       @ruleset_directory = {}
       @ruleset_list = []
-      @databases = databases
-      @state_cache_size = state_cache_size
+      
+      @assert_event_func = Proc.new do |rules, arg|
+        rules.assert_event arg
+      end
+
+      @assert_events_func = Proc.new do |rules, arg|
+        rules.assert_events arg
+      end
+
+      @assert_fact_func = Proc.new do |rules, arg|
+        rules.assert_fact arg
+      end
+
+      @assert_facts_func = Proc.new do |rules, arg|
+        rules.assert_facts arg
+      end
+
+      @retract_fact_func = Proc.new do |rules, arg|
+        rules.retract_fact arg
+      end
+
+      @retract_facts_func = Proc.new do |rules, arg|
+        rules.retract_facts arg
+      end
+
+      @update_state_func = Proc.new do |rules, arg|
+        rules.update_state arg
+      end
+
       register_rulesets nil, ruleset_definitions if ruleset_definitions
+      start_dispatch_ruleset_thread
+      start_dispatch_timers_thread
     end
 
     def get_action(action_name)
@@ -1139,8 +930,55 @@ module Engine
     end
 
     def set_ruleset(ruleset_name, ruleset_definition)
-      register_rulesets nil, ruleset_definition
+      register_rulesets nil, { ruleset_name => ruleset_definition }
       save_ruleset ruleset_name, ruleset_definition
+    end
+
+    def post(ruleset_name, event, complete = nil)
+      if event.kind_of? Array
+        return post_batch ruleset_name, event
+      end
+
+      rules = get_ruleset(ruleset_name) 
+      handle_function rules, @assert_event_func, event, complete
+    end
+
+    def post_batch(ruleset_name, events, complete = nil)
+      rules = get_ruleset(ruleset_name) 
+      handle_function rules, @assert_events_func, events, complete
+    end
+
+    def assert(ruleset_name, fact, complete = nil)
+      if fact.kind_of? Array
+        return assert_facts ruleset_name, fact
+      end
+
+      rules = get_ruleset(ruleset_name) 
+      handle_function rules, @assert_fact_func, fact, complete
+    end
+
+    def assert_facts(ruleset_name, facts, complete = nil)
+      rules = get_ruleset(ruleset_name) 
+      handle_function rules, @assert_facts_func, facts, complete
+    end
+
+    def retract(ruleset_name, fact, complete = nil)
+      if fact.kind_of? Array
+        return retract_facts ruleset_name, fact
+      end
+
+      rules = get_ruleset(ruleset_name) 
+      handle_function rules, @retract_fact_func, fact, complete
+    end
+
+    def retract_facts(ruleset_name, facts, complete = nil)
+      rules = get_ruleset(ruleset_name) 
+      handle_function rules, @retract_facts_func, facts, complete
+    end
+
+    def update_state(ruleset_name, state, complete = nil)
+      rules = get_ruleset(ruleset_name) 
+      handle_function rules, @update_state_func, state, complete
     end
 
     def get_state(ruleset_name, sid)
@@ -1151,80 +989,12 @@ module Engine
       get_ruleset(ruleset_name).delete_state sid
     end
 
-    def post_batch(ruleset_name, *events)
-      get_ruleset(ruleset_name).assert_events events
-    end
-
-    def start_post_batch(ruleset_name, *events)
-      get_ruleset(ruleset_name).start_assert_events events
-    end
-
-    def post(ruleset_name, event)
-      if event.kind_of? Array
-        return post_batch ruleset_name, event
-      end
-
-      get_ruleset(ruleset_name).assert_event event
-    end
-
-    def start_post(ruleset_name, event)
-      if event.kind_of? Array
-        return start_post_batch ruleset_name, event
-      end
-
-      get_ruleset(ruleset_name).start_assert_event event
-    end
-
-    def assert(ruleset_name, fact)
-      if fact.kind_of? Array
-        return assert_facts ruleset_name, fact
-      end
-
-      get_ruleset(ruleset_name).assert_fact fact
-    end
-
-    def start_assert(ruleset_name, fact)
-      if fact.kind_of? Array
-        return start_assert_facts ruleset_name, fact
-      end
-
-      get_ruleset(ruleset_name).start_assert_fact fact
-    end
-
-    def assert_facts(ruleset_name, *facts)
-      get_ruleset(ruleset_name).assert_facts facts
-    end
-
-    def start_assert_facts(ruleset_name, *facts)
-      get_ruleset(ruleset_name).start_assert_facts facts
-    end
-
-    def retract(ruleset_name, fact)
-      get_ruleset(ruleset_name).retract_fact fact
-    end
-
-    def start_retract(ruleset_name, fact)
-      get_ruleset(ruleset_name).start_retract_fact fact
-    end
-
-    def retract_facts(ruleset_name, *facts)
-      get_ruleset(ruleset_name).retract_facts facts
-    end
-
-    def start_retract_facts(ruleset_name, *facts)
-      get_ruleset(ruleset_name).start_retract_facts facts
-    end
-
-    def patch_state(ruleset_name, state)
-      get_ruleset(ruleset_name).assert_state state
-    end
-
     def renew_action_lease(ruleset_name, sid)
       get_ruleset(ruleset_name).renew_action_lease sid
     end
 
     def register_rulesets(parent_name, ruleset_definitions)
-      rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions, @state_cache_size)
+      rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions)
       for ruleset_name, ruleset in rulesets do
         if @ruleset_directory.key? ruleset_name
           raise ArgumentError, "Ruleset with name #{ruleset_name} already registered"
@@ -1232,65 +1002,68 @@ module Engine
 
         @ruleset_directory[ruleset_name] = ruleset
         @ruleset_list << ruleset
-        ruleset.bind @databases
       end
 
       rulesets.keys
     end
 
-    def start!
-
-      start_dispatch_ruleset_thread
-
-      start_dispatch_timers_thread
-
-    end
-
     private
+
+    def handle_function(rules, func, args, complete)
+      error = nil
+      result = nil
+
+      if not complete
+        rules.do_actions func.call(rules, args), -> e, s {
+          error = e
+          result = s
+        }
+
+        if error
+          raise error
+        end
+
+        result
+      else
+        begin
+          rules.do_actions func.call(rules, args), complete
+        rescue Exception => e
+          complete.call e, nil
+        end
+      end 
+    end
 
     def start_dispatch_timers_thread
 
       timer = Timers::Group.new
 
       thread_lambda = -> c {
-
-        callback = -> e, w {
-          inner_wait = Thread.current[:wait]
-          if e
-            puts "unexpected error #{e}"
-          elsif !w
-            inner_wait = false
-          end
-
-          if (Thread.current[:index] == (@ruleset_list.length-1)) & inner_wait
-            Thread.current[:index] = (Thread.current[:index] + 1) % @ruleset_list.length
-            Thread.current[:wait] = inner_wait
-            timer.after 0.25, &thread_lambda
-          else
-            Thread.current[:index] = (Thread.current[:index] + 1) % @ruleset_list.length
-            Thread.current[:wait] = inner_wait
-            timer.after 0, &thread_lambda
-          end
-        }
-
-        if @ruleset_list.length > 0
-          ruleset = @ruleset_list[Thread.current[:index]]
-          Thread.current[:wait] = true unless Thread.current[:index] > 0
-          ruleset.dispatch_timers callback
-        else
+        if @ruleset_list.empty?
           timer.after 0.5, &thread_lambda
+        else
+          ruleset = @ruleset_list[Thread.current[:index]]
+          begin
+            ruleset.dispatch_timers
+          rescue Exception => e
+            puts e.backtrace
+            puts "Error #{e}"
+          end
+      
+          timeout = 0
+          if (Thread.current[:index] == (@ruleset_list.length-1))
+            timeout = 0.2
+          end
+          Thread.current[:index] = (Thread.current[:index] + 1) % @ruleset_list.length
+          timer.after timeout, &thread_lambda
         end
-
       }
 
       timer.after 0.1, &thread_lambda
 
       Thread.new do
         Thread.current[:index] = 0
-        Thread.current[:wait] = 0
         loop { timer.wait }
       end
-
     end
 
     def start_dispatch_ruleset_thread
@@ -1298,95 +1071,31 @@ module Engine
       timer = Timers::Group.new
 
       thread_lambda = -> c {
-
-        callback = -> e, w {
-          inner_wait = Thread.current[:wait]
-          if e
-            puts "unexpected error #{e}"
-            puts e.backtrace
-          elsif !w
-            inner_wait = false
-          end
-          if (Thread.current[:index] == (@ruleset_list.length-1)) & inner_wait
-            Thread.current[:index] = ( Thread.current[:index] + 1 ) % @ruleset_list.length
-            Thread.current[:wait] = inner_wait
-            timer.after 0.25, &thread_lambda
-          else
-            Thread.current[:index] = ( Thread.current[:index] + 1 ) % @ruleset_list.length
-            Thread.current[:wait] = inner_wait
-            timer.after 0, &thread_lambda
-          end
-        }
-
         if @ruleset_list.empty?
           timer.after 0.5, &thread_lambda
         else
           ruleset = @ruleset_list[Thread.current[:index]]
-          Thread.current[:wait] = true if (Thread.current[:index] > 0)
-          ruleset.dispatch callback
+          begin
+            ruleset.dispatch_ruleset
+          rescue Exception => e
+            puts e.backtrace
+            puts "Error #{e}"
+          end
+      
+          timeout = 0
+          if (Thread.current[:index] == (@ruleset_list.length-1))
+            timeout = 0.2
+          end
+          Thread.current[:index] = (Thread.current[:index] + 1) % @ruleset_list.length
+          timer.after timeout, &thread_lambda
         end
-
       }
 
       timer.after 0.1, &thread_lambda
 
       Thread.new do
         Thread.current[:index] = 0
-        Thread.current[:wait] = 0
         loop { timer.wait }
-      end
-
-    end
-
-  end
-
-  class Queue
-
-    def initialize(ruleset_name, database = {:host => "localhost", :port => 6379, :password => nil, :db => 0}, state_cache_size = 1024)
-      @_ruleset_name = ruleset_name.to_s
-      @handle = Rules.create_client @_ruleset_name, state_cache_size
-      if database.kind_of? String
-        Rules.bind_ruleset @handle, database, 0, nil, 0
-      else
-        Rules.bind_ruleset @handle, database[:host], database[:port], database[:password], database[:db]
-      end
-    end
-
-    def isClosed()
-      @handle == 0
-    end
-
-    def post(message)
-      if @handle == 0
-        raise "Queue has already been closed"
-      end
-
-      sid = (message.key? :sid) ? message[:sid]: message['sid']
-      Rules.queue_assert_event @handle, sid.to_s, @_ruleset_name, JSON.generate(message)
-    end
-
-    def assert(message)
-      if @handle == 0
-        raise "Queue has already been closed"
-      end
-
-      sid = (message.key? :sid) ? message[:sid]: message['sid']
-      Rules.queue_assert_fact @handle, sid.to_s, @_ruleset_name, JSON.generate(message)
-    end
-
-    def retract(message)
-      if @handle == 0
-        raise "Queue has already been closed"
-      end
-
-      sid = (message.key? :sid) ? message[:sid]: message['sid']
-      Rules.queue_retract_fact @handle, sid.to_s, @_ruleset_name, JSON.generate(message)
-    end
-
-    def close()
-      if @handle != 0
-        Rules.delete_client @handle
-        @handle = 0
       end
     end
   end

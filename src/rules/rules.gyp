@@ -11,18 +11,11 @@
         'sources': [
             'json.c',
             'rete.c',
-            'net.c',
             'events.c',
             'state.c',
             'regex.c'
         ],
         'conditions': [
-        ['OS=="win"', {
-            'dependencies': [ '../../deps/hiredis_win.gyp:hiredis' ],
-        }],
-        ['OS!="win"', {
-            'dependencies': [ '../../deps/hiredis.gyp:hiredis' ],
-        }],
         ['OS=="mac"', {
             'xcode_settings': {
                 'GCC_C_LANGUAGE_STANDARD': 'c99'

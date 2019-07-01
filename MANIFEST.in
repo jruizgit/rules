@@ -1,10 +1,4 @@
 include MANIFEST.in
 include LICENSE
 include docs/py/README.txt
-include deps/hiredis/COPYING
-include deps/hiredis/*.[ch]
-include deps/hiredis_win/COPYING
-include deps/hiredis_win/*.[ch]
-include deps/Win32_Interop/*.[ch]
-include deps/Win32_Interop/*.cpp
 include src/rules/*.[ch]

@@ -1,5 +1,4 @@
 from . import engine
-from . import interface
 
 class avalue(object):
 
@@ -75,9 +74,6 @@ class avalue(object):
 
         if self._name == '$s':
             raise Exception('s not allowed as rvalue')
-
-        if self._name == '$sref':
-            self._name = '$s'
 
         if not self._op:
             if self._sid:
@@ -396,9 +392,8 @@ class ruleset(object):
         self.name = name
         self.rules = []
         if not len(_ruleset_stack):
-            _rulesets.append(self)
+            _rulesets[name] = self
         elif len(_rule_stack) > 0:
-
             _rule_stack[-1].func.append(self)
         else:
             raise Exception('Invalid rule context')
@@ -413,11 +408,8 @@ class ruleset(object):
         index = 0
         new_definition = {}
         for rule in self.rules:
-            if isinstance(rule, when_start):
-                _start_functions.append(rule.func)
-            else:
-                new_definition['r_{0}'.format(index)] = rule.define()
-                index += 1   
+            new_definition['r_{0}'.format(index)] = rule.define()
+            index += 1   
         
         return self.name, new_definition
         
@@ -519,7 +511,7 @@ class statechart(object):
         self.states = []
         self.root = True
         if not len(_ruleset_stack):
-            _rulesets.append(self)
+            _rulesets[name] = self
         elif len(_rule_stack) > 0:
             _rule_stack[-1].func.append(self)
         else:
@@ -534,11 +526,8 @@ class statechart(object):
     def define(self):
         new_definition = {}
         for state in self.states:
-            if isinstance(state, when_start):
-                _start_functions.append(state.func)
-            else:
-                state_name, state_definition = state.define()
-                new_definition[state_name] = state_definition
+            state_name, state_definition = state.define()
+            new_definition[state_name] = state_definition
 
         return '{0}$state'.format(self.name), new_definition
 
@@ -604,7 +593,7 @@ class flowchart(object):
         self.name = name
         self.stages = []
         if not len(_ruleset_stack):
-            _rulesets.append(self)
+            _rulesets[name] = self
         elif len(_rule_stack) > 0:
             _rule_stack[-1].func.append(self)
         else:
@@ -619,17 +608,15 @@ class flowchart(object):
     def define(self):
         new_definition = {}
         for stage in self.stages:
-            if isinstance(stage, when_start):
-                _start_functions.append(stage.func)
-            else:
-                stage_name, stage_definition = stage.define()
-                new_definition[stage_name] = stage_definition
+            stage_name, stage_definition = stage.define()
+            new_definition[stage_name] = stage_definition
 
         return '{0}$flow'.format(self.name), new_definition
 
 
 def timeout(name):
-    return (value('$m', '$t') == name) 
+    return all(avalue('base') << value('$m', '$timerName') == name, 
+               avalue('timeout') << value('$m', '$time') >= avalue('base', '$baseTime'))
 
 def count(value):
     return {'count': value}
@@ -643,13 +630,9 @@ def cap(value):
 def distinct(value):
     return {'dist': value}
 
-def sref(sid = None):
-    return avalue('$sref', None, sid, None, None)
-
 def select(name):
-    for rset in _rulesets:
-        if rset.name == name:
-            return rset
+    if name in _rulesets:
+        return _rulesets[name]
 
     raise Exception('Ruleset {0} not found'.format(name))
 
@@ -660,30 +643,49 @@ c = closure()
 
 _rule_stack = []
 _ruleset_stack = []
-_rulesets = []
-_start_functions = []
+_rulesets = {}
+_main_host = None
 
-def create_queue(ruleset_name, database = None, state_cache_size = 1024):
-    return engine.Queue(ruleset_name, database, state_cache_size)
+def get_host():
+    global _main_host
+    global _rulesets
 
-def create_host(databases = None, state_cache_size = 1024):
-    ruleset_definitions = {}
-    for rset in _rulesets:
-        ruleset_name, ruleset_definition = rset.define()
-        ruleset_definitions[ruleset_name] = ruleset_definition
+    if not _main_host:
+        _main_host = engine.Host()
+
+    for name, rset in _rulesets.items():
+        full_name, ruleset_definition = rset.define()
+        _main_host.set_ruleset(full_name, ruleset_definition)
+
+
+    _rulesets = {}
+    return _main_host
+
+def post(ruleset_name, message, complete = None):
+    return get_host().post(ruleset_name, message, complete)
         
-    main_host = engine.Host(ruleset_definitions, databases, state_cache_size)
-    for start in _start_functions:
-        start(main_host)
+def post_batch(ruleset_name, messages, complete = None):
+    return get_host().post_batch(ruleset_name, messages, complete)
+    
+def assert_fact(ruleset_name, fact, complete = None):
+    return get_host().assert_fact(ruleset_name, fact, complete)
+    
+def assert_facts(ruleset_name, facts, complete = None):
+    return get_host().assert_facts(ruleset_name, facts, complete)
+    
+def retract_fact(ruleset_name, fact, complete = None):
+    return get_host().retract_fact(ruleset_name, fact, complete)
+    
+def retract_facts(ruleset_name, facts, complete = None):
+    return get_host().retract_facts(ruleset_name, facts, complete)
+    
+def update_state(ruleset_name, state, complete = None):
+    get_host().update_state(ruleset_name, state, complete)
 
-    main_host.run()
-    return main_host
+def get_state(ruleset_name, sid):
+    return get_host().get_state(ruleset_name, sid)
 
-def run_all(databases = None, host_name = '127.0.0.1', port = 5000, routing_rules = None, run = None, state_cache_size = 1024):
-    main_host = create_host(databases, state_cache_size)
-    main_app = interface.Application(main_host, host_name, port, routing_rules, run)
-    main_app.run()
+def delete_state(ruleset_name, sid):
+    get_host().delete_state(ruleset_name, sid)
 
-def run_server(run, databases = None, routing_rules = None, state_cache_size = 1024):
-    run_all(databases, None, None, routing_rules, run, state_cache_size)
 

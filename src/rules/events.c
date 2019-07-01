@@ -3,11 +3,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include "rules.h"
-#include "net.h"
 #include "json.h"
 #include "regex.h"
+#include "rete.h"
 
-#include <time.h> 
+#define ACTION_ASSERT_FACT 1
+#define ACTION_ASSERT_EVENT 2
+#define ACTION_RETRACT_FACT 3
+#define ACTION_RETRACT_EVENT 4
+#define ACTION_UPDATE_STATE 5
+
 
 #define MAX_RESULT_NODES 32
 #define MAX_NODE_RESULTS 16
@@ -16,6 +21,8 @@
 #define MAX_COMMAND_COUNT 10000
 #define MAX_ADD_COUNT 1000
 #define MAX_EVAL_COUNT 1000
+#define MAX_INT_LENGTH 256
+#define MAX_DOUBLE_LENGTH 256
 
 #define OP_BOOL_BOOL 0x0404
 #define OP_BOOL_INT 0x0402
@@ -47,903 +54,1361 @@
 
 #define HASH_I 1622948014 //$i
 
-typedef struct actionContext {
-    void *rulesBinding;
-    redisReply *reply;
-} actionContext;
-
-typedef struct jsonResult {
-    unsigned int hash;
-    char *firstName;
-    char *lastName;
-    char *messages[MAX_MESSAGE_BATCH];
-    unsigned short messagesLength;
-    unsigned char childrenCount;
-    unsigned char children[MAX_NODE_RESULTS];
-} jsonResult;
+#define ONE_HASH 873244444
 
 static unsigned int handleMessage(ruleset *tree,
-                                  char *state,
                                   char *message, 
                                   unsigned char actionType, 
-                                  char **commands,
-                                  unsigned int *commandCount,
-                                  void **rulesBinding);
+                                  unsigned int *messageOffset,
+                                  unsigned int *stateOffset);
 
-static unsigned int reduceIdiom(ruleset *tree, 
-                                char *sid,
-                                char *message,
-                                jsonObject *messageObject,
-                                unsigned int idiomOffset,
-                                char **state,
-                                unsigned char *releaseState,
-                                jsonProperty **targetValue);
+static unsigned int reduceExpression(ruleset *tree,
+                                     stateNode *state, 
+                                     expression *currentExpression,
+                                     jsonObject *messageObject,
+                                     leftFrameNode *context,
+                                     jsonProperty *targetProperty);
 
-static unsigned char compareBool(unsigned char left, 
-                                 unsigned char right, 
-                                 unsigned char op) {
-    switch(op) {
-        case OP_LT:
-            return (left < right);
-        case OP_LTE:
-            return 1;
-        case OP_GT:
-            return (left > right);
-        case OP_GTE: 
-            return 1;
-        case OP_EQ:
-            return (left == right);
-        case OP_NEQ:
-            return (left != right);
-    }
-
-    return 0;
-}
-
-static unsigned char compareInt(long left, 
-                                long right, 
-                                unsigned char op) {
-    switch(op) {
-        case OP_LT:
-            return (left < right);
-        case OP_LTE:
-            return (left <= right);
-        case OP_GT:
-            return (left > right);
-        case OP_GTE: 
-            return (left >= right);
-        case OP_EQ:
-            return (left == right);
-        case OP_NEQ:
-            return (left != right);
-    }
-
-    return 0;
-}
-
-static unsigned char compareDouble(double left, 
-                                   double right, 
-                                   unsigned char op) {
-    switch(op) {
-        case OP_LT:
-            return (left < right);
-        case OP_LTE:
-            return (left <= right);
-        case OP_GT:
-            return (left > right);
-        case OP_GTE: 
-            return (left >= right);
-        case OP_EQ:
-            return (left == right);
-        case OP_NEQ:
-            return (left != right);
-    }
-
-    return 0;
-}
-
-static unsigned char compareString(char *leftFirst, 
-                                   unsigned short leftLength, 
-                                   char *right, 
-                                   unsigned char op) {
-    char temp = leftFirst[leftLength];
-    leftFirst[leftLength] = '\0';
-    int result = strcmp(leftFirst, right);
-    leftFirst[leftLength] = temp;
-    switch(op) {
-        case OP_LT:
-            return (result < 0);
-        case OP_LTE:
-            return (result <= 0);
-        case OP_GT:
-            return (result > 0);
-        case OP_GTE: 
-            return (result >= 0);
-        case OP_EQ:
-            return (result == 0);
-        case OP_NEQ:
-            return (result != 0);
-    }
-
-    return 0;
-}
-
-static unsigned char compareStringProperty(char *left, 
-                                           char *rightFirst, 
-                                           unsigned short rightLength, 
-                                           unsigned char op) {
-    char temp = rightFirst[rightLength];
-    rightFirst[rightLength] = '\0';
-    int result = strcmp(left, rightFirst);
-    rightFirst[rightLength] = temp;
-    switch(op) {
-        case OP_LT:
-            return (result < 0);
-        case OP_LTE:
-            return (result <= 0);
-        case OP_GT:
-            return (result > 0);
-        case OP_GTE: 
-            return (result >= 0);
-        case OP_EQ:
-            return (result == 0);
-        case OP_NEQ:
-            return (result != 0);
-    }
-
-    return 0;
-}
-
-static unsigned char compareStringAndStringProperty(char *leftFirst, 
-                                                    unsigned short leftLength, 
-                                                    char *rightFirst, 
-                                                    unsigned short rightLength,
-                                                    unsigned char op) {
-    
-    char rightTemp = rightFirst[rightLength];
-    rightFirst[rightLength] = '\0';        
-    char leftTemp = leftFirst[leftLength];
-    leftFirst[leftLength] = '\0';
-    int result = strcmp(leftFirst, rightFirst);
-    rightFirst[rightLength] = rightTemp;
-    leftFirst[leftLength] = leftTemp;
-    switch(op) {
-        case OP_LT:
-            return (result < 0);
-        case OP_LTE:
-            return (result <= 0);
-        case OP_GT:
-            return (result > 0);
-        case OP_GTE: 
-            return (result >= 0);
-        case OP_EQ:
-            return (result == 0);
-        case OP_NEQ:
-            return (result != 0);
-    }
-
-    return 0;
-
-}
-
-static long reduceInt(long left, 
-                      long right, 
-                      unsigned char op) {
+static unsigned int reduceString(char *left, 
+                                 unsigned short leftLength, 
+                                 char *right, 
+                                 unsigned short rightLength,
+                                 unsigned char op,
+                                 jsonProperty *targetProperty) {
+    int length = (leftLength > rightLength ? leftLength: rightLength);
+    int result = strncmp(left, right, length);
     switch(op) {
         case OP_ADD:
-            return left + right;
         case OP_SUB:
-            return left - right;
         case OP_MUL:
-            return left * right;
         case OP_DIV: 
-            return left / right;
-    }
-
-    return 0;
-}
-
-static double reduceDouble(double left, 
-                           double right, 
-                           unsigned char op) {
-    switch(op) {
-        case OP_ADD:
-            return left + right;
-        case OP_SUB:
-            return left - right;
-        case OP_MUL:
-            return left * right;
-        case OP_DIV: 
-            return left / right;
-    }
-
-    return 0;
-}
-
-static void freeCommands(char **commands,
-                         unsigned int commandCount) {
-    for (unsigned int i = 0; i < commandCount; ++i) {
-        free(commands[i]);
-    }
-}
-
-static unsigned int handleAction(ruleset *tree, 
-                                 char *sid, 
-                                 char *mid,
-                                 char *prefix, 
-                                 node *node, 
-                                 unsigned char actionType, 
-                                 char **evalKeys,
-                                 unsigned int *evalCount,
-                                 char **addKeys,
-                                 unsigned int *addCount,
-                                 char **removeCommand,
-                                 void **rulesBinding) {
-    unsigned int result = ERR_UNEXPECTED_VALUE;
-    if (*rulesBinding == NULL) {
-        result = resolveBinding(tree, 
-                                sid, 
-                                rulesBinding);
-        if (result != RULES_OK) {
-            return result;
-        }
-    }
-
-    switch (actionType) {
-        case ACTION_ASSERT_EVENT:
-        case ACTION_ASSERT_FACT:
-        case ACTION_RETRACT_EVENT:
-        case ACTION_RETRACT_FACT:
-            if (*evalCount == MAX_EVAL_COUNT) {
-                return ERR_MAX_EVAL_COUNT;
-            }
-
-            char *evalKey = malloc((strlen(prefix) + 1) * sizeof(char));
-            if (evalKey == NULL) {
-                return ERR_OUT_OF_MEMORY;
-            }
-
-            strcpy(evalKey, prefix);
-            evalKeys[*evalCount] = evalKey;
-            ++*evalCount;
+            return ERR_OPERATION_NOT_SUPPORTED;
+        case OP_LT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (result < 0);
             break;
-
-        case ACTION_ADD_EVENT:
-        case ACTION_ADD_FACT:
-            if (*addCount == MAX_ADD_COUNT) {
-                return ERR_MAX_ADD_COUNT;
-            }
-            char *addKey = malloc((strlen(prefix) + 1) * sizeof(char));
-            if (addKey == NULL) {
-                return ERR_OUT_OF_MEMORY;
-            }
-
-            strcpy(addKey, prefix);
-            addKeys[*addCount] = addKey;
-            *addCount = *addCount + 1; 
+        case OP_LTE:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (result <= 0);
             break;
-
-        case ACTION_REMOVE_EVENT:
-        case ACTION_REMOVE_FACT:
-            if (*removeCommand == NULL) {
-                result = formatRemoveMessage(*rulesBinding, 
-                                         sid,
-                                         mid, 
-                                         actionType == ACTION_REMOVE_FACT ? 1 : 0,
-                                         removeCommand);  
-
-                if (result != RULES_OK) {
-                    return result;
-                }
-            }
+        case OP_GT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (result > 0);
+            break;
+        case OP_GTE: 
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (result >= 0);
+            break;
+        case OP_EQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (result == 0);
+            break;
+        case OP_NEQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (result != 0);
             break;
     }
+
     return RULES_OK;
 }
 
-static unsigned int handleBeta(ruleset *tree, 
-                               char *sid,
-                               char *mid,
-                               node *betaNode,
-                               unsigned short actionType, 
-                               char **evalKeys,
-                               unsigned int *evalCount,
-                               char **addKeys,
-                               unsigned int *addCount,
-                               char **removeCommand,
-                               void **rulesBinding) {
-    int prefixLength = 0;
-    node *currentNode = betaNode;
-    while (currentNode != NULL) {
-        int nameLength = strlen(&tree->stringPool[currentNode->nameOffset]);
-        prefixLength += nameLength + 1;
-
-        if (currentNode->type == NODE_ACTION) {
-            currentNode = NULL;
-        } else {
-            if (currentNode->value.b.not) {
-                switch (actionType) {
-                    case ACTION_ASSERT_FACT:
-                        actionType = ACTION_ADD_FACT;
-                        break;
-                    case ACTION_ASSERT_EVENT:
-                        actionType = ACTION_ADD_EVENT;
-                        break;
-                    case ACTION_REMOVE_FACT:
-                        actionType = ACTION_RETRACT_FACT;
-                        break;
-                    case ACTION_REMOVE_EVENT:
-                        actionType = ACTION_RETRACT_EVENT;
-                        break;
-                }
-            }
-            currentNode = &tree->nodePool[currentNode->value.b.nextOffset];
-        }
+static unsigned int reduceBool(unsigned char left, 
+                               unsigned char right, 
+                               unsigned char op,
+                               jsonProperty *targetProperty) {
+    switch(op) {
+        case OP_DIV: 
+        case OP_SUB:
+            return ERR_OPERATION_NOT_SUPPORTED;
+        case OP_ADD:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = left & right;
+            break;
+        case OP_MUL:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = left ^ right;
+            break;
+        case OP_LT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left < right);
+            break;
+        case OP_LTE:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left <= right);
+            break;
+        case OP_GT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left > right);
+            break;
+        case OP_GTE: 
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left >= right);
+            break;
+        case OP_EQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left == right);
+            break;
+        case OP_NEQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left != right);
+            break;
     }
 
-    node *actionNode = NULL;
-#ifdef _WIN32
-    char *prefix = (char *)_alloca(sizeof(char)*(prefixLength));
-#else
-    char prefix[prefixLength];
-#endif
-    char *currentPrefix = prefix;
-    currentNode = betaNode;
-    while (currentNode != NULL) {
-        char *name = &tree->stringPool[currentNode->nameOffset];
-        int nameLength = strlen(&tree->stringPool[currentNode->nameOffset]);
-        strncpy(currentPrefix, name, nameLength);
-        
-        if (currentNode->type == NODE_ACTION) {
-            currentPrefix[nameLength] = '\0';
-            actionNode = currentNode;
-            currentNode = NULL;
-        }
-        else {
-            currentPrefix[nameLength] = '!';
-            currentPrefix = &currentPrefix[nameLength + 1];
-            currentNode = &tree->nodePool[currentNode->value.b.nextOffset];
-        }
-    }
-    return handleAction(tree, 
-                        sid, 
-                        mid,
-                        prefix, 
-                        actionNode, 
-                        actionType,
-                        evalKeys,
-                        evalCount,
-                        addKeys,
-                        addCount,
-                        removeCommand,
-                        rulesBinding);
+    return RULES_OK;
 }
 
-
-static unsigned int valueToProperty(ruleset *tree,
-                                    char *sid,
-                                    char *message,
-                                    jsonObject *messageObject,
-                                    jsonValue *sourceValue, 
-                                    char **state,
-                                    unsigned char *releaseState,
-                                    jsonProperty **targetProperty) {
-
-    unsigned int result = RULES_OK;
-    *releaseState = 0;
-    switch(sourceValue->type) {
-        case JSON_EVENT_LOCAL_IDIOM:
-        case JSON_STATE_IDIOM:
-            result = reduceIdiom(tree, 
-                                 sid, 
-                                 message,
-                                 messageObject,
-                                 sourceValue->value.idiomOffset,
-                                 state,
-                                 releaseState,
-                                 targetProperty);
-
-            return result;
-        case JSON_EVENT_LOCAL_PROPERTY:
-            for (unsigned short i = 0; i < messageObject->propertiesLength; ++i) {
-                if (sourceValue->value.property.nameHash == messageObject->properties[i].hash) {
-                    *targetProperty = &messageObject->properties[i];
-                    rehydrateProperty(*targetProperty, message);
-                    return RULES_OK;
-                } 
-            }
-
-            return ERR_PROPERTY_NOT_FOUND;
-        case JSON_STATE_PROPERTY:
-            if (sourceValue->value.property.idOffset) {
-                sid = &tree->stringPool[sourceValue->value.property.idOffset];
-            }
-            result = fetchStateProperty(tree, 
-                                        sid, 
-                                        sourceValue->value.property.nameHash, 
-                                        MAX_STATE_PROPERTY_TIME, 
-                                        0,
-                                        state,
-                                        targetProperty);
-
-            if (result == ERR_STATE_NOT_LOADED || result == ERR_STALE_STATE) {
-                result = refreshState(tree,sid);
-                if (result != RULES_OK) {
-                    return result;
-                }
-
-                result = fetchStateProperty(tree, 
-                                            sid, 
-                                            sourceValue->value.property.nameHash, 
-                                            MAX_STATE_PROPERTY_TIME, 
-                                            0,
-                                            state,
-                                            targetProperty);
-            }
-
-            return result;
-        case JSON_STRING:
-            *state = &tree->stringPool[sourceValue->value.stringOffset];
-            (*targetProperty)->valueLength = strlen(*state);
-            (*targetProperty)->valueString = *state;
+static unsigned int reduceInt(long left, 
+                              long right, 
+                              unsigned char op,
+                              jsonProperty *targetProperty) {
+    switch(op) {
+        case OP_ADD:
+            targetProperty->type = JSON_INT;
+            targetProperty->value.i = left + right;
             break;
-        case JSON_INT:
-            (*targetProperty)->value.i = sourceValue->value.i;
+        case OP_SUB:
+            targetProperty->type = JSON_INT;
+            targetProperty->value.i = left - right;
             break;
-        case JSON_DOUBLE:
-            (*targetProperty)->value.d = sourceValue->value.d;
+        case OP_MUL:
+            targetProperty->type = JSON_INT;
+            targetProperty->value.i = left * right;
             break;
-        case JSON_BOOL:
-            (*targetProperty)->value.b = sourceValue->value.b;
+        case OP_DIV: 
+            targetProperty->type = JSON_INT;
+            targetProperty->value.i = left / right;
+            break;
+        case OP_LT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left < right);
+            break;
+        case OP_LTE:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left <= right);
+            break;
+        case OP_GT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left > right);
+            break;
+        case OP_GTE: 
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left >= right);
+            break;
+        case OP_EQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left == right);
+            break;
+        case OP_NEQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left != right);
             break;
     }
 
-    (*targetProperty)->isMaterial = 1;
-    (*targetProperty)->type = sourceValue->type;
-    return result;
+    return RULES_OK;
+}
+
+static unsigned int reduceDouble(double left, 
+                                 double right, 
+                                 unsigned char op,
+                                 jsonProperty *targetProperty) {
+    switch(op) {
+        case OP_ADD:
+            targetProperty->type = JSON_DOUBLE;
+            targetProperty->value.d = left + right;
+            break;
+        case OP_SUB:
+            targetProperty->type = JSON_DOUBLE;
+            targetProperty->value.d = left - right;
+            break;
+        case OP_MUL:
+            targetProperty->type = JSON_DOUBLE;
+            targetProperty->value.d = left * right;
+            break;
+        case OP_DIV: 
+            targetProperty->type = JSON_DOUBLE;
+            targetProperty->value.d = left / right;
+            break;
+        case OP_LT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left < right);
+            break;
+        case OP_LTE:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left <= right);
+            break;
+        case OP_GT:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left > right);
+            break;
+        case OP_GTE: 
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left >= right);
+            break;
+        case OP_EQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left == right);
+            break;
+        case OP_NEQ:
+            targetProperty->type = JSON_BOOL;
+            targetProperty->value.b = (left != right);
+            break;
+    }
+
+    return RULES_OK;
+}
+
+static unsigned int reduceOperand(ruleset *tree,
+                                  stateNode *state, 
+                                  operand *sourceOperand, 
+                                  jsonObject *messageObject,
+                                  leftFrameNode *context,
+                                  jsonProperty **targetProperty) {
+    (*targetProperty)->type = sourceOperand->type;
+    switch(sourceOperand->type) {
+        case JSON_EXPRESSION:
+        case JSON_MESSAGE_EXPRESSION:
+            {
+                expression *currentExpression = &tree->expressionPool[sourceOperand->value.expressionOffset];
+                return reduceExpression(tree, 
+                                        state,
+                                        currentExpression,
+                                        messageObject,
+                                        context,
+                                        *targetProperty);
+            }
+        case JSON_IDENTIFIER:
+            CHECK_RESULT(getMessageFromFrame(state,
+                                             context->messages, 
+                                             sourceOperand->value.id.nameHash, 
+                                             &messageObject));
+            // break omitted intentionally, continue to next case
+        case JSON_MESSAGE_IDENTIFIER:
+            CHECK_RESULT(getObjectProperty(messageObject,
+                                           sourceOperand->value.id.propertyNameHash,
+                                           targetProperty));
+            return RULES_OK;
+        case JSON_STRING:
+            {
+                char *stringValue = &tree->stringPool[sourceOperand->value.stringOffset];
+                (*targetProperty)->valueLength = strlen(stringValue);
+                (*targetProperty)->valueOffset = 0;
+                (*targetProperty)->value.s = stringValue;
+                return RULES_OK;
+            }
+        case JSON_INT:
+            (*targetProperty)->value.i = sourceOperand->value.i;
+            return RULES_OK;
+        case JSON_DOUBLE:
+            (*targetProperty)->value.d = sourceOperand->value.d;
+            return RULES_OK;
+        case JSON_BOOL:
+            (*targetProperty)->value.b = sourceOperand->value.b;
+            return RULES_OK;
+    }
+
+    return ERR_OPERATION_NOT_SUPPORTED;
 }
 
 static unsigned int reduceProperties(unsigned char operator,
                                      jsonProperty *leftProperty,
-                                     char *leftState, 
                                      jsonProperty *rightProperty,
-                                     char *rightState,
-                                     jsonProperty *targetValue,
-                                     char **state) {
-    *state = NULL;
+                                     jsonProperty *targetProperty) {
     unsigned short type = leftProperty->type << 8;
     type = type + rightProperty->type;
-    char leftTemp = 0;
-    char rightTemp = 0;
-    if (leftProperty->type == JSON_STRING || rightProperty->type == JSON_STRING) {
-        if (operator != OP_ADD) {
-            *state = (char *)calloc(1, sizeof(char));
-            if (!*state) {
-                return ERR_OUT_OF_MEMORY;
-            }
-            return RULES_OK;
-        }
-
-        if (leftProperty->type == JSON_STRING) {
-            leftTemp = *(leftProperty->valueString + leftProperty->valueLength);
-            *(leftProperty->valueString + leftProperty->valueLength) = '\0';
-        } 
-
-        if (rightProperty->type == JSON_STRING) {
-            rightTemp = *(rightProperty->valueString + rightProperty->valueLength);
-            *(rightProperty->valueString + rightProperty->valueLength) = '\0';
-        }
-    }
-
     switch(type) {
         case OP_BOOL_BOOL:
-            targetValue->value.i = reduceInt(leftProperty->value.b, rightProperty->value.b, operator); 
-            targetValue->type = JSON_INT;
-            break;
+            return reduceBool(leftProperty->value.b, rightProperty->value.b, operator, targetProperty); 
         case OP_BOOL_INT: 
-            targetValue->value.i = reduceInt(leftProperty->value.b, rightProperty->value.i, operator); 
-            targetValue->type = JSON_INT;
-            break;
+            return reduceInt(leftProperty->value.b, rightProperty->value.i, operator, targetProperty);
         case OP_BOOL_DOUBLE: 
-            targetValue->value.d = reduceDouble(leftProperty->value.b, rightProperty->value.d, operator); 
-            targetValue->type = JSON_DOUBLE;
-            break;
-        case OP_BOOL_STRING:
-            if (asprintf(state, 
-                         "%s%s", 
-                         leftProperty->value.b ? "true" : "false", 
-                         rightProperty->valueString) == -1) {
-                return ERR_OUT_OF_MEMORY;
-            }
-            break;
+            return reduceDouble(leftProperty->value.b, rightProperty->value.d, operator, targetProperty); 
         case OP_INT_BOOL:
-            targetValue->value.i = reduceInt(leftProperty->value.i, rightProperty->value.b, operator); 
-            targetValue->type = JSON_INT;
-            break;
+            return reduceInt(leftProperty->value.i, rightProperty->value.b, operator, targetProperty); 
         case OP_INT_INT:
-            targetValue->value.i = reduceInt(leftProperty->value.i, rightProperty->value.i, operator); 
-            targetValue->type = JSON_INT;
-            break;
+            return reduceInt(leftProperty->value.i, rightProperty->value.i, operator, targetProperty); 
         case OP_INT_DOUBLE: 
-            targetValue->value.d = reduceDouble(leftProperty->value.i, rightProperty->value.d, operator); 
-            targetValue->type = JSON_DOUBLE;
-            break;
-        case OP_INT_STRING:
-            if (asprintf(state, 
-                         "%ld%s", 
-                         leftProperty->value.i, 
-                         rightProperty->valueString) == -1) {
-                return ERR_OUT_OF_MEMORY;
-            }
-            break;
+            return reduceDouble(leftProperty->value.i, rightProperty->value.d, operator, targetProperty); 
         case OP_DOUBLE_BOOL:
-            targetValue->value.d = reduceDouble(leftProperty->value.d, rightProperty->value.b, operator); 
-            targetValue->type = JSON_DOUBLE;
-            break;
+            return reduceDouble(leftProperty->value.d, rightProperty->value.b, operator, targetProperty); 
         case OP_DOUBLE_INT:
-            targetValue->value.d = reduceDouble(leftProperty->value.d, rightProperty->value.i, operator); 
-            targetValue->type = JSON_DOUBLE; 
-            break;
+            return reduceDouble(leftProperty->value.d, rightProperty->value.i, operator, targetProperty); 
         case OP_DOUBLE_DOUBLE:
-            targetValue->value.d = reduceDouble(leftProperty->value.d, rightProperty->value.d, operator); 
-            targetValue->type = JSON_DOUBLE; 
-            break;
+            return reduceDouble(leftProperty->value.d, rightProperty->value.d, operator, targetProperty); 
+        case OP_BOOL_STRING:
+            if (leftProperty->value.b) {
+                return reduceString("true ",
+                                    4,
+                                    rightProperty->value.s,
+                                    rightProperty->valueLength, 
+                                    operator,
+                                    targetProperty);
+            }
+            else {
+                return reduceString("false ",
+                                    5,
+                                    rightProperty->value.s,
+                                    rightProperty->valueLength, 
+                                    operator,
+                                    targetProperty);
+            }
+        case OP_INT_STRING:
+            {
+#ifdef _WIN32
+                char *leftString = (char *)_alloca(sizeof(char)*(MAX_INT_LENGTH + 1));
+                sprintf_s(leftString, sizeof(char)*(MAX_INT_LENGTH + 1), "%ld", leftProperty->value.i);
+#else
+                char leftString[MAX_INT_LENGTH + 1];
+                snprintf(leftString, sizeof(char)*(MAX_INT_LENGTH + 1), "%ld", leftProperty->value.i);
+#endif         
+                return reduceString(leftString,
+                                    leftProperty->valueLength,
+                                    rightProperty->value.s,
+                                    rightProperty->valueLength, 
+                                    operator,
+                                    targetProperty);
+            }
         case OP_DOUBLE_STRING:
-            if (asprintf(state, 
-                         "%g%s", 
-                         leftProperty->value.d, 
-                         rightProperty->valueString) == -1) {
-                return ERR_OUT_OF_MEMORY;
+            {
+#ifdef _WIN32
+                char *leftString = (char *)_alloca(sizeof(char)*(MAX_DOUBLE_LENGTH + 1));
+                sprintf_s(leftString, sizeof(char)*(MAX_DOUBLE_LENGTH + 1), "%f", leftProperty->value.d);
+#else
+                char leftString[MAX_DOUBLE_LENGTH + 1];
+                snprintf(leftString, sizeof(char)*(MAX_DOUBLE_LENGTH + 1), "%f", leftProperty->value.d);
+#endif         
+                return reduceString(leftString,
+                                    leftProperty->valueLength,
+                                    rightProperty->value.s,
+                                    rightProperty->valueLength, 
+                                    operator,
+                                    targetProperty);
+            }
+        case OP_STRING_BOOL:
+            if (rightProperty->value.b) {
+                return reduceString(leftProperty->value.s,
+                                    leftProperty->valueLength, 
+                                    "true ",
+                                    4,
+                                    operator,
+                                    targetProperty);
+            }
+            else {
+                return reduceString(leftProperty->value.s,
+                                    leftProperty->valueLength,
+                                    "false ",
+                                    5, 
+                                    operator,
+                                    targetProperty);
+            }
+        case OP_STRING_INT: 
+            {
+#ifdef _WIN32
+                char *rightString = (char *)_alloca(sizeof(char)*(MAX_INT_LENGTH + 1));
+                sprintf_s(rightString, sizeof(char)*(MAX_INT_LENGTH + 1), "%ld", rightProperty->value.i);
+#else
+                char rightString[MAX_INT_LENGTH + 1];
+                snprintf(rightString, sizeof(char)*(MAX_INT_LENGTH + 1), "%ld", rightProperty->value.i);
+#endif         
+                return reduceString(leftProperty->value.s,
+                                    leftProperty->valueLength,
+                                    rightString,
+                                    rightProperty->valueLength,
+                                    operator,
+                                    targetProperty);
+            }
+        case OP_STRING_DOUBLE: 
+            {
+#ifdef _WIN32
+                char *rightString = (char *)_alloca(sizeof(char)*(MAX_DOUBLE_LENGTH + 1));
+                sprintf_s(rightString, sizeof(char)*(MAX_DOUBLE_LENGTH + 1), "%f", rightProperty->value.d);
+#else
+                char rightString[MAX_DOUBLE_LENGTH + 1];
+                snprintf(rightString, sizeof(char)*(MAX_DOUBLE_LENGTH + 1), "%f", rightProperty->value.d);
+#endif         
+                return reduceString(leftProperty->value.s,
+                                    leftProperty->valueLength,
+                                    rightString,
+                                    rightProperty->valueLength,
+                                    operator,
+                                    targetProperty);
+            }
+        case OP_STRING_STRING:
+            return reduceString(leftProperty->value.s,
+                                leftProperty->valueLength,
+                                rightProperty->value.s,
+                                rightProperty->valueLength,
+                                operator,
+                                targetProperty);
+        case OP_BOOL_NIL:
+        case OP_INT_NIL:
+        case OP_DOUBLE_NIL:
+        case OP_STRING_NIL:
+            targetProperty->type = JSON_BOOL;
+            if (operator == OP_NEQ) {
+                targetProperty->value.b = 1;
+            } else {
+                targetProperty->value.b = 0;
             }
 
-            break;
-        case OP_STRING_BOOL:
-            if (asprintf(state, 
-                         "%s%s",
-                         leftProperty->valueString,
-                         rightProperty->value.b ? "true" : "false") == -1) {
-                return ERR_OUT_OF_MEMORY;
+            return RULES_OK;
+        case OP_NIL_NIL:
+            targetProperty->type = JSON_BOOL;
+            if (operator == OP_EQ) {
+                targetProperty->value.b = 1;
+            } else {
+                targetProperty->value.b = 0;
             }
-            break;
-        case OP_STRING_INT: 
-            if (asprintf(state, 
-                         "%s%ld",
-                         leftProperty->valueString,
-                         rightProperty->value.i) == -1) {
-                return ERR_OUT_OF_MEMORY;
-            }
-            break;
-        case OP_STRING_DOUBLE: 
-            if (asprintf(state, 
-                         "%s%ld",
-                         leftProperty->valueString,
-                         rightProperty->value.i) == -1) {
-                return ERR_OUT_OF_MEMORY;
-            }
-            break;
-        case OP_STRING_STRING:
-            if (asprintf(state, 
-                         "%s%s",
-                         leftProperty->valueString,
-                         rightProperty->valueString) == -1) {
-                return ERR_OUT_OF_MEMORY;
-            }
-            break;
+
+            return RULES_OK;
     }    
 
-    if (leftProperty->type == JSON_STRING || rightProperty->type == JSON_STRING) {
-        targetValue->type = JSON_STRING;
-        targetValue->valueString = *state;
-        targetValue->valueLength = strlen(*state);
-                
-        if (leftTemp) {
-            *(leftProperty->valueString + leftProperty->valueLength) = leftTemp;
+    return ERR_OPERATION_NOT_SUPPORTED;
+}
+
+static unsigned int reduceExpression(ruleset *tree,
+                                     stateNode *state, 
+                                     expression *currentExpression,
+                                     jsonObject *messageObject,
+                                     leftFrameNode *context,
+                                     jsonProperty *targetProperty) {
+    jsonProperty leftValue;
+    jsonProperty *leftProperty = &leftValue;
+    CHECK_RESULT(reduceOperand(tree,
+                               state,
+                               &currentExpression->left,
+                               messageObject,
+                               context,
+                               &leftProperty));
+
+    if (currentExpression->right.type == JSON_REGEX || currentExpression->right.type == JSON_IREGEX) {
+        targetProperty->type = JSON_BOOL;
+        targetProperty->value.b = evaluateRegex(tree,
+                                                leftProperty->value.s, 
+                                                leftProperty->valueLength, 
+                                                (currentExpression->right.type == JSON_REGEX) ? 0 : 1,
+                                                currentExpression->right.value.regex.vocabularyLength,
+                                                currentExpression->right.value.regex.statesLength,
+                                                currentExpression->right.value.regex.stateMachineOffset);
+        return RULES_OK;
+    }
+
+    jsonProperty rightValue;
+    jsonProperty *rightProperty = &rightValue;
+    CHECK_RESULT(reduceOperand(tree,
+                               state,
+                               &currentExpression->right,
+                               messageObject,
+                               context,
+                               &rightProperty));
+
+    return reduceProperties(currentExpression->operator, 
+                            leftProperty, 
+                            rightProperty, 
+                            targetProperty);
+}
+
+static unsigned int reduceExpressionSequence(ruleset *tree,
+                                             stateNode *state, 
+                                             expressionSequence *exprs,
+                                             unsigned short operator,
+                                             jsonObject *messageObject,
+                                             leftFrameNode *context,
+                                             unsigned short *i,
+                                             jsonProperty *targetProperty) {
+    targetProperty->type = JSON_BOOL;
+    targetProperty->value.b = 1;    
+    while (*i < exprs->length) {
+        expression *currentExpression = &exprs->expressions[*i];
+        if (currentExpression->operator == OP_END) {
+            return RULES_OK;          
         } 
 
-        if (rightTemp) {
-            *(rightProperty->valueString + rightProperty->valueLength) = rightTemp;
+        if ((operator != OP_NOP) &&
+            ((operator == OP_OR && targetProperty->value.b) || 
+             (operator == OP_AND && !targetProperty->value.b))) {
+            if (currentExpression->operator == OP_AND || currentExpression->operator == OP_OR) {
+                jsonProperty dummyProperty;
+                dummyProperty.type = JSON_BOOL;
+                if (currentExpression->operator == OP_AND) {
+                    dummyProperty.value.b = 0;
+                } else {
+                    dummyProperty.value.b = 1;
+                }
+
+                ++*i;
+                CHECK_RESULT(reduceExpressionSequence(tree,
+                                                      state,
+                                                      exprs,
+                                                      currentExpression->operator,
+                                                      messageObject,
+                                                      context,
+                                                      i,
+                                                      &dummyProperty));
+            }
+        } else {
+            if (currentExpression->operator == OP_AND || currentExpression->operator == OP_OR) {
+                ++*i;
+                CHECK_RESULT(reduceExpressionSequence(tree,
+                                                      state,
+                                                      exprs,
+                                                      currentExpression->operator,
+                                                      messageObject,
+                                                      context,
+                                                      i,
+                                                      targetProperty));
+            } else if (currentExpression->operator == OP_IALL || currentExpression->operator == OP_IANY) {
+                
+            } else {
+                CHECK_RESULT(reduceExpression(tree,
+                                              state,
+                                              currentExpression,
+                                              messageObject,
+                                              context,
+                                              targetProperty));
+                if (targetProperty->type != JSON_BOOL) {
+                    return ERR_OPERATION_NOT_SUPPORTED;
+                }
+            }
+        }
+
+        ++*i;
+    }
+
+    return RULES_OK;
+}
+
+static unsigned int getFrameHashForExpression(ruleset *tree,
+                                              stateNode *state, 
+                                              expression *currentExpression,
+                                              jsonObject *messageObject,
+                                              leftFrameNode *context,
+                                              unsigned int *hash) {
+    jsonProperty value;
+    jsonProperty *property = &value;
+    *hash = ONE_HASH;
+                    
+    if (context) {
+        CHECK_RESULT(reduceOperand(tree,
+                                   state,
+                                   &currentExpression->right,
+                                   NULL,
+                                   context,
+                                   &property));    
+    } else {
+        CHECK_RESULT(reduceOperand(tree,
+                                   state,
+                                   &currentExpression->left,
+                                   messageObject,
+                                   NULL,
+                                   &property));
+    }
+
+    switch (property->type) {
+        case JSON_STRING:
+            *hash = fnv1Hash32(property->value.s, property->valueLength);
+            break;
+        case JSON_BOOL:
+            if (property->value.b) {
+                *hash = fnv1Hash32("true", 4);
+            } else {
+                *hash = fnv1Hash32("false", 5);
+            }
+            break;
+        case JSON_INT:
+        {
+#ifdef _WIN32
+            char *string = (char *)_alloca(sizeof(char)*(MAX_INT_LENGTH + 1));
+            sprintf_s(string, sizeof(char)*(MAX_INT_LENGTH + 1), "%ld", property->value.i);
+#else
+            char string[MAX_INT_LENGTH + 1];
+            snprintf(string, sizeof(char)*(MAX_INT_LENGTH + 1), "%ld", property->value.i);
+#endif   
+            *hash = fnv1Hash32(string, strlen(string));
+            break;
+        }
+        case JSON_DOUBLE:
+        {
+#ifdef _WIN32
+            char *string = (char *)_alloca(sizeof(char)*(MAX_INT_LENGTH + 1));
+            sprintf_s(string, sizeof(char)*(MAX_INT_LENGTH + 1), "%f", property->value.d);
+#else
+            char string[MAX_INT_LENGTH + 1];
+            snprintf(string, sizeof(char)*(MAX_INT_LENGTH + 1), "%f", property->value.d);
+#endif   
+            *hash = fnv1Hash32(string, strlen(string));
+            break;
         }
     }
 
     return RULES_OK;
 }
 
-static unsigned int reduceIdiom(ruleset *tree, 
-                                char *sid,
-                                char *message,
-                                jsonObject *messageObject,
-                                unsigned int idiomOffset,
-                                char **state,
-                                unsigned char *releaseState,
-                                jsonProperty **targetValue) {
-    unsigned int result = RULES_OK;
-    *releaseState = 0;
-    idiom *currentIdiom = &tree->idiomPool[idiomOffset];
-    jsonProperty leftValue;
-    jsonProperty *leftProperty = &leftValue;
-    unsigned char releaseLeftState = 0;
-    char *leftState = NULL;
-    result = valueToProperty(tree,
-                             sid,
-                             message,
-                             messageObject,
-                             &currentIdiom->left,
-                             &leftState,
-                             &releaseLeftState,
-                             &leftProperty);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    jsonProperty rightValue;
-    jsonProperty *rightProperty = &rightValue;
-    unsigned char releaseRightState = 0;
-    char *rightState = NULL;
-    result = valueToProperty(tree,
-                             sid,
-                             message,
-                             messageObject,
-                             &currentIdiom->right,
-                             &rightState,
-                             &releaseRightState,
-                             &rightProperty);
-    if (result != RULES_OK) {
-        if (releaseLeftState) {
-            free(leftState);
+static unsigned int getFrameHash(ruleset *tree,
+                                 stateNode *state, 
+                                 beta *currentBeta, 
+                                 jsonObject *messageObject,
+                                 leftFrameNode *context,
+                                 unsigned int *hash) {
+    expressionSequence *exprs = &currentBeta->expressionSequence;
+    *hash = ONE_HASH;
+    if (exprs->length == 1) {
+        if (exprs->expressions[0].operator == OP_EQ) {
+            return getFrameHashForExpression(tree,
+                                             state,
+                                             &exprs->expressions[0],
+                                             messageObject,
+                                             context,
+                                             hash);
         }
+    } else if (exprs->length > 0) {
+        if (exprs->expressions[0].operator == OP_AND) {
+            *hash = FNV_32_OFFSET_BASIS;
+            unsigned int result;
+            for (unsigned int i = 1; i < exprs->length; ++ i) {
 
-        return result;
-    }
-
-    result = reduceProperties(currentIdiom->operator, 
-                            leftProperty, 
-                            leftState,
-                            rightProperty, 
-                            rightState, 
-                            *targetValue,
-                            state);
-
-    if (releaseLeftState) {
-        free(leftState);
-    }
-
-    if (releaseRightState) {
-        free(rightState);
-    }
-
-    if (state) {
-        *releaseState = 1;
-    }
-
-    return result;
-}
-
-static unsigned int isMatch(ruleset *tree,
-                            char *sid,
-                            char *message,
-                            jsonObject *messageObject,
-                            jsonProperty *currentProperty, 
-                            alpha *currentAlpha,
-                            unsigned char *propertyMatch,
-                            void **rulesBinding) {
-    unsigned char alphaOp = currentAlpha->operator;
-    unsigned char propertyType = currentProperty->type;
-    unsigned int result = RULES_OK;
-    *propertyMatch = 0;
-    if (alphaOp == OP_EX) {
-        *propertyMatch = 1;
-        return RULES_OK;
-    }
-
-    rehydrateProperty(currentProperty, message);
-    jsonProperty rightValue;
-    jsonProperty *rightProperty = &rightValue;
-    unsigned char releaseRightState = 0;
-    char *rightState = NULL;
-    result = valueToProperty(tree,
-                             sid,
-                             message,
-                             messageObject,
-                             &currentAlpha->right,
-                             &rightState,
-                             &releaseRightState,
-                             &rightProperty);
-    if (result != RULES_OK) {
-        if (releaseRightState) {
-            free(rightState);
+                if (exprs->expressions[i].operator == OP_EQ) {
+                    unsigned int newHash;
+                    result = getFrameHashForExpression(tree,
+                                                       state,
+                                                       &exprs->expressions[i],
+                                                       messageObject,
+                                                       context,
+                                                       &newHash);
+                    if (result == RULES_OK) {
+                        *hash ^= newHash;
+                        *hash *= FNV_32_PRIME;
+                    }
+                }
+            }
         }
-
-        if (result != ERR_NEW_SESSION && result != ERR_PROPERTY_NOT_FOUND) {
-            return result;    
-        }
-
-        return RULES_OK;
     }
     
-    int leftLength;
-    int rightLength;
-    unsigned short type = propertyType << 8;
-    type = type + rightProperty->type;
-    switch(type) {
-        case OP_BOOL_BOOL:
-            *propertyMatch = compareBool(currentProperty->value.b, rightProperty->value.b, alphaOp);
-            break;
-        case OP_BOOL_INT: 
-            *propertyMatch = compareInt(currentProperty->value.b, rightProperty->value.i, alphaOp);
-            break;
-        case OP_BOOL_DOUBLE: 
-            *propertyMatch = compareDouble(currentProperty->value.b, rightProperty->value.d, alphaOp);
-            break;
-        case OP_BOOL_STRING:
-            if (currentProperty->value.b) {
-                *propertyMatch = compareStringProperty("true",
-                                                       rightProperty->valueString, 
-                                                       rightProperty->valueLength,
-                                                       alphaOp);
-            }
-            else {
-                *propertyMatch = compareStringProperty("false",
-                                                       rightProperty->valueString, 
-                                                       rightProperty->valueLength,
-                                                       alphaOp);
+    return RULES_OK;
+}
+
+static unsigned int isBetaMatch(ruleset *tree,
+                                stateNode *state, 
+                                beta *currentBeta, 
+                                jsonObject *messageObject,
+                                leftFrameNode *context,
+                                unsigned char *propertyMatch) {
+
+    jsonProperty resultProperty;
+    unsigned short i = 0;
+    CHECK_RESULT(reduceExpressionSequence(tree,
+                                         state,
+                                         &currentBeta->expressionSequence,
+                                         OP_NOP,
+                                         messageObject,
+                                         context,
+                                         &i,
+                                         &resultProperty));
+
+    if (resultProperty.type != JSON_BOOL) {
+        return ERR_OPERATION_NOT_SUPPORTED;
+    }
+
+    *propertyMatch = resultProperty.value.b;
+
+    return RULES_OK;
+}
+
+static unsigned int isAlphaMatch(ruleset *tree,
+                                 alpha *currentAlpha,
+                                 jsonObject *messageObject,
+                                 unsigned char *propertyMatch) {
+
+    *propertyMatch = 0;
+    if (currentAlpha->expression.operator == OP_EX) {
+        *propertyMatch = 1;
+    } else {
+        jsonProperty resultProperty;
+        unsigned int result = reduceExpression(tree,
+                                               NULL,
+                                               &currentAlpha->expression,
+                                               messageObject,
+                                               NULL,
+                                               &resultProperty);
+
+        if (result == ERR_OPERATION_NOT_SUPPORTED || resultProperty.type != JSON_BOOL) {
+            *propertyMatch = 0;
+        } else {
+            *propertyMatch = resultProperty.value.b;
+        }
+    }
+
+    return RULES_OK;
+}
+
+static unsigned char isDistinct(leftFrameNode *currentFrame, unsigned int currentMessageOffset) {
+    for (unsigned short i = 0; i < currentFrame->messageCount; ++i) {
+        if (currentFrame->messages[currentFrame->reverseIndex[i]].messageNodeOffset == currentMessageOffset) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+static unsigned int handleAction(ruleset *tree, 
+                                 stateNode *state, 
+                                 node *node,
+                                 frameLocation currentFrameLocation,
+                                 leftFrameNode *frame) {
+#ifdef _PRINT
+
+    printf("handle action %s\n", &tree->stringPool[node->nameOffset]);
+    printf("frame %d, %d\n", currentFrameLocation.nodeIndex, currentFrameLocation.frameOffset);
+    for (int i = 0; i < MAX_MESSAGE_FRAMES; ++i) {
+        if (frame->messages[i].hash) {
+            messageNode *node = MESSAGE_NODE(state, frame->messages[i].messageNodeOffset);
+            printf("   %d -> %s\n", frame->messages[i].messageNodeOffset, node->jo.content);
+        }
+    }
+
+#endif
+
+    return RULES_OK;
+}
+
+static unsigned int handleBetaFrame(ruleset *tree, 
+                                    stateNode *state,
+                                    unsigned int oldMessageOffset,
+                                    node *oldNode,
+                                    node *currentNode,
+                                    leftFrameNode *oldFrame,
+                                    leftFrameNode *currentFrame) {
+    frameLocation currentFrameLocation;
+    unsigned int frameType = LEFT_FRAME; 
+    
+    if (currentNode->type == NODE_ACTION) {
+        CHECK_RESULT(createActionFrame(state,
+                                       currentNode,
+                                       currentFrame,
+                                       &currentFrame,
+                                       &currentFrameLocation));
+    } else if (currentNode->type == NODE_BETA) {
+        CHECK_RESULT(createLeftFrame(state,
+                                     currentNode,
+                                     currentFrame,
+                                     &currentFrame,
+                                     &currentFrameLocation));
+    } else {
+        node *aNode = &tree->nodePool[currentNode->value.b.aOffset];
+        frameType = (aNode == oldNode) ? A_FRAME : B_FRAME;
+        CHECK_RESULT(createConnectorFrame(state,
+                                          frameType,
+                                          currentNode,
+                                          currentFrame,
+                                          &currentFrame,
+                                          &currentFrameLocation));
+    }
+
+    if (oldMessageOffset != UNDEFINED_HASH_OFFSET) {
+        CHECK_RESULT(setMessageInFrame(currentFrame,
+                                       oldNode->nameOffset,
+                                       oldNode->value.b.hash,
+                                       oldMessageOffset));
+
+        CHECK_RESULT(addFrameLocation(state,
+                                      currentFrameLocation,
+                                      oldMessageOffset));  
+    }
+
+    if (oldFrame) {
+        for (int i = 0; i < oldFrame->messageCount; ++i) {
+            messageFrame *currentMessageFrame = &oldFrame->messages[oldFrame->reverseIndex[i]]; 
+            CHECK_RESULT(setMessageInFrame(currentFrame,
+                                           currentMessageFrame->nameOffset,
+                                           currentMessageFrame->hash,
+                                           currentMessageFrame->messageNodeOffset));
+
+            CHECK_RESULT(addFrameLocation(state,
+                                          currentFrameLocation,
+                                          currentMessageFrame->messageNodeOffset));     
+        }
+    }
+
+    unsigned int frameHash = UNDEFINED_HASH_OFFSET;
+    if (currentNode->type == NODE_ACTION) {
+        CHECK_RESULT(setActionFrame(state, 
+                                    currentFrameLocation));
+
+        return handleAction(tree, 
+                            state, 
+                            currentNode,
+                            currentFrameLocation,
+                            currentFrame);
+    } else if (currentNode->type == NODE_BETA) {
+        CHECK_RESULT(getFrameHash(tree,
+                                  state,
+                                  &currentNode->value.b,
+                                  NULL,
+                                  currentFrame,
+                                  &frameHash));
+
+        CHECK_RESULT(setLeftFrame(state,
+                                  frameHash,
+                                  currentFrameLocation));
+    } else {
+        CHECK_RESULT(setConnectorFrame(state,
+                                       frameType,                         
+                                       currentFrameLocation));
+    }
+
+
+    node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
+    if (currentNode->value.b.not) {
+        // Apply filter to frame and clone old closure
+        rightFrameNode *rightFrame = NULL;
+        CHECK_RESULT(getLastRightFrame(state,
+                                       currentNode->value.b.index,
+                                       frameHash,
+                                       &rightFrame));
+        while (rightFrame) {
+            messageNode *rightMessage = MESSAGE_NODE(state, rightFrame->messageOffset); 
+            unsigned char match = 0;
+            CHECK_RESULT(isBetaMatch(tree,
+                                     state,
+                                     &currentNode->value.b,
+                                     &rightMessage->jo,
+                                     currentFrame,
+                                     &match));
+            if (match) {
+                if (!currentNode->value.b.distinct || isDistinct(currentFrame, rightFrame->messageOffset)) {
+                    return RULES_OK;
+                }
             }
             
-            break;
-        case OP_INT_BOOL:
-            *propertyMatch = compareInt(currentProperty->value.i, rightProperty->value.b, alphaOp);
-            break;
-        case OP_INT_INT: 
-            *propertyMatch = compareInt(currentProperty->value.i, rightProperty->value.i, alphaOp);
-            break;
-        case OP_INT_DOUBLE: 
-            *propertyMatch = compareDouble(currentProperty->value.i, rightProperty->value.d, alphaOp);
-            break;
-        case OP_INT_STRING:
-            {
-                rightLength = rightProperty->valueLength + 1;
-#ifdef _WIN32
-                char *leftStringInt = (char *)_alloca(sizeof(char)*(rightLength));
-                sprintf_s(leftStringInt, sizeof(char)*(rightLength), "%ld", currentProperty->value.i);
-#else
-                char leftStringInt[rightLength];
-                snprintf(leftStringInt, sizeof(char)*(rightLength), "%ld", currentProperty->value.i);
-#endif         
-                *propertyMatch = compareStringProperty(leftStringInt, 
-                                                       rightProperty->valueString,
-                                                       rightProperty->valueLength, 
-                                                       alphaOp);
+            unsigned int rightFrameOffset = rightFrame->prevOffset;
+            rightFrame = NULL;
+            while (rightFrameOffset != UNDEFINED_HASH_OFFSET && !rightFrame) {
+                rightFrame = RIGHT_FRAME_NODE(state,
+                                              currentNode->value.b.index, 
+                                              rightFrameOffset); 
+                if (rightFrame->hash != frameHash) {
+                    rightFrameOffset = rightFrame->prevOffset;
+                    rightFrame = NULL;
+                } 
             }
-            break;
-        case OP_DOUBLE_BOOL:
-            *propertyMatch = compareDouble(currentProperty->value.d, rightProperty->value.b, alphaOp);
-            break;
-        case OP_DOUBLE_INT: 
-            *propertyMatch = compareDouble(currentProperty->value.d, rightProperty->value.i, alphaOp);
-            break;
-        case OP_DOUBLE_DOUBLE: 
-            *propertyMatch = compareDouble(currentProperty->value.d, rightProperty->value.d, alphaOp);
-            break;
-        case OP_DOUBLE_STRING:
-            {
-                rightLength = rightProperty->valueLength + 1;
-#ifdef _WIN32
-                char *leftStringDouble = (char *)_alloca(sizeof(char)*(rightLength));
-                sprintf_s(leftStringDouble, sizeof(char)*(rightLength), "%f", currentProperty->value.d);
-#else
-                char leftStringDouble[rightLength];
-                snprintf(leftStringDouble, sizeof(char)*(rightLength), "%f", currentProperty->value.d);
-#endif         
-                *propertyMatch = compareStringProperty(leftStringDouble,
-                                                       rightProperty->valueString,
-                                                       rightProperty->valueLength, 
-                                                       alphaOp);
+        }
+
+        return handleBetaFrame(tree,
+                               state, 
+                               UNDEFINED_HASH_OFFSET,
+                               currentNode,
+                               nextNode,
+                               NULL,
+                               currentFrame);
+
+    } else if (currentNode->type == NODE_BETA) {
+        // Find all messages for frame 
+        rightFrameNode *rightFrame;
+        CHECK_RESULT(getLastRightFrame(state,
+                                       currentNode->value.b.index,
+                                       frameHash,
+                                       &rightFrame));
+
+        
+        while (rightFrame) {
+            messageNode *rightMessage = MESSAGE_NODE(state, rightFrame->messageOffset); 
+            unsigned char match = 0;
+            CHECK_RESULT(isBetaMatch(tree,
+                                     state,
+                                     &currentNode->value.b,
+                                     &rightMessage->jo,
+                                     currentFrame,
+                                     &match));
+
+            if (match && (!currentNode->value.b.distinct || isDistinct(currentFrame, rightFrame->messageOffset))) {
+                CHECK_RESULT(handleBetaFrame(tree,
+                                             state, 
+                                             rightFrame->messageOffset,
+                                             currentNode,
+                                             nextNode,
+                                             NULL,
+                                             currentFrame));
             }
-            break;
-        case OP_STRING_BOOL:
-            if (rightProperty->value.b) {
-                *propertyMatch = compareString(currentProperty->valueString, 
-                                               currentProperty->valueLength, 
-                                               "true", 
-                                               alphaOp);
+            
+            unsigned int rightFrameOffset = rightFrame->prevOffset;
+            rightFrame = NULL;
+            while (rightFrameOffset != UNDEFINED_HASH_OFFSET && !rightFrame) {
+                rightFrame = RIGHT_FRAME_NODE(state,
+                                              currentNode->value.b.index, 
+                                              rightFrameOffset); 
+                if (rightFrame->hash != frameHash) {
+                    rightFrameOffset = rightFrame->prevOffset;
+                    rightFrame = NULL;
+                } 
             }
-            else {
-                *propertyMatch = compareString(currentProperty->valueString, 
-                                               currentProperty->valueLength, 
-                                               "false", 
-                                               alphaOp);
-            }
-            break;
-        case OP_STRING_INT: 
-            {
-                leftLength = currentProperty->valueLength + 1;
-#ifdef _WIN32
-                char *rightStringInt = (char *)_alloca(sizeof(char)*(leftLength));
-                sprintf_s(rightStringInt, sizeof(char)*(leftLength), "%ld", rightProperty->value.i);
-#else
-                char rightStringInt[leftLength];
-                snprintf(rightStringInt, sizeof(char)*(leftLength), "%ld", rightProperty->value.i);
-#endif
-                *propertyMatch = compareString(currentProperty->valueString, 
-                                               currentProperty->valueLength, 
-                                               rightStringInt, 
-                                               alphaOp);
-            }
-            break;
-        case OP_STRING_DOUBLE: 
-            {
-                leftLength = currentProperty->valueLength + 1;
-#ifdef _WIN32
-                char *rightStringDouble = (char *)_alloca(sizeof(char)*(leftLength));
-                sprintf_s(rightStringDouble, sizeof(char)*(leftLength), "%f", rightProperty->value.d);
-#else
-                char rightStringDouble[leftLength];
-                snprintf(rightStringDouble, sizeof(char)*(leftLength), "%f", rightProperty->value.d);
-#endif              
-                *propertyMatch = compareString(currentProperty->valueString, 
-                                               currentProperty->valueLength, 
-                                               rightStringDouble, 
-                                               alphaOp);
-            }
-            break;
-        case OP_STRING_STRING:
-            *propertyMatch = compareStringAndStringProperty(currentProperty->valueString, 
-                                                            currentProperty->valueLength, 
-                                                            rightProperty->valueString,
-                                                            rightProperty->valueLength,
-                                                            alphaOp);
-            break;
-        case OP_BOOL_NIL:
-        case OP_INT_NIL:
-        case OP_DOUBLE_NIL:
-        case OP_STRING_NIL:
-            if (alphaOp == OP_NEQ) {
-                *propertyMatch = 1;
+        }   
+    } else {
+        // Get all other frames 
+        leftFrameNode *connectorFrame;
+        unsigned int connectorFrameOffset;
+        unsigned int otherFrameType = (frameType == B_FRAME) ? A_FRAME : B_FRAME;
+        CHECK_RESULT(getLastConnectorFrame(state,
+                                           otherFrameType,
+                                           currentNode->value.b.index,
+                                           &connectorFrameOffset,
+                                           &connectorFrame));
+
+        while (connectorFrame) {
+            CHECK_RESULT(handleBetaFrame(tree,
+                                         state, 
+                                         UNDEFINED_HASH_OFFSET,
+                                         currentNode,
+                                         nextNode,
+                                         connectorFrame,
+                                         currentFrame));
+
+            connectorFrameOffset = connectorFrame->prevOffset;
+            if (connectorFrameOffset == UNDEFINED_HASH_OFFSET) {
+                connectorFrame = NULL;
+            } else if (otherFrameType == A_FRAME) {
+                connectorFrame = A_FRAME_NODE(state,
+                                              currentNode->value.b.index, 
+                                              connectorFrameOffset); 
             } else {
-                *propertyMatch = 0;
+                connectorFrame = B_FRAME_NODE(state,
+                                              currentNode->value.b.index, 
+                                              connectorFrameOffset);
             }
-
-            break;
-        case OP_NIL_NIL:
-            if (alphaOp == OP_EQ) {
-                *propertyMatch = 1;
-            } else {
-                *propertyMatch = 0;
-            }
-
-            break;
-        case OP_STRING_REGEX:
-        case OP_STRING_IREGEX:
-            *propertyMatch = evaluateRegex(tree,
-                                           currentProperty->valueString, 
-                                           currentProperty->valueLength, 
-                                           (type == OP_STRING_REGEX) ? 0 : 1,
-                                           currentAlpha->right.value.regex.vocabularyLength,
-                                           currentAlpha->right.value.regex.statesLength,
-                                           currentAlpha->right.value.regex.stateMachineOffset);
-            break;
-
+        }
     }
-    
-    if (releaseRightState) {
-        free(rightState);
-    }
-    return result;
+
+    if (currentNode->value.b.gateType == GATE_OR || currentNode->value.b.isFirst) {
+        CHECK_RESULT(handleBetaFrame(tree,
+                                     state, 
+                                     UNDEFINED_HASH_OFFSET,
+                                     currentNode,
+                                     nextNode,
+                                     NULL,
+                                     currentFrame));
+    } 
+
+    return RULES_OK;
 }
 
-static unsigned int isArrayMatch(ruleset *tree,
-                                 char *sid,
-                                 char *message,
-                                 jsonObject *messageObject,
-                                 jsonProperty *currentProperty,
-                                 alpha *arrayAlpha,
-                                 unsigned char *propertyMatch,
-                                 void **rulesBinding) {
+static unsigned int handleDeleteMessage(ruleset *tree,
+                                        stateNode *state,
+                                        unsigned int messageOffset) {
+    unsigned int result;
+    unsigned int count = 0;
+    unsigned int i = 1;
+    messageNode *message = MESSAGE_NODE(state, messageOffset);
+    if (!message->isActive) {
+        return RULES_OK;
+    }
+
+    while (count < message->locationPool.count) {
+        locationNode *currentLocationNode = LOCATION_NODE(message, i++);
+        if (currentLocationNode->isActive) {
+            ++count;
+            leftFrameNode *frame = NULL;
+            switch(currentLocationNode->location.frameType) {
+                case A_FRAME:
+                    frame = A_FRAME_NODE(state, 
+                                         currentLocationNode->location.nodeIndex,
+                                         currentLocationNode->location.frameOffset);
+                    
+                    result = deleteConnectorFrame(state, 
+                                                  currentLocationNode->location.frameType, 
+                                                  currentLocationNode->location);
+                    break;
+                case B_FRAME:
+                    frame = B_FRAME_NODE(state, 
+                                         currentLocationNode->location.nodeIndex,
+                                         currentLocationNode->location.frameOffset);
+                    
+                    result = deleteConnectorFrame(state, 
+                                                  currentLocationNode->location.frameType, 
+                                                  currentLocationNode->location);
+                    break;
+                case LEFT_FRAME:
+                    frame = LEFT_FRAME_NODE(state, 
+                                            currentLocationNode->location.nodeIndex,
+                                            currentLocationNode->location.frameOffset);
+                    
+                    result = deleteLeftFrame(state, 
+                                             currentLocationNode->location);
+                    break;
+                case ACTION_FRAME:
+                    frame = ACTION_FRAME_NODE(state, 
+                                              currentLocationNode->location.nodeIndex,
+                                              currentLocationNode->location.frameOffset);
+
+                    result = deleteActionFrame(state, 
+                                               currentLocationNode->location);
+                    break;
+                case RIGHT_FRAME:
+                    result = deleteRightFrame(state, 
+                                              currentLocationNode->location);
+                    break;
+            }
+
+            if (result != RULES_OK && result != ERR_NODE_DISPATCHING && result != ERR_NODE_DELETED) {
+                return result;
+            } else if (result == ERR_NODE_DISPATCHING) {
+                CHECK_RESULT(deleteMessageFromFrame(messageOffset, frame));
+            } else if (result == RULES_OK) {
+                if (currentLocationNode->location.frameType != RIGHT_FRAME) {
+                    for (unsigned int ii = 0; ii < frame->messageCount; ++ii) {
+                        messageFrame *currentFrame = &frame->messages[frame->reverseIndex[ii]]; 
+                        if (currentFrame->messageNodeOffset != messageOffset) {
+                            CHECK_RESULT(deleteFrameLocation(state,
+                                                             currentFrame->messageNodeOffset,
+                                                             currentLocationNode->location));
+                        }
+                    }                  
+                } else {
+                    node *currentNode = state->betaState[currentLocationNode->location.nodeIndex].reteNode;
+                    if (currentNode->value.b.not) {
+                        if (currentNode->value.b.isFirst) {
+                            if (!state->betaState[currentLocationNode->location.nodeIndex].rightFramePool.count) {
+                                node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
+                                CHECK_RESULT(handleBetaFrame(tree,
+                                                             state, 
+                                                             UNDEFINED_HASH_OFFSET,
+                                                             currentNode,
+                                                             nextNode,
+                                                             NULL,
+                                                             NULL));
+                            }
+                        } else {
+                            unsigned int messageHash;
+                            CHECK_RESULT(getFrameHash(tree,
+                                                      state,
+                                                      &currentNode->value.b,
+                                                      &message->jo,
+                                                      NULL,
+                                                      &messageHash));
+
+                            node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
+
+                            // Find all frames for message
+                            leftFrameNode *currentFrame = NULL;
+                            CHECK_RESULT(getLastLeftFrame(state,
+                                                          currentNode->value.b.index,
+                                                          messageHash,
+                                                          NULL,
+                                                          &currentFrame));
+                            while (currentFrame) {
+                                unsigned char match = 0;
+                                CHECK_RESULT(isBetaMatch(tree,
+                                                         state,
+                                                         &currentNode->value.b,
+                                                         &message->jo,
+                                                         currentFrame,
+                                                         &match));
+
+                                if (match && (!currentNode->value.b.distinct || isDistinct(currentFrame, messageOffset))) {
+                                    CHECK_RESULT(handleBetaFrame(tree,
+                                                                 state, 
+                                                                 UNDEFINED_HASH_OFFSET,
+                                                                 currentNode,
+                                                                 nextNode,
+                                                                 NULL,
+                                                                 currentFrame));
+                                }
+
+                                unsigned int currentFrameOffset = currentFrame->prevOffset;
+                                currentFrame = NULL;
+                                while (currentFrameOffset != UNDEFINED_HASH_OFFSET) {
+                                    currentFrame = LEFT_FRAME_NODE(state, 
+                                                                   currentNode->value.b.index, 
+                                                                   currentFrameOffset);
+                                    if (currentFrame->hash != messageHash) {
+                                        currentFrameOffset = currentFrame->prevOffset;
+                                        currentFrame = NULL;
+                                    } else {
+                                        currentFrameOffset = UNDEFINED_HASH_OFFSET;
+                                    }   
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    result = deleteMessage(state, messageOffset);
+    if (result == ERR_NODE_DELETED) {
+        return RULES_OK;
+    } else if (result != RULES_OK) {
+        return result;
+    }
+
+    return RULES_OK;
+}
+
+static unsigned char isSubset(leftFrameNode *currentFrame, 
+                              leftFrameNode *targetFrame) {
+
+    for (unsigned int i = 0; i < currentFrame->messageCount; ++i) {
+        unsigned char found = 0;
+        for (unsigned int ii = 0; ii < targetFrame->messageCount; ++ii) {
+            if (currentFrame->messages[currentFrame->reverseIndex[i]].messageNodeOffset == 
+                targetFrame->messages[targetFrame->reverseIndex[ii]].messageNodeOffset) {
+                found = 1;
+                break;
+            }
+        }
+
+        if (!found) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+static unsigned int deleteDownstreamFrames(ruleset *tree, 
+                                           stateNode *state,
+                                           node *currentNode,
+                                           leftFrameNode *currentFrame) {
+
+    messageNode *currentMessage = NULL;
+
+    // Find message with the smallest location count
+    for (unsigned int i = 0; i < currentFrame->messageCount; ++i) {
+        if (currentFrame->messages[i].messageNodeOffset != UNDEFINED_HASH_OFFSET) {
+            messageNode *message = MESSAGE_NODE(state, currentFrame->messages[i].messageNodeOffset);
+            if (!currentMessage ||
+                message->locationPool.count < currentMessage->locationPool.count) {
+                currentMessage = message;
+            }
+        }
+    }
+
+    if (currentMessage) {
+        unsigned int i = 1;
+        unsigned int count = 0;
+        while (count < currentMessage->locationPool.count) {
+            locationNode *candidateLocationNode = LOCATION_NODE(currentMessage, i++);
+            if (candidateLocationNode->isActive) {
+                ++count;
+
+                leftFrameNode *candidateFrame = NULL;
+                if (candidateLocationNode->location.frameType == LEFT_FRAME &&
+                    candidateLocationNode->location.nodeIndex > currentNode->value.b.index) {
+                    candidateFrame = LEFT_FRAME_NODE(state, 
+                                                     candidateLocationNode->location.nodeIndex, 
+                                                     candidateLocationNode->location.frameOffset);
+                } else if (candidateLocationNode->location.frameType == ACTION_FRAME) {
+                    candidateFrame = ACTION_FRAME_NODE(state, 
+                                                       candidateLocationNode->location.nodeIndex, 
+                                                       candidateLocationNode->location.frameOffset);
+                }
+
+                if (candidateFrame && isSubset(currentFrame, candidateFrame)) {
+
+                    unsigned int result;
+                    if (candidateLocationNode->location.frameType == LEFT_FRAME) {
+                        result = deleteLeftFrame(state, 
+                                                 candidateLocationNode->location);
+                    } else {
+                        result = deleteActionFrame(state, 
+                                                   candidateLocationNode->location);   
+                    }
+
+                    if (result != ERR_NODE_DELETED && result != ERR_NODE_DISPATCHING && result != RULES_OK) {
+                        return result;
+                    }
+                }
+            }
+        }
+    }
+
+    return RULES_OK;
+}
+
+static unsigned int handleFilterFrames(ruleset *tree, 
+                                       stateNode *state,
+                                       node *currentNode,
+                                       jsonObject *messageObject,
+                                       unsigned int currentMessageOffset,
+                                       unsigned int messageHash) { 
+
+    leftFrameNode *currentFrame = NULL;
+    frameLocation location;
+    CHECK_RESULT(getLastLeftFrame(state,
+                                  currentNode->value.b.index,
+                                  messageHash,
+                                  &location,
+                                  &currentFrame));
+
+    while (currentFrame) {
+
+        unsigned char match = 0;
+        CHECK_RESULT(isBetaMatch(tree,
+                                 state,
+                                 &currentNode->value.b,
+                                 messageObject,
+                                 currentFrame,
+                                 &match));
+
+        if (match) {
+            if (!currentNode->value.b.distinct || isDistinct(currentFrame, currentMessageOffset)) {
+                CHECK_RESULT(deleteDownstreamFrames(tree,
+                                                    state,
+                                                    currentNode,
+                                                    currentFrame));
+            }
+        } 
+
+        location.frameOffset = currentFrame->prevOffset;
+        currentFrame = NULL;
+        while (location.frameOffset != UNDEFINED_HASH_OFFSET) {
+            currentFrame = LEFT_FRAME_NODE(state, 
+                                           location.nodeIndex, 
+                                           location.frameOffset);
+            
+            if (currentFrame->hash == messageHash) {
+                break;
+            } else {
+                location.frameOffset = currentFrame->prevOffset;
+                currentFrame = NULL;
+            } 
+        }
+    }   
+
+    return RULES_OK;
+}
+
+static unsigned int handleMatchFrames(ruleset *tree, 
+                                      stateNode *state,
+                                      node *currentNode,
+                                      jsonObject *messageObject,
+                                      unsigned int currentMessageOffset,
+                                      unsigned int messageHash) { 
+    // Find frames for message
+    leftFrameNode *currentFrame = NULL;
+    node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
+    CHECK_RESULT(getLastLeftFrame(state,
+                                  currentNode->value.b.index,
+                                  messageHash,
+                                  NULL,
+                                  &currentFrame));
+
+    while (currentFrame) {
+        unsigned char match = 0;
+        CHECK_RESULT(isBetaMatch(tree,
+                                 state,
+                                 &currentNode->value.b,
+                                 messageObject,
+                                 currentFrame,
+                                 &match));
+
+        if (match && (!currentNode->value.b.distinct || isDistinct(currentFrame, currentMessageOffset))) {
+            CHECK_RESULT(handleBetaFrame(tree,
+                                         state, 
+                                         currentMessageOffset,
+                                         currentNode,
+                                         nextNode,
+                                         NULL,
+                                         currentFrame));
+        }
+
+        unsigned int currentFrameOffset = currentFrame->prevOffset;        
+        currentFrame = NULL;
+        while (currentFrameOffset != UNDEFINED_HASH_OFFSET) {
+            currentFrame = LEFT_FRAME_NODE(state, 
+                                           currentNode->value.b.index, 
+                                           currentFrameOffset);
+            if (currentFrame->hash == messageHash) {
+                break;
+            } else {
+                currentFrameOffset = currentFrame->prevOffset;
+                currentFrame = NULL;
+            }  
+        }
+    }
+
+    if(currentNode->value.b.gateType == GATE_OR && !currentNode->value.b.expressionSequence.length) {
+        return handleBetaFrame(tree,
+                               state,
+                               currentMessageOffset,
+                               currentNode, 
+                               nextNode,
+                               NULL,
+                               NULL);   
+    }
+
+    return RULES_OK;
+}
+
+static unsigned int handleBetaMessage(ruleset *tree, 
+                                      stateNode *state,
+                                      node *betaNode,
+                                      jsonObject *messageObject,
+                                      unsigned int currentMessageOffset) { 
+    if (betaNode->value.b.isFirst && !betaNode->value.b.not) {
+        node *nextNode = &tree->nodePool[betaNode->value.b.nextOffset];
+        return handleBetaFrame(tree,
+                               state,
+                               currentMessageOffset,
+                               betaNode, 
+                               nextNode,
+                               NULL,
+                               NULL);
+    }
+
+    frameLocation rightFrameLocation;
+    rightFrameNode *rightFrame;
+
+    CHECK_RESULT(createRightFrame(state,
+                                  betaNode,
+                                  &rightFrame,
+                                  &rightFrameLocation));
+
+    unsigned int messageHash;
+    CHECK_RESULT(getFrameHash(tree,
+                              state,
+                              &betaNode->value.b,
+                              messageObject,
+                              NULL,
+                              &messageHash));
+
+    rightFrame->messageOffset = currentMessageOffset;
+    CHECK_RESULT(addFrameLocation(state,
+                                  rightFrameLocation,
+                                  currentMessageOffset));
+
+    CHECK_RESULT(setRightFrame(state,
+                               messageHash,
+                               rightFrameLocation)); 
+
+    if (betaNode->value.b.not) {
+        return handleFilterFrames(tree,
+                                  state,
+                                  betaNode,
+                                  messageObject,
+                                  currentMessageOffset,
+                                  messageHash);
+    } 
+
+    return handleMatchFrames(tree,
+                             state,
+                             betaNode,
+                             messageObject,
+                             currentMessageOffset,
+                             messageHash);
+}
+
+
+static unsigned int handleAplhaArray(ruleset *tree,
+                                     jsonObject *messageObject,
+                                     jsonProperty *currentProperty,
+                                     alpha *arrayAlpha,
+                                     unsigned char *propertyMatch) {
     unsigned int result = RULES_OK;
     if (currentProperty->type != JSON_ARRAY) {
         return RULES_OK;
     }
 
-    char *first = currentProperty->valueString;
+    char *first = messageObject->content + currentProperty->valueOffset;
     char *last;
     unsigned char type;
     jsonObject jo;
@@ -957,25 +1422,26 @@ static unsigned int isArrayMatch(ruleset *tree,
         if (type == JSON_OBJECT) {
             char *next;
             jo.propertiesLength = 0;
-            result = constructObject(first,
-                                     "$i", 
-                                     NULL, 
-                                     JSON_OBJECT_SEQUENCED, 
-                                     0,
-                                     &jo, 
-                                     &next);
-            if (result != RULES_OK) {
-                return result;
-            }
+            jo.content = first;
+            jo.idIndex = UNDEFINED_INDEX;
+            jo.sidIndex = UNDEFINED_INDEX;
+            memset(jo.propertyIndex, 0, MAX_OBJECT_PROPERTIES * sizeof(unsigned short));
+
+            CHECK_RESULT(constructObject(first,
+                                         "$i", 
+                                         NULL, 
+                                         0,
+                                         &jo, 
+                                         &next));
         } else {
-            jo.propertiesLength = 1;
-            jo.properties[0].hash = HASH_I;
-            jo.properties[0].type = type;
-            jo.properties[0].isMaterial = 0;
-            jo.properties[0].valueString = first;
-            jo.properties[0].valueLength = last - first;
-            jo.properties[0].nameLength = 2;
-            strcpy(jo.properties[0].name, "$i");
+            memset(jo.propertyIndex, 0, MAX_OBJECT_PROPERTIES * sizeof(unsigned short));
+            jo.propertiesLength = 0;
+            jo.content = first;
+            CHECK_RESULT(setObjectProperty(&jo, 
+                                           HASH_I, 
+                                           type, 
+                                           0, 
+                                           last - first + 1));
         }
 
         while (top) {
@@ -988,7 +1454,7 @@ static unsigned int isArrayMatch(ruleset *tree,
                     node *listNode = &tree->nodePool[nextList[entry]];
                     char exists = 0;
                     for(unsigned int propertyIndex = 0; propertyIndex < jo.propertiesLength; ++propertyIndex) {
-                        if (listNode->value.a.hash == jo.properties[propertyIndex].hash) {
+                        if (listNode->value.a.expression.left.value.id.propertyNameHash == jo.properties[propertyIndex].hash) {
                             // filter out not exists (OP_NEX)
                             exists = 1;
                             break;
@@ -1013,27 +1479,20 @@ static unsigned int isArrayMatch(ruleset *tree,
                     jsonProperty *currentProperty = &jo.properties[propertyIndex];
                     for (unsigned int entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
                         node *hashNode = &tree->nodePool[nextHashset[entry]];
-                        if (currentProperty->hash == hashNode->value.a.hash) {
+                        if (currentProperty->hash == hashNode->value.a.expression.left.value.id.propertyNameHash) {
                             unsigned char match = 0;
-                            if (hashNode->value.a.operator == OP_IALL || hashNode->value.a.operator == OP_IANY) {
-                                // isArrayMatch finds a valid path, thus use propertyMatch
-                                result = isArrayMatch(tree, 
-                                                      sid, 
-                                                      message,
-                                                      messageObject,
-                                                      currentProperty, 
-                                                      &hashNode->value.a,
-                                                      propertyMatch,
-                                                      rulesBinding);
+                            if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
+                                // handleAplhaArray finds a valid path, thus use propertyMatch
+                                CHECK_RESULT(handleAplhaArray(tree, 
+                                                              &jo,
+                                                              currentProperty, 
+                                                              &hashNode->value.a,
+                                                              propertyMatch));
                             } else {
-                                result = isMatch(tree,
-                                                 sid,
-                                                 message,
-                                                 messageObject,
-                                                 currentProperty,
-                                                 &hashNode->value.a,
-                                                 &match,
-                                                 rulesBinding);
+                                CHECK_RESULT(isAlphaMatch(tree,
+                                                          &hashNode->value.a,
+                                                          &jo,
+                                                          &match));
 
                                 if (match) {
                                     if (top == MAX_STACK_SIZE) {
@@ -1043,10 +1502,6 @@ static unsigned int isArrayMatch(ruleset *tree,
                                     stack[top] = &hashNode->value.a; 
                                     ++top;
                                 }
-                            }
-
-                            if (result != RULES_OK) {
-                                return result;
                             }
                         }
                     }               
@@ -1062,8 +1517,8 @@ static unsigned int isArrayMatch(ruleset *tree,
         
         // OP_IANY, one element led a a valid path
         // OP_IALL, all elements led to a valid path
-        if ((arrayAlpha->operator == OP_IALL && !*propertyMatch) ||
-            (arrayAlpha->operator == OP_IANY && *propertyMatch)) {
+        if ((arrayAlpha->expression.operator == OP_IALL && !*propertyMatch) ||
+            (arrayAlpha->expression.operator == OP_IANY && *propertyMatch)) {
             break;
         } 
 
@@ -1073,25 +1528,19 @@ static unsigned int isArrayMatch(ruleset *tree,
     return (result == PARSE_END ? RULES_OK: result);
 }
 
-static unsigned int handleAlpha(ruleset *tree, 
-                                char *sid, 
+static unsigned int handleAlpha(ruleset *tree,
+                                stateNode *state,
                                 char *mid,
-                                char *message,
                                 jsonObject *jo,
-                                alpha *alphaNode, 
-                                unsigned char actionType,
-                                char **evalKeys,
-                                unsigned int *evalCount,
-                                char **addKeys,
-                                unsigned int *addCount,
-                                char **removeCommand,
-                                void **rulesBinding) {                        
-    unsigned int result = ERR_EVENT_NOT_HANDLED;
+                                unsigned int currentMessageOffset,
+                                alpha *alphaNode) { 
     unsigned short top = 1;
     unsigned int entry;
     alpha *stack[MAX_STACK_SIZE];
     stack[0] = alphaNode;
     alpha *currentAlpha;
+    unsigned int result = ERR_EVENT_NOT_HANDLED;
+
     while (top) {
         --top;
         currentAlpha = stack[top];
@@ -1100,16 +1549,10 @@ static unsigned int handleAlpha(ruleset *tree,
             unsigned int *nextList = &tree->nextPool[currentAlpha->nextListOffset];
             for (entry = 0; nextList[entry] != 0; ++entry) {
                 node *listNode = &tree->nodePool[nextList[entry]];
-                char exists = 0;
-                for(unsigned int propertyIndex = 0; propertyIndex < jo->propertiesLength; ++propertyIndex) {
-                    if (listNode->value.a.hash == jo->properties[propertyIndex].hash) {
-                        // filter out not exists (OP_NEX)
-                        exists = 1;
-                        break;
-                    }
-                }
-
-                if (!exists) {
+                jsonProperty *property;
+                unsigned int aresult = getObjectProperty(jo, listNode->value.a.expression.left.value.id.propertyNameHash, &property);
+                if (aresult == ERR_PROPERTY_NOT_FOUND) {
+                    // filter out not exists (OP_NEX)
                     if (top == MAX_STACK_SIZE) {
                         return ERR_MAX_STACK_SIZE;
                     }
@@ -1127,8 +1570,8 @@ static unsigned int handleAlpha(ruleset *tree,
                 jsonProperty *currentProperty = &jo->properties[propertyIndex];
                 for (entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
                     node *hashNode = &tree->nodePool[nextHashset[entry]];
-                    if (currentProperty->hash == hashNode->value.a.hash) {
-                        if (hashNode->value.a.right.type == JSON_EVENT_PROPERTY || hashNode->value.a.right.type == JSON_EVENT_IDIOM) {
+                    if (currentProperty->hash == hashNode->value.a.expression.left.value.id.propertyNameHash) {
+                        if (hashNode->value.a.expression.right.type == JSON_IDENTIFIER || hashNode->value.a.expression.right.type == JSON_EXPRESSION) {
                             if (top == MAX_STACK_SIZE) {
                                 return ERR_MAX_STACK_SIZE;
                             }
@@ -1136,29 +1579,17 @@ static unsigned int handleAlpha(ruleset *tree,
                             ++top;
                         } else {
                             unsigned char match = 0;
-                            unsigned int mresult = RULES_OK;
-                            if (hashNode->value.a.operator == OP_IALL || hashNode->value.a.operator == OP_IANY) {
-                                mresult = isArrayMatch(tree, 
-                                                       sid, 
-                                                       message,
-                                                       jo,
-                                                       currentProperty, 
-                                                       &hashNode->value.a,
-                                                       &match,
-                                                       rulesBinding);
+                            if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
+                                CHECK_RESULT(handleAplhaArray(tree,
+                                                              jo,
+                                                              currentProperty, 
+                                                              &hashNode->value.a,
+                                                              &match));
                             } else {
-                                mresult = isMatch(tree, 
-                                                  sid, 
-                                                  message,
-                                                  jo,
-                                                  currentProperty, 
-                                                  &hashNode->value.a,
-                                                  &match,
-                                                  rulesBinding);
-                            }
-
-                            if (mresult != RULES_OK){
-                                return mresult;
+                                CHECK_RESULT(isAlphaMatch(tree, 
+                                                          &hashNode->value.a,
+                                                          jo, 
+                                                          &match));
                             }
 
                             if (match) {
@@ -1176,26 +1607,14 @@ static unsigned int handleAlpha(ruleset *tree,
         }
 
         if (currentAlpha->betaListOffset) {
+            result = RULES_OK;
             unsigned int *betaList = &tree->nextPool[currentAlpha->betaListOffset];
             for (unsigned int entry = 0; betaList[entry] != 0; ++entry) {
-                unsigned int bresult = handleBeta(tree, 
-                                    sid, 
-                                    mid,
-                                    &tree->nodePool[betaList[entry]],  
-                                    actionType, 
-                                    evalKeys,
-                                    evalCount,
-                                    addKeys,
-                                    addCount,
-                                    removeCommand,
-                                    rulesBinding);
-                if (bresult != RULES_OK && bresult != ERR_NEW_SESSION) {
-                    return result;
-                }
-
-                if (result != ERR_NEW_SESSION) {
-                    result = bresult;
-                }
+                CHECK_RESULT(handleBetaMessage(tree, 
+                                               state, 
+                                               &tree->nodePool[betaList[entry]],
+                                               jo,
+                                               currentMessageOffset));
             }
         }
     }
@@ -1204,256 +1623,158 @@ static unsigned int handleAlpha(ruleset *tree,
 }
 
 static unsigned int handleMessageCore(ruleset *tree,
-                                      char *state,
-                                      char *message, 
                                       jsonObject *jo, 
                                       unsigned char actionType,
-                                      char **commands,
-                                      unsigned int *commandCount,
-                                      void **rulesBinding) {
-    unsigned int result;
-    char *storeCommand;
+                                      unsigned int *messageOffset,
+                                      unsigned int *stateOffset) {
+    stateNode *sidState;
     jsonProperty *sidProperty = &jo->properties[jo->sidIndex];
     jsonProperty *midProperty = &jo->properties[jo->idIndex];
-    
+
 #ifdef _WIN32
     char *sid = (char *)_alloca(sizeof(char)*(sidProperty->valueLength + 1));
 #else
     char sid[sidProperty->valueLength + 1];
 #endif  
-    strncpy(sid, sidProperty->valueString, sidProperty->valueLength);
+    if (sidProperty->valueOffset) {
+        strncpy(sid, jo->content + sidProperty->valueOffset, sidProperty->valueLength);
+    } else {
+        strncpy(sid, jo->sidBuffer, sidProperty->valueLength);
+    }
+
     sid[sidProperty->valueLength] = '\0';
-    
-#ifdef _WIN32
+
+    #ifdef _WIN32
     char *mid = (char *)_alloca(sizeof(char)*(midProperty->valueLength + 1));
 #else
     char mid[midProperty->valueLength + 1];
 #endif
-    strncpy(mid, midProperty->valueString, midProperty->valueLength);
+    if (midProperty->valueOffset) {
+        strncpy(mid, jo->content + midProperty->valueOffset, midProperty->valueLength);
+    } else {
+        strncpy(mid, jo->idBuffer, midProperty->valueLength);
+    }
+
     mid[midProperty->valueLength] = '\0';
-    
-    if (*commandCount == MAX_COMMAND_COUNT) {
-        return ERR_MAX_COMMAND_COUNT;
-    }
+    unsigned char isNewState;
+    CHECK_RESULT(ensureStateNode(tree, 
+                                 sid,
+                                 &isNewState, 
+                                 &sidState));
 
-    if (state) {
-        if (!*rulesBinding) {
-            result = resolveBinding(tree, sid, rulesBinding);
-            if (result != RULES_OK) {
-                return result;
-            }
+    *stateOffset = sidState->offset;
+    if (actionType == ACTION_UPDATE_STATE) {
+        if (sidState->factOffset != UNDEFINED_HASH_OFFSET) {
+            CHECK_RESULT(handleDeleteMessage(tree,
+                                             sidState,
+                                             sidState->factOffset));
+
         }
 
-        result = formatStoreSession(*rulesBinding, sid, state, 0, &storeCommand);
-        if (result != RULES_OK) {
-            return result;
+        CHECK_RESULT(storeMessage(sidState,
+                                  mid,
+                                  jo,
+                                  MESSAGE_TYPE_FACT,
+                                  messageOffset));
+
+
+        sidState->factOffset = *messageOffset;
+        CHECK_RESULT(handleAlpha(tree,
+                                 sidState,
+                                 mid,
+                                 jo,
+                                 sidState->factOffset,
+                                 &tree->nodePool[NODE_M_OFFSET].value.a));
+
+    } else if (actionType == ACTION_RETRACT_FACT || actionType == ACTION_RETRACT_EVENT) {
+        CHECK_RESULT(getMessage(sidState,
+                                mid,
+                                messageOffset));
+
+        if (*messageOffset != UNDEFINED_HASH_OFFSET) {
+            CHECK_RESULT(handleDeleteMessage(tree,
+                                             sidState,
+                                             *messageOffset));
         }
+    } else {
+        CHECK_RESULT(storeMessage(sidState,
+                                  mid,
+                                  jo,
+                                  (actionType == ACTION_ASSERT_FACT ? MESSAGE_TYPE_FACT : MESSAGE_TYPE_EVENT),
+                                  messageOffset));
 
-        commands[*commandCount] = storeCommand;
-        ++*commandCount;
-    }
-    char *removeCommand = NULL;
-    char *addKeys[MAX_ADD_COUNT];
-    unsigned int addCount = 0;
-    char *evalKeys[MAX_EVAL_COUNT];
-    unsigned int evalCount = 0;
-    result = handleAlpha(tree, 
-                         sid, 
-                         mid,
-                         message, 
-                         jo,
-                         &tree->nodePool[NODE_M_OFFSET].value.a, 
-                         actionType, 
-                         evalKeys,
-                         &evalCount,
-                         addKeys,
-                         &addCount,
-                         &removeCommand,
-                         rulesBinding);
-    if (result == RULES_OK) {
-        if (*commandCount == MAX_COMMAND_COUNT - 3) {
-            for (unsigned int i = 0; i < addCount; ++i) {
-                free(addKeys[i]);
-            }
+        unsigned int result = handleAlpha(tree,
+                                          sidState,
+                                          mid,
+                                          jo,
+                                          *messageOffset,
+                                          &tree->nodePool[NODE_M_OFFSET].value.a);
 
-            for (unsigned int i = 0; i < evalCount; ++i) {
-                free(evalKeys[i]);
-            }
-            
-            return ERR_MAX_COMMAND_COUNT;
-        }
-
-        if (removeCommand) {
-            commands[*commandCount] = removeCommand;
-            ++*commandCount;
-        }
-
-        if (addCount > 0) {
-            char *addCommand = NULL;
-            result = formatStoreMessage(*rulesBinding,
-                                        sid,
-                                        message,
-                                        jo,
-                                        actionType == ACTION_ASSERT_FACT ? 1 : 0,
-                                        evalCount == 0 ? 1 : 0, 
-                                        addKeys,
-                                        addCount,
-                                        &addCommand);
-            for (unsigned int i = 0; i < addCount; ++i) {
-                free(addKeys[i]);
-            }
-
-            if (result != RULES_OK) {
-                for (unsigned int i = 0; i < evalCount; ++i) {
-                    free(evalKeys[i]);
+        if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
+            if (isNewState) {      
+#ifdef _WIN32
+                char *stateMessage = (char *)_alloca(sizeof(char)*(50 + sidProperty->valueLength * 2));
+                sprintf_s(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"id\":\"sid-%s\", \"$s\":1}", sid, sid);
+#else
+                char stateMessage[50 + sidProperty->valueLength * 2];
+                snprintf(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"id\":\"sid-%s\", \"$s\":1}", sid, sid);
+#endif
+                
+                unsigned int stateMessageOffset;
+                unsigned int stateResult = handleMessage(tree,
+                                                         stateMessage,  
+                                                         ACTION_ASSERT_FACT,
+                                                         &stateMessageOffset,
+                                                         stateOffset);
+                if (stateResult != RULES_OK && stateResult != ERR_EVENT_NOT_HANDLED) {
+                    return stateResult;
                 }
 
-                return result;
-            }
+                sidState->factOffset = stateMessageOffset;
 
-            commands[*commandCount] = addCommand;
-            ++*commandCount;
-        }
-
-        if (evalCount > 0) {
-            char *evalCommand = NULL;
-            result = formatEvalMessage(*rulesBinding,
-                                        sid,
-                                        mid,
-                                        message,
-                                        jo,
-                                        actionType == ACTION_REMOVE_FACT ? ACTION_RETRACT_FACT : actionType,
-                                        evalKeys,
-                                        evalCount,
-                                        &evalCommand);
-
-            for (unsigned int i = 0; i < evalCount; ++i) {
-                free(evalKeys[i]);
-            }
-
-            if (result != RULES_OK) {
-                return result;
-            }
-
-            commands[*commandCount] = evalCommand;
-            ++*commandCount;
-        }
-
-        if (!state) {
-            // try creating state if doesn't exist
-            jsonProperty *targetProperty;
-            char *targetState;
-            result = fetchStateProperty(tree, 
-                                        sid, 
-                                        HASH_SID, 
-                                        MAX_STATE_PROPERTY_TIME, 
-                                        1,
-                                        &targetState,
-                                        &targetProperty);
-            if (result != ERR_STATE_NOT_LOADED && result != ERR_PROPERTY_NOT_FOUND) {
-                return result;
-            }
-
-            // this sid has been tried by this process already
-            if (result == ERR_PROPERTY_NOT_FOUND) {
-                return RULES_OK;
-            }
-
-            result = refreshState(tree, sid);
-            if (result != ERR_NEW_SESSION) {
-                return result;
-            }            
-#ifdef _WIN32
-            char *stateMessage = (char *)_alloca(sizeof(char)*(36 + sidProperty->valueLength));
-            char *newState = (char *)_alloca(sizeof(char)*(12 + sidProperty->valueLength));
-            sprintf_s(stateMessage, sizeof(char)*(26 + sidProperty->valueLength), "{\"sid\":\"%s\", \"$s\":1}", sid);
-            sprintf_s(newState, sizeof(char)*(12 + sidProperty->valueLength), "{\"sid\":\"%s\"}", sid); 
-#else
-            char stateMessage[36 + sidProperty->valueLength];
-            char newState[12 + sidProperty->valueLength];
-            snprintf(stateMessage, sizeof(char)*(26 + sidProperty->valueLength), "{\"sid\":\"%s\", \"$s\":1}", sid);
-            snprintf(newState, sizeof(char)*(12 + sidProperty->valueLength), "{\"sid\":\"%s\"}", sid);
-#endif
-
-            if (*commandCount == MAX_COMMAND_COUNT) {
-                return ERR_MAX_COMMAND_COUNT;
-            }
-
-            result = formatStoreSession(*rulesBinding, sid, newState, 1, &storeCommand);
-            if (result != RULES_OK) {
-                return result;
-            }
-
-            commands[*commandCount] = storeCommand;
-            ++*commandCount;
-            result = handleMessage(tree, 
-                                   NULL,
-                                   stateMessage,  
-                                   ACTION_ASSERT_EVENT,
-                                   commands,
-                                   commandCount,
-                                   rulesBinding);
-            if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-                return result;
-            }
-
-            if (result == ERR_EVENT_NOT_HANDLED) {
-                return RULES_OK;
             }
         }
 
-        return RULES_OK;
+        return result;
     } 
 
-    return result;
+    return RULES_OK;
+
 }
 
 static unsigned int handleMessage(ruleset *tree,
-                                  char *state,
                                   char *message, 
                                   unsigned char actionType, 
-                                  char **commands,
-                                  unsigned int *commandCount,
-                                  void **rulesBinding) {
+                                  unsigned int *messageOffset,
+                                  unsigned int *stateOffset) {
     char *next;
     jsonObject jo;
-    int result = constructObject(message,
+    CHECK_RESULT(constructObject(message,
                                  NULL, 
                                  NULL, 
-                                 JSON_OBJECT_SEQUENCED, 
-                                 actionType == ACTION_ASSERT_FACT || 
-                                 actionType == ACTION_RETRACT_FACT || 
-                                 actionType == ACTION_REMOVE_FACT,
+                                 1,
                                  &jo, 
-                                 &next);
-    if (result != RULES_OK) {
-        return result;
-    }
+                                 &next));
     
-    return handleMessageCore(tree,
-                            state, 
-                            message, 
-                            &jo,
-                            actionType,
-                            commands,
-                            commandCount,
-                            rulesBinding);
+    return handleMessageCore(tree, 
+                             &jo,
+                             actionType,
+                             messageOffset,
+                             stateOffset);
 }
 
 static unsigned int handleMessages(ruleset *tree, 
                                    unsigned char actionType,
                                    char *messages, 
-                                   char **commands,
-                                   unsigned int *commandCount,
-                                   void **rulesBinding) {
+                                   unsigned int *stateOffset) {
     unsigned int result;
     unsigned int returnResult = RULES_OK;
+    unsigned int messageOffset;
     jsonObject jo;
 
     char *first = messages;
     char *last = NULL;
     char lastTemp;
-
     while (*first != '{' && *first != '\0' ) {
         ++first;
     }
@@ -1461,10 +1782,7 @@ static unsigned int handleMessages(ruleset *tree,
     while (constructObject(first,
                            NULL, 
                            NULL, 
-                           JSON_OBJECT_SEQUENCED,
-                           actionType == ACTION_ASSERT_FACT || 
-                           actionType == ACTION_RETRACT_FACT || 
-                           actionType == ACTION_REMOVE_FACT,
+                           1,
                            &jo,
                            &last) == RULES_OK) {
 
@@ -1479,13 +1797,10 @@ static unsigned int handleMessages(ruleset *tree,
         lastTemp = *last;
         *last = '\0';
         result = handleMessageCore(tree,
-                                 NULL, 
-                                 first, 
-                                 &jo, 
-                                 actionType, 
-                                 commands,
-                                 commandCount,
-                                 rulesBinding);
+                                   &jo, 
+                                   actionType, 
+                                   &messageOffset,
+                                   stateOffset);
         
         *last = lastTemp;
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
@@ -1505,599 +1820,415 @@ static unsigned int handleMessages(ruleset *tree,
     return returnResult;
 }
 
-static unsigned int handleState(ruleset *tree, 
-                                char *state,
-                                char **commands,
-                                unsigned int *commandCount,
-                                void **rulesBinding) {
-    int stateLength = strlen(state);
-    if (stateLength < 2) {
-        return ERR_PARSE_OBJECT;
-    }
-
-    if (state[0] != '{') {
-        return ERR_PARSE_OBJECT;
-    }
-
-    char *stateMessagePostfix = state + 1;
-#ifdef _WIN32
-    char *stateMessage = (char *)_alloca(sizeof(char)*(24 + stateLength - 1));
-#else
-    char stateMessage[24 + stateLength - 1];
-#endif
-    
-#ifdef _WIN32
-    sprintf_s(stateMessage, sizeof(char)*(24 + stateLength - 1), "{\"$s\":1, %s", stateMessagePostfix);
-#else
-    snprintf(stateMessage, sizeof(char)*(24 + stateLength - 1), "{\"$s\":1, %s", stateMessagePostfix);
-#endif
-    unsigned int result = handleMessage(tree, 
-                                        state,
-                                        stateMessage,  
-                                        ACTION_ASSERT_EVENT,
-                                        commands,
-                                        commandCount,
-                                        rulesBinding);
-
-    return result;
-}
-
-static unsigned int handleTimers(ruleset *tree, 
-                                 char **commands,
-                                 unsigned int *commandCount,
-                                 void **rulesBinding) {
-    redisReply *reply;
-    unsigned int result = peekTimers(tree, rulesBinding, &reply);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    for (unsigned long i = 0; i < reply->elements; ++i) {
-        if (*commandCount == MAX_COMMAND_COUNT) {
-            return ERR_MAX_COMMAND_COUNT;
-        }
-
-        char *command;
-        result = formatRemoveTimer(*rulesBinding, reply->element[i]->str, &command);
-        if (result != RULES_OK) {
-            freeReplyObject(reply);
-            return result;
-        }
-
-        unsigned int action;
-        switch (reply->element[i]->str[0]) {
-            case 'p':
-                action  = ACTION_ASSERT_EVENT;
-                break;
-            case 'a':
-                action  = ACTION_ASSERT_FACT;
-                break;
-            case 'r':
-                action  = ACTION_RETRACT_FACT;
-                break;
-        }
-
-        commands[*commandCount] = command;
-        ++*commandCount;
-        result = handleMessage(tree, 
-                               NULL,
-                               reply->element[i]->str + 2, 
-                               action,
-                               commands, 
-                               commandCount, 
-                               rulesBinding);
-        if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-            freeReplyObject(reply);
-            return result;
-        }
-    }
-
-    freeReplyObject(reply);
-    return RULES_OK;
-}
-
-static unsigned int startHandleMessage(ruleset *tree, 
-                                       char *message, 
-                                       unsigned char actionType,
-                                       void **rulesBinding,
-                                       unsigned int *replyCount) {
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
-    unsigned int result = handleMessage(tree, 
-                                        NULL,
-                                        message, 
-                                        actionType, 
-                                        commands,
-                                        &commandCount,
-                                        rulesBinding);
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    unsigned int batchResult = startNonBlockingBatch(*rulesBinding, commands, commandCount, replyCount);
-    if (batchResult != RULES_OK) {
-        return batchResult;
-    }
-
-    return result;
-}
-
-static unsigned int executeHandleMessage(ruleset *tree, 
-                                         char *message, 
-                                         unsigned char actionType) {
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
-    void *rulesBinding = NULL;
-    unsigned int result = handleMessage(tree, 
-                                        NULL,
-                                        message, 
-                                        actionType, 
-                                        commands,
-                                        &commandCount,
-                                        &rulesBinding);
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    unsigned int batchResult = executeBatch(rulesBinding, commands, commandCount);
-    if (batchResult != RULES_OK) {
-        return batchResult;
-    }
-
-    return result;
-}
-
-static unsigned int startHandleMessages(ruleset *tree, 
-                                        char *messages, 
-                                        unsigned char actionType,
-                                        void **rulesBinding,
-                                        unsigned int *replyCount) {
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
-    unsigned int result = handleMessages(tree,
-                                         actionType,
-                                         messages,
-                                         commands,
-                                         &commandCount,
-                                         rulesBinding);
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    unsigned int batchResult = startNonBlockingBatch(*rulesBinding, commands, commandCount, replyCount);
-    if (batchResult != RULES_OK) {
-        return batchResult;
-    }
-
-    return result;
-}
-
-static unsigned int executeHandleMessages(ruleset *tree, 
-                                          char *messages, 
-                                          unsigned char actionType) {
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
-    void *rulesBinding = NULL;
-    unsigned int result = handleMessages(tree,
-                                         actionType,
-                                         messages,
-                                         commands,
-                                         &commandCount,
-                                         &rulesBinding);
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    unsigned int batchResult = executeBatch(rulesBinding, commands, commandCount);
-    if (batchResult != RULES_OK) {
-        return batchResult;
-    }
-
-    return result;
-}
-
-unsigned int complete(void *rulesBinding, unsigned int replyCount) {
-    unsigned int result = completeNonBlockingBatch(rulesBinding, replyCount);
-    if (result != RULES_OK && result != ERR_EVENT_OBSERVED) {
-        return result;
-    }
-
-    return RULES_OK;
-}
-
-unsigned int assertEvent(unsigned int handle, char *message) {
+unsigned int assertEvent(unsigned int handle, 
+                         char *message, 
+                         unsigned int *stateOffset) {
     ruleset *tree;
+    unsigned int messageOffset;
     RESOLVE_HANDLE(handle, &tree);
 
-    return executeHandleMessage(tree, message, ACTION_ASSERT_EVENT);
-}
-
-unsigned int startAssertEvent(unsigned int handle, 
-                             char *message, 
-                             void **rulesBinding, 
-                             unsigned int *replyCount) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    return startHandleMessage(tree, message, ACTION_ASSERT_EVENT, rulesBinding, replyCount);
+    return handleMessage(tree, message, ACTION_ASSERT_EVENT, &messageOffset, stateOffset);
 }
 
 unsigned int assertEvents(unsigned int handle, 
-                          char *messages) {
+                          char *messages, 
+                          unsigned int *stateOffset) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    return executeHandleMessages(tree, messages, ACTION_ASSERT_EVENT);
+    return handleMessages(tree, ACTION_ASSERT_EVENT, messages, stateOffset);
 }
 
-unsigned int startAssertEvents(unsigned int handle, 
-                              char *messages, 
-                              void **rulesBinding, 
-                              unsigned int *replyCount) {
+unsigned int assertFact(unsigned int handle, 
+                        char *message, 
+                        unsigned int *stateOffset) {
     ruleset *tree;
+    unsigned int messageOffset;
     RESOLVE_HANDLE(handle, &tree);
 
-    return startHandleMessages(tree, messages, ACTION_ASSERT_EVENT, rulesBinding, replyCount);
-}
-
-unsigned int retractEvent(unsigned int handle, char *message) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    return executeHandleMessage(tree, message, ACTION_REMOVE_EVENT);
-}
-
-unsigned int startAssertFact(unsigned int handle, 
-                             char *message, 
-                             void **rulesBinding, 
-                             unsigned int *replyCount) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    return startHandleMessage(tree, message, ACTION_ASSERT_FACT, rulesBinding, replyCount);
-}
-
-unsigned int assertFact(unsigned int handle, char *message) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    return executeHandleMessage(tree, message, ACTION_ASSERT_FACT);
-}
-
-unsigned int startAssertFacts(unsigned int handle, 
-                              char *messages, 
-                              void **rulesBinding, 
-                              unsigned int *replyCount) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    return startHandleMessages(tree, messages, ACTION_ASSERT_FACT, rulesBinding, replyCount);
+    return handleMessage(tree, message, ACTION_ASSERT_FACT, &messageOffset, stateOffset);
 }
 
 unsigned int assertFacts(unsigned int handle, 
-                         char *messages) {
+                         char *messages, 
+                         unsigned int *stateOffset) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    return executeHandleMessages(tree, messages, ACTION_ASSERT_FACT);
+    return handleMessages(tree, ACTION_ASSERT_EVENT, messages, stateOffset);
 }
 
-unsigned int retractFact(unsigned int handle, char *message) {
+unsigned int retractFact(unsigned int handle, 
+                         char *message, 
+                         unsigned int *stateOffset) {
     ruleset *tree;
+    unsigned int messageOffset;
     RESOLVE_HANDLE(handle, &tree);
 
-    return executeHandleMessage(tree, message, ACTION_REMOVE_FACT);
-}
-
-unsigned int startRetractFact(unsigned int handle, 
-                             char *message, 
-                             void **rulesBinding, 
-                             unsigned int *replyCount) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    return startHandleMessage(tree, message, ACTION_REMOVE_FACT, rulesBinding, replyCount);
+    return handleMessage(tree, message, ACTION_RETRACT_FACT, &messageOffset, stateOffset);
 }
 
 unsigned int retractFacts(unsigned int handle, 
-                          char *messages) {
+                          char *messages, 
+                          unsigned int *stateOffset) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    return executeHandleMessages(tree, messages, ACTION_REMOVE_FACT);
+    return handleMessages(tree, ACTION_ASSERT_EVENT, messages, stateOffset);
 }
 
-unsigned int startRetractFacts(unsigned int handle, 
-                              char *messages, 
-                              void **rulesBinding, 
-                              unsigned int *replyCount) {
+unsigned int updateState(unsigned int handle, 
+                         char *state,
+                         unsigned int *stateOffset) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
-
-    return startHandleMessages(tree, messages, ACTION_REMOVE_FACT, rulesBinding, replyCount);
-}
-
-unsigned int assertState(unsigned int handle, char *sid, char *state) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
-    void *rulesBinding = NULL;
-
-    unsigned int result = handleState(tree, 
-                                      state, 
-                                      commands,
-                                      &commandCount,
-                                      &rulesBinding);
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    unsigned int batchResult = executeBatch(rulesBinding, commands, commandCount);
-    if (batchResult != RULES_OK) {
-        return batchResult;
+    unsigned int messageOffset;
+    unsigned int result = handleMessage(tree, state, ACTION_UPDATE_STATE, &messageOffset, stateOffset);
+    if (result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+        return RULES_OK;
     }
 
     return result;
-}
-
-unsigned int assertTimers(unsigned int handle) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
-    void *rulesBinding = NULL;
-    unsigned int result = handleTimers(tree, 
-                                       commands,
-                                       &commandCount,
-                                       &rulesBinding);
-    if (result != RULES_OK) {
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    result = executeBatch(rulesBinding, commands, commandCount);
-    if (result != RULES_OK && result != ERR_EVENT_OBSERVED) {
-        return result;
-    }
-
-    return RULES_OK;
 }
 
 unsigned int startAction(unsigned int handle, 
-                         char **state, 
+                         char **stateFact, 
                          char **messages, 
-                         void **actionHandle,
-                         void **actionBinding) {
+                         unsigned int *stateOffset) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
+    stateNode *resultState;
+    actionStateNode *resultAction;
+    unsigned int actionStateIndex;
+    unsigned int resultCount;
+    unsigned int resultFrameOffset;
+    time_t currentTime = time(NULL);
 
-    redisReply *reply;
-    void *rulesBinding;
-    unsigned int result = peekAction(tree, &rulesBinding, &reply);
-    if (result != RULES_OK) {
-        return result;
-    }
+    CHECK_RESULT(getNextResult(tree,
+                               currentTime,
+                               &resultState, 
+                               &actionStateIndex,
+                               &resultCount,
+                               &resultFrameOffset,
+                               &resultAction));
 
-    *state = reply->element[1]->str;
-    *messages = reply->element[2]->str;
-    actionContext *context = malloc(sizeof(actionContext));
-    if (!context) {
-        return ERR_OUT_OF_MEMORY;
-    }
+    CHECK_RESULT(serializeResult(tree, 
+                                 resultState, 
+                                 resultAction, 
+                                 resultCount,
+                                 &resultState->context.messages));
+
+    CHECK_RESULT(serializeState(resultState, 
+                                &resultState->context.stateFact));
+
+   
+    resultState->context.actionStateIndex = actionStateIndex;
+    resultState->context.resultCount = resultCount;
+    resultState->context.resultFrameOffset = resultFrameOffset;
+    resultState->lockExpireTime = currentTime + STATE_LEASE_TIME;
+    *stateOffset = resultState->offset;
+    *messages  = resultState->context.messages;
+    *stateFact = resultState->context.stateFact;
     
-    context->reply = reply;
-    context->rulesBinding = rulesBinding;
-    *actionHandle = context;
-    *actionBinding = rulesBinding;
     return RULES_OK;
 }
 
-unsigned int startUpdateState(unsigned int handle, 
-                              void *actionHandle, 
-                              char *state,
-                              void **rulesBinding,
-                              unsigned int *replyCount) {
+unsigned int startActionForState(unsigned int handle, 
+                                 unsigned int stateOffset,
+                                 char **stateFact,
+                                 char **messages) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
+    stateNode *resultState = STATE_NODE(tree, stateOffset);
 
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int result = RULES_OK;
-    unsigned int commandCount = 0;
-    result = handleState(tree, 
-                         state,
-                         commands,
-                         &commandCount,
-                         rulesBinding);
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        //reply object should be freed by the app during abandonAction
-        freeCommands(commands, commandCount);
-        return result;
-    }
+    actionStateNode *resultAction;
+    unsigned int actionStateIndex;
+    unsigned int resultCount;
+    unsigned int resultFrameOffset;
+    
+    CHECK_RESULT(getNextResultInState(tree,
+                                      resultState,
+                                      &actionStateIndex,
+                                      &resultCount,
+                                      &resultFrameOffset, 
+                                      &resultAction));
 
-    result = startNonBlockingBatch(*rulesBinding, commands, commandCount, replyCount);
-    return result;
+    CHECK_RESULT(serializeResult(tree, 
+                                 resultState, 
+                                 resultAction, 
+                                 resultCount,
+                                 &resultState->context.messages));
 
+    CHECK_RESULT(serializeState(resultState, 
+                                &resultState->context.stateFact));
+
+    resultState->context.actionStateIndex = actionStateIndex;
+    resultState->context.resultCount = resultCount;
+    resultState->context.resultFrameOffset = resultFrameOffset;
+    resultState->lockExpireTime = time(NULL) + STATE_LEASE_TIME;
+    *messages = resultState->context.messages;
+    *stateFact = resultState->context.stateFact;
+    
+    return RULES_OK;
 }
 
-unsigned int completeAction(unsigned int handle, 
-                            void *actionHandle, 
-                            char *state) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
+static unsigned int deleteCurrentAction(ruleset *tree,
+                                        stateNode *state,
+                                        unsigned int actionStateIndex,
+                                        unsigned int resultCount,
+                                        unsigned int resultFrameOffset) {
 
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
-    actionContext *context = (actionContext*)actionHandle;
-    redisReply *reply = context->reply;
-    void *rulesBinding = context->rulesBinding;
-    
-    unsigned int result = formatRemoveAction(rulesBinding, 
-                                             reply->element[0]->str, 
-                                             &commands[commandCount]);
-    if (result != RULES_OK) {
-        //reply object should be freed by the app during abandonAction
-        return result;
+    for (unsigned int currentCount = 0; currentCount < resultCount; ++currentCount) {
+        leftFrameNode *resultFrame;
+        frameLocation resultLocation; 
+        resultLocation.frameType = ACTION_FRAME;
+        resultLocation.nodeIndex = actionStateIndex;
+        resultLocation.frameOffset = resultFrameOffset;   
+        CHECK_RESULT(getActionFrame(state,
+                                    resultLocation,
+                                    &resultFrame));
+        
+        for (int i = 0; i < resultFrame->messageCount; ++i) {
+            messageFrame *currentMessageFrame = &resultFrame->messages[resultFrame->reverseIndex[i]]; 
+            if (currentMessageFrame->messageNodeOffset != UNDEFINED_HASH_OFFSET) {
+                messageNode *currentMessageNode = MESSAGE_NODE(state, 
+                                                               currentMessageFrame->messageNodeOffset);
+
+
+                if (currentMessageNode->messageType == MESSAGE_TYPE_EVENT) {
+                    CHECK_RESULT(handleDeleteMessage(tree,
+                                                     state, 
+                                                     currentMessageFrame->messageNodeOffset));
+                }
+            }
+        }
+
+        resultFrameOffset = resultFrame->nextOffset;
+        unsigned int result = deleteDispatchingActionFrame(state, resultLocation);
+        if (result != RULES_OK) {
+            return result;
+        }
     }
 
-    ++commandCount;
-    result = handleState(tree, 
-                         state,
-                         commands,
-                         &commandCount,
-                         &rulesBinding);
-    if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
-        //reply object should be freed by the app during abandonAction
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    result = executeBatch(rulesBinding, commands, commandCount); 
-    if (result != RULES_OK && result != ERR_EVENT_OBSERVED) {
-        //reply object should be freed by the app during abandonAction
-        return result;
-    }
-
-    freeReplyObject(reply);
-    free(actionHandle);
     return RULES_OK;
+}
+
+static void freeActionContext(stateNode *resultState) {
+    if (resultState->context.messages) {
+        free(resultState->context.messages);
+        resultState->context.messages = NULL;
+    }
+
+    if (resultState->context.stateFact) {
+        free(resultState->context.stateFact);
+        resultState->context.stateFact = NULL;
+    }
+
+    resultState->lockExpireTime = 0;
 }
 
 unsigned int completeAndStartAction(unsigned int handle, 
-                                    unsigned int expectedReplies,
-                                    void *actionHandle, 
+                                    unsigned int stateOffset, 
                                     char **messages) {
-    char *commands[MAX_COMMAND_COUNT];
-    unsigned int commandCount = 0;
-    actionContext *context = (actionContext*)actionHandle;
-    redisReply *reply = context->reply;
-    void *rulesBinding = context->rulesBinding;
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+    stateNode *resultState = STATE_NODE(tree, stateOffset);
     
-    unsigned int result = formatRemoveAction(rulesBinding, 
-                                             reply->element[0]->str, 
-                                             &commands[commandCount]);
-    if (result != RULES_OK) {
-        //reply object should be freed by the app during abandonAction
-        return result;
-    }
+    CHECK_RESULT(deleteCurrentAction(tree,
+                                     resultState, 
+                                     resultState->context.actionStateIndex,
+                                     resultState->context.resultCount,
+                                     resultState->context.resultFrameOffset));
 
-    ++commandCount;
-    if (commandCount == MAX_COMMAND_COUNT) {
-        //reply object should be freed by the app during abandonAction
-        freeCommands(commands, commandCount);
-        return ERR_MAX_COMMAND_COUNT;
-    }
-
-    result = formatPeekAction(rulesBinding, 
-                              reply->element[0]->str,
-                              &commands[commandCount]);
-    if (result != RULES_OK) {
-        //reply object should be freed by the app during abandonAction
-        freeCommands(commands, commandCount);
-        return result;
-    }
-
-    ++commandCount;
-    redisReply *newReply;
-    result = executeBatchWithReply(rulesBinding, 
-                                   expectedReplies, 
-                                   commands, 
-                                   commandCount, 
-                                   &newReply);  
-    if (result != RULES_OK && result != ERR_EVENT_OBSERVED) {
-        //reply object should be freed by the app during abandonAction
-        return result;
-    }
     
-    freeReplyObject(reply);
-    if (newReply == NULL) {
-        free(actionHandle);
-        return ERR_NO_ACTION_AVAILABLE;
-    }
+    freeActionContext(resultState);
+    
+    actionStateNode *resultAction;
+    unsigned int actionStateIndex;
+    unsigned int resultCount;
+    unsigned int resultFrameOffset;
+    
+    CHECK_RESULT(getNextResultInState(tree,
+                                      resultState,
+                                      &actionStateIndex,
+                                      &resultCount,
+                                      &resultFrameOffset, 
+                                      &resultAction));
 
-    *messages = newReply->element[1]->str;
-    context->reply = newReply;
+    CHECK_RESULT(serializeResult(tree, 
+                                 resultState, 
+                                 resultAction, 
+                                 resultCount,
+                                 &resultState->context.messages));
+
+    resultState->context.actionStateIndex = actionStateIndex;
+    resultState->context.resultCount = resultCount;
+    resultState->context.resultFrameOffset = resultFrameOffset;
+    resultState->lockExpireTime = time(NULL) + STATE_LEASE_TIME;
+    *messages  = resultState->context.messages;
     return RULES_OK;
 }
 
-unsigned int abandonAction(unsigned int handle, void *actionHandle) {
-    freeReplyObject(((actionContext*)actionHandle)->reply);
-    free(actionHandle);
-    return RULES_OK;
-}
-
-unsigned int queueMessage(unsigned int handle, unsigned int queueAction, char *sid, char *destination, char *message) {
+unsigned int abandonAction(unsigned int handle, unsigned int stateOffset) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
-
-    void *rulesBinding;
-    if (!sid) {
-        sid = "0";
-    }
-
-    unsigned int result = resolveBinding(tree, sid, &rulesBinding);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    return registerMessage(rulesBinding, queueAction, destination, message);
-}
-
-unsigned int startTimer(unsigned int handle, char *sid, unsigned int duration, char manualReset, char *timer) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    void *rulesBinding;
-    if (!sid) {
-        sid = "0";
-    }
+    stateNode *resultState = STATE_NODE(tree, stateOffset);
     
-    unsigned int result = resolveBinding(tree, sid, &rulesBinding);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    return registerTimer(rulesBinding, duration, manualReset, timer);
-}
-
-unsigned int cancelTimer(unsigned int handle, char *sid, char *timerName) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    void *rulesBinding;
-    if (!sid) {
-        sid = "0";
-    }
-
-    unsigned int result = resolveBinding(tree, sid, &rulesBinding);
-    if (result != RULES_OK) {
-        return result;
-    }
-
-    return removeTimer(rulesBinding, sid, timerName);
+    freeActionContext(resultState);
+    return RULES_OK;
 }
 
 unsigned int renewActionLease(unsigned int handle, char *sid) {
     ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
+    unsigned char isNewState;
+    stateNode *state = NULL;
 
-    void *rulesBinding;
+    RESOLVE_HANDLE(handle, &tree);
     if (!sid) {
         sid = "0";
     }
 
-    unsigned int result = resolveBinding(tree, sid, &rulesBinding);
-    if (result != RULES_OK) {
+    CHECK_RESULT(ensureStateNode(tree, 
+                                 sid,
+                                 &isNewState,
+                                 &state));    
+
+    state->lockExpireTime = time(NULL) + STATE_LEASE_TIME;
+    return RULES_OK;
+}
+
+unsigned int assertTimers(unsigned int handle) {
+    ruleset *tree;
+    unsigned int result;
+    RESOLVE_HANDLE(handle, &tree);
+
+    time_t pulseTime = time(NULL);
+    for (unsigned int i = 0; i < tree->statePool.count; ++i) {
+        stateNode *state = STATE_NODE(tree, tree->reverseStateIndex[i]);
+        unsigned int stateOffset;
+        unsigned int messageOffset;
+        CHECK_RESULT(getMessage(state,
+                                "$pulse",
+                                &messageOffset));
+        
+        if (messageOffset != UNDEFINED_HASH_OFFSET) {
+            messageNode *message = MESSAGE_NODE(state, messageOffset);
+            CHECK_RESULT(handleMessage(tree, 
+                                       message->jo.content, 
+                                       ACTION_RETRACT_FACT,
+                                       &messageOffset,
+                                       &stateOffset));
+        }
+
+        int messageSize = sizeof(char) * (100 + strlen(state->sid));
+#ifdef _WIN32
+        char *pulseMessage = (char *)_alloca(messageSize);
+        sprintf_s(pulseMessage, 
+                  messageSize, 
+                  "{ \"sid\":\"%s\", \"id\":\"$pulse\", \"$time\":%ld }", 
+                  state->sid, 
+                  pulseTime);
+#else
+        char pulseMessage[messageSize];
+        snprintf(pulseMessage, 
+                messageSize, 
+                "{ \"sid\":\"%s\", \"id\":\"$pulse\", \"$time\":%ld }", 
+                state->sid, 
+                pulseTime);
+#endif
+        result = handleMessage(tree, 
+                               pulseMessage, 
+                               ACTION_ASSERT_EVENT,
+                               &messageOffset,
+                               &stateOffset);
+        if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+            return result;
+        }
+    }
+
+    return RULES_OK;
+}
+
+unsigned int cancelTimer(unsigned int handle, char *sid, char *timerName) {
+    ruleset *tree;
+    unsigned char isNewState;
+    unsigned int messageOffset;
+    unsigned int stateOffset;
+    stateNode *state = NULL;
+
+    RESOLVE_HANDLE(handle, &tree);
+    if (!sid) {
+        sid = "0";
+    }
+
+    CHECK_RESULT(ensureStateNode(tree, 
+                                 sid,
+                                 &isNewState, 
+                                 &state));
+
+    CHECK_RESULT(getMessage(state,
+                            timerName,
+                            &messageOffset));
+    
+    if (messageOffset != UNDEFINED_HASH_OFFSET) {
+        messageNode *message = MESSAGE_NODE(state, messageOffset);
+        CHECK_RESULT(handleMessage(tree, 
+                                   message->jo.content, 
+                                   ACTION_RETRACT_FACT,
+                                   &messageOffset,
+                                   &stateOffset));
+    }
+    
+    return RULES_OK;
+}
+
+unsigned int startTimer(unsigned int handle, 
+                        char *sid, 
+                        unsigned int duration, 
+                        char manualReset, 
+                        char *timer) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+    unsigned int result  = cancelTimer(handle, sid, timer);
+    if (result != RULES_OK && result != ERR_MESSAGE_NOT_FOUND) {
         return result;
     }
 
-    return updateAction(rulesBinding, sid);
+    time_t baseTime = time(NULL);
+    baseTime += duration;
+    if (!sid) {
+        sid = "0";
+    }
+    
+    int messageSize = sizeof(char) * (100 + strlen(sid) + strlen(timer) * 2);
+
+#ifdef _WIN32
+    char *baseMessage = (char *)_alloca(messageSize);
+    sprintf_s(baseMessage, 
+              messageSize, 
+              "{ \"sid\":\"%s\", \"id\":\"%s\", \"$timerName\":\"%s\", \"$baseTime\":%ld }", 
+              sid,
+              timer, 
+              timer, 
+              baseTime);
+#else
+    char baseMessage[messageSize];
+    snprintf(baseMessage, 
+             messageSize, 
+             "{ \"sid\":\"%s\", \"id\":\"%s\", \"$timerName\":\"%s\", \"$baseTime\":%ld }", 
+             sid,
+             timer,
+             timer, 
+             baseTime);
+#endif
+    unsigned int messageOffset;
+    unsigned int stateOffset;
+
+    return handleMessage(tree, 
+                         baseMessage, 
+                         manualReset ? ACTION_ASSERT_FACT : ACTION_ASSERT_EVENT,
+                         &messageOffset,
+                         &stateOffset);
 }
+
 

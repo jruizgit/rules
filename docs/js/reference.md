@@ -24,7 +24,6 @@ Reference Manual
   * [Action Batches](reference.md#action-batches)
   * [Async Actions](reference.md#async-actions)
   * [Unhandled Exceptions](reference.md#unhandled-exceptions)
-  * [Fault Tolerance](reference.md#fault-tolerance)
 * [Flow Structures](reference.md#flow-structures) 
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
@@ -32,34 +31,9 @@ Reference Manual
   * [Timers](reference.md#timers)
 
 ## Setup
-durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
-### Redis install
-durable.js relies on Redis version 2.8  
- 
-_Mac_  
-1. Download [Redis](http://download.redis.io/releases/redis-2.8.4.tar.gz)   
-2. Extract code, compile and start Redis
-
-For more information go to: http://redis.io/download  
-
-_Windows_  
-1. Download Redis binaries from [MSTechOpen](https://github.com/MSOpenTech/redis/releases)  
-2. Extract binaries and start Redis  
-
-For more information go to: https://github.com/MSOpenTech/redis  
-
-Note: To test applications locally you can also use a Redis [cloud service](reference.md#cloud-setup) 
-### Node.js install
-durable.js uses Node.js version  0.10.15.    
-
-1. Download [Node.js](http://nodejs.org/dist/v0.10.15)  
-2. Run the installer and follow the instructions  
-3. The installer will set all the necessary environment variables, so you are ready to go  
-
-For more information go to: http://nodejs.org/download   
 
 ### First App
-Now that your cache and web server are ready, let's write a simple rule:  
+Let's write a simple rule:  
 
 1. Start a terminal  
 2. Create a directory for your app: `mkdir firstapp` `cd firstapp`  
@@ -68,24 +42,18 @@ Now that your cache and web server are ready, let's write a simple rule:
 5. Copy/Paste and save the following code:
   ```javascript
   var d = require('durable');
+  
   d.ruleset('a0', function() {
       whenAll: m.amount < 100
       run: console.log('a0 approved')
-    
-      whenStart: {
-          post('a0', { amount: 10 });
-      }
   });
-  d.runAll();
+
+  d.post('a0', { amount: 10 });
   ```
 7. In the terminal type `node test.js`  
-8. You should see the message: `a0 approved from 1`  
+8. You should see the message: `a0 approved`  
 
-Note 1: If you are using a redis service outside your local host, replace the last line with:
-  ```javascript
-  d.runAll([{host: 'hostName', port: port, password: 'password'}]);
-  ```
-Note 2: If you are running in Windows, you will need VS2013 express edition and Python 2.7 for the package to build during npm install. Make sure both the VS build tools and the python directory are in your path. 
+Note: If you are running in Windows, you will need VS2013 express edition and Python 2.7 for the package to build during npm install. Make sure both the VS build tools and the python directory are in your path. 
 
 [top](reference.md#table-of-contents) 
 
@@ -95,7 +63,6 @@ A rule is the basic building block of the framework. The rule antecendent define
 
 * `whenAll` and `whenAny` label the antecendent definition of a rule
 * `run` and `runAsync` label the consequent definition of a rule 
-* `whenStart` labels the action to be taken when starting the ruleset  
   
 ```javascript
 var d = require('durable');
@@ -105,11 +72,9 @@ d.ruleset('test', function() {
     whenAll: m.subject == 'World'
     // consequent
     run: console.log('Hello ' + m.subject)
-    // on ruleset start
-    whenStart: post('test', { subject: 'World' })
 });
 
-d.runAll();
+d.post('test', {subject: 'World'});
 ```
 ### Facts
 Facts represent the data that defines a knowledge base. After facts are asserted as JSON objects. Facts are stored until they are retracted. When a fact satisfies a rule antecedent, the rule consequent is executed.
@@ -134,18 +99,10 @@ d.ruleset('animal', function() {
 
     whenAll: +m.subject
     run: console.log('fact: ' + m.subject + ' ' + m.predicate + ' ' + m.object)
-
-    whenStart: {
-        assert('animal', { subject: 'Kermit', predicate: 'eats', object: 'flies' });
-    }
 });
 
-d.runAll();
+d.assert('animal', { subject: 'Kermit', predicate: 'eats', object: 'flies' });
 ```
-
-Facts can also be asserted using the http API. For the example above, run the following command:  
-
-<sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "predicate": "eats", "object": "worms"}' http://localhost:5000/animal/facts`</sub>
 
 [top](reference.md#table-of-contents)  
 
@@ -162,21 +119,12 @@ d.ruleset('risk', function() {
     }
     // the event pair will only be observed once
     run: console.log('fraud detected ->' + first.location + ', ' + second.location)
-   
-    whenStart: {
-        // 'post' submits events, try 'assert' instead and to see differt behavior
-        post('risk', { t: 'purchase', location: 'US' });
-        post('risk', { t: 'purchase', location: 'CA' });
-    }
 });
 
-d.runAll();
+// 'post' submits events, try 'assert' instead and to see differt behavior
+d.post('risk', { t: 'purchase', location: 'US' });
+d.post('risk', { t: 'purchase', location: 'CA' });
 ```
-
-Events can be posted using the http API. When the example above is listening, run the following commands:  
-
-<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:5000/risk/events`</sub>  
-<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:5000/risk/events`</sub>  
 
 **Note from the autor:**  
 
@@ -187,9 +135,9 @@ Events can be posted using the http API. When the example above is listening, ru
 
 *The reason is because both facts satisfy the first condition m.t == 'purchase' and each fact satisfies the second condition m.location != c.first.location in relation to the facts which satisfied the first.*  
 
-*Given that, you might be wondering why post behaves differently: the reason is because an event is an ephemeral fact, as soon as it is scheduled to be dispatched, it is retracted. When using post in the example above, by the time the second pair is calculated the events have already been retracted.*  
+*Events are ephemeral facts, they are retracted before they are dispatched. When using post in the example above, by the time the second pair is calculated the events have already been retracted.*  
 
-*And why is the difference between events and facts important? Retracting events before dispatch reduces the number of combinations to be calculated for dispatch. Thus, processing events is much more efficient (orders of magnitude faster in some cases).*  
+*Retracting events before dispatch reduces the number of combinations to be calculated during action execution.*  
 
 [top](reference.md#table-of-contents)  
 ### State
@@ -220,20 +168,16 @@ d.ruleset('flow', function() {
         // deletes state at the end
         deleteState();
     }
-
-    // modifies context state
-    whenStart: patchState('flow', { status: 'start' })
 });
 
-d.runAll();
+// modifies context state
+d.updateState('flow', { status: 'start' });
 ```
-State can also be retrieved and modified using the http API. When the example above is running, try the following commands:  
-<sub>`curl -H "content-type: application/json" -X POST -d '{"status": "next"}' http://localhost:5000/flow/state`</sub>  
 
 [top](reference.md#table-of-contents)  
 
 ### Identity
-Facts with the same property names and values are considered equal when asserted or retracted. Events with the same property names and values are considered different when posted because the posting time matters. 
+Facts and events with the same property names and values are considered equal. 
 
 ```javascript
 var d = require('durable');
@@ -241,99 +185,66 @@ var d = require('durable');
 d.ruleset('bookstore', function() {
     // this rule will trigger for events with status
     whenAll: +m.status
-    run: console.log('reference ' + m.reference + ' status ' + m.status)
+    run: console.log('bookstore reference ' + m.reference + ' status ' + m.status)
 
     whenAll: +m.name
     run: { 
-        console.log('Added: ' + m.name);
-        retract({
-            name: 'The new book',
-            reference: '75323',
-            price: 500,
-            seller: 'bookstore'
-        });
+        console.log('bookstore added: ' + m.name);
     }
 
     // this rule will be triggered when the fact is retracted
     whenAll: none(+m.name)
-    run: console.log('no books');
-
-
-    whenStart: {
-        // will return 0 because the fact assert was successful 
-        console.log(assert('bookstore', {
-            name: 'The new book',
-            seller: 'bookstore',
-            reference: '75323',
-            price: 500
-        }));
-
-        // will return 212 because the fact has already been asserted 
-        console.log(assert('bookstore', {
-            reference: '75323',
-            name: 'The new book',
-            price: 500,
-            seller: 'bookstore'
-        }));
-
-        // will return 0 because a new event is being posted
-        console.log(post('bookstore', {
-            reference: '75323',
-            status: 'Active'
-        }));
-
-        // will return 0 because a new event is being posted
-        console.log(post('bookstore', {
-            reference: '75323',
-            status: 'Active'
-        }));
-    }
+    run: console.log('bookstore no books');
 });
 
-d.runAll();
+// will not throw because the fact assert was successful 
+d.assert('bookstore', {
+    name: 'The new book',
+    seller: 'bookstore',
+    reference: '75323',
+    price: 500
+});
+
+
+// will throw MessageObservedError because the fact has already been asserted 
+try {
+    d.assert('bookstore', {
+        reference: '75323',
+        name: 'The new book',
+        price: 500,
+        seller: 'bookstore'
+    });
+} catch (err) {
+    console.log('bookstore: ' + err.message);   
+}
+
+// will not throw because a new event is being posted
+d.post('bookstore', {
+    reference: '75323',
+    status: 'Active'
+});
+
+// will not throw because a new event is being posted
+d.post('bookstore', {
+    reference: '75323',
+    status: 'Active'
+});
+
+d.retract('bookstore', {
+    reference: '75323',
+    name: 'The new book',
+    price: 500,
+    seller: 'bookstore'
+});
+
 ```
 
 ### Error Codes
 
-When the runAll command fails, it can return the following error codes:
+When asserting a fact, retracting a fact, posting an event or updating state context, the following errors can be thrown:
 
-* 0 - OK
-* 1 - Out of memory (uncommon)
-* 2 - Unexpected type (uncommon)
-* 5 - Unexpected name (uncommon)
-* 6 - Rule limit exceeded (uncommon)
-* 8 - Rule beta limit exceeded (uncommon)
-* 9 - Rule without qualifier (uncommon)
-* 10 - Invalid rule attribute (uncommon)
-* 101 - Error parsing JSON value (uncommon)
-* 102 - Error parsing JSON string (uncommon)
-* 103 - Error parsing JSON number (uncommon)
-* 104 - Error parsing JSON object (uncommon)
-* 301 - Could not establish Redis connection
-* 302 - Redis returned an error
-* 501 - Could not parse regex
-* 502 - Max regex state transitions reached (uncommon)
-* 503 - Max regex states reached (uncommon)
-* 504 - Regex DFA transform queue full (uncommon)
-* 505 - Regex DFA transform list full (uncommon)
-* 506 - Regex DFA transform set full (uncommon)
-* 507 - Conflict in regex transform (uncommon)
-
-When asserting a fact or posting an event via the whenStart function or the web API, these error codes can be returned:
-
-* 0 - OK
-* 101 - Error parsing JSON value (uncommon)
-* 102 - Error parsing JSON string (uncommon)
-* 103 - Error parsing JSON number (uncommon)
-* 104 - Error parsing JSON object (uncommon)
-* 201 - The event or fact was not captured because it did not match any rule
-* 202 - Too many properties in the event or fact
-* 203 - Max rule stack size reached due to complex ruleset (uncommon) 
-* 209 - Max number of command actions reached (uncommon)
-* 210 - Max number of add actions reached (uncommon)
-* 211 - Max number of eval actions reached (uncommon)
-* 212 - The event or fact has already been observed
-* 302 - Redis returned an error
+* MessageObservedError: The fact has already been asserted or the event has already been posted.
+* MessageNotHandledError: The event or fact was not captured because it did not match any rule.
 
 [top](reference.md#table-of-contents) 
 
@@ -352,15 +263,13 @@ var d = require('durable');
 d.ruleset('expense', function() {
     whenAll: m.subject == 'approve' || m.subject == 'ok'
     run: console.log('Approved')
-    
-    whenStart: post('expense', { subject: 'approve' })
 });
 
-d.runAll();
+d.post('expense', { subject: 'approve' });
 ```  
 [top](reference.md#table-of-contents)
 ### Pattern Matching
-durable_rules implements a simple pattern matching dialect. Similar to lua, it uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. Event processing is O(n) guaranteed (n being the size of the event).  
+durable_rules implements a simple pattern matching dialect. It uses % to escape, which vastly simplifies writing expressions. Expressions are compiled down into a deterministic state machine, thus backtracking is not supported. Event processing is O(n) guaranteed (n being the size of the event).  
 
 **Repetition**  
 \+ 1 or more repetitions  
@@ -391,17 +300,13 @@ var d = require('durable');
 d.ruleset('match', function() {
     whenAll: m.url.matches('(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*') 
     run: console.log('match url ' + m.url)
-        
-    whenStart: {
-        post('match', { url: 'https://github.com' });
-        post('match', { url: 'http://github.com/jruizgit/rul!es' });
-        post('match', { url: 'https://github.com/jruizgit/rules/reference.md' });
-        post('match', { url: '//rules'});
-        post('match', { url: 'https://github.c/jruizgit/rules' });
-    }
 });
 
-d.runAll();
+d.post('match', {url: 'https://github.com'});
+d.post('match', {url: 'http://github.com/jruizgit/rul!es'}, function(err, state){ console.log('match: ' + err.message) });
+d.post('match', {url: 'https://github.com/jruizgit/rules/reference.md'});
+d.post('match', {url: '//rules'}, function(err, state){ console.log('match: ' + err.message) });
+d.post('match', {url: 'https://github.c/jruizgit/rules'}, function(err, state){ console.log('match: ' + err.message) });
 ```  
 [top](reference.md#table-of-contents) 
 ### String Operations  
@@ -419,17 +324,13 @@ d.ruleset('strings', function() {
 
     whenAll: m.subject.imatches('.*hello.*')
     run: console.log('string contains hello (case insensitive): ' + m.subject)
-
-    whenStart: {
-        assert('strings', { subject: 'HELLO world' });
-        assert('strings', { subject: 'world hello' });
-        assert('strings', { subject: 'hello hi' });
-        assert('strings', { subject: 'has Hello string' });
-        assert('strings', { subject: 'does not match' });
-    }
 });
 
-d.runAll();
+d.assert('strings', { subject: 'HELLO world' });
+d.assert('strings', { subject: 'world hello' });
+d.assert('strings', { subject: 'hello hi' });
+d.assert('strings', { subject: 'has Hello string' });
+d.assert('strings', { subject: 'does not match' }, function(err, state){ console.log('strings: ' + err.message) });
 ```  
 [top](reference.md#table-of-contents)
 
@@ -456,15 +357,11 @@ d.ruleset('risk', function() {
         console.log('               -> ' + second.amount);
         console.log('               -> ' + third.amount);
     }
-
-    whenStart: {
-        host.post('risk', { amount: 50 });
-        host.post('risk', { amount: 200 });
-        host.post('risk', { amount: 251 });
-    }
 });
 
-d.runAll();
+d.post('risk', { amount: 50 });
+d.post('risk', { amount: 200 });
+d.post('risk', { amount: 251 });
 ```
 [top](reference.md#table-of-contents)  
 
@@ -496,16 +393,12 @@ d.ruleset('expense', function() {
             console.log('Approved ' + third.subject + ' ' + fourth.amount);        
         }
     }
-
-    whenStart: {
-        post('expense', { subject: 'approve' });
-        post('expense', { amount: 1000 });
-        post('expense', { subject: 'jumbo' });
-        post('expense', { amount: 10000 });
-    }
 });
 
-d.runAll();
+d.post('expense', { subject: 'approve' });
+d.post('expense', { amount: 1000 });
+d.post('expense', { subject: 'jumbo' });
+d.post('expense', { amount: 10000 });
 ```
 [top](reference.md#table-of-contents) 
 
@@ -525,15 +418,22 @@ d.ruleset('risk', function() {
         fourth = m.t == 'chargeback'
     }
     run: console.log('fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
-
-    whenStart: {
-        post('risk', { t: 'deposit' });
-        post('risk', { t: 'withrawal' });
-        post('risk', { t: 'chargeback' });
-    }
 });
 
-d.runAll();
+d.assert('risk', {t: 'deposit'});
+d.assert('risk', {t: 'withrawal'});
+d.assert('risk', {t: 'chargeback'});
+
+d.assert('risk', {sid: 1, t: 'balance'});
+d.assert('risk', {sid: 1, t: 'deposit'});
+d.assert('risk', {sid: 1, t: 'withrawal'});
+d.assert('risk', {sid: 1, t: 'chargeback'});
+d.retract('risk', {sid: 1, t: 'balance'});
+
+d.assert('risk', {sid: 2, t: 'deposit'});
+d.assert('risk', {sid: 2, t: 'withrawal'});
+d.assert('risk', {sid: 2, t: 'chargeback'});
+d.assert('risk', {sid: 2, t: 'balance'});
 ```
 
 [top](reference.md#table-of-contents)  
@@ -554,17 +454,13 @@ d.ruleset('expense4', function() {
         console.log('bill amount ->' + bill.invoice.amount);
         console.log('account payment amount ->' + account.payment.invoice.amount);
     }
-
-    whenStart: {
-        // one level of nesting
-        post('expense4', {t: 'bill', invoice: {amount: 100}});  
-
-        // two levels of nesting
-        post('expense4', {t: 'account', payment: {invoice: {amount: 100}}}); 
-    }
 });
 
-d.runAll();
+// one level of nesting
+d.post('expense4', {t: 'bill', invoice: {amount: 100}});  
+
+// two levels of nesting
+d.post('expense4', {t: 'account', payment: {invoice: {amount: 100}}}); 
 ```
 [top](reference.md#table-of-contents)  
 
@@ -597,34 +493,30 @@ d.ruleset('risk', function() {
         m.payments.anyItem(item.allItems(item < 100))
     }
     run: console.log('fraud 4 detected ' + JSON.stringify(m.payments))
-
-    whenStart: {
-        post('risk', { payments: [ 150, 350, 450 ] });
-        post('risk', { payments: [ { amount: 200 }, { amount: 300 }, { amount: 400 } ] });
-        post('risk', { cards: [ 'one card', 'two cards', 'three cards' ] });
-        post('risk', { payments: [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]});    
-    }
 });
 
-d.runAll();
+d.post('risk', { payments: [ 150, 350, 450 ] });
+d.post('risk', { payments: [ { amount: 200 }, { amount: 300 }, { amount: 400 } ] });
+d.post('risk', { cards: [ 'one card', 'two cards', 'three cards' ] });
+d.post('risk', { payments: [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]});    
 ```
 [top](reference.md#table-of-contents) 
 ### Facts and Events as rvalues
 
-Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
+Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. 
 
 ```javascript
 var d = require('durable');
 
 d.ruleset('risk', function() {
     
-    // compares properties in the same event, this expression is evaluated in the client
+    // compares properties in the same event
     whenAll: {
         m.debit > 2 * m.credit
     }
     run: console.log('debit ' + m.debit + ' more than twice the credit ' + m.credit)
    
-    // compares two correlated events, this expression is evaluated in the backend
+    // compares two correlated events
     whenAll: {
         first = m.amount > 100
         second = m.amount > first.amount + m.amount / 2
@@ -633,16 +525,12 @@ d.ruleset('risk', function() {
         console.log('fraud detected -> ' + first.amount);
         console.log('fraud detected -> ' + second.amount);
     }
-
-    whenStart: {
-        post('risk', { debit: 220, credit: 100 });
-        post('risk', { debit: 150, credit: 100 });
-        post('risk', {amount: 200});
-        post('risk', {amount: 500});
-    }
 });
 
-d.runAll();
+d.post('risk', { debit: 220, credit: 100 });
+d.post('risk', { debit: 150, credit: 100 });
+d.post('risk', {amount: 200});
+d.post('risk', {amount: 500});
 ```
 
 [top](reference.md#table-of-contents) 
@@ -667,15 +555,11 @@ d.ruleset('attributes', function() {
     whenAll: m.amount < 100
     pri: 1
     run: console.log('attributes P1 ->' + m.amount);
-       
-    whenStart: {
-        assert('attributes', { amount: 50 });
-        assert('attributes', { amount: 150 });
-        assert('attributes', { amount: 250 });
-    }
 });
 
-d.runAll();
+d.assert('attributes', { amount: 50 });
+d.assert('attributes', { amount: 150 });
+d.assert('attributes', { amount: 250 });
 ```
 [top](reference.md#table-of-contents) 
 ### Action Batches
@@ -692,7 +576,7 @@ d.ruleset('expense', function() {
     // this rule will trigger as soon as three events match the condition
     whenAll: m.amount < 100
     count: 3
-    run: console.log('approved ' + JSON.stringify(m));
+    run: console.log('approved ' + JSON.stringify(m))
 
     // this rule will be triggered when 'expense' is asserted batching at most two results
     whenAll: {
@@ -700,20 +584,16 @@ d.ruleset('expense', function() {
         approval = m.review == true
     }
     cap: 2
-    run: console.log('rejected ' + JSON.stringify(m));
-
-    whenStart: {
-        postBatch('expense', { amount: 10 },
-                             { amount: 20 },
-                             { amount: 100 },
-                             { amount: 30 },
-                             { amount: 200 },
-                             { amount: 400 });
-        assert('expense', { review: true })
-    }
+    run: console.log('rejected ' + JSON.stringify(m))
 });
 
-d.runAll();
+d.postBatch('expense', [{ amount: 10 },
+                        { amount: 20 },
+                        { amount: 100 },
+                        { amount: 30 },
+                        { amount: 200 },
+                        { amount: 400 }]);
+d.assert('expense', { review: true })
 ```
 [top](reference.md#table-of-contents)  
 
@@ -750,13 +630,9 @@ d.ruleset('flow', function() {
         // overrides the 5 second default abandon timeout
         return 10;
     }
-
-    whenStart: {
-        patchState('flow', { state: 'first' });
-    }
 });
 
-d.runAll();
+d.updateState('flow', { state: 'first' });
 ```
 [top](reference.md#table-of-contents)  
 ### Unhandled Exceptions  
@@ -775,49 +651,11 @@ d.ruleset('flow', function() {
         console.log(s.exception);
         delete(s.exception); 
     }
-
-    whenStart: {
-        post('flow', { action: 'start' });
-    }
 });
 
-d.runAll();
+d.post('flow', { action: 'start' });
 ```
 [top](reference.md#table-of-contents)  
-
-### Fault Tolerance  
-Consequent execution is transactional and atomic. That is, if the process crashes in the middle of a consequent execution, no facts will be asserted nor retracted, no events will posted and the context state will not be changed. The consequent will be retried a few seconds after process restart.  
-
-```javascript
-var d = require('durable');
-
-d.ruleset('flow', function() {
-    whenAll: m.status == 'start'
-    run: {
-        post({ status: 'next' });
-        console.log('start');
-    }
-
-    whenAll: m.status == 'next'
-    // the process will always exit here every time the action is run
-    // when restarting the process this action will be retried after a few seconds
-    run: {
-        post({ status: 'last' });
-        console.log('next');
-        process.exit();
-    }
-
-    whenAll: m.status == 'last'
-    run: {
-        console.log('last');
-    }
-
-    whenStart: post('flow', { status: 'start' })
-});
-
-d.runAll();
-```
-[top](reference.md#table-of-contents)
  
 ## Flow Structures
 
@@ -865,22 +703,17 @@ d.statechart('expense', function() {
     // 'denied' and 'approved' are final states
     denied: {}
     approved: {}
-    
-    whenStart: {
-        // events directed to default statechart instance
-        post('expense', { subject: 'approve', amount: 100 });
-        post('expense', { subject: 'approved' });
-        
-        // events directed to statechart instance with id '1'
-        post('expense', { sid: 1, subject: 'approve', amount: 100 });
-        post('expense', { sid: 1, subject: 'denied' });
-        
-        // events directed to statechart instance with id '2'
-        post('expense', { sid: 2, subject: 'approve', amount: 10000 });
-    }
 });
 
-d.runAll();
+d.post('expense', { subject: 'approve', amount: 100 });
+d.post('expense', { subject: 'approved' });
+
+// events directed to statechart instance with id '1'
+d.post('expense', { sid: 1, subject: 'approve', amount: 100 });
+d.post('expense', { sid: 1, subject: 'denied' });
+
+// events directed to statechart instance with id '2'
+d.post('expense', { sid: 2, subject: 'approve', amount: 10000 });
 ```
 [top](reference.md#table-of-contents)  
 ### Nested States
@@ -912,20 +745,17 @@ d.statechart('worker', function() {
     }
 
     canceled: {}
-    whenStart: {
-        // will move the statechart to the 'work.process' sub-state
-        post('worker', { subject: 'enter' });
-        
-        // will keep the statechart to the 'work.process' sub-state
-        post('worker', { subject: 'continue' });
-        post('worker', { subject: 'continue' });
-        
-        // will move the statechart out of the work state
-        post('worker', { subject: 'cancel' });
-    }
 });
 
-d.runAll();
+// will move the statechart to the 'work.process' sub-state
+d.post('worker', { subject: 'enter' });
+        
+// will keep the statechart to the 'work.process' sub-state
+d.post('worker', { subject: 'continue' });
+d.post('worker', { subject: 'continue' });
+
+// will move the statechart out of the work state
+d.post('worker', { subject: 'cancel' });
 ```
 [top](reference.md#table-of-contents)
 ### Flowchart
@@ -966,23 +796,18 @@ d.flowchart('expense', function() {
     deny: {
         run: console.log('Expense denied')
     }
-
-    whenStart: {
-        // events for the default flowchart instance, approved after retry
-        post('expense', { subject: 'approve', amount: 100 });
-        post('expense', { subject: 'retry' });
-        post('expense', { subject: 'approved' });
-        
-        // events for the flowchart instance '1', denied after first try
-        post('expense', {sid: 1, subject: 'approve', amount: 100});
-        post('expense', {sid: 1, subject: 'denied'});
-        
-        // event for the flowchart instance '2' immediately denied
-        post('expense', {sid: 2, subject: 'approve', amount: 10000});
-    }
 });
+// events for the default flowchart instance, approved after retry
+d.post('expense', { subject: 'approve', amount: 100 });
+d.post('expense', { subject: 'retry' });
+d.post('expense', { subject: 'approved' });
 
-d.runAll();
+// events for the flowchart instance '1', denied after first try
+d.post('expense', {sid: 1, subject: 'approve', amount: 100});
+d.post('expense', {sid: 1, subject: 'denied'});
+
+// event for the flowchart instance '2' immediately denied
+d.post('expense', {sid: 2, subject: 'approve', amount: 10000});
 ```
 [top](reference.md#table-of-contents)  
 ### Timers
@@ -993,43 +818,24 @@ Events can be scheduled with timers. A timeout condition can be included in the 
 * cancelTimer: cancels ongoing timer.
 * timeout: used as an antecedent condition.
 
-In this example, the timer can be canceled by running the following command:  
-
-<sub>`curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:5000/timer/events`</sub>  
-
 ```javascript
 var d = require('durable');
 
 d.ruleset('timer', function() {
-    whenAny: {
-        whenAll: s.count == 0
-        // will trigger when MyTimer expires
-        whenAll: {
-            s.count < 5 
-            timeout('MyTimer')
-        }
-    }
-    run: {
-        s.count += 1;
-        // MyTimer will expire in 5 seconds
-        startTimer('MyTimer', 5);
-        console.log('Pusle ->' + new Date());
-    }
+    
+    whenAll: m.subject == 'start'
+    run: startTimer('MyTimer', 5);
 
     whenAll: {
-        m.cancel == true
+        timeout('MyTimer')    
     }
     run: {
-        cancelTimer('MyTimer');
-        console.log('canceled timer');
-    }
-
-    whenStart: {
-        patchState('timer', { count: 0 }); 
+        console.log('timer timeout'); 
     }
 });
 
-d.runAll();
+
+d.post('timer', {subject: 'start'});
 ```
 
 The example below use a timer to detect higher event rate:  
@@ -1047,35 +853,28 @@ d.statechart('risk', function() {
         to: 'fraud'
         whenAll: message = m.amount > 100
         count: 3
-        run: m.forEach(function(e, i){ console.log(JSON.stringify(e.message)) });
+        run: m.forEach(function(e, i){ console.log('risk ' + JSON.stringify(e.message)) })
 
         to: 'exit'
         whenAll: timeout('RiskTimer')
-        run: console.log('exit')    
+        run: console.log('risk exit for ' + c.s.sid)
     }
 
     fraud: {}
     exit:{}
-
-    whenStart: {
-        // three events in a row will trigger the fraud rule
-        post('risk', { amount: 200 }); 
-        post('risk', { amount: 300 }); 
-        post('risk', { amount: 400 }); 
-
-        // two events will exit after 5 seconds
-        post('risk', { sid: 1, amount: 500 }); 
-        post('risk', { sid: 1, amount: 600 }); 
-        
-    }
 });
 
-d.runAll();
+// three events in a row will trigger the fraud rule
+d.post('risk', { amount: 200 }); 
+d.post('risk', { amount: 300 }); 
+d.post('risk', { amount: 400 }); 
+
+// two events will exit after 5 seconds
+d.post('risk', { sid: 1, amount: 500 }); 
+d.post('risk', { sid: 1, amount: 600 });  
 ```
 
-In this example a manual reset timer is used for measuring velocity. Try issuing the command below multiple times.
-
-<sub>`curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk/events`</sub>  
+In this example a manual reset timer is used for measuring velocity.
 
 ```javascript
 var d = require('durable');
@@ -1095,9 +894,8 @@ d.statechart('risk', function() {
         }
         cap: 100
         run: {
-            console.log('velocity: ' + m.length + ' events in 5 seconds');
+            console.log('risk velocity: ' + m.length + ' events in 5 seconds');
             // resets and restarts the manual reset timer
-            resetTimer('VelocityTimer');
             startTimer('VelocityTimer', 5, true);
         }  
 
@@ -1106,23 +904,16 @@ d.statechart('risk', function() {
             timeout('VelocityTimer')
         }
         run: {
-            console.log('velocity: no events in 5 seconds');
-            resetTimer('VelocityTimer');
-            startTimer('VelocityTimer', 5, true);
+            console.log('risk velocity: no events in 5 seconds');
+            cancelTimer('VelocityTimer');
         }
-    }
-
-    whenStart: {
-        // the velocity will 4 events in 5 seconds
-        post('risk', { amount: 200 }); 
-        post('risk', { amount: 300 }); 
-        post('risk', { amount: 50 }); 
-        post('risk', { amount: 500 }); 
-        post('risk', { amount: 600 }); 
     }
 });
 
-d.runAll();
+d.post('risk', { amount: 200 }); 
+d.post('risk', { amount: 300 }); 
+d.post('risk', { amount: 500 }); 
+d.post('risk', { amount: 600 }); 
 ```
 
 [top](reference.md#table-of-contents)  

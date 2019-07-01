@@ -1,5 +1,7 @@
 #include "state.h"
 
+//#define _PRINT 1
+
 #define OP_NOP 0
 #define OP_LT 0x01
 #define OP_LTE 0x02
@@ -26,15 +28,24 @@
 #define OP_IANY 0x17
 
 #define NODE_ALPHA 0
-#define NODE_BETA_CONNECTOR 1
-#define NODE_ACTION 2
+#define NODE_BETA 1
+#define NODE_CONNECTOR 2
+#define NODE_ACTION 3
+
+#define GATE_AND 0
+#define GATE_OR 1
+
 #define NODE_M_OFFSET 0
 
-typedef struct reference {
-    unsigned int nameHash;
+#define MAX_STATE_INDEX_LENGTH 1024
+#define MAX_SEQUENCE_EXPRESSIONS 32
+
+typedef struct identifier {
+    unsigned int propertyNameHash;
+    unsigned int propertyNameOffset;
     unsigned int nameOffset;
-    unsigned int idOffset;
-} reference;
+    unsigned int nameHash;
+} identifier;
 
 typedef struct regexReference {
     unsigned int stringOffset;
@@ -43,64 +54,58 @@ typedef struct regexReference {
     unsigned short vocabularyLength;
 } regexReference;
 
-typedef struct jsonValue {
+typedef struct operand {
     unsigned char type;
     union { 
         long i; 
         double d; 
         unsigned char b; 
         unsigned int stringOffset;
-        unsigned int idiomOffset;
+        unsigned int expressionOffset;
         regexReference regex;
-        reference property;
+        identifier id;
     } value;
-} jsonValue;
-
-typedef struct idiom {
-    unsigned char operator;
-    jsonValue left;
-    jsonValue right; 
-} idiom;
+} operand;
 
 typedef struct expression {
-    unsigned int nameOffset;
-    unsigned int aliasOffset;
-    unsigned short termsLength;
-    unsigned char distinct;
-    unsigned char not;
-    union {
-        unsigned int termsOffset; 
-        unsigned int *termsPointer;
-    } t;
+    unsigned char operator;
+    operand left;
+    operand right; 
 } expression;
 
-typedef struct join {
-    unsigned int expressionsOffset;
-    unsigned short expressionsLength;
-} join;
+typedef struct expressionSequence {
+    unsigned int nameOffset;
+    unsigned int aliasOffset;
+    unsigned short length;
+    unsigned char not;
+    expression expressions[MAX_SEQUENCE_EXPRESSIONS];
+} expressionSequence;
 
 typedef struct alpha {
-    unsigned int hash;
-    unsigned char operator;
+    expression expression;
     unsigned int betaListOffset;
     unsigned int nextListOffset;
     unsigned int nextOffset;
-    jsonValue right;
 } alpha;
 
-typedef struct betaConnector {
+typedef struct beta {
+    unsigned int index;
+    expressionSequence expressionSequence;
     unsigned int hash;
     unsigned int nextOffset;
+    unsigned int aOffset;
+    unsigned int bOffset;
+    unsigned char distinct;
     unsigned char not;
-} betaConnector;
+    unsigned char gateType;
+    unsigned char isFirst;
+} beta;
 
 typedef struct action {
     unsigned int index;
     unsigned short count;
     unsigned short cap;
     unsigned short priority;
-    unsigned int joinsOffset;
-    unsigned short joinsLength;
 } action;
 
 typedef struct node {
@@ -108,40 +113,49 @@ typedef struct node {
     unsigned char type;
     union { 
         alpha a; 
-        betaConnector b; 
+        beta b; 
         action c; 
     } value;
 } node;
 
-
 typedef struct ruleset {
     unsigned int nameOffset;
+    unsigned int actionCount;
+    unsigned int betaCount;
+    unsigned int connectorCount;
+    void *bindingsList;
+    
     node *nodePool;
     unsigned int nodeOffset;
+    
     unsigned int *nextPool;
     unsigned int nextOffset;
+    
     char *stringPool;
     unsigned int stringPoolLength; 
+    
     expression *expressionPool;
     unsigned int expressionOffset;
-    idiom *idiomPool;
-    unsigned int idiomOffset;
-    join *joinPool;
-    unsigned int joinOffset;
+    
     char *regexStateMachinePool;
     unsigned int regexStateMachineOffset;
-    unsigned int actionCount;
-    void *bindingsList;
-    unsigned int *stateBuckets;
-    unsigned int stateBucketsLength;
-    stateEntry *state; 
-    unsigned int maxStateLength;
-    unsigned int stateLength;
-    unsigned int lruStateOffset;
-    unsigned int mruStateOffset;
-    unsigned int orNodeOffset;
-    unsigned int andNodeOffset;
-    unsigned int endNodeOffset;
+    
+    pool statePool;
+    unsigned int stateIndex[MAX_STATE_INDEX_LENGTH];
+    unsigned int reverseStateIndex[MAX_STATE_INDEX_LENGTH];
+    unsigned int currentStateIndex;
 } ruleset;
 
+#ifdef _PRINT
 
+void printSimpleExpression(ruleset *tree, 
+                           expression *currentExpression, 
+                           unsigned char first, 
+                           char *comp);
+
+void printExpressionSequence(ruleset *tree, 
+                             expressionSequence *exprs, 
+                             int level);
+
+
+#endif

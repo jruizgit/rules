@@ -24,7 +24,6 @@ Reference Manual
   * [Action Batches](reference.md#action-batches)
   * [Async Actions](reference.md#async-actions)
   * [Unhandled Exceptions](reference.md#unhandled-exceptions)
-  * [Fault Tolerance](reference.md#fault-tolerance)
 * [Flow Structures](reference.md#flow-structures) 
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
@@ -32,26 +31,9 @@ Reference Manual
   * [Timers](reference.md#timers)
   
 ## Setup
-durable_rules has been tested in MacOS X, Ubuntu Linux and Windows.
-### Redis install
-durable_rules relies on Redis version 2.8 or higher 
- 
-_Mac_  
-1. Download [Redis](http://download.redis.io/releases/redis-2.8.4.tar.gz)   
-2. Extract code, compile and start Redis
-
-For more information go to: http://redis.io/download  
-
-_Windows_  
-1. Download Redis binaries from [MSTechOpen](https://github.com/MSOpenTech/redis/releases)  
-2. Extract binaries and start Redis  
-
-For more information go to: https://github.com/MSOpenTech/redis  
-
-Note: To test applications locally you can also use a Redis [cloud service](reference.md#cloud-setup) 
 
 ### First App
-Now that your cache ready, let's write a simple rule:  
+Let's write a simple rule:  
 
 1. Start a terminal  
 2. Create a directory for your app: `mkdir firstapp` `cd firstapp`  
@@ -61,24 +43,19 @@ Now that your cache ready, let's write a simple rule:
 
 ```ruby
 require "durable"
+
 Durable.ruleset :test do
   when_all (m.subject == "World") do
     puts "Hello #{m.subject}"
   end
-  when_start do
-    post :test, { :subject => "World"}
-  end
 end
-Durable.run_all
+
+Durable.post :test, { :subject => "World"}
 ```  
 
 7. In the terminal type `ruby test.rb`  
 8. You should see the message: `Hello World`  
 
-Note: If you are using a redis service outside your local host, replace the last line with:
-  ```ruby
-  Durable.run_all([{:host => "host_name", :port => "port", :password => "password"}])
-  ```
 [top](reference.md#table-of-contents) 
 
 ## Basics
@@ -86,7 +63,6 @@ Note: If you are using a redis service outside your local host, replace the last
 A rule is the basic building block of the framework. The rule antecendent defines the conditions that need to be satisfied to execute the rule consequent (action). By convention `m` represents the data to be evaluated by a given rule.
 
 * `when_all` and `when_any` annotate the antecendent definition of a rule
-* `when_start` annotates the action to be taken when starting the ruleset  
   
 ```ruby
 require "durable"
@@ -97,13 +73,9 @@ Durable.ruleset :test do
     # consequent
     puts "Hello #{m.subject}"
   end
-  # on ruleset start
-  when_start do
-    post :test, { :subject => "World" }
-  end
 end
 
-Durable.run_all
+Durable.post :test, { :subject => "World" }
 ```  
 ### Facts
 Facts represent the data that defines a knowledge base. After facts are asserted as JSON objects. Facts are stored until they are retracted. When a fact satisfies a rule antecedent, the rule consequent is executed.
@@ -133,18 +105,10 @@ Durable.ruleset :animal do
   when_all +m.subject do
     puts "fact: #{m.subject} #{m.predicate} #{m.object}"
   end
-    
-  when_start do
-    assert :animal, { :subject => "Kermit", :predicate => "eats", :object => "flies" }
-  end
 end
 
-Durable.run_all
+Durable.assert :animal, { :subject => "Kermit", :predicate => "eats", :object => "flies" }
 ```  
-
-Facts can also be asserted using the http API. For the example above, run the following command:  
-
-<sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "predicate": "eats", "object": "worms"}' http://localhost:4567/animal/facts`</sub>
 
 [top](reference.md#table-of-contents)  
 
@@ -160,21 +124,11 @@ Durable.ruleset :risk do
     # the event pair will only be observed once
     puts "fraud detected -> #{first.location}, #{second.location}"
   end
-
-  when_start do
-    # 'post' submits events, try 'assert' instead and to see differt behavior
-    post :risk, { :t => "purchase", :location => "US" }
-    post :risk, { :t => "purchase", :location => "CA" }
-  end
 end
 
-Durable.run_all
+Durable.post :risk, { :t => "purchase", :location => "US" }
+Durable.post :risk, { :t => "purchase", :location => "CA" }
 ```  
-
-Events can be posted using the http API. When the example above is listening, run the following commands:  
-
-<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:4567/risk/events`</sub>  
-<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:4567/risk/events`</sub>  
 
 **Note:**  
 
@@ -185,10 +139,9 @@ Events can be posted using the http API. When the example above is listening, ru
 
 *The reason is because both facts satisfy the first condition m.t == 'purchase' and each fact satisfies the second condition m.location != c.first.location in relation to the facts which satisfied the first.*  
 
-*Given that, you might be wondering why post behaves differently: the reason is because an event is an ephemeral fact, as soon as it is scheduled to be dispatched, it is retracted. When using post in the example above, by the time the second pair is calculated the events have already been retracted.*  
+*Events are ephemeral facts, they are retracted before they are dispatched. When using post in the example above, by the time the second pair is calculated the events have already been retracted.*  
 
-*And why is the difference between events and facts important? Retracting events before dispatch reduces the number of combinations to be calculated for dispatch. Thus, processing events is much more efficient (orders of magnitude faster in some cases).*  
-
+*Retracting events before dispatch reduces the number of combinations to be calculated during action execution.*
 
 [top](reference.md#table-of-contents)  
 
@@ -217,116 +170,75 @@ Durable.ruleset :flow do
     # deletes state at the end
     delete_state
   end
-  # modifies context state
-  when_start do
-    patch_state :flow, { :status => "start"}
-  end
 end
 
-Durable.run_all
+# modifies context state
+Durable.update_state :flow, { :status => "start"}
 ```  
-State can also be retrieved and modified using the http API. When the example above is running, try the following commands:  
-<sub>`curl -H "content-type: application/json" -X POST -d '{"status": "next"}' http://localhost:4567/flow/state`</sub>  
-
 [top](reference.md#table-of-contents)  
 
 ### Identity
 Facts with the same property names and values are considered equal when asserted or retracted. Events with the same property names and values are considered different when posted because the posting time matters. 
 
 ```ruby
-require "durable"
-
 Durable.ruleset :bookstore do
   # this rule will trigger for events with status
   when_all +m.status do
-    puts "Reference #{m.reference} status #{m.status}"
+    puts "bookstore-> Reference #{m.reference} status #{m.status}"
   end
 
   when_all +m.name do
-    puts "Added: #{m.name}"
-    retract(:name => 'The new book',
-            :reference => '75323',
-            :price => 500,
-            :seller => 'bookstore')
+    puts "bookstore-> Added: #{m.name}"
   end
 
   when_all none(+m.name) do
-    puts "No books"
+    puts "bookstore-> No books"
   end  
-
-  when_start do
-    # will return 0 because the fact assert was successful 
-    puts assert :bookstore, {
-                :name => 'The new book',
-                :seller => 'bookstore',
-                :reference => '75323',
-                :price => 500}
-
-    # will return 212 because the fact has already been asserted 
-    puts assert :bookstore, {
-                :reference => '75323',
-                :name => 'The new book',
-                :price => 500,
-                :seller => 'bookstore'}
-
-    # will return 0 because a new event is being posted
-    puts post :bookstore, {
-              :reference => '75323',
-              :status => 'Active'}
-
-    # will return 0 because a new event is being posted
-    puts post :bookstore, {
-              :reference => '75323',
-              :status => 'Active'}
-  end
 end
 
-Durable.run_all
+# will return 0 because the fact assert was successful 
+puts Durable.assert :bookstore, {
+            :name => 'The new book',
+            :seller => 'bookstore',
+            :reference => '75323',
+            :price => 500}
+
+# will return 212 because the fact has already been asserted 
+begin
+  Durable.assert :bookstore, {
+              :reference => '75323',
+              :name => 'The new book',
+              :price => 500,
+              :seller => 'bookstore'}
+rescue Exception => e
+  puts "bookstore expected: #{e}"
+end
+
+# will return 0 because a new event is being posted
+Durable.post :bookstore, {
+             :reference => '75323',
+             :status => 'Active'}
+
+# will return 0 because a new event is being posted
+Durable.post :bookstore, {
+             :reference => '75323',
+             :status => 'Active'}
+
+Durable.retract :bookstore, {
+            :name => 'The new book',
+            :reference => '75323',
+            :price => 500,
+            :seller => 'bookstore'}
 ```
 
 [top](reference.md#table-of-contents)  
 
 ### Error Codes
 
-When the run_all command fails, it can return the following error codes:
+hen asserting a fact, retracting a fact, posting an event or updating state context, the following exceptions can be thrown:
 
-* 0 - OK
-* 1 - Out of memory (uncommon)
-* 2 - Unexpected type (uncommon)
-* 5 - Unexpected name (uncommon)
-* 6 - Rule limit exceeded (uncommon)
-* 8 - Rule beta limit exceeded (uncommon)
-* 9 - Rule without qualifier (uncommon)
-* 10 - Invalid rule attribute (uncommon)
-* 101 - Error parsing JSON value (uncommon)
-* 102 - Error parsing JSON string (uncommon)
-* 103 - Error parsing JSON number (uncommon)
-* 104 - Error parsing JSON object (uncommon)
-* 301 - Could not establish Redis connection
-* 302 - Redis returned an error
-* 501 - Could not parse regex
-* 502 - Max regex state transitions reached (uncommon)
-* 503 - Max regex states reached (uncommon)
-* 504 - Regex DFA transform queue full (uncommon)
-* 505 - Regex DFA transform list full (uncommon)
-* 506 - Regex DFA transform set full (uncommon)
-* 507 - Conflict in regex transform (uncommon)
-
-When asserting a fact or posting an event via the when_start function or the web API, these error codes can be returned:
-
-* 0 - OK
-* 101 - Error parsing JSON value (uncommon)
-* 102 - Error parsing JSON string (uncommon)
-* 103 - Error parsing JSON number (uncommon)
-* 104 - Error parsing JSON object (uncommon)
-* 201 - The event or fact was not captured because it did not match any rule
-* 202 - Too many properties in the event or fact
-* 203 - Max rule stack size reached due to complex ruleset (uncommon) 
-* 209 - Max number of command actions reached (uncommon)
-* 210 - Max number of add actions reached (uncommon)
-* 211 - Max number of eval actions reached (uncommon)
-* 212 - The event or fact has already been observed
-* 302 - Redis returned an error
+* MessageObservedError: The fact has already been asserted or the event has already been posted.
+* MessageNotHandledError: The event or fact was not captured because it did not match any rule.
 
 [top](reference.md#table-of-contents) 
 
@@ -346,13 +258,9 @@ Durable.ruleset :expense do
   when_all (m.subject == "approve") | (m.subject == "ok") do
     puts "Approved subject: #{m.subject}"
   end
-
-  when_start do
-    post :expense, { :subject => "approve" }
-  end
 end
 
-Durable.run_all
+Durable.post :expense, { :subject => "approve" }
 ```  
 [top](reference.md#table-of-contents)  
 
@@ -389,16 +297,23 @@ Durable.ruleset :match do
   when_all (m.url.matches("(https?://)?([0-9a-z.-]+)%.[a-z]{2,6}(/[A-z0-9_.-]+/?)*")) do
     puts "match -> #{m.url}"
   end
-  when_start do
-    post :match, { :url => "https://github.com" }
-    post :match, { :url => "http://github.com/jruizgit/rul!es" }
-    post :match, { :url => "https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md" }
-    post :match, { :url => "//rules" }
-    post :match, { :url => "https://github.c/jruizgit/rules" }
-  end
 end
 
-Durable.run_all
+Durable.post :match, { :url => "https://github.com" }
+
+Durable.post :match, { :url => "http://github.com/jruizgit/rul!es" }, -> e, state {
+  puts "match expected:#{e}"
+}
+
+Durable.post :match, { :url => "https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md" }
+
+Durable.post :match, { :url => "//rules" }, -> e, state {
+  puts "match expected:#{e}"
+}
+
+Durable.post :match, { :url => "https://github.c/jruizgit/rules" }, -> e, state {
+  puts "match expected:#{e}"
+}
 ```  
 
 [top](reference.md#table-of-contents)  
@@ -421,17 +336,13 @@ Durable.ruleset :strings do
   when_all m.subject.imatches(".*Hello.*") do
     puts "string contains hello (case insensitive): #{m.subject}"
   end
-
-  when_start do
-    assert :strings, { :subject => "HELLO world" }
-    assert :strings, { :subject => "world hello" }
-    assert :strings, { :subject => "hello hi" }
-    assert :strings, { :subject => "has Hello string" }
-    assert :strings, { :subject => "does not match" }
-  end
 end
 
-Durable.run_all
+Durable.assert :strings, { :subject => "HELLO world" }
+Durable.assert :strings, { :subject => "world hello" }
+Durable.assert :strings, { :subject => "hello hi" }
+Durable.assert :strings, { :subject => "has Hello string" }
+Durable.assert :strings, { :subject => "does not match" }
 ```  
 
 [top](reference.md#table-of-contents) 
@@ -456,15 +367,11 @@ Durable.ruleset :risk do
     puts "               -> #{second.amount}"
     puts "               -> #{third.amount}"
   end
-  
-  when_start do
-    post :risk, { :t => "purchase", :amount => 50 }
-    post :risk, { :t => "purchase", :amount => 200 }
-    post :risk, { :t => "purchase", :amount => 251 } 
-  end
 end
 
-Durable.run_all
+Durable.post :risk, { :t => "purchase", :amount => 50 }
+Durable.post :risk, { :t => "purchase", :amount => 200 }
+Durable.post :risk, { :t => "purchase", :amount => 251 } 
 ```  
 
 [top](reference.md#table-of-contents)  
@@ -490,16 +397,12 @@ Durable.ruleset :expense do
       puts "Approved #{third.subject} #{fourth.amount}"
     end
   end
-  
-  when_start do
-    post :expense, { :subject => "approve" }
-    post :expense, { :amount => 1000 }
-    post :expense, { :subject => "jumbo" }
-    post :expense, { :amount => 10000 }
-  end
 end
 
-Durable.run_all
+Durable.post :expense, { :subject => "approve" }
+Durable.post :expense, { :amount => 1000 }
+Durable.post :expense, { :subject => "jumbo" }
+Durable.post :expense, { :amount => 10000 }
 ```  
 [top](reference.md#table-of-contents)  
 
@@ -518,15 +421,17 @@ Durable.ruleset :risk do
            c.fourth = m.t == "chargeback" do
     puts "fraud detected #{first.t} #{third.t} #{fourth.t}"
   end
-  
-  when_start do
-    post :risk, { :t => "deposit" }
-    post :risk, { :t => "withrawal" }
-    post :risk, { :t => "chargeback" }
-  end
 end
 
-Durable.run_all
+Durable.assert :risk, { :t => "deposit" }
+Durable.assert :risk, { :t => "withrawal" }
+Durable.assert :risk, { :t => "chargeback" }
+
+Durable.assert :risk, { :sid => 1, :t => "balance" }
+Durable.assert :risk, { :sid => 1, :t => "deposit" }
+Durable.assert :risk, { :sid => 1, :t => "withrawal" }
+Durable.assert :risk, { :sid => 1, :t => "chargeback" }
+Durable.retract :risk, { :sid => 1, :t => "balance" }
 ```  
 
 [top](reference.md#table-of-contents)  
@@ -543,14 +448,10 @@ Durable.ruleset :expense do
     puts "bill amount -> #{bill.invoice.amount}" 
     puts "account payment amount -> #{account.payment.invoice.amount}" 
   end
-  
-  when_start do
-    post :expense, { t:"bill", :invoice => { :amount => 1000 }}
-    post :expense, { t:"account", :payment => { :invoice => { :amount => 1000 }}}
-  end
 end
 
-Durable.run_all
+Durable.post :expense, { t:"bill", :invoice => { :amount => 1000 }}
+Durable.post :expense, { t:"account", :payment => { :invoice => { :amount => 1000 }}}
 ```  
 [top](reference.md#table-of-contents)  
 
@@ -592,27 +493,23 @@ Durable.ruleset :risk do
   when_all (m.field == 1) & m.payments.allItems(item.anyItem((item > 100) | (item < 50))) do
     puts "fraud 7 detected #{m.payments}"
   end
-
-  when_start do
-    post :risk, { :payments => [ 2500, 150, 450 ] }
-    post :risk, { :payments => [ 1500, 3500, 4500 ] }
-    post :risk, { :payments => [ { :amount => 200 }, { :amount => 300 }, { :amount => 400 } ] }
-    post :risk, { :cards => [ "one card", "two cards", "three cards" ] }
-    post :risk, { :payments => [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ] }
-    post :risk, { :payments => [ 150, 350, 450 ], :cash => true }
-    post :risk, { :field => 1, :payments => [ [ 200, 300 ], [ 150, 200 ] ] }
-    post :risk, { :field => 1, :payments => [ [ 20, 180 ], [ 90, 190 ] ] }
-  end
 end
-        
-Durable.run_all
+
+Durable.post :risk, { :payments => [ 2500, 150, 450 ] }
+Durable.post :risk, { :payments => [ 1500, 3500, 4500 ] }
+Durable.post :risk, { :payments => [ { :amount => 200 }, { :amount => 300 }, { :amount => 400 } ] }
+Durable.post :risk, { :cards => [ "one card", "two cards", "three cards" ] }
+Durable.post :risk, { :payments => [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ] }
+Durable.post :risk, { :payments => [ 150, 350, 450 ], :cash => true }
+Durable.post :risk, { :field => 1, :payments => [ [ 200, 300 ], [ 150, 200 ] ] }
+Durable.post :risk, { :field => 1, :payments => [ [ 20, 180 ], [ 90, 190 ] ] }
 ```  
 [top](reference.md#table-of-contents)  
 
 
 ### Facts and Events as rvalues
 
-Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
+Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression.   
 
 ```ruby
 require "durable"
@@ -628,16 +525,12 @@ Durable.ruleset :risk do
     puts "fraud detected -> #{first.amount}"
     puts "fraud detected -> #{second.amount}"
   end
-
-  when_start do
-    post :risk, { :debit => 220, :credit => 100 }
-    post :risk, { :debit => 150, :credit => 100 }
-    post :risk, { :amount => 200 }
-    post :risk, { :amount => 500 }
-  end
 end
 
-Durable.run_all
+Durable.post :risk, { :debit => 220, :credit => 100 }
+Durable.post :risk, { :debit => 150, :credit => 100 }
+Durable.post :risk, { :amount => 200 }
+Durable.post :risk, { :amount => 500 }
 ```
 
 [top](reference.md#table-of-contents) 
@@ -662,15 +555,11 @@ Durable.ruleset :attributes do
   when_all pri(1), m.amount < 100  do
     puts "attributes P1 -> #{m.amount}"
   end
-
-  when_start do
-    assert :attributes, { :amount => 50 }
-    assert :attributes, { :amount => 150 }
-    assert :attributes, { :amount => 250 }
-  end
 end
 
-Durable.run_all
+Durable.assert :attributes, { :amount => 50 }
+Durable.assert :attributes, { :amount => 150 }
+Durable.assert :attributes, { :amount => 250 }
 ```  
 [top](reference.md#table-of-contents)  
 ### Action Batches
@@ -699,19 +588,15 @@ Durable.ruleset :expense do
       puts "rejected ->#{f}"
     end
   end
-
-  when_start do
-    post_batch :expense, { :amount => 10 },
-                         { :amount => 20 },
-                         { :amount => 100 },
-                         { :amount => 30 },
-                         { :amount => 200 },
-                         { :amount => 400 }
-    assert :expense, { :review => true }
-  end
 end
 
-Durable.run_all
+Durable.post_batch :expense, [{ :amount => 10 },
+                              { :amount => 20 },
+                              { :amount => 100 },
+                              { :amount => 30 },
+                              { :amount => 200 },
+                              { :amount => 400 }]
+Durable.assert :expense, { :review => true }
 ```  
 [top](reference.md#table-of-contents)  
 ### Async Actions  
@@ -744,13 +629,9 @@ Durable.ruleset :flow do
     # overrides the 5 second default abandon timeout
     10
   end
-  
-  when_start do
-    patch_state :flow, { :state => "first" }
-  end
 end
 
-Durable.run_all
+Durable.update_state :flow, { :state => "first" }
 ```  
 [top](reference.md#table-of-contents)  
 ### Unhandled Exceptions  
@@ -769,47 +650,10 @@ Durable.ruleset :flow do
     puts "#{s.exception}"
     s.exception = nil
   end
-
-  when_start do
-    post :flow, { :action => "start" }
-  end
 end
 
-Durable.run_all
+Durable.post :flow, { :action => "start" }
 ```  
-[top](reference.md#table-of-contents)  
-### Fault Tolerance  
-Consequent execution is transactional and atomic. That is, if the process crashes in the middle of a consequent execution, no facts will be asserted nor retracted, no events will posted and the context state will not be changed. The consequent will be retried a few seconds after process restart.  
-
-```ruby
-require "durable"
-
-Durable.ruleset :flow do
-
-  when_all m.status == "start" do
-    post :status => "next"
-    puts "start"
-  end
-  # the process will always exit here every time the action is run
-  # when restarting the process this action will be retried after a few seconds
-  when_all m.status == "next" do
-    post :status => "last"
-    puts "next"
-    Process.kill 9, Process.pid
-  end
-
-  when_all m.status == "last" do
-    puts "last"
-  end
-  
-  when_start do
-    post :flow, { :status => "start" }
-  end
-end
-
-
-Durable.run_all
-```
 [top](reference.md#table-of-contents)   
 ## Flow Structures
 ### Statechart
@@ -855,22 +699,19 @@ Durable.statechart :expense do
 
   state :approved
   state :denied
-
-  when_start do
-    # events directed to default statechart instance
-    post :expense, { :subject => 'approve', :amount => 100 }
-    post :expense, { :subject => 'approved' }
-
-    # events directed to statechart instance with id '1'
-    post :expense, { :sid => 1, :subject => 'approve', :amount => 100 }
-    post :expense, { :sid => 1, :subject => 'denied' }
-
-    # events directed to statechart instance with id '2'
-    post :expense, { :sid => 2, :subject => 'approve', :amount => 10000 }
-  end
 end
 
-Durable.run_all
+
+# events directed to default statechart instance
+Durable.post :expense, { :subject => 'approve', :amount => 100 }
+Durable.post :expense, { :subject => 'approved' }
+
+# events directed to statechart instance with id '1'
+Durable.post :expense, { :sid => 1, :subject => 'approve', :amount => 100 }
+Durable.post :expense, { :sid => 1, :subject => 'denied' }
+
+# events directed to statechart instance with id '2'
+Durable.post :expense, { :sid => 2, :subject => 'approve', :amount => 10000 }
 ```  
 [top](reference.md#table-of-contents)  
 ### Nested States
@@ -902,21 +743,16 @@ Durable.statechart :worker do
   end
 
   state :canceled
-  
-  when_start do
-    # will move the statechart to the 'work.process' sub-state
-    post :worker, { :subject => "enter" }
-
-     # will keep the statechart to the 'work.process' sub-state
-    post :worker, { :subject => "continue" }
-    post :worker, { :subject => "continue" }
-
-    # will move the statechart out of the work state
-    post :worker, { :subject => "cancel" }
-  end
 end
+# will move the statechart to the 'work.process' sub-state
+Durable.post :worker, { :subject => "enter" }
 
-Durable.run_all
+# will keep the statechart to the 'work.process' sub-state
+Durable.post :worker, { :subject => "continue" }
+Durable.post :worker, { :subject => "continue" }
+
+# will move the statechart out of the work state
+Durable.post :worker, { :subject => "cancel" }
 ```  
 [top](reference.md#table-of-contents)
 ### Flowchart
@@ -955,23 +791,19 @@ Durable.flowchart :expense do
   stage :deny do
     puts "expense denied"
   end
-
-  when_start do
-    # events for the default flowchart instance, approved after retry
-    post :expense, { :subject => "approve", :amount => 100 }
-    post :expense, { :subject => "retry" }
-    post :expense, { :subject => "approved" }
-
-    # events for the flowchart instance '1', denied after first try
-    post :expense, {:sid => 1, :subject => "approve", :amount => 100}
-    post :expense, {:sid => 1, :subject => "denied"}
-
-     # event for the flowchart instance '2' immediately denied    
-    post :expense, {:sid => 2, :subject => "approve", :amount => 10000}
-  end
 end
 
-Durable.run_all
+# events for the default flowchart instance, approved after retry
+Durable.post :expense, { :subject => "approve", :amount => 100 }
+Durable.post :expense, { :subject => "retry" }
+Durable.post :expense, { :subject => "approved" }
+
+# events for the flowchart instance '1', denied after first try
+Durable.post :expense, {:sid => 1, :subject => "approve", :amount => 100}
+Durable.post :expense, {:sid => 1, :subject => "denied"}
+
+# event for the flowchart instance '2' immediately denied    
+Durable.post :expense, {:sid => 2, :subject => "approve", :amount => 10000}
 ```  
 [top](reference.md#table-of-contents)  
 ### Timers
@@ -982,35 +814,20 @@ Events can be scheduled with timers. A timeout condition can be included in the 
 * cancel_timer: cancels ongoing timer.
 * timeout: used as an antecedent condition.
 
-In this example, the timer can be canceled by running the following command:  
-
-<sub>`curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:4567/timer/events`</sub>  
-
 ```ruby
 require "durable"
 
 Durable.ruleset :timer do
-  when_any all(s.count == 0),
-           # will trigger when MyTimer expires
-           all(s.count < 5, 
-               timeout("MyTimer")) do
-    s.count += 1
-    # MyTimer will expire in 5 seconds
+  when_all m.subject == "start" do
     start_timer "MyTimer", 5
-    puts "pulse -> #{Time.now}"
   end
 
-  when_all m.cancel == true do
-    cancel_timer "MyTimer"
-    puts "canceled timer"
-  end
-
-  when_start do
-    patch_state :timer, { :count => 0 }
+  when_all timeout("MyTimer") do
+    puts "timer-> timeout"
   end
 end
 
-Durable.run_all
+Durable.post :timer, { :subject => "start" }
 ```  
 
 The example below uses a timer to detect higher event rate:  
@@ -1039,25 +856,19 @@ Durable.statechart :risk do
 
   state :fraud
   state :exit
-
-  when_start do
-    # three events in a row will trigger the fraud rule
-    post 'risk', { :amount => 200 } 
-    post 'risk', { :amount => 300 } 
-    post 'risk', { :amount => 400 }
-
-    # two events will exit after 5 seconds
-    post 'risk', { :sid => 1, :amount => 500 } 
-    post 'risk', { :sid => 1, :amount => 600 } 
-  end
 end
 
-Durable.run_all
+# three events in a row will trigger the fraud rule
+Durable.post 'risk', { :amount => 200 } 
+Durable.post 'risk', { :amount => 300 } 
+Durable.post 'risk', { :amount => 400 }
+
+# two events will exit after 5 seconds
+Durable.post 'risk', { :sid => 1, :amount => 500 } 
+Durable.post 'risk', { :sid => 1, :amount => 600 } 
 ```  
 
-In this example a manual reset timer is used for measuring velocity. Try issuing the command below multiple times.
-
-<sub>`curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:4567/risk/events`</sub>  
+In this example a manual reset timer is used for measuring velocity. 
 
 ```ruby
 require "durable"
@@ -1086,18 +897,14 @@ Durable.statechart :risk do
       start_timer "VelocityTimer", 5, true
     end
   end
-
-  when_start do
-    # the velocity will 4 events in 5 seconds
-    post 'risk', { :amount => 200 } 
-    post 'risk', { :amount => 300 } 
-    post 'risk', { :amount => 50 }
-    post 'risk', { :amount => 300 } 
-    post 'risk', { :amount => 400 }
-  end
 end
 
-Durable.run_all
+# the velocity will 4 events in 5 seconds
+Durable.post 'risk', { :amount => 200 } 
+Durable.post 'risk', { :amount => 300 } 
+Durable.post 'risk', { :amount => 50 }
+Durable.post 'risk', { :amount => 300 } 
+Durable.post 'risk', { :amount => 400 }
 ```  
 
 [top](reference.md#table-of-contents)  

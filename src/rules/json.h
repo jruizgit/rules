@@ -10,12 +10,10 @@
 #define JSON_ARRAY 0x05
 #define JSON_OBJECT 0x06
 #define JSON_NIL 0x07
-#define JSON_STATE_PROPERTY 0x08
-#define JSON_EVENT_PROPERTY 0x09
-#define JSON_EVENT_LOCAL_PROPERTY 0x0A
-#define JSON_STATE_IDIOM 0x0B
-#define JSON_EVENT_IDIOM 0x0C
-#define JSON_EVENT_LOCAL_IDIOM 0x0D
+#define JSON_IDENTIFIER 0x09
+#define JSON_MESSAGE_IDENTIFIER 0x0A
+#define JSON_EXPRESSION 0x0C
+#define JSON_MESSAGE_EXPRESSION 0x0D
 #define JSON_REGEX 0x0E
 #define JSON_IREGEX 0x0F
 
@@ -24,6 +22,12 @@
 
 #define FNV_64_OFFSET_BASIS 0xcbf29ce484222325
 #define FNV_64_PRIME 1099511628211
+
+#define CHECK_PARSE_RESULT(result) do { \
+    if (result != PARSE_OK) { \
+        return result; \
+    } \
+} while(0)
 
 unsigned int readNextName(char *start, char **first, char **last, unsigned int *hash);
 unsigned int readNextValue(char *start, char **first, char **last, unsigned char *type);
