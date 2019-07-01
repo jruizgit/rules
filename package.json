@@ -1,6 +1,6 @@
 {
   "name": "durable",
-  "version": "2.00.003",
+  "version": "2.00.03",
   "description": "A lightweight rules engine for real-time, consistent and scalable coordination of events.",
   "keywords": [
     "business rules",
@@ -13,8 +13,8 @@
     "workflow"
   ],
   "dependencies": {
-    "bindings": "^1.3.1",
-    "escodegen": "^1.11.0",
+    "bindings": "^1.5.0",
+    "escodegen": "^1.11.1",
     "esprima": "^3.1.3",
     "nan": "^1.9.0",
     "node-gyp": "^3.8.0"

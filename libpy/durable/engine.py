@@ -725,16 +725,6 @@ class Host(object):
         self.register_rulesets(None, {ruleset_name: ruleset_definition})
         self.save_ruleset(ruleset_name, ruleset_definition)
 
-<<<<<<< HEAD
-    def get_state(self, ruleset_name, sid):
-        return self.get_ruleset(ruleset_name).get_state(sid)
-
-    def delete_state(self, ruleset_name, sid):
-        self.get_ruleset(ruleset_name).delete_state(sid)
-
-    def post_batch(self, ruleset_name, messages):
-        return self.get_ruleset(ruleset_name).assert_events(messages)
-=======
     def _handle_function(self, rules, func, args, complete):
         error = [0]
         result = [0]
@@ -746,7 +736,6 @@ class Host(object):
             rules.do_actions(func(args), callback)
             if error[0]:
                 raise error[0]
->>>>>>> v2
 
             return result[0]
         else:
