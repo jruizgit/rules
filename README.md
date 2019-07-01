@@ -1,7 +1,7 @@
 
 # durable_rules    
 #### for real time analytics (a Ruby, Python and Node.js Rules Engine)
-[![Build Status](https://travis-ci.org/jruizgit/rules.svg?branch=v2)](https://travis-ci.org/jruizgit/rules)
+[![Build Status](https://travis-ci.org/jruizgit/rules.svg?branch=master)](https://travis-ci.org/jruizgit/rules)
 [![Gem Version](https://badge.fury.io/rb/durable_rules.svg)](https://badge.fury.io/rb/durable_rules)
 [![npm version](https://badge.fury.io/js/durable.svg)](https://badge.fury.io/js/durable)
 [![PyPI version](https://badge.fury.io/py/durable_rules.svg)](https://badge.fury.io/py/durable_rules)  
@@ -266,13 +266,13 @@ durable_rules can also be used to solve traditional Production Business Rules pr
 
 Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance nor altering the combinatorics required by the benchmark. For 128 guests, 438 facts, the execution time is 450 ms in node.js and 600 ms in Python and Ruby. 
 
-<div align="center"><img src="https://github.com/jruizgit/rules/blob/v2/docs/manners.png" width="700px" height="400px" /></div>  
+<div align="center"><img src="https://github.com/jruizgit/rules/blob/master/docs/manners.png" width="700px" height="400px" /></div>  
 
 _IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive_    
 
-* [Ruby](https://github.com/jruizgit/rules/blob/v2/testrb/manners.rb)  
-* [Python](https://github.com/jruizgit/rules/blob/v2/testpy/manners.py)  
-* [Node.js](https://github.com/jruizgit/rules/blob/v2/testjs/manners.js)
+* [Ruby](https://github.com/jruizgit/rules/blob/testrb/manners.rb)  
+* [Python](https://github.com/jruizgit/rules/blob/testpy/manners.py)  
+* [Node.js](https://github.com/jruizgit/rules/blob/testjs/manners.js)
 
 ## Image recognition and Waltzdb
 
@@ -280,22 +280,22 @@ Waltzdb is a constraint propagation problem for image recognition: given a set o
 
 In this case too, the benchmark flow structure is defined using a statechart to improve code readability. The benchmark requirements are not altered. The execution time, for the case of 4 regions, is 430 ms in node.js, 654 ms in Python and 552 ms in Ruby.
 
-<div align="center"><img src="https://github.com/jruizgit/rules/blob/v2/docs/waltzdb.png" width="700px" height="400px" /></div>  
+<div align="center"><img src="https://github.com/jruizgit/rules/blob/master/docs/waltzdb.png" width="700px" height="400px" /></div>  
 
 _IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive_    
 
-* [Node.js](https://github.com/jruizgit/rules/blob/v2/testjs/waltzdb.js)  
-* [Ruby](https://github.com/jruizgit/rules/blob/v2/testrb/waltzdb.rb)  
-* [Python](https://github.com/jruizgit/rules/blob/v2/testpy/waltzdb.py)  
+* [Node.js](https://github.com/jruizgit/rules/blob/master/testjs/waltzdb.js)  
+* [Ruby](https://github.com/jruizgit/rules/blob/master/testrb/waltzdb.rb)  
+* [Python](https://github.com/jruizgit/rules/blob/master/testpy/waltzdb.py)  
 
 
 ## To Learn More  
 Reference Manual:  
-### [Ruby](https://github.com/jruizgit/rules/blob/v2/docs/rb/reference.md)  
+### [Ruby](https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md)  
 
-### [Python](https://github.com/jruizgit/rules/blob/v2/docs/py/reference.md)  
+### [Python](https://github.com/jruizgit/rules/blob/master/docs/py/reference.md)  
 
-### [Node.js](https://github.com/jruizgit/rules/blob/v2/docs/js/reference.md)  
+### [Node.js](https://github.com/jruizgit/rules/blob/master/docs/js/reference.md)  
 
-### [JSON](https://github.com/jruizgit/rules/blob/v2/docs/json/reference.md)  
+### [JSON](https://github.com/jruizgit/rules/blob/master/docs/json/reference.md)  
 

@@ -106,7 +106,7 @@ durable_rules can also be used to solve traditional Production Business Rules pr
 
 Note how the benchmark flow structure is defined using a statechart to improve code readability without sacrificing performance nor altering the combinatorics required by the benchmark. For 128 guests, 438 facts, the execution time is 600 ms.  
 
-https://github.com/jruizgit/rules/blob/v2/testpy/manners.py  
+https://github.com/jruizgit/rules/blob/master/testpy/manners.py  
 
 IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive  
 
@@ -116,13 +116,13 @@ Waltzdb is a constraint propagation problem for image recognition: given a set o
 
 In this case too, the benchmark flow structure is defined using a statechart to improve code readability. The benchmark requirements are not altered. The execution time, for the case of 4 regions 654 ms.  
 
-https://github.com/jruizgit/rules/blob/v2/testrb/waltzdb.rb  
+https://github.com/jruizgit/rules/blob/master/testrb/waltzdb.rb  
 
 IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive    
 
 **Reference Manual:**
 
-https://github.com/jruizgit/rules/blob/v2/docs/py/reference.md  
+https://github.com/jruizgit/rules/blob/master/docs/py/reference.md  
 
 
 
