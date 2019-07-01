@@ -1,6 +1,256 @@
 'use strict';
 var d = require('../libjs/durable');
 
+d.ruleset('match1', function() {
+    whenAll: m.subject.matches('a+(bc|de?)*')
+    run: console.log('match 1 ' + m.subject)
+});
+
+d.post('match1', {id: 1, sid: 1, subject: 'abcbc'});
+d.post('match1', {id: 2, sid: 1, subject: 'addd'});
+d.post('match1', {id: 3, sid: 1, subject: 'ddd'}, function(err, state){ console.log('match 1 ' + err.message)});
+d.post('match1', {id: 4, sid: 1, subject: 'adee'}, function(err, state){ console.log('match 1 ' + err.message)});
+
+d.ruleset('match2', function() {
+    whenAll: m.subject.matches('[0-9]+-[a-z]+')
+    run: console.log('match 2 ' + m.subject)
+});
+
+d.post('match2', {id: 1, sid: 1, subject: '0-a'});
+d.post('match2', {id: 2, sid: 1, subject: '43-bcd'});
+d.post('match2', {id: 3, sid: 1, subject: 'a-3'}, function(err, state){ console.log('match 2 ' + err.message)});
+d.post('match2', {id: 4, sid: 1, subject: '0a'}, function(err, state){ console.log('match 2 ' + err.message)});
+
+d.ruleset('match3', function() {
+    whenAll: m.subject.matches('[adfzx-]+[5678]+')
+    run: console.log('match 3 ' + m.subject)
+});
+
+d.post('match3', {id: 1, sid: 1, subject: 'ad-567'});
+d.post('match3', {id: 2, sid: 1, subject: 'ac-78'}, function(err, state){ console.log('match 3 ' + err.message)});
+d.post('match3', {id: 3, sid: 1, subject: 'zx12'}, function(err, state){ console.log('match 3 ' + err.message)});
+d.post('match3', {id: 4, sid: 1, subject: 'xxxx-8888'});
+
+d.ruleset('match4', function() {
+    whenAll: m.subject.matches('[z-a]+-[9-0]+')
+    run: console.log('match 4 ' + m.subject)
+});
+
+d.post('match4', {id: 1, sid: 1, subject: 'ed-56'});
+d.post('match4', {id: 2, sid: 1, subject: 'ac-ac'}, function(err, state){ console.log('match 4 ' + err.message)});
+d.post('match4', {id: 3, sid: 1, subject: 'az-90'});
+d.post('match4', {id: 4, sid: 1, subject: 'AZ-90'}, function(err, state){ console.log('match 4 ' + err.message)});
+
+d.ruleset('match5', function() {
+    whenAll: m.subject.matches('.+b')
+    run: console.log('match 5 ' + m.subject)
+});
+
+d.post('match5', {id: 1, sid: 1, subject: 'ab'});
+d.post('match5', {id: 2, sid: 1, subject: 'adfb0'}, function(err, state){ console.log('match 5 ' + err.message)});
+d.post('match5', {id: 3, sid: 1, subject: 'abbbcd'}, function(err, state){ console.log('match 5 ' + err.message)});
+d.post('match5', {id: 4, sid: 1, subject: 'xybz.b'});
+
+d.ruleset('match6', function() {
+    whenAll: m.subject.matches('[a-z]{3}')
+    run: console.log('match 6 ' + m.subject)
+});
+
+d.post('match6', {id: 1, sid: 1, subject: 'ab'}, function(err, state){ console.log('match 6 ' + err.message)});
+d.post('match6', {id: 2, sid: 1, subject: 'bbb'});
+d.post('match6', {id: 3, sid: 1, subject: 'azc'});
+d.post('match6', {id: 4, sid: 1, subject: 'abbbcd'}, function(err, state){ console.log('match 6 ' + err.message)});
+
+d.ruleset('match7', function() {
+    whenAll: m.subject.matches('[a-z]{2,4}')
+    run: console.log('match 7 ' + m.subject)
+});
+
+d.post('match7', {id: 1, sid: 1, subject: 'ar'});
+d.post('match7', {id: 2, sid: 1, subject: 'bxbc'});
+d.post('match7', {id: 3, sid: 1, subject: 'a'}, function(err, state){ console.log('match 7 ' + err.message)});
+d.post('match7', {id: 4, sid: 1, subject: 'abbbc'}, function(err, state){ console.log('match 7 ' + err.message)});
+
+d.ruleset('match8', function() {
+    whenAll: m.subject.matches('(a|bc){2,}')
+    run: console.log('match 8 ' + m.subject)
+});
+
+d.post('match8', {id: 1, sid: 1, subject: 'aa'});
+d.post('match8', {id: 2, sid: 1, subject: 'abcbc'});
+d.post('match8', {id: 3, sid: 1, subject: 'bc'}, function(err, state){ console.log('match 8 ' + err.message)});
+d.post('match8', {id: 4, sid: 1, subject: 'a'}, function(err, state){ console.log('match 8 ' + err.message)});
+
+d.ruleset('match9', function() {
+    whenAll: m.subject.matches('a{1,2}')
+    run: console.log('match 9 ' + m.subject)
+});
+
+d.post('match9', {id: 1, sid: 1, subject: 'a'});
+d.post('match9', {id: 2, sid: 1, subject: 'b'}, function(err, state){ console.log('match 9 ' + err.message)});
+d.post('match9', {id: 3, sid: 1, subject: 'aa'});
+d.post('match9', {id: 4, sid: 1, subject: 'aaa'}, function(err, state){ console.log('match 9 ' + err.message)});
+
+d.ruleset('match10', function() {
+    whenAll: m.subject.matches('cba{1,}')
+    run: console.log('match 10 ' + m.subject)
+});
+
+d.post('match10', {id: 1, sid: 1, subject: 'cba'});
+d.post('match10', {id: 2, sid: 1, subject: 'b'}, function(err, state){ console.log('match 10 ' + err.message)});
+d.post('match10', {id: 3, sid: 1, subject: 'cb'}, function(err, state){ console.log('match 10 ' + err.message)});
+d.post('match10', {id: 4, sid: 1, subject: 'cbaaa'});
+
+d.ruleset('match11', function() {
+    whenAll: m.subject.matches('cba{0,}')
+    run: console.log('match 11 ' + m.subject)
+});
+
+d.post('match11', {id: 1, sid: 1, subject: 'cb'});
+d.post('match11', {id: 2, sid: 1, subject: 'b'}, function(err, state){ console.log('match 11 ' + err.message)});
+d.post('match11', {id: 3, sid: 1, subject: 'cbab'}, function(err, state){ console.log('match 11 ' + err.message)});
+d.post('match11', {id: 4, sid: 1, subject: 'cbaaa'});
+
+d.ruleset('match12', function() {
+    whenAll: m.user.matches('[a-z0-9_-]{3,16}')
+    run: console.log('match 12 user ' + m.user)
+});
+
+d.post('match12', {id: 1, sid: 1, user: 'git-9'});
+d.post('match12', {id: 2, sid: 1, user: 'git_9'});
+d.post('match12', {id: 3, sid: 1, user: 'GIT-9'}, function(err, state){ console.log('match 12 ' + err.message)});
+d.post('match12', {id: 4, sid: 1, user: '01234567890123456789'}, function(err, state){ console.log('match 12 ' + err.message)});
+d.post('match12', {id: 5, sid: 1, user: 'gi'}, function(err, state){ console.log('match 12 ' + err.message)});
+
+d.ruleset('match13', function() {
+    whenAll: m.number.matches('#?([a-f0-9]{6}|[a-f0-9]{3})')
+    run: console.log('match 13 hex ' + m.number)
+});
+
+d.post('match13', {id: 1, sid: 1, number: 'fff'});
+d.post('match13', {id: 2, sid: 1, number: '#45'}, function(err, state){ console.log('match 13 ' + err.message)});
+d.post('match13', {id: 3, sid: 1, number: 'abcdex'}, function(err, state){ console.log('match 13 ' + err.message)});
+d.post('match13', {id: 4, sid: 1, number: '#54ba45'});
+d.post('match13', {id: 5, sid: 1, number: '#9999'}, function(err, state){ console.log('match 13 ' + err.message)});
+
+d.ruleset('match14', function() {
+    whenAll: m.alias.matches('([a-z0-9_.-]+)@([0-9a-z.-]+)%.([a-z]{2,6})')
+    run: console.log('match 14 email ' + m.alias)
+});
+
+d.post('match14', {id: 1, sid: 1, alias: 'john_59@mail.mx'});
+d.post('match14', {id: 2, sid: 1, alias: 'j#5@mail.com'}, function(err, state){ console.log('match 14 ' + err.message)});
+d.post('match14', {id: 3, sid: 1, alias: 'abcd.abcd@mail.mx.com'});
+d.post('match14', {id: 4, sid: 1, alias: 'dd@dd.'}, function(err, state){ console.log('match 14 ' + err.message)});
+d.post('match14', {id: 5, sid: 1, alias: 'dd@dd.c'}, function(err, state){ console.log('match 14 ' + err.message)});
+
+d.ruleset('match15', function() {
+    whenAll: m.url.matches('(https?://)?([%da-z.-]+)%.[a-z]{2,6}(/[%w_.-]+/?)*')
+    run: console.log('match 15 url ' + m.url)
+});
+
+d.post('match15', {id: 1, sid: 1, url: 'https://github.com'});
+d.post('match15', {id: 2, sid: 1, url: 'http://github.com/jruizgit/rul!es'}, function(err, state){ console.log('match 15 ' + err.message)});
+d.post('match15', {id: 3, sid: 1, url: 'https://github.com/jruizgit/rules/blob/master/docs/rb/reference.md'});
+d.post('match15', {id: 4, sid: 1, url: '//rules'}, function(err, state){ console.log('match 15 ' + err.message)});
+d.post('match15', {id: 5, sid: 1, url: 'https://github.c/jruizgit/rules'}, function(err, state){ console.log('match 15 ' + err.message)});
+
+d.ruleset('match16', function() {
+    whenAll: m.ip.matches('((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)%.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)')
+    run: console.log('match 16 ip ' + m.ip)
+});
+
+d.post('match16', {id: 1, sid: 1, ip: '73.60.124.136'});
+d.post('match16', {id: 2, sid: 1, ip: '256.60.124.136'}, function(err, state){ console.log('match 16 ' + err.message)});
+d.post('match16', {id: 3, sid: 1, ip: '250.60.124.256'}, function(err, state){ console.log('match 16 ' + err.message)});
+d.post('match16', {id: 4, sid: 1, ip: '73.60.124'}, function(err, state){ console.log('match 16 ' + err.message)});
+d.post('match16', {id: 5, sid: 1, ip: '127.0.0.1'});
+
+d.ruleset('match17', function() {
+    whenAll: m.subject.matches('([ab]?){30}%w{30}')
+    run: console.log('match 17 ' + m.subject)
+});
+
+d.post('match17', {id: 1, sid: 1, subject: 'aaaaaaaaab'}, function(err, state){ console.log('match 17 ' + err.message)});
+d.post('match17', {id: 2, sid: 1, subject: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaab'});
+d.post('match17', {id: 3, sid: 1, subject: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab'});
+d.post('match17', {id: 4, sid: 1, subject: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab'}, function(err, state){ console.log('match 17 ' + err.message)});
+
+d.ruleset('match18', function() {
+    whenAll: m.subject.matches('%w+')
+    run: console.log('match 18 ' + m.subject)
+});
+
+d.post('match18', {id: 1, sid: 1, subject: 'aAzZ5678'});
+d.post('match18', {id: 2, sid: 1, subject: '789Az'});
+d.post('match18', {id: 3, sid: 1, subject: 'aA`89'}, function(err, state){ console.log('match 18 ' + err.message)});
+
+d.ruleset('match19', function() {
+    whenAll: m.subject.matches('%u+')
+    run: console.log('match 19 upper ' + m.subject)
+
+    whenAll: m.subject.matches('%l+')
+    run: console.log('match 19 lower ' + m.subject)
+});
+
+d.post('match19', {id: 1, sid: 1, subject: 'ABCDZ'});
+d.post('match19', {id: 2, sid: 1, subject: 'W\u00D2\u00D3'});
+d.post('match19', {id: 3, sid: 1, subject: 'abcz'});
+d.post('match19', {id: 4, sid: 1, subject: 'wßÿ'});
+d.post('match19', {id: 4, sid: 1, subject: 'AbcZ'}, function(err, state){ console.log('match 19 ' + err.message)});
+
+d.ruleset('match20', function() {
+    whenAll: m.subject.matches('[^ABab]+')
+    run: console.log('match 20 ' + m.subject)
+});
+
+d.post('match20', {id: 1, sid: 1, subject: 'ABCDZ'}, function(err, state){ console.log('match 20 ' + err.message)});
+d.post('match20', {id: 2, sid: 1, subject: '.;:<>'});
+d.post('match20', {id: 3, sid: 1, subject: '^&%()'});
+d.post('match20', {id: 4, sid: 1, subject: 'abcz'}, function(err, state){ console.log('match 20 ' + err.message)});
+
+d.ruleset('match21', function() {
+    whenAll: m.subject.matches('hello.*')
+    run: console.log('match 21 starts with hello: ' + m.subject)
+
+    whenAll: m.subject.matches('.*hello')
+    run: console.log('match 21 ends with hello: ' + m.subject)
+
+    whenAll: m.subject.matches('.*hello.*')
+    run: console.log('match 21 contains hello: ' + m.subject)
+
+    whenAll: m.subject.matches('.*(error while abc).*')
+    run: console.log('match 21 error while: ' + m.subject)
+
+    whenAll: m.subject.matches('.*error error.*')
+    run: console.log('match 21 error: ' + m.subject)
+});
+
+d.assert('match21', {subject: 'hello world'});
+d.assert('match21', {subject: 'world hello'});
+d.assert('match21', {subject: 'world hello hello'});
+d.assert('match21', {subject: 'has hello string'});
+d.assert('match21', {subject: 'error while abc'});
+d.assert('match21', {subject: 'error error error'});
+d.assert('match21', {subject: 'does not match'}, function(err, state){ console.log('match 21 ' + err.message)});
+
+d.ruleset('match22', function() {
+    whenAll: m.subject.imatches('hello.*')
+    run: console.log('match 22 starts with case insensitive hello: ' + m.subject)
+
+    whenAll: m.subject.imatches('.*hello')
+    run: console.log('match 22 ends with case insensitive hello: ' + m.subject)
+
+    whenAll: m.subject.imatches('.*Hello.*')
+    run: console.log('match 22 contains case insensitive hello: ' + m.subject)
+});
+
+d.assert('match22', {id: 1, sid: 1, subject: 'HELLO world'});
+d.assert('match22', {id: 2, sid: 1, subject: 'world hello'});
+d.assert('match22', {id: 3, sid: 1, subject: 'world hello hi'});
+d.assert('match22', {id: 4, sid: 1, subject: 'has Hello string'});
+d.assert('match22', {id: 5, sid: 1, subject: 'does not match'}, function(err, state){ console.log('match 22 ' + err.message)});
+
 d.ruleset('test', function() {
     // antecedent
     whenAll: m.subject == 'World'
