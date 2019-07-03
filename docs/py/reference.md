@@ -118,8 +118,8 @@ with ruleset('risk'):
     def fraud(c):
         print('Fraud detected -> {0}, {1}'.format(c.first.location, c.second.location))
         
-post('risk', {'t': 'purchase', 'location': 'US'});
-post('risk', {'t': 'purchase', 'location': 'CA'});
+post('risk', {'t': 'purchase', 'location': 'US'})
+post('risk', {'t': 'purchase', 'location': 'CA'})
 
 ```
 
@@ -416,7 +416,6 @@ assert_fact('risk', { 'sid': 1, 't': 'withrawal' })
 assert_fact('risk', { 'sid': 1, 't': 'chargeback' })
 retract_fact('risk', { 'sid': 1, 't': 'balance' })
 
-run_all()
 ```
 
 [top](reference.md#table-of-contents)  
@@ -478,11 +477,7 @@ post('risk', {'payments': [ [ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ] ]})
 
 ### Facts and Events as rvalues
 
-<<<<<<< HEAD
-Aside from scalars (strings, numbers and boolean values), it is possible to use the fact or event observed on the right side of an expression. This allows for efficient evaluation in the scripting client before reaching the Redis backend.  
-=======
 Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression.  
->>>>>>> v2
 
 ```python
 from durable.lang import *
@@ -682,15 +677,15 @@ with statechart('expense'):
     state('approved')
         
 # events directed to default statechart instance
-post('expense', { 'subject': 'approve', 'amount': 100 });
-post('expense', { 'subject': 'approved' });
+post('expense', { 'subject': 'approve', 'amount': 100 })
+post('expense', { 'subject': 'approved' })
 
 # events directed to statechart instance with id '1'
-post('expense', { 'sid': 1, 'subject': 'approve', 'amount': 100 });
-post('expense', { 'sid': 1, 'subject': 'denied' });
+post('expense', { 'sid': 1, 'subject': 'approve', 'amount': 100 })
+post('expense', { 'sid': 1, 'subject': 'denied' })
 
 # events directed to statechart instance with id '2'
-post('expense', { 'sid': 2, 'subject': 'approve', 'amount': 10000 });
+post('expense', { 'sid': 2, 'subject': 'approve', 'amount': 10000 })
 ```
 [top](reference.md#table-of-contents)  
 ### Nested States
