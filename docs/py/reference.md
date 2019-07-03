@@ -117,9 +117,6 @@ with ruleset('risk'):
     # the event pair will only be observed once
     def fraud(c):
         print('Fraud detected -> {0}, {1}'.format(c.first.location, c.second.location))
-
-    @when_start
-    def start(host):
         
 post('risk', {'t': 'purchase', 'location': 'US'});
 post('risk', {'t': 'purchase', 'location': 'CA'});
