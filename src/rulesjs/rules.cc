@@ -132,34 +132,6 @@ void jsAssertEvents(const FunctionCallbackInfo<v8::Value>& args) {
     }
 }
 
-void jsRetractEvent(const FunctionCallbackInfo<v8::Value>& args) {
-    Isolate* isolate;
-    isolate = args.GetIsolate();
-    if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
-    } else {
-        unsigned int stateOffset;
-        unsigned int result = retractEvent(TO_NUMBER(isolate, args[0]), 
-                                           TO_STRING(isolate, args[1]),
-                                           &stateOffset);
-        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, result));
-            array->Set(1, Number::New(isolate, stateOffset));
-            args.GetReturnValue().Set(array);
-        } else {
-            char *message = NULL;
-            if (asprintf(&message, "Could not assert events, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
-            } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
-            } 
-        } 
-    }
-}
-
 void jsAssertFact(const FunctionCallbackInfo<v8::Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
@@ -611,9 +583,6 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewFromUtf8(isolate, "assertEvents", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsAssertEvents)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "retractEvent", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsRetractEvent)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "assertFact", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsAssertFact)->GetFunction());

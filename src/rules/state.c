@@ -1,7 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <errno.h>
+#ifndef _WIN32
+#include <time.h> /* for struct timeval */
+#else
+#include <WinSock2.h>
+#endif
 #include "rules.h"
 #include "json.h"
 #include "rete.h"

@@ -2,6 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#ifndef _WIN32
+#include <time.h> /* for struct timeval */
+#else
+#include <WinSock2.h>
+#endif
 #include "rules.h"
 #include "json.h"
 #include "regex.h"
@@ -2125,7 +2131,7 @@ unsigned int assertTimers(unsigned int handle) {
         char *pulseMessage = (char *)_alloca(messageSize);
         sprintf_s(pulseMessage, 
                   messageSize, 
-                  "{ \"sid\":\"%s\", \"id\":\"$pulse\", \"$time\":%ld }", 
+                  "{ \"sid\":\"%s\", \"id\":\"$pulse\", \"$time\":%lld }", 
                   state->sid, 
                   pulseTime);
 #else
@@ -2206,7 +2212,7 @@ unsigned int startTimer(unsigned int handle,
     char *baseMessage = (char *)_alloca(messageSize);
     sprintf_s(baseMessage, 
               messageSize, 
-              "{ \"sid\":\"%s\", \"id\":\"%s\", \"$timerName\":\"%s\", \"$baseTime\":%ld }", 
+              "{ \"sid\":\"%s\", \"id\":\"%s\", \"$timerName\":\"%s\", \"$baseTime\":%lld }", 
               sid,
               timer, 
               timer, 
