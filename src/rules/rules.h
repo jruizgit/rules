@@ -133,10 +133,6 @@ unsigned int assertEvents(unsigned int handle,
                           char *messages,
                           unsigned int *stateOffset);
 
-unsigned int retractEvent(unsigned int handle, 
-                          char *message,
-                          unsigned int *stateOffset);
-
 unsigned int assertFact(unsigned int handle, 
                         char *message,
                           unsigned int *stateOffset);
@@ -195,10 +191,6 @@ unsigned int deleteState(unsigned int handle,
 
 unsigned int renewActionLease(unsigned int handle, 
                               char *sid);
-
-#ifdef _WIN32
-int asprintf(char** ret, char* format, ...);
-#endif
 
 #ifdef __cplusplus
 }
