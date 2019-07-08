@@ -192,6 +192,10 @@ unsigned int deleteState(unsigned int handle,
 unsigned int renewActionLease(unsigned int handle, 
                               char *sid);
 
+#ifdef _WIN32
+int asprintf(char** ret, char* format, ...);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

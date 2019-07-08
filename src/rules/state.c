@@ -12,6 +12,33 @@
 #define MAX_RIGHT_FRAME_NODES 8
 #define MAX_LOCATION_NODES 16
 
+#ifdef _WIN32
+int asprintf(char** ret, char* format, ...){
+    va_list args;
+    *ret = NULL;
+    if (!format) return 0;
+    va_start(args, format);
+    int size = _vscprintf(format, args);
+    if (size == 0) {
+        *ret = (char*)malloc(1);
+        **ret = 0;
+    }
+    else {
+        size++; //for null
+        *ret = (char*)malloc(size + 2);
+        if (*ret) {
+            _vsnprintf(*ret, size, format, args);
+        }
+        else {
+            return -1;
+        }
+    }
+
+    va_end(args);
+    return size;
+}
+#endif
+
 // The first node is never used as it corresponds to UNDEFINED_HASH_OFFSET
 #define INIT(type, pool, length) do { \
     pool.content = malloc(length * sizeof(type)); \
