@@ -796,6 +796,9 @@ unsigned int ensureStateNode(void *tree,
             sidHash, 
             nodeOffset);
 
+        if (rulesetTree->statePool.count > MAX_STATE_INDEX_LENGTH) {
+            return ERR_OUT_OF_MEMORY;
+        }
         rulesetTree->reverseStateIndex[rulesetTree->statePool.count - 1] = nodeOffset;
         stateNode *node = STATE_NODE(tree, nodeOffset); 
         node->offset = nodeOffset;
