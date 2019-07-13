@@ -1118,7 +1118,7 @@ unsigned int getNextResult(void *tree,
 static void insertSortProperties(jsonObject *jo, jsonProperty **properties) {
     for (unsigned short i = 1; i < jo->propertiesLength; ++i) {
         unsigned short ii = i; 
-        while (properties[ii]->hash < properties[ii - 1]->hash) {
+        while (ii >= 1 && (properties[ii]->hash < properties[ii - 1]->hash)) {
             jsonProperty *temp = properties[ii];
             properties[ii] = properties[ii - 1];
             properties[ii - 1] = temp;
