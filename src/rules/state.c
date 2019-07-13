@@ -1200,7 +1200,7 @@ unsigned int calculateId(jsonObject *jo) {
 
     unsigned int candidate = HASH_ID % MAX_OBJECT_PROPERTIES;
     while (jo->propertyIndex[candidate] != 0) {
-        candidate = candidate + 1 % MAX_OBJECT_PROPERTIES;
+        candidate = (candidate + 1) % MAX_OBJECT_PROPERTIES;
     }
 
     // Index intentionally offset by 1 to enable getObject 
@@ -1234,7 +1234,7 @@ static unsigned int fixupIds(jsonObject *jo, char generateId) {
 
         unsigned int candidate = HASH_SID % MAX_OBJECT_PROPERTIES;
         while (jo->propertyIndex[candidate] != 0) {
-            candidate = candidate + 1 % MAX_OBJECT_PROPERTIES;
+            candidate = (candidate + 1) % MAX_OBJECT_PROPERTIES;
         }
 
         // Index intentionally offset by 1 to enable getObject 
@@ -1294,7 +1294,7 @@ unsigned int setObjectProperty(jsonObject *jo,
 
     unsigned int candidate = hash % MAX_OBJECT_PROPERTIES;
     while (jo->propertyIndex[candidate] != 0) {
-        candidate = candidate + 1 % MAX_OBJECT_PROPERTIES;
+        candidate = (candidate + 1) % MAX_OBJECT_PROPERTIES;
     }
 
     // Index intentionally offset by 1 to enable getObject 
