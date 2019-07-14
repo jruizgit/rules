@@ -1490,24 +1490,27 @@ static unsigned int handleAplhaArray(ruleset *tree,
                             if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
                                 // handleAplhaArray finds a valid path, thus use propertyMatch
                                 CHECK_RESULT(handleAplhaArray(tree, 
-                                                              &jo,
-                                                              currentProperty, 
-                                                              &hashNode->value.a,
-                                                              propertyMatch));
+                                            &jo,
+                                            currentProperty, 
+                                            &hashNode->value.a,
+                                            &match));
                             } else {
                                 CHECK_RESULT(isAlphaMatch(tree,
-                                                          &hashNode->value.a,
-                                                          &jo,
-                                                          &match));
+                                            &hashNode->value.a,
+                                            &jo,
+                                            &match));
+                            }
 
-                                if (match) {
-                                    if (top == MAX_STACK_SIZE) {
-                                        return ERR_MAX_STACK_SIZE;
-                                    }
-
-                                    stack[top] = &hashNode->value.a; 
-                                    ++top;
+                            if (match) {
+                                *propertyMatch = 1;
+                                if (top == MAX_STACK_SIZE) {
+                                    return ERR_MAX_STACK_SIZE;
                                 }
+
+                                stack[top] = &hashNode->value.a; 
+                                ++top;
+                            } else {
+                                *propertyMatch = 0;
                             }
                         }
                     }               
