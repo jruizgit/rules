@@ -1403,12 +1403,82 @@ static unsigned int handleBetaMessage(ruleset *tree,
                              messageHash);
 }
 
+static unsigned int isArrayMatch(ruleset *tree,
+                                 jsonObject *messageObject,
+                                 jsonProperty *currentProperty,
+                                 alpha *arrayAlpha,
+                                 unsigned char *propertyMatch);
 
-static unsigned int handleAplhaArray(ruleset *tree,
-                                     jsonObject *messageObject,
-                                     jsonProperty *currentProperty,
-                                     alpha *arrayAlpha,
-                                     unsigned char *propertyMatch) {
+static unsigned int isNextMatch(ruleset *tree,
+                                jsonObject *jo,
+                                alpha *currentAlpha,
+                                unsigned char *propertyMatch) {
+    *propertyMatch = 0;
+    if (currentAlpha->nextListOffset) {
+        unsigned int *nextList = &tree->nextPool[currentAlpha->nextListOffset];
+        for (unsigned int entry = 0; nextList[entry] != 0; ++entry) {
+            node *listNode = &tree->nodePool[nextList[entry]];
+            jsonProperty *currentProperty;
+            unsigned int aresult = getObjectProperty(jo, listNode->value.a.expression.left.value.id.propertyNameHash, &currentProperty);
+            if (aresult == ERR_PROPERTY_NOT_FOUND) {
+                *propertyMatch = 1;
+                if (listNode->value.a.nextOffset || listNode->value.a.nextListOffset) {
+                    CHECK_RESULT(isNextMatch(tree,
+                                             jo,
+                                             &listNode->value.a,
+                                             propertyMatch));
+                }    
+
+                if (*propertyMatch) {
+                    break;
+                }
+                
+            }
+        }
+    }
+
+    if (currentAlpha->nextOffset) {
+        unsigned int *nextHashset = &tree->nextPool[currentAlpha->nextOffset];
+        for(unsigned int propertyIndex = 0; propertyIndex < jo->propertiesLength; ++propertyIndex) {
+            jsonProperty *currentProperty = &jo->properties[propertyIndex];
+            for (unsigned int entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
+                node *hashNode = &tree->nodePool[nextHashset[entry]];  
+                if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
+                    CHECK_RESULT(isArrayMatch(tree,
+                                              jo,
+                                              currentProperty, 
+                                              &hashNode->value.a,
+                                              propertyMatch));
+                } else {
+                    CHECK_RESULT(isAlphaMatch(tree, 
+                                              &hashNode->value.a,
+                                              jo, 
+                                              propertyMatch));
+                }
+
+                if (*propertyMatch && (hashNode->value.a.nextOffset || hashNode->value.a.nextListOffset)) {
+                    CHECK_RESULT(isNextMatch(tree,
+                                             jo,
+                                             &hashNode->value.a,
+                                             propertyMatch));
+
+                }
+
+                if (*propertyMatch) {
+                    break;
+                }   
+            }
+        }
+    }   
+    
+    return RULES_OK;
+}
+
+static unsigned int isArrayMatch(ruleset *tree,
+                                 jsonObject *messageObject,
+                                 jsonProperty *currentProperty,
+                                 alpha *arrayAlpha,
+                                 unsigned char *propertyMatch) {
     unsigned int result = RULES_OK;
     if (currentProperty->type != JSON_ARRAY) {
         return RULES_OK;
@@ -1421,10 +1491,6 @@ static unsigned int handleAplhaArray(ruleset *tree,
     result = readNextArrayValue(first, &first, &last, &type);
     while (result == PARSE_OK) {
         *propertyMatch = 0;
-        unsigned short top = 1;
-        alpha *stack[MAX_STACK_SIZE];
-        stack[0] = arrayAlpha;
-        alpha *currentAlpha;
         if (type == JSON_OBJECT) {
             char *next;
             jo.propertiesLength = 0;
@@ -1450,75 +1516,61 @@ static unsigned int handleAplhaArray(ruleset *tree,
                                            last - first + 1));
         }
 
-        while (top) {
-            --top;
-            currentAlpha = stack[top];
-            // add all disjunctive nodes to stack
-            if (currentAlpha->nextListOffset) {
-                unsigned int *nextList = &tree->nextPool[currentAlpha->nextListOffset];
-                for (unsigned int entry = 0; nextList[entry] != 0; ++entry) {
-                    node *listNode = &tree->nodePool[nextList[entry]];
-                    char exists = 0;
-                    for(unsigned int propertyIndex = 0; propertyIndex < jo.propertiesLength; ++propertyIndex) {
-                        if (listNode->value.a.expression.left.value.id.propertyNameHash == jo.properties[propertyIndex].hash) {
-                            // filter out not exists (OP_NEX)
-                            exists = 1;
-                            break;
-                        }
-                    }
+        if (arrayAlpha->nextListOffset) {
+            unsigned int *nextList = &tree->nextPool[arrayAlpha->nextListOffset];
+            for (unsigned int entry = 0; nextList[entry] != 0; ++entry) {
+                node *listNode = &tree->nodePool[nextList[entry]];
+                jsonProperty *currentProperty;
+                unsigned int aresult = getObjectProperty(&jo, listNode->value.a.expression.left.value.id.propertyNameHash, &currentProperty);
+                if (aresult == ERR_PROPERTY_NOT_FOUND) {
+                    *propertyMatch = 1;
+                    if (listNode->value.a.nextOffset || listNode->value.a.nextListOffset) {
+                        CHECK_RESULT(isNextMatch(tree,
+                                                 &jo,
+                                                 &listNode->value.a,
+                                                 propertyMatch));
+                    }    
 
-                    if (!exists) {
-                        if (top == MAX_STACK_SIZE) {
-                            return ERR_MAX_STACK_SIZE;
-                        }
-                        
-                        stack[top] = &listNode->value.a; 
-                        ++top;
+                    if (*propertyMatch) {
+                        break;
                     }
+                    
                 }
             }
+        }
 
-            // calculate conjunctive nodes
-            if (currentAlpha->nextOffset) {
-                unsigned int *nextHashset = &tree->nextPool[currentAlpha->nextOffset];
-                for(unsigned int propertyIndex = 0; propertyIndex < jo.propertiesLength; ++propertyIndex) {
-                    jsonProperty *currentProperty = &jo.properties[propertyIndex];
-                    for (unsigned int entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
-                        node *hashNode = &tree->nodePool[nextHashset[entry]];
-                        if (currentProperty->hash == hashNode->value.a.expression.left.value.id.propertyNameHash) {
-                            unsigned char match = 0;
-                            if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
-                                // handleAplhaArray finds a valid path, thus use propertyMatch
-                                CHECK_RESULT(handleAplhaArray(tree, 
-                                                              &jo,
-                                                              currentProperty, 
-                                                              &hashNode->value.a,
-                                                              propertyMatch));
-                            } else {
-                                CHECK_RESULT(isAlphaMatch(tree,
-                                                          &hashNode->value.a,
-                                                          &jo,
-                                                          &match));
+        if (arrayAlpha->arrayListOffset) {
+            unsigned int *nextHashset = &tree->nextPool[arrayAlpha->arrayListOffset];
+            for(unsigned int propertyIndex = 0; propertyIndex < jo.propertiesLength; ++propertyIndex) {
+                jsonProperty *currentProperty = &jo.properties[propertyIndex];
+                for (unsigned int entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
+                    node *hashNode = &tree->nodePool[nextHashset[entry]];  
+                    if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
+                        CHECK_RESULT(isArrayMatch(tree,
+                                                  &jo,
+                                                  currentProperty, 
+                                                  &hashNode->value.a,
+                                                  propertyMatch));
+                    } else {
+                        CHECK_RESULT(isAlphaMatch(tree, 
+                                                  &hashNode->value.a,
+                                                  &jo, 
+                                                  propertyMatch));
+                    }
 
-                                if (match) {
-                                    if (top == MAX_STACK_SIZE) {
-                                        return ERR_MAX_STACK_SIZE;
-                                    }
+                    if (*propertyMatch && hashNode->value.a.nextOffset) {
+                        CHECK_RESULT(isNextMatch(tree,
+                                                 &jo,
+                                                 &hashNode->value.a,
+                                                 propertyMatch));
 
-                                    stack[top] = &hashNode->value.a; 
-                                    ++top;
-                                }
-                            }
-                        }
-                    }               
+                    }
+
+                    if (*propertyMatch && (hashNode->value.a.nextOffset || hashNode->value.a.nextListOffset)) {
+                        break;
+                    }   
                 }
             }
-
-            // no next offset and no nextListOffest means we found a valid path
-            if (!currentAlpha->nextOffset && !currentAlpha->nextListOffset) {
-                *propertyMatch = 1;
-                break;
-            } 
         }
         
         // OP_IANY, one element led a a valid path
@@ -1586,11 +1638,11 @@ static unsigned int handleAlpha(ruleset *tree,
                         } else {
                             unsigned char match = 0;
                             if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
-                                CHECK_RESULT(handleAplhaArray(tree,
-                                                              jo,
-                                                              currentProperty, 
-                                                              &hashNode->value.a,
-                                                              &match));
+                                CHECK_RESULT(isArrayMatch(tree,
+                                                          jo,
+                                                          currentProperty, 
+                                                          &hashNode->value.a,
+                                                          &match));
                             } else {
                                 CHECK_RESULT(isAlphaMatch(tree, 
                                                           &hashNode->value.a,

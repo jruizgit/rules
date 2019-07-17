@@ -698,6 +698,7 @@ d.ruleset('risk6', function() {
     whenAll: {
         m.payments.anyItem(item.allItems(item < 100))
     }
+    pri: 1
     run: console.log('risk6 fraud 4 detected ' + JSON.stringify(m.payments))
 
     // matching array and value
@@ -716,10 +717,25 @@ d.ruleset('risk6', function() {
     }
     run: console.log('risk6 fraud 7 detected ' + JSON.stringify(m.payments))
 
-    whenAll: { 
-        m.payments.anyItem(~item.field1 && item.field2 == 2) 
+    whenAll: {
+        m.array1.anyItem(item.array2.anyItem(item.field21 == 1) && item.field == 8)
     }
-    run: console.log('risk6 fraud 8 detected ' + JSON.stringify(m.payments));
+    run: console.log('risk6 fraud 9 detected ' + JSON.stringify(m));
+
+    whenAll: {
+        m.array1.anyItem(item.field == 8 && item.array2.anyItem(item.field21 == 1))
+    }
+    run: console.log('risk6 fraud 10 detected ' + JSON.stringify(m));
+
+    whenAll: { 
+        m.payments.anyItem((~item.field1 || ~item.field2) && item.field3 == 2) 
+    }
+    run: console.log('risk6 fraud 11 detected ' + JSON.stringify(m.payments));
+
+    whenAll: { 
+        m.a1.anyItem(~item.field1 && item.a2.anyItem(~item.field2)) 
+    }
+    run: console.log('risk6 fraud 12 detected ' + JSON.stringify(m));
 
 });
 
@@ -730,11 +746,18 @@ d.post('risk6', { cards: ['one card', 'two cards', 'three cards']});
 d.post('risk6', { payments: [[ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ]]});
 d.post('risk6', { payments: [ 150, 350, 450 ], cash : true});    
 d.post('risk6', { field: 1, payments: [ [ 200, 300 ], [ 150, 200 ] ]}); 
-d.post('risk6', { field: 1, payments: [ [ 20, 180 ], [ 90, 190 ] ]}); 
-d.post('risk6', { payments: [{field2: 2}]}); 
-d.post('risk6', { payments: [{field2: 1}]}, function(err, state) {console.log('risk6: ' + err.message)}); 
+d.post('risk6', { field: 1, payments: [ [ 20, 80 ], [ 90, 180 ] ]});   
+d.assert('risk6', { array1: [{ field: 8, array2: [{field21: 1}]}]})
+d.assert('risk6', { array1: [{ field: 7, array2: [{field21: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)})
+d.assert('risk6', { array1: [{ field: 8, array2: [{field21: 2}]}]}, function(err, state) {console.log('risk6: ' + err.message)})
+d.post('risk6', { payments: [{field3: 2}]}); 
+d.post('risk6', { payments: [{field2: 1, field3: 2}]}); 
 d.post('risk6', { payments: [{field1: 1, field2: 2}]}, function(err, state) {console.log('risk6: ' + err.message)});  
-d.post('risk6', { payments: [{field1: 1, field2: 1}]}, function(err, state) {console.log('risk6: ' + err.message)});  
+d.post('risk6', { payments: [{field1: 1, field2: 1}]}, function(err, state) {console.log('risk6: ' + err.message)});
+d.post('risk6', { a1: [{ field: 8, a2: [{field: 1}]}]})
+d.post('risk6', { a1: [{ field1: 8, a2: [{field2: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)})
+d.post('risk6', { a1: [{ field1: 8, a2: [{field: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)})
+d.post('risk6', { a1: [{ field: 8, a2: [{field2: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)})  
 
 d.ruleset('expense1', function() {
     whenAny: {
