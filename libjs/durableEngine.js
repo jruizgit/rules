@@ -417,7 +417,6 @@ exports = module.exports = durableEngine = function () {
         that.getDefinition = function () {
             return rulesetDefinition;
         };
-
         for (var actionName in rulesetDefinition) {
             var rule = rulesetDefinition[actionName];
             if (typeof(rule.run) === 'string') {
@@ -803,10 +802,13 @@ exports = module.exports = durableEngine = function () {
             return rules;
         }
 
-        that.setRuleset = function (rulesetDefinition, complete) {
+        that.setRulesets = function (rulesetDefinitions, complete) {
             try {
-                that.registerRulesets(rulesetDefinition);
-                that.saveRuleset(rulesetName, rulesetDefinition, complete);
+                that.registerRulesets(rulesetDefinitions);
+                for (var rulesetName in rulesetDefinitions) {
+                    var rulesetDefinition = rulesetDefinitions[rulesetName];
+                    that.saveRuleset(rulesetName, rulesetDefinition, complete);
+                }
             } catch (reason) {
                 complete(reason);
             }
