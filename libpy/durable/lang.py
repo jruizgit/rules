@@ -653,11 +653,12 @@ def get_host():
     if not _main_host:
         _main_host = engine.Host()
 
+    ruleset_definitions = {}
     for name, rset in _rulesets.items():
         full_name, ruleset_definition = rset.define()
-        _main_host.set_ruleset(full_name, ruleset_definition)
+        ruleset_definitions[full_name] = ruleset_definition
 
-
+    _main_host.register_rulesets(ruleset_definitions)
     _rulesets = {}
     return _main_host
 

@@ -662,4 +662,17 @@ Durable.post :risk6, { :payments => [ { :field1 => 1 , :field2 => 1 } ] }, -> e,
   puts "risk6 expected:#{e}"
 }
 
+Durable.get_host().set_rulesets({ :risk7 => {
+    :suspect => {
+        :run => -> c { puts('risk7 fraud detected') },
+        :all => [
+            {:first => {:t => "purchase"}},
+            {:second => {:$neq => {:location => {:first => "location"}}}}
+        ],
+    }
+}})
+
+Durable.post(:risk7, {:t => "purchase", :location => "US"})
+Durable.post(:risk7, {:t => "purchase", :location => "CA"})
+
 sleep(30)

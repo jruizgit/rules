@@ -9,9 +9,7 @@ module Durable
       @@main_host = Engine::Host.new
     end
 
-    for name, ruleset in @@rulesets
-      @@main_host.set_ruleset name, ruleset
-    end
+    @@main_host.register_rulesets @@rulesets
 
     @@rulesets = {}
     @@main_host 

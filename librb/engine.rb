@@ -403,20 +403,17 @@ module Engine
       Rules.renew_action_lease @handle, sid.to_s
     end
 
-    def Ruleset.create_rulesets(parent_name, host, ruleset_definitions)
+    def Ruleset.create_rulesets(host, ruleset_definitions)
       branches = {}
       for name, definition in ruleset_definitions do
         name = name.to_s
         if name.end_with? "$state"
           name = name[0..-7]
-          name = "#{parent_name}.#{name}" if parent_name
           branches[name] = Statechart.new name, host, definition
         elsif name.end_with? "$flow"
           name = name[0..-6]
-          name = "#{parent_name}.#{name}" if parent_name
           branches[name] = Flowchart.new name, host, definition
         else
-          name = "#{parent_name}.#{name}" if parent_name
           branches[name] = Ruleset.new name, host, definition
         end
       end
@@ -929,9 +926,11 @@ module Engine
       @ruleset_directory[ruleset_name]
     end
 
-    def set_ruleset(ruleset_name, ruleset_definition)
-      register_rulesets nil, { ruleset_name => ruleset_definition }
-      save_ruleset ruleset_name, ruleset_definition
+    def set_rulesets(ruleset_definitions)
+      register_rulesets ruleset_definitions
+      for ruleset_name, ruleset_definition in ruleset_definitions do
+        save_ruleset ruleset_name, ruleset_definition
+      end
     end
 
     def post(ruleset_name, event, complete = nil)
@@ -993,8 +992,8 @@ module Engine
       get_ruleset(ruleset_name).renew_action_lease sid
     end
 
-    def register_rulesets(parent_name, ruleset_definitions)
-      rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions)
+    def register_rulesets(ruleset_definitions)
+      rulesets = Ruleset.create_rulesets(self, ruleset_definitions)
       for ruleset_name, ruleset in rulesets do
         if @ruleset_directory.key? ruleset_name
           raise ArgumentError, "Ruleset with name #{ruleset_name} already registered"

@@ -531,6 +531,22 @@ post('risk6', {'payments': [ {'field1': 1, 'field2': 2} ]}, risk6_callback)
 post('risk6', {'payments': [ {'field1': 1, 'field2': 1} ]}, risk6_callback)
 
 
+def risk7_callback(c):
+    print('risk7 fraud detected')
+
+get_host().set_rulesets({ 'risk7': {
+    'suspect': {
+        'run': risk7_callback,
+        'all': [
+            {'first': {'t': 'purchase'}},
+            {'second': {'$neq': {'location': {'first': 'location'}}}}
+        ],
+    }
+}})
+
+post('risk7', {'t': 'purchase', 'location': 'US'})
+post('risk7', {'t': 'purchase', 'location': 'CA'})
+
 with ruleset('timer1'):
     
     @when_all(m.subject == 'start')

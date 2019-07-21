@@ -376,25 +376,16 @@ class Ruleset(object):
         return self._definition
 
     @staticmethod
-    def create_rulesets(parent_name, host, ruleset_definitions):
+    def create_rulesets(host, ruleset_definitions):
         branches = {}
         for name, definition in ruleset_definitions.items():  
             if name.rfind('$state') != -1:
                 name = name[:name.rfind('$state')]
-                if parent_name:
-                    name = '{0}.{1}'.format(parent_name, name) 
-
                 branches[name] = Statechart(name, host, definition)
             elif name.rfind('$flow') != -1:
                 name = name[:name.rfind('$flow')]
-                if parent_name:
-                    name = '{0}.{1}'.format(parent_name, name) 
-
                 branches[name] = Flowchart(name, host, definition)
             else:
-                if parent_name:
-                    name = '{0}.{1}'.format(parent_name, name)
-
                 branches[name] = Ruleset(name, host, definition)
 
         return branches
@@ -721,9 +712,10 @@ class Host(object):
             self.register_rulesets(None, ruleset_definition)
             return self._ruleset_directory[ruleset_name]
 
-    def set_ruleset(self, ruleset_name, ruleset_definition):
-        self.register_rulesets(None, {ruleset_name: ruleset_definition})
-        self.save_ruleset(ruleset_name, ruleset_definition)
+    def set_rulesets(self, ruleset_definitions):
+        self.register_rulesets(ruleset_definitions)
+        for ruleset_name, ruleset_definition in ruleset_definitions.items():
+            self.save_ruleset(ruleset_name, ruleset_definition)
 
     def _handle_function(self, rules, func, args, complete):
         error = [0]
@@ -787,8 +779,8 @@ class Host(object):
     def renew_action_lease(self, ruleset_name, sid):
         self.get_ruleset(ruleset_name).renew_action_lease(sid)
 
-    def register_rulesets(self, parent_name, ruleset_definitions):
-        rulesets = Ruleset.create_rulesets(parent_name, self, ruleset_definitions)
+    def register_rulesets(self, ruleset_definitions):
+        rulesets = Ruleset.create_rulesets(self, ruleset_definitions)
         for ruleset_name, ruleset in rulesets.items():
             if ruleset_name in self._ruleset_directory:
                 raise Exception('Ruleset with name {0} already registered'.format(ruleset_name))

@@ -843,6 +843,19 @@ d.assert('expense7', {amount: 1000});
 d.assert('expense7', {subject: 'jumbo'});
 d.post('expense7', {amount: 10000});
 
+d.getHost().setRulesets({ risk7: {
+    suspect: {
+        run: function(c) { console.log('risk7: fraud detected'); },
+        all: [
+            {first: {t: 'purchase'}},
+            {second: {$neq: {location: {first: 'location'}}}}
+        ],
+    }
+}}, function(err){});
+
+d.post('risk7', {t: 'purchase', location: 'US'});
+d.post('risk7', {t: 'purchase', location: 'CA'});
+
 d.ruleset('timer1', function() {
     
     whenAll: m.subject == 'start'
@@ -916,8 +929,6 @@ d.post('risk3', { amount: 400 });
 d.post('risk3', { sid: 1, amount: 500 }); 
 d.post('risk3', { sid: 1, amount: 600 }); 
 
-// // curl -H "content-type: application/json" -X POST -d '{"cancel": true}' http://localhost:5000/timer2/events
-
 d.statechart('risk4', function() {
     start: {
         to: 'meter'
@@ -954,9 +965,6 @@ d.post('risk4', { amount: 300 });
 d.post('risk4', { amount: 500 }); 
 d.post('risk4', { amount: 600 }); 
 
-
-// // curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk4/events
-
 d.ruleset('flow1', function() {
     whenAll: s.state == 'first'
     // runAsync labels an async action
@@ -984,5 +992,3 @@ d.ruleset('flow1', function() {
 });
 
 d.updateState('flow1', { state: 'first' });
-
-//d.runAll();
