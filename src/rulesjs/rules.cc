@@ -31,6 +31,18 @@ private:
 };
 
 
+class CallbackProxy {
+public:
+
+    explicit CallbackProxy(Handle<Function> value) { 
+        Isolate* isolate = Isolate::GetCurrent();
+        func.Reset(isolate, value); 
+
+    }
+    
+    Persistent<Function> func;
+};
+
 void jsCreateRuleset(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
@@ -515,6 +527,43 @@ void jsRenewActionLease(const FunctionCallbackInfo<Value>& args) {
     }
 }
 
+static unsigned int storeMessageCallback(void *context, char *sid, char *mid, char *content) {
+    CallbackProxy *p = (CallbackProxy *)context;
+    Isolate* isolate = Isolate::GetCurrent();
+     
+    Local<Value> args[3];
+    args[0] = String::NewFromUtf8(isolate, sid);
+    args[1] = String::NewFromUtf8(isolate, mid);
+    args[2] = String::NewFromUtf8(isolate, content);
+
+    Local<Function> storeMessageFunc = Local<Function>::New(isolate, p->func);
+    Local<Value> result = storeMessageFunc->Call(isolate->GetCurrentContext()->Global(), 3, args);    
+    return TO_NUMBER(isolate, result);
+}
+
+void jsSetStoreMessageCallback(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsFunction()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        CallbackProxy *p = new CallbackProxy(Handle<Function>::Cast(args[1]));
+        unsigned int result = setStoreMessageCallback(TO_NUMBER(isolate, args[0]),
+                                                      p,
+                                                      &storeMessageCallback);  
+        if (result != RULES_OK) {
+            char *message = NULL;
+            if (asprintf(&message, "Could not set storage message callback, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            }
+        }  
+    }
+}
+
 void jsCreateProxy(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
@@ -631,6 +680,9 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewFromUtf8(isolate, "createProxy", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsCreateProxy)->GetFunction());
+
+    exports->Set(String::NewFromUtf8(isolate, "setStoreMessageCallback", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsSetStoreMessageCallback)->GetFunction());
 }
 
 NODE_MODULE(rulesjs, init)

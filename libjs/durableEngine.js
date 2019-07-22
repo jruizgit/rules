@@ -343,6 +343,10 @@ exports = module.exports = durableEngine = function () {
             r.assertTimers(handle);
         };
 
+        that.setStoreMessageCallback = function (func) {
+            r.setStoreMessageCallback(handle, func);
+        };
+
         var flushActions = function (state, resultContainer, stateOffset, complete) {
             while (resultContainer['message']) {
                 var actionName = null;
@@ -900,6 +904,10 @@ exports = module.exports = durableEngine = function () {
 
         that.renewActionLease = function (rulesetName, sid) {
             that.getRuleset(rulesetName).renewActionLease(sid);
+        };
+
+        that.setStoreMessageCallback = function (rulesetName, func) {
+            that.getRuleset(rulesetName).setStoreMessageCallback(func);
         };
 
         var dispatchRules = function (index) {

@@ -1852,6 +1852,9 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     tree->actionCount = 0;
     tree->bindingsList = NULL;
     tree->currentStateIndex = 0;
+    tree->storeMessageCallback = NULL;
+    tree->storeMessageCallbackContext = NULL;
+    tree->deleteMessageCallback = NULL;
     memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int) * 2);
     memset(tree->reverseStateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
     initStatePool(tree);
@@ -1894,4 +1897,21 @@ unsigned int deleteRuleset(unsigned int handle) {
     return RULES_OK;
 }
 
+unsigned int setStoreMessageCallback(unsigned int handle, 
+                                     void *context, 
+                                     unsigned int (*callback)(void *, char *, char *, char *)) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
 
+    tree->storeMessageCallbackContext = context;
+    tree->storeMessageCallback = callback;
+    return RULES_OK;
+}
+
+unsigned int setDeleteMessageCallback(unsigned int handle, unsigned int (*callback)(char *, char *)) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+
+    tree->deleteMessageCallback = callback;    
+    return RULES_OK;
+}

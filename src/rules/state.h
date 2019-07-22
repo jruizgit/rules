@@ -307,14 +307,17 @@ unsigned int createActionFrame(stateNode *state,
                                leftFrameNode **newNode,
                                frameLocation *newLocation);
 
-unsigned int deleteMessage(stateNode *state,
+unsigned int deleteMessage(void *tree,
+                           stateNode *state,
+                           char *mid,
                            unsigned int messageNodeOffset);
 
 unsigned int getMessage(stateNode *state,
                         char *mid,
                         unsigned int *valueOffset);
 
-unsigned int storeMessage(stateNode *state,
+unsigned int storeMessage(void *tree,
+                          stateNode *state,
                           char *mid,
                           jsonObject *message,
                           unsigned char messageType,

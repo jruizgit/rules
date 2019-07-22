@@ -112,6 +112,12 @@ unsigned int createRuleset(unsigned int *handle,
                            char *name, 
                            char *rules);
 
+unsigned int setStoreMessageCallback(unsigned int handle, 
+                                     void *context, 
+                                     unsigned int (*callback)(void *, char *, char *, char *));
+
+unsigned int setDeleteMessageCallback(unsigned int handle, unsigned int (*callback)(char *, char *));
+
 unsigned int deleteRuleset(unsigned int handle);
 
 unsigned int createClient(unsigned int *handle, 

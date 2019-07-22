@@ -670,10 +670,17 @@ unsigned int createRightFrame(stateNode *state,
     return RULES_OK;
 }
 
-unsigned int deleteMessage(stateNode *state,
+unsigned int deleteMessage(void *tree,
+                           stateNode *state,
+                           char *mid,
                            unsigned int messageNodeOffset) {
 
     messageNode *node = MESSAGE_NODE(state, messageNodeOffset);
+    ruleset *rulesetTree = (ruleset*)tree;
+    if (rulesetTree->deleteMessageCallback) {
+        return rulesetTree->deleteMessageCallback(state->sid, mid);
+    }
+
     if (node->jo.content) {
         free(node->jo.content);
         free(node->locationPool.content);
@@ -686,6 +693,7 @@ unsigned int deleteMessage(stateNode *state,
            MAX_MESSAGE_INDEX_LENGTH,
            state->messagePool,
            messageNodeOffset);
+
     return RULES_OK;
 }
 
@@ -724,7 +732,8 @@ static unsigned int copyMessage(jsonObject *targetMessage,
     return RULES_OK;
 }
 
-unsigned int storeMessage(stateNode *state,
+unsigned int storeMessage(void *tree,
+                          stateNode *state,
                           char *mid,
                           jsonObject *message,
                           unsigned char messageType,
@@ -762,7 +771,17 @@ unsigned int storeMessage(stateNode *state,
     memset(node->locationIndex, 0, MAX_LOCATION_INDEX_LENGTH * sizeof(unsigned int) * 2);
 
     node->messageType = messageType;
-    return copyMessage(&node->jo, message);
+    CHECK_RESULT(copyMessage(&node->jo, message));
+
+    ruleset *rulesetTree = (ruleset*)tree;
+    if (rulesetTree->storeMessageCallback) {
+        return rulesetTree->storeMessageCallback(rulesetTree->storeMessageCallbackContext, 
+                                                 state->sid, 
+                                                 mid, 
+                                                 message->content);
+    }
+
+    return RULES_OK;
 }
 
 unsigned int ensureStateNode(void *tree, 

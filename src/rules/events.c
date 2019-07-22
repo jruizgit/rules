@@ -998,6 +998,7 @@ static unsigned int handleBetaFrame(ruleset *tree,
 
 static unsigned int handleDeleteMessage(ruleset *tree,
                                         stateNode *state,
+                                        char *mid,
                                         unsigned int messageOffset) {
     unsigned int result;
     unsigned int count = 0;
@@ -1139,7 +1140,10 @@ static unsigned int handleDeleteMessage(ruleset *tree,
         }
     }
 
-    result = deleteMessage(state, messageOffset);
+    result = deleteMessage(tree, 
+                           state,
+                           mid, 
+                           messageOffset);
     if (result == ERR_NODE_DELETED) {
         return RULES_OK;
     } else if (result != RULES_OK) {
@@ -1702,7 +1706,7 @@ static unsigned int handleMessageCore(ruleset *tree,
 
     sid[sidProperty->valueLength] = '\0';
 
-    #ifdef _WIN32
+#ifdef _WIN32
     char *mid = (char *)_alloca(sizeof(char)*(midProperty->valueLength + 1));
 #else
     char mid[midProperty->valueLength + 1];
@@ -1725,11 +1729,13 @@ static unsigned int handleMessageCore(ruleset *tree,
         if (sidState->factOffset != UNDEFINED_HASH_OFFSET) {
             CHECK_RESULT(handleDeleteMessage(tree,
                                              sidState,
+                                             mid,
                                              sidState->factOffset));
 
         }
 
-        CHECK_RESULT(storeMessage(sidState,
+        CHECK_RESULT(storeMessage(tree,
+                                  sidState,
                                   mid,
                                   jo,
                                   MESSAGE_TYPE_FACT,
@@ -1752,10 +1758,12 @@ static unsigned int handleMessageCore(ruleset *tree,
         if (*messageOffset != UNDEFINED_HASH_OFFSET) {
             CHECK_RESULT(handleDeleteMessage(tree,
                                              sidState,
+                                             mid,
                                              *messageOffset));
         }
     } else {
-        CHECK_RESULT(storeMessage(sidState,
+        CHECK_RESULT(storeMessage(tree,
+                                  sidState,
                                   mid,
                                   jo,
                                   (actionType == ACTION_ASSERT_FACT ? MESSAGE_TYPE_FACT : MESSAGE_TYPE_EVENT),
@@ -2054,8 +2062,25 @@ static unsigned int deleteCurrentAction(ruleset *tree,
 
 
                 if (currentMessageNode->messageType == MESSAGE_TYPE_EVENT) {
+                    jsonObject *jo = &currentMessageNode->jo;
+                    jsonProperty *midProperty = &jo->properties[jo->idIndex];
+
+#ifdef _WIN32
+                    char *mid = (char *)_alloca(sizeof(char)*(midProperty->valueLength + 1));
+#else
+                    char mid[midProperty->valueLength + 1];
+#endif
+                    if (midProperty->valueOffset) {
+                        strncpy(mid, jo->content + midProperty->valueOffset, midProperty->valueLength);
+                    } else {
+                        strncpy(mid, jo->idBuffer, midProperty->valueLength);
+                    }
+
+                    mid[midProperty->valueLength] = '\0';
+
                     CHECK_RESULT(handleDeleteMessage(tree,
-                                                     state, 
+                                                     state,
+                                                     mid, 
                                                      currentMessageFrame->messageNodeOffset));
                 }
             }

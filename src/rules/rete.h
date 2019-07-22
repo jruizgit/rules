@@ -146,6 +146,10 @@ typedef struct ruleset {
     unsigned int stateIndex[MAX_STATE_INDEX_LENGTH];
     unsigned int reverseStateIndex[MAX_STATE_INDEX_LENGTH];
     unsigned int currentStateIndex;
+
+    unsigned int (*storeMessageCallback)(void*, char *, char *, char *);
+    void *storeMessageCallbackContext;
+    unsigned int (*deleteMessageCallback)(char *, char *);
 } ruleset;
 
 #ifdef _PRINT
