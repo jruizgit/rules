@@ -323,9 +323,12 @@ unsigned int storeMessage(void *tree,
                           unsigned char messageType,
                           unsigned int *valueOffset);
 
-unsigned int ensureStateNode(void *tree, 
+unsigned int getStateNode(void *tree, 
+                          char *sid, 
+                          stateNode **state);
+
+unsigned int createStateNode(void *tree, 
                              char *sid, 
-                             unsigned char *isNew,
                              stateNode **state);
 
 unsigned int serializeResult(void *tree, 

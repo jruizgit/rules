@@ -674,11 +674,14 @@ unsigned int deleteMessage(void *tree,
                            stateNode *state,
                            char *mid,
                            unsigned int messageNodeOffset) {
-
     messageNode *node = MESSAGE_NODE(state, messageNodeOffset);
     ruleset *rulesetTree = (ruleset*)tree;
     if (rulesetTree->deleteMessageCallback) {
-        return rulesetTree->deleteMessageCallback(state->sid, mid);
+        CHECK_RESULT(rulesetTree->deleteMessageCallback(rulesetTree->deleteMessageCallbackContext,
+                                                        &rulesetTree->stringPool[rulesetTree->nameOffset],
+                                                        state->sid, 
+                                                        mid,
+                                                        node->messageType));
     }
 
     if (node->jo.content) {
@@ -776,18 +779,19 @@ unsigned int storeMessage(void *tree,
     ruleset *rulesetTree = (ruleset*)tree;
     if (rulesetTree->storeMessageCallback) {
         return rulesetTree->storeMessageCallback(rulesetTree->storeMessageCallbackContext, 
+                                                 &rulesetTree->stringPool[rulesetTree->nameOffset],
                                                  state->sid, 
                                                  mid, 
+                                                 messageType,
                                                  message->content);
     }
 
     return RULES_OK;
 }
 
-unsigned int ensureStateNode(void *tree, 
-                             char *sid, 
-                             unsigned char *isNew,
-                             stateNode **state) {  
+unsigned int getStateNode(void *tree, 
+                          char *sid, 
+                          stateNode **state) { 
     unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
     unsigned int nodeOffset;
     ruleset *rulesetTree = (ruleset*)tree;
@@ -798,98 +802,106 @@ unsigned int ensureStateNode(void *tree,
               ((ruleset*)tree)->statePool, 
               sidHash, 
               nodeOffset);
-
-    if (nodeOffset != UNDEFINED_HASH_OFFSET) {
-        *isNew = 0;
-        *state = STATE_NODE(tree, nodeOffset); 
-    } else {
-        *isNew = 1;
-        NEW(stateNode, 
-            rulesetTree->statePool, 
-            nodeOffset);
-
-        SET(stateNode, 
-            rulesetTree->stateIndex, 
-            MAX_STATE_INDEX_LENGTH, 
-            rulesetTree->statePool, 
-            sidHash, 
-            nodeOffset);
-
-        if (rulesetTree->statePool.count > MAX_STATE_INDEX_LENGTH) {
-            return ERR_OUT_OF_MEMORY;
-        }
-        rulesetTree->reverseStateIndex[rulesetTree->statePool.count - 1] = nodeOffset;
-        stateNode *node = STATE_NODE(tree, nodeOffset); 
-        node->offset = nodeOffset;
-
-        int sidLength = sizeof(char) * (strlen(sid) + 1);
-        node->sid = malloc(sidLength);
-        if (!node->sid) {
-            return ERR_OUT_OF_MEMORY;
-        }
-        memcpy(node->sid, sid, sidLength);
-
-        INIT(messageNode, 
-             node->messagePool, 
-             MAX_MESSAGE_NODES);
-
-        memset(node->messageIndex, 0, MAX_MESSAGE_INDEX_LENGTH * sizeof(unsigned int) * 2);
-        
-        node->betaState = malloc(((ruleset*)tree)->betaCount * sizeof(betaStateNode));
-        for (unsigned int i = 0; i < ((ruleset*)tree)->betaCount; ++i) {
-            betaStateNode *betaNode = &node->betaState[i];
-            betaNode->reteNode = NULL;
-
-            INIT(leftFrameNode, 
-                 betaNode->leftFramePool, 
-                 MAX_LEFT_FRAME_NODES);
-
-            memset(betaNode->leftFrameIndex, 0, MAX_LEFT_FRAME_INDEX_LENGTH * sizeof(unsigned int) * 2);
-            
-            INIT(rightFrameNode, 
-                 betaNode->rightFramePool, 
-                 MAX_RIGHT_FRAME_NODES);
-
-            memset(betaNode->rightFrameIndex, 0, MAX_RIGHT_FRAME_INDEX_LENGTH * sizeof(unsigned int) * 2);
-        }
-
-        node->connectorState = malloc(((ruleset*)tree)->connectorCount * sizeof(connectorStateNode));
-        for (unsigned int i = 0; i < ((ruleset*)tree)->connectorCount; ++i) {
-            connectorStateNode *connectorNode = &node->connectorState[i];
-            connectorNode->reteNode = NULL;
-
-            INIT(leftFrameNode, 
-                 connectorNode->aFramePool, 
-                 MAX_LEFT_FRAME_NODES);
- 
-            connectorNode->aFrameIndex[0] = UNDEFINED_HASH_OFFSET;
-            connectorNode->aFrameIndex[1] = UNDEFINED_HASH_OFFSET;
-
-            INIT(leftFrameNode, 
-                 connectorNode->bFramePool, 
-                 MAX_LEFT_FRAME_NODES);
-
-            connectorNode->bFrameIndex[0] = UNDEFINED_HASH_OFFSET;
-            connectorNode->bFrameIndex[1] = UNDEFINED_HASH_OFFSET;
-        }
-
-        node->actionState = malloc(((ruleset*)tree)->actionCount * sizeof(actionStateNode));
-        for (unsigned int i = 0; i < ((ruleset*)tree)->actionCount; ++i) {
-            actionStateNode *actionNode = &node->actionState[i];
-            actionNode->reteNode = NULL;
-            
-            actionNode->resultIndex[0] = UNDEFINED_HASH_OFFSET;
-            actionNode->resultIndex[1] = UNDEFINED_HASH_OFFSET;
-
-            INIT(leftFrameNode, 
-                 actionNode->resultPool, 
-                 MAX_LEFT_FRAME_NODES);
-        }        
-
-        node->factOffset = UNDEFINED_HASH_OFFSET;
-        node->lockExpireTime = 0;
-        *state = node;
+    if (nodeOffset == UNDEFINED_HASH_OFFSET) {
+      return ERR_SID_NOT_FOUND;
     }
+
+    *state = STATE_NODE(tree, nodeOffset); 
+    return RULES_OK; 
+} 
+
+unsigned int createStateNode(void *tree, 
+                             char *sid, 
+                             stateNode **state) {  
+    unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
+    unsigned int nodeOffset;
+    ruleset *rulesetTree = (ruleset*)tree;
+
+    NEW(stateNode, 
+        rulesetTree->statePool, 
+        nodeOffset);
+
+    SET(stateNode, 
+        rulesetTree->stateIndex, 
+        MAX_STATE_INDEX_LENGTH, 
+        rulesetTree->statePool, 
+        sidHash, 
+        nodeOffset);
+
+    if (rulesetTree->statePool.count > MAX_STATE_INDEX_LENGTH) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    rulesetTree->reverseStateIndex[rulesetTree->statePool.count - 1] = nodeOffset;
+    stateNode *node = STATE_NODE(tree, nodeOffset); 
+    node->offset = nodeOffset;
+
+    int sidLength = sizeof(char) * (strlen(sid) + 1);
+    node->sid = malloc(sidLength);
+    if (!node->sid) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    memcpy(node->sid, sid, sidLength);
+
+    INIT(messageNode, 
+         node->messagePool, 
+         MAX_MESSAGE_NODES);
+
+    memset(node->messageIndex, 0, MAX_MESSAGE_INDEX_LENGTH * sizeof(unsigned int) * 2);
+    
+    node->betaState = malloc(((ruleset*)tree)->betaCount * sizeof(betaStateNode));
+    for (unsigned int i = 0; i < ((ruleset*)tree)->betaCount; ++i) {
+        betaStateNode *betaNode = &node->betaState[i];
+        betaNode->reteNode = NULL;
+
+        INIT(leftFrameNode, 
+             betaNode->leftFramePool, 
+             MAX_LEFT_FRAME_NODES);
+
+        memset(betaNode->leftFrameIndex, 0, MAX_LEFT_FRAME_INDEX_LENGTH * sizeof(unsigned int) * 2);
+        
+        INIT(rightFrameNode, 
+             betaNode->rightFramePool, 
+             MAX_RIGHT_FRAME_NODES);
+
+        memset(betaNode->rightFrameIndex, 0, MAX_RIGHT_FRAME_INDEX_LENGTH * sizeof(unsigned int) * 2);
+    }
+
+    node->connectorState = malloc(((ruleset*)tree)->connectorCount * sizeof(connectorStateNode));
+    for (unsigned int i = 0; i < ((ruleset*)tree)->connectorCount; ++i) {
+        connectorStateNode *connectorNode = &node->connectorState[i];
+        connectorNode->reteNode = NULL;
+
+        INIT(leftFrameNode, 
+             connectorNode->aFramePool, 
+             MAX_LEFT_FRAME_NODES);
+
+        connectorNode->aFrameIndex[0] = UNDEFINED_HASH_OFFSET;
+        connectorNode->aFrameIndex[1] = UNDEFINED_HASH_OFFSET;
+
+        INIT(leftFrameNode, 
+             connectorNode->bFramePool, 
+             MAX_LEFT_FRAME_NODES);
+
+        connectorNode->bFrameIndex[0] = UNDEFINED_HASH_OFFSET;
+        connectorNode->bFrameIndex[1] = UNDEFINED_HASH_OFFSET;
+    }
+
+    node->actionState = malloc(((ruleset*)tree)->actionCount * sizeof(actionStateNode));
+    for (unsigned int i = 0; i < ((ruleset*)tree)->actionCount; ++i) {
+        actionStateNode *actionNode = &node->actionState[i];
+        actionNode->reteNode = NULL;
+        
+        actionNode->resultIndex[0] = UNDEFINED_HASH_OFFSET;
+        actionNode->resultIndex[1] = UNDEFINED_HASH_OFFSET;
+
+        INIT(leftFrameNode, 
+             actionNode->resultPool, 
+             MAX_LEFT_FRAME_NODES);
+    }        
+
+    node->factOffset = UNDEFINED_HASH_OFFSET;
+    node->lockExpireTime = 0;
+    *state = node;
     
     return RULES_OK;
 }

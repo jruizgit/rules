@@ -279,7 +279,9 @@ exports = module.exports = durableEngine = function () {
                 throw new MessageNotHandledError(message);
             } else if (result[0] === 2) {
                 throw new MessageObservedError(message);  
-            }
+            } else if (result[0] === 3) {
+                return 0;
+            } 
 
             return result[1];
         };
@@ -316,7 +318,7 @@ exports = module.exports = durableEngine = function () {
 
         that.updateState = function (state) {
             state['$s'] = 1;
-            return r.updateState(handle, JSON.stringify(state));
+            return handleResult(r.updateState(handle, JSON.stringify(state)));
         };
 
         that.startTimer = function (sid, timer, timerDuration, manualReset) {
@@ -347,6 +349,26 @@ exports = module.exports = durableEngine = function () {
             r.setStoreMessageCallback(handle, func);
         };
 
+        that.setDeleteMessageCallback = function (func) {
+            r.setDeleteMessageCallback(handle, func);
+        };
+
+        that.setQueueMessageCallback = function (func) {
+            r.setQueueMessageCallback(handle, func);
+        };
+
+        that.setGetStoredMessagesCallback = function (func) {
+            r.setGetStoredMessagesCallback(handle, func);
+        };
+
+        that.setGetQueuedMessagesCallback = function (func) {
+            r.setGetQueuedMessagesCallback(handle, func);
+        };
+
+        that.setGetIdleStateCallback = function (func) {
+            r.setGetIdleStateCallback(handle, func);
+        };
+
         var flushActions = function (state, resultContainer, stateOffset, complete) {
             while (resultContainer['message']) {
                 var actionName = null;
@@ -369,12 +391,8 @@ exports = module.exports = durableEngine = function () {
                         }
 
                         try {
-                            try {
-                                r.updateState(handle, JSON.stringify(c.s));
-                            } catch (reason) {
-                                c.s.rulesetException = { action: 'updateState', events: events, reason: reason};
-                            }
-
+                            r.updateState(handle, JSON.stringify(c.s));
+                            
                             var newResult = r.completeAndStartAction(handle, c.getHandle());
                             if (newResult) {
                                 resultContainer['message'] = JSON.parse(newResult);
@@ -765,6 +783,12 @@ exports = module.exports = durableEngine = function () {
         var rulesDirectory = {};
         var instanceDirectory = {};
         var rulesList = [];
+        var storeMessageCallback = null;
+        var deleteMessageCallback = null;
+        var queueMessageCallback = null;
+        var getStoredMessagesCallback = null;
+        var getQueuedMessagesCallback = null;
+        var getIdleStateCallback = null;
         
         that.getAction = function (actionName) {
             throw 'Action ' + actionName + ' not found';
@@ -822,13 +846,36 @@ exports = module.exports = durableEngine = function () {
             var rulesets = createRulesets(that, rulesetDefinitions);
             var names = [];
             for (var rulesetName in rulesets) {
-                var rulesetDefinition = rulesets[rulesetName];
+                var ruleset = rulesets[rulesetName];
                 if (rulesDirectory[rulesetName]) {
                     throw 'ruleset ' + rulesetName + ' already registered';
                 } else {
-                    rulesDirectory[rulesetName] = rulesetDefinition;
-                    rulesList.push(rulesetDefinition);
+                    rulesDirectory[rulesetName] = ruleset;
+                    rulesList.push(ruleset);
                     names.push(rulesetName);
+                    if (storeMessageCallback) {
+                        ruleset.setStoreMessageCallback(storeMessageCallback);
+                    }
+
+                    if (deleteMessageCallback) {
+                        ruleset.setDeleteMessageCallback(deleteMessageCallback);
+                    }
+
+                    if (queueMessageCallback) {
+                        ruleset.setQueueMessageCallback(queueMessageCallback);
+                    }
+
+                    if (getStoredMessagesCallback) {
+                        ruleset.setGetStoredMessagesCallback(getStoredMessagesCallback);
+                    }
+
+                    if (getQueuedMessagesCallback) {
+                        ruleset.setGetQueuedMessagesCallback(getQueuedMessagesCallback);
+                    }
+
+                    if (getIdleStateCallback) {
+                        ruleset.setGetIdleStateCallback(getIdleStateCallback);
+                    }
                 }
             }
 
@@ -906,8 +953,52 @@ exports = module.exports = durableEngine = function () {
             that.getRuleset(rulesetName).renewActionLease(sid);
         };
 
-        that.setStoreMessageCallback = function (rulesetName, func) {
-            that.getRuleset(rulesetName).setStoreMessageCallback(func);
+        that.setStoreMessageCallback = function (func) {
+            storeMessageCallback = func;
+
+            for (var ruleset in rulesList) {
+                ruleset.setStoreMessageCallback(func);
+            }
+        };
+
+        that.setDeleteMessageCallback = function (func) {
+            deleteMessageCallback = func;
+
+            for (var ruleset in rulesList) {
+                ruleset.setDeleteMessageCallback(func);
+            }
+        };
+
+        that.setQueueMessageCallback = function (func) {
+            queueMessageCallback = func;
+
+            for (var ruleset in rulesList) {
+                ruleset.setQueueMessageCallback(func);
+            }
+        };
+
+        that.setGetQueuesMessagesCallback = function (func) {
+            getQueuedMessagesCallback = func;
+
+            for (var ruleset in rulesList) {
+                ruleset.setGetQueuedMessagesCallback(func);
+            }
+        };
+
+        that.setGetStoredMessagesCallback = function (func) {
+            getStoredMessagesCallback = func;
+
+            for (var ruleset in rulesList) {
+                ruleset.setGetStoredMessagesCallback(func);
+            }
+        };
+
+        that.setGetIdleStateCallback = function (func) {
+            getIdleStateCallback = func;
+
+            for (var ruleset in rulesList) {
+                ruleset.setGetIdleStateCallback(func);
+            }
         };
 
         var dispatchRules = function (index) {

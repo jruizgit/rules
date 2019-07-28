@@ -2,6 +2,7 @@
 #define RULES_OK 0
 #define ERR_EVENT_NOT_HANDLED 1
 #define ERR_EVENT_OBSERVED 2
+#define ERR_EVENT_DEFERRED 3
 
 #define ERR_OUT_OF_MEMORY 101
 #define ERR_UNEXPECTED_TYPE 102
@@ -114,9 +115,27 @@ unsigned int createRuleset(unsigned int *handle,
 
 unsigned int setStoreMessageCallback(unsigned int handle, 
                                      void *context, 
-                                     unsigned int (*callback)(void *, char *, char *, char *));
+                                     unsigned int (*callback)(void *, char *, char *, char *, unsigned char, char *));
 
-unsigned int setDeleteMessageCallback(unsigned int handle, unsigned int (*callback)(char *, char *));
+unsigned int setDeleteMessageCallback(unsigned int handle, 
+                                      void *context,
+                                      unsigned int (*callback)(void *, char *, char *, char *, unsigned char));
+
+unsigned int setQueueMessageCallback(unsigned int handle, 
+                                     void *context, 
+                                     unsigned int (*callback)(void *, char *, char *, unsigned char, char *));
+
+unsigned int setGetQueuedMessagesCallback(unsigned int handle, 
+                                          void *context, 
+                                          unsigned int (*callback)(void *, char *, char *, unsigned char, char **));
+
+unsigned int setGetStoredMessagesCallback(unsigned int handle, 
+                                          void *context, 
+                                          unsigned int (*callback)(void *, char *, char *, unsigned char, char **));
+
+unsigned int setGetIdleStateCallback(unsigned int handle, 
+                                     void *context, 
+                                     unsigned int (*callback)(void *, char *, char **));
 
 unsigned int deleteRuleset(unsigned int handle);
 

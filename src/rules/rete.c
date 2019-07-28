@@ -1855,6 +1855,16 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     tree->storeMessageCallback = NULL;
     tree->storeMessageCallbackContext = NULL;
     tree->deleteMessageCallback = NULL;
+    tree->deleteMessageCallbackContext = NULL;
+    tree->queueMessageCallback = NULL;
+    tree->queueMessageCallbackContext = NULL;
+    tree->getQueuedMessagesCallback = NULL;
+    tree->getQueuedMessagesCallbackContext = NULL;
+    tree->getStoredMessagesCallback = NULL;
+    tree->getStoredMessagesCallbackContext = NULL;
+    tree->getIdleStateCallback = NULL;
+    tree->getIdleStateCallbackContext = NULL;
+
     memset(tree->stateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int) * 2);
     memset(tree->reverseStateIndex, 0, MAX_STATE_INDEX_LENGTH * sizeof(unsigned int));
     initStatePool(tree);
@@ -1899,19 +1909,64 @@ unsigned int deleteRuleset(unsigned int handle) {
 
 unsigned int setStoreMessageCallback(unsigned int handle, 
                                      void *context, 
-                                     unsigned int (*callback)(void *, char *, char *, char *)) {
+                                     unsigned int (*callback)(void *, char *, char *, char *, unsigned char, char *)) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
-
     tree->storeMessageCallbackContext = context;
     tree->storeMessageCallback = callback;
     return RULES_OK;
 }
 
-unsigned int setDeleteMessageCallback(unsigned int handle, unsigned int (*callback)(char *, char *)) {
+unsigned int setDeleteMessageCallback(unsigned int handle, 
+                                      void *context,
+                                      unsigned int (*callback)(void *, char *, char *, char *, unsigned char)) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
-
+    tree->deleteMessageCallbackContext = context;
     tree->deleteMessageCallback = callback;    
     return RULES_OK;
 }
+
+unsigned int setQueueMessageCallback(unsigned int handle, 
+                                     void *context, 
+                                     unsigned int (*callback)(void *, char *, char *, unsigned char, char *)) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+    tree->queueMessageCallbackContext = context;
+    tree->queueMessageCallback = callback;
+    return RULES_OK;
+}
+
+unsigned int setGetQueuedMessagesCallback(unsigned int handle, 
+                                          void *context, 
+                                          unsigned int (*callback)(void *, char *, char *, unsigned char, char **)) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+
+    tree->getQueuedMessagesCallbackContext = context;
+    tree->getQueuedMessagesCallback = callback;
+    return RULES_OK;
+}
+
+unsigned int setGetStoredMessagesCallback(unsigned int handle, 
+                                          void *context, 
+                                          unsigned int (*callback)(void *, char *, char *, unsigned char, char **)) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+
+    tree->getStoredMessagesCallbackContext = context;
+    tree->getStoredMessagesCallback = callback;
+    return RULES_OK;
+}
+
+unsigned int setGetIdleStateCallback(unsigned int handle, 
+                                     void *context, 
+                                     unsigned int (*callback)(void *, char *, char **)) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+
+    tree->getIdleStateCallbackContext = context;
+    tree->getIdleStateCallback = callback;
+    return RULES_OK;
+}
+

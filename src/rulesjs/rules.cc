@@ -100,7 +100,7 @@ void jsAssertEvent(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int result = assertEvent(TO_NUMBER(isolate, args[0]),
                                           TO_STRING(isolate, args[1]),
                                           &stateOffset);
-        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED) {
+        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_DEFERRED) {
             Handle<Array> array = Array::New(isolate, 2);
             array->Set(0, Number::New(isolate, result));
             array->Set(1, Number::New(isolate, stateOffset));
@@ -128,7 +128,7 @@ void jsAssertEvents(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int result = assertEvents(TO_NUMBER(isolate, args[0]), 
                                            TO_STRING(isolate, args[1]),
                                            &stateOffset);
-        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED) {
+        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_DEFERRED) {
             Handle<Array> array = Array::New(isolate, 2);
             array->Set(0, Number::New(isolate, result));
             array->Set(1, Number::New(isolate, stateOffset));
@@ -156,7 +156,7 @@ void jsAssertFact(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int result = assertFact(TO_NUMBER(isolate, args[0]), 
                                          TO_STRING(isolate, args[1]),
                                          &stateOffset);
-        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED) {
+        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_DEFERRED) {
             Handle<Array> array = Array::New(isolate, 2);
             array->Set(0, Number::New(isolate, result));
             array->Set(1, Number::New(isolate, stateOffset));
@@ -184,7 +184,7 @@ void jsAssertFacts(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int result = assertFacts(TO_NUMBER(isolate, args[0]), 
                                           TO_STRING(isolate, args[1]),
                                           &stateOffset);
-        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED) {
+        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_DEFERRED) {
             Handle<Array> array = Array::New(isolate, 2);
             array->Set(0, Number::New(isolate, result));
             array->Set(1, Number::New(isolate, stateOffset));
@@ -212,7 +212,7 @@ void jsRetractFact(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int result = retractFact(TO_NUMBER(isolate, args[0]), 
                                           TO_STRING(isolate, args[1]),
                                           &stateOffset);
-        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED) {
+        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_DEFERRED) {
             Handle<Array> array = Array::New(isolate, 2);
             array->Set(0, Number::New(isolate, result));
             array->Set(1, Number::New(isolate, stateOffset));
@@ -240,7 +240,7 @@ void jsRetractFacts(const FunctionCallbackInfo<v8::Value>& args) {
         unsigned int result = retractFacts(TO_NUMBER(isolate, args[0]), 
                                            TO_STRING(isolate, args[1]),
                                            &stateOffset);
-        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED) {
+        if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_DEFERRED) {
             Handle<Array> array = Array::New(isolate, 2);
             array->Set(0, Number::New(isolate, result));
             array->Set(1, Number::New(isolate, stateOffset));
@@ -268,9 +268,11 @@ void jsUpdateState(const FunctionCallbackInfo<Value>& args) {
         unsigned int result = updateState(TO_NUMBER(isolate, args[0]),
                                           TO_STRING(isolate, args[1]),
                                           &stateOffset);
-        
-        if (result == RULES_OK) {
-            args.GetReturnValue().Set(Number::New(isolate, stateOffset));
+        if (result == RULES_OK || result == ERR_EVENT_DEFERRED) {
+            Handle<Array> array = Array::New(isolate, 2);
+            array->Set(0, Number::New(isolate, result));
+            array->Set(1, Number::New(isolate, stateOffset));
+            args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not update state, error code: %d", result) == -1) {
@@ -527,18 +529,24 @@ void jsRenewActionLease(const FunctionCallbackInfo<Value>& args) {
     }
 }
 
-static unsigned int storeMessageCallback(void *context, char *sid, char *mid, char *content) {
+static unsigned int storeMessageCallback(void *context, char *ruleset, char *sid, char *mid, unsigned char messageType, char *content) {
     CallbackProxy *p = (CallbackProxy *)context;
     Isolate* isolate = Isolate::GetCurrent();
      
-    Local<Value> args[3];
-    args[0] = String::NewFromUtf8(isolate, sid);
-    args[1] = String::NewFromUtf8(isolate, mid);
-    args[2] = String::NewFromUtf8(isolate, content);
+    Local<Value> args[5];
+    args[0] = String::NewFromUtf8(isolate, ruleset);
+    args[1] = String::NewFromUtf8(isolate, sid);
+    args[2] = String::NewFromUtf8(isolate, mid);
+    args[3] = Number::New(isolate, messageType);
+    args[4] = String::NewFromUtf8(isolate, content);
 
-    Local<Function> storeMessageFunc = Local<Function>::New(isolate, p->func);
-    Local<Value> result = storeMessageFunc->Call(isolate->GetCurrentContext()->Global(), 3, args);    
-    return TO_NUMBER(isolate, result);
+    Local<Function> func = Local<Function>::New(isolate, p->func);
+    Local<Value> result = func->Call(isolate->GetCurrentContext()->Global(), 5, args);  
+    if (result->IsNumber()) {  
+        return TO_NUMBER(isolate, result);
+    } else {
+        return RULES_OK;
+    }
 }
 
 void jsSetStoreMessageCallback(const FunctionCallbackInfo<Value>& args) {
@@ -556,6 +564,90 @@ void jsSetStoreMessageCallback(const FunctionCallbackInfo<Value>& args) {
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not set storage message callback, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            }
+        }  
+    }
+}
+
+static unsigned int deleteMessageCallback(void *context, char *ruleset, char *sid, char *mid, unsigned char messageType) {
+    CallbackProxy *p = (CallbackProxy *)context;
+    Isolate* isolate = Isolate::GetCurrent();
+     
+    Local<Value> args[4];
+    args[0] = String::NewFromUtf8(isolate, ruleset);
+    args[1] = String::NewFromUtf8(isolate, sid);
+    args[2] = String::NewFromUtf8(isolate, mid);
+    args[3] = Number::New(isolate, messageType);
+
+    Local<Function> func = Local<Function>::New(isolate, p->func);
+    Local<Value> result = func->Call(isolate->GetCurrentContext()->Global(), 4, args);    
+    if (result->IsNumber()) {  
+        return TO_NUMBER(isolate, result);
+    } else {
+        return RULES_OK;
+    }
+}
+
+void jsSetDeleteMessageCallback(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsFunction()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        CallbackProxy *p = new CallbackProxy(Handle<Function>::Cast(args[1]));
+        unsigned int result = setDeleteMessageCallback(TO_NUMBER(isolate, args[0]),
+                                                       p,
+                                                       &deleteMessageCallback);  
+        if (result != RULES_OK) {
+            char *message = NULL;
+            if (asprintf(&message, "Could not set delete message callback, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            }
+        }  
+    }
+}
+
+static unsigned int queueMessageCallback(void *context, char *ruleset, char *sid, unsigned char actionType, char *content) {
+    CallbackProxy *p = (CallbackProxy *)context;
+    Isolate* isolate = Isolate::GetCurrent();
+     
+    Local<Value> args[4];
+    args[0] = String::NewFromUtf8(isolate, ruleset);
+    args[1] = String::NewFromUtf8(isolate, sid);
+    args[2] = Number::New(isolate, actionType);
+    args[3] = String::NewFromUtf8(isolate, content);
+
+    Local<Function> func = Local<Function>::New(isolate, p->func);
+    Local<Value> result = func->Call(isolate->GetCurrentContext()->Global(), 4, args);    
+    if (result->IsNumber()) {  
+        return TO_NUMBER(isolate, result);
+    } else {
+        return RULES_OK;
+    }
+}
+
+void jsSetQueueMessageCallback(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsFunction()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        CallbackProxy *p = new CallbackProxy(Handle<Function>::Cast(args[1]));
+        unsigned int result = setQueueMessageCallback(TO_NUMBER(isolate, args[0]),
+                                                       p,
+                                                       &queueMessageCallback);  
+        if (result != RULES_OK) {
+            char *message = NULL;
+            if (asprintf(&message, "Could not set queue message callback, error code: %d", result) == -1) {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
             } else {
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
@@ -683,6 +775,21 @@ void init(Handle<Object> exports) {
 
     exports->Set(String::NewFromUtf8(isolate, "setStoreMessageCallback", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsSetStoreMessageCallback)->GetFunction());
+
+    exports->Set(String::NewFromUtf8(isolate, "setDeleteMessageCallback", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsSetDeleteMessageCallback)->GetFunction());
+
+    exports->Set(String::NewFromUtf8(isolate, "setQueueMessageCallback", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsSetQueueMessageCallback)->GetFunction());
+
+    // exports->Set(String::NewFromUtf8(isolate, "setGetQueuedMessagesCallback", String::kInternalizedString),
+    //     FunctionTemplate::New(isolate, jsSetGetQueuedMessagesCallback)->GetFunction());
+
+    // exports->Set(String::NewFromUtf8(isolate, "setGetStoredMessagesCallback", String::kInternalizedString),
+    //     FunctionTemplate::New(isolate, jsSetGetStoredMessagesCallback)->GetFunction());
+
+    // exports->Set(String::NewFromUtf8(isolate, "setGetIdleStateCallback", String::kInternalizedString),
+    //     FunctionTemplate::New(isolate, jsSetGetIdleStateCallback)->GetFunction());
 }
 
 NODE_MODULE(rulesjs, init)

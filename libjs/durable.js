@@ -1940,7 +1940,6 @@ exports = module.exports = durableEngine = function () {
         getState: getState,
         deleteState: deleteState,
         getHost: getHost
-
     }; 
     extend(ex);
 
