@@ -1729,15 +1729,14 @@ static unsigned int handleMessageCore(ruleset *tree,
         strncpy(mid, jo->idBuffer, midProperty->valueLength);
     }
 
+    *stateOffset = UNDEFINED_HASH_OFFSET;
     mid[midProperty->valueLength] = '\0';
-    unsigned char isNewState = 0;
     unsigned int result = getStateNode(tree, 
                                        sid,
                                        &sidState);
     if (result != RULES_OK && result != ERR_SID_NOT_FOUND) {
         return result;
     } else if (result == ERR_SID_NOT_FOUND) {
-        isNewState = 1;
         if (!tree->queueMessageCallback) {
             CHECK_RESULT(createStateNode(tree, 
                                          sid,
@@ -1803,7 +1802,7 @@ static unsigned int handleMessageCore(ruleset *tree,
                                           messageOffset);
 
         if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-            if (isNewState) {      
+            if (sidState->factOffset == UNDEFINED_HASH_OFFSET) {      
 #ifdef _WIN32
                 char *stateMessage = (char *)_alloca(sizeof(char)*(50 + sidProperty->valueLength * 2));
                 sprintf_s(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"id\":\"sid-%s\", \"$s\":1}", sid, sid);
@@ -1984,12 +1983,75 @@ unsigned int updateState(unsigned int handle,
 }
 
 static unsigned int flushQueuedActions(ruleset *tree) {
+    if (tree->getIdleStateCallback) {
+        char *sid;
+        CHECK_RESULT(tree->getIdleStateCallback(tree->getIdleStateCallbackContext,
+                                                &tree->stringPool[tree->nameOffset],
+                                                &sid));
+        if (sid) {
+            stateNode *state;
+            unsigned int result = getStateNode(tree, 
+                                               sid,
+                                               &state);
+            if (result != RULES_OK && result != ERR_SID_NOT_FOUND) {
+                return result;
+            } else if (result == RULES_OK) {
+                CHECK_RESULT(deleteStateNode(tree,
+                                             state));
+            }
+                
+            CHECK_RESULT(createStateNode(tree, 
+                                         sid,
+                                         &state)); 
+
+            free(sid);
+            if (tree->getStoredMessagesCallback) {
+                char *messages;
+                unsigned int stateOffset;
+                CHECK_RESULT(tree->getStoredMessagesCallback(tree->getStoredMessagesCallbackContext,
+                                                             &tree->stringPool[tree->nameOffset],
+                                                             state->sid,
+                                                             MESSAGE_TYPE_EVENT,
+                                                             &messages));   
+                if (messages) {
+                    result = handleMessages(tree,
+                                            ACTION_ASSERT_EVENT,
+                                            messages,
+                                            &stateOffset);
+                    if (result != RULES_OK && result != ERR_EVENT_OBSERVED && result != ERR_EVENT_NOT_HANDLED) {
+                        return result;
+                    }
+
+                    free(messages);
+                }
+
+                CHECK_RESULT(tree->getStoredMessagesCallback(tree->getStoredMessagesCallbackContext,
+                                                             &tree->stringPool[tree->nameOffset],
+                                                             state->sid,
+                                                             MESSAGE_TYPE_FACT,
+                                                             &messages));   
+                if (messages) {
+                    result = handleMessages(tree,
+                                            ACTION_ASSERT_FACT,
+                                            messages,
+                                            &stateOffset);
+                    if (result != RULES_OK && result != ERR_EVENT_OBSERVED && result != ERR_EVENT_NOT_HANDLED) {
+                        return result;
+                    }
+
+                    free(messages);
+                }                                                        
+            }
+        }
+    }
+
+
     if (tree->getQueuedMessagesCallback) {
         for (unsigned int index = 0; index < tree->statePool.count; ++index) {
             unsigned int nodeOffset = tree->reverseStateIndex[index];
             stateNode *currentState = STATE_NODE(tree, nodeOffset);
 
-            for (unsigned char actionType = 1; actionType != 4; ++actionType) {
+            for (unsigned char actionType = 1; actionType <= 4; ++actionType) {
                 char *messages;
                 unsigned int stateOffset;
                 CHECK_RESULT(tree->getQueuedMessagesCallback(tree->getQueuedMessagesCallbackContext,
@@ -1998,10 +2060,15 @@ static unsigned int flushQueuedActions(ruleset *tree) {
                                                              actionType,
                                                              &messages));
                 if (messages) {
-                    CHECK_RESULT(handleMessages(tree,
-                                                actionType,
-                                                messages,
-                                                &stateOffset));
+                    unsigned int result = handleMessages(tree,
+                                                         actionType,
+                                                         messages,
+                                                         &stateOffset);
+                    if (result != RULES_OK && result != ERR_EVENT_OBSERVED && result != ERR_EVENT_NOT_HANDLED) {
+                        return result;
+                    }
+
+                    free(messages);
                 }
             }
         }
@@ -2058,6 +2125,11 @@ unsigned int startActionForState(unsigned int handle,
                                  unsigned int stateOffset,
                                  char **stateFact,
                                  char **messages) {
+
+    if (stateOffset == UNDEFINED_HASH_OFFSET) {
+        return ERR_NO_ACTION_AVAILABLE;
+    }
+
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
     stateNode *resultState = STATE_NODE(tree, stateOffset);
@@ -2171,7 +2243,6 @@ unsigned int completeAndStartAction(unsigned int handle,
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
     stateNode *resultState = STATE_NODE(tree, stateOffset);
-    
     CHECK_RESULT(deleteCurrentAction(tree,
                                      resultState, 
                                      resultState->context.actionStateIndex,

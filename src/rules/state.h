@@ -331,6 +331,9 @@ unsigned int createStateNode(void *tree,
                              char *sid, 
                              stateNode **state);
 
+unsigned int deleteStateNode(void *tree, 
+                             stateNode *state);
+
 unsigned int serializeResult(void *tree, 
                              stateNode *state, 
                              actionStateNode *actionNode, 

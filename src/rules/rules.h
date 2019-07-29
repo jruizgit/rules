@@ -109,6 +109,9 @@ extern char entriesInitialized;
     if (!firstEmptyEntry) firstEmptyEntry = lastEmptyEntry; \
 } while(0)
 
+
+unsigned int cloneString(char **target, char *source);
+
 unsigned int createRuleset(unsigned int *handle, 
                            char *name, 
                            char *rules);

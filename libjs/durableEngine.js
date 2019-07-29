@@ -977,7 +977,7 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
-        that.setGetQueuesMessagesCallback = function (func) {
+        that.setGetQueuedMessagesCallback = function (func) {
             getQueuedMessagesCallback = func;
 
             for (var ruleset in rulesList) {

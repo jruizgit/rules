@@ -154,6 +154,17 @@ int asprintf(char** ret, char* format, ...){
     --pool.count; \
 } while (0)
 
+unsigned int cloneString(char **target, char *source) {
+    unsigned int length = (strlen(source) + 1) * sizeof(char);
+    *target = malloc(length);
+    if (!*target) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    memcpy(*target, source, length);
+
+    return RULES_OK;
+}
+
 unsigned int fnv1Hash32(char *str, unsigned int length) {
     unsigned int hash = FNV_32_OFFSET_BASIS;
     for(unsigned int i = 0; i < length; str++, i++) {
@@ -906,6 +917,40 @@ unsigned int createStateNode(void *tree,
     return RULES_OK;
 }
 
+unsigned int deleteStateNode(void *tree, 
+                             stateNode *node) {
+    ruleset *rulesetTree = (ruleset*)tree;
+    free(node->sid);
+
+    for (unsigned int i = 0; i < rulesetTree->betaCount; ++i) {
+        betaStateNode *betaNode = &node->betaState[i];
+        free(betaNode->leftFramePool.content);
+        free(betaNode->rightFramePool.content);
+    }
+    free(node->betaState);
+
+    for (unsigned int i = 0; i < rulesetTree->connectorCount; ++i) {
+        connectorStateNode *connectorNode = &node->connectorState[i];
+        free(connectorNode->aFramePool.content);
+        free(connectorNode->bFramePool.content);
+    }
+    free(node->connectorState);
+
+    for (unsigned int i = 0; i < rulesetTree->actionCount; ++i) {
+        actionStateNode *actionNode = &node->actionState[i];
+        free(actionNode->resultPool.content);
+    }   
+    free(node->actionState);
+
+    DELETE(stateNode, 
+           rulesetTree->stateIndex, 
+           MAX_STATE_INDEX_LENGTH, 
+           rulesetTree->statePool, 
+           node->offset);
+
+    return RULES_OK;
+}
+
 static unsigned int getResultFrameLength(ruleset *tree, 
                                          stateNode *state, 
                                          leftFrameNode *frame) {
@@ -1497,6 +1542,8 @@ unsigned int getState(unsigned int handle, char *sid, char **state) {
     return serializeState(node, state);
 }
 
+
+
 unsigned int deleteState(unsigned int handle, char *sid) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
@@ -1519,33 +1566,5 @@ unsigned int deleteState(unsigned int handle, char *sid) {
     }
 
     stateNode *node = STATE_NODE(tree, nodeOffset); 
-    free(node->sid);
-
-    for (unsigned int i = 0; i < ((ruleset*)tree)->betaCount; ++i) {
-        betaStateNode *betaNode = &node->betaState[i];
-        free(betaNode->leftFramePool.content);
-        free(betaNode->rightFramePool.content);
-    }
-    free(node->betaState);
-
-    for (unsigned int i = 0; i < ((ruleset*)tree)->connectorCount; ++i) {
-        connectorStateNode *connectorNode = &node->connectorState[i];
-        free(connectorNode->aFramePool.content);
-        free(connectorNode->bFramePool.content);
-    }
-    free(node->connectorState);
-
-    for (unsigned int i = 0; i < ((ruleset*)tree)->actionCount; ++i) {
-        actionStateNode *actionNode = &node->actionState[i];
-        free(actionNode->resultPool.content);
-    }   
-    free(node->actionState);
-
-    DELETE(stateNode, 
-           tree->stateIndex, 
-           MAX_STATE_INDEX_LENGTH, 
-           tree->statePool, 
-           nodeOffset);
-
-    return RULES_OK;
+    return deleteStateNode(tree, node);
 }
