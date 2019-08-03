@@ -1919,7 +1919,7 @@ unsigned int setStoreMessageCallback(unsigned int handle,
 
 unsigned int setDeleteMessageCallback(unsigned int handle, 
                                       void *context,
-                                      unsigned int (*callback)(void *, char *, char *, char *, unsigned char)) {
+                                      unsigned int (*callback)(void *, char *, char *, char *)) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
     tree->deleteMessageCallbackContext = context;
@@ -1939,7 +1939,7 @@ unsigned int setQueueMessageCallback(unsigned int handle,
 
 unsigned int setGetQueuedMessagesCallback(unsigned int handle, 
                                           void *context, 
-                                          unsigned int (*callback)(void *, char *, char *, unsigned char, char **)) {
+                                          unsigned int (*callback)(void *, char *, char *, char **)) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
@@ -1950,7 +1950,7 @@ unsigned int setGetQueuedMessagesCallback(unsigned int handle,
 
 unsigned int setGetStoredMessagesCallback(unsigned int handle, 
                                           void *context, 
-                                          unsigned int (*callback)(void *, char *, char *, unsigned char, char **)) {
+                                          unsigned int (*callback)(void *, char *, char *, char **)) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 

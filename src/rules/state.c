@@ -691,8 +691,7 @@ unsigned int deleteMessage(void *tree,
         CHECK_RESULT(rulesetTree->deleteMessageCallback(rulesetTree->deleteMessageCallbackContext,
                                                         &rulesetTree->stringPool[rulesetTree->nameOffset],
                                                         state->sid, 
-                                                        mid,
-                                                        node->messageType));
+                                                        mid));
     }
 
     if (node->jo.content) {
@@ -789,11 +788,16 @@ unsigned int storeMessage(void *tree,
 
     ruleset *rulesetTree = (ruleset*)tree;
     if (rulesetTree->storeMessageCallback) {
+        unsigned char actionType = ACTION_ASSERT_FACT;
+        if (messageType == MESSAGE_TYPE_EVENT) {
+            actionType = ACTION_ASSERT_EVENT;
+        }
+
         return rulesetTree->storeMessageCallback(rulesetTree->storeMessageCallbackContext, 
                                                  &rulesetTree->stringPool[rulesetTree->nameOffset],
                                                  state->sid, 
                                                  mid, 
-                                                 messageType,
+                                                 actionType,
                                                  message->content);
     }
 

@@ -13,11 +13,6 @@
 #include "regex.h"
 #include "rete.h"
 
-#define ACTION_ASSERT_FACT 1
-#define ACTION_ASSERT_EVENT 2
-#define ACTION_RETRACT_FACT 3
-#define ACTION_UPDATE_STATE 4
-
 #define MAX_RESULT_NODES 32
 #define MAX_NODE_RESULTS 16
 #define MAX_STACK_SIZE 64
@@ -1894,12 +1889,12 @@ static unsigned int handleMessages(ruleset *tree,
                                    stateOffset);
         
         *last = lastTemp;
-        if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
+        if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED && result != ERR_EVENT_OBSERVED) {
             return result;
         }
 
-        if (result == ERR_EVENT_NOT_HANDLED) {
-            returnResult = ERR_EVENT_NOT_HANDLED;
+        if (result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+            returnResult = result;
         }
        
         first = last;
@@ -1982,6 +1977,77 @@ unsigned int updateState(unsigned int handle,
     return result;
 }
 
+static unsigned int replayMessages(ruleset *tree, 
+                                   char *messages, 
+                                   unsigned int *stateOffset) {
+    unsigned int result;
+    unsigned int messageOffset;
+    jsonObject jo;
+    unsigned char type;
+    unsigned char actionType;
+    char *first = messages;
+    char *last = NULL;
+    char lastTemp;
+    
+    while (readNextArrayValue(first, 
+                         &first, 
+                         &last, 
+                         &type) == PARSE_OK) {
+
+        if (type != JSON_INT) {
+            return ERR_UNEXPECTED_TYPE;
+        }
+
+        char temp = last[1];
+        last[1] = '\0';
+        actionType = atol(first);
+        last[1] = temp;
+        first = last;
+
+        CHECK_PARSE_RESULT(readNextArrayValue(first, 
+                                             &first, 
+                                             &last, 
+                                             &type));
+
+        if (type != JSON_OBJECT) {
+            return ERR_UNEXPECTED_TYPE;
+        }
+        
+        CHECK_RESULT(constructObject(first,
+                                     NULL, 
+                                     NULL, 
+                                     1,
+                                     &jo,
+                                     &last));
+
+        while (*last != ',' && *last != '\0' ) {
+            ++last;
+        }
+
+        if (*last == '\0') {
+            --last;
+        }
+
+        lastTemp = *last;
+        *last = '\0';
+        result = handleMessageCore(tree,
+                                   &jo, 
+                                   actionType, 
+                                   &messageOffset,
+                                   stateOffset);
+        
+        *last = lastTemp;
+        if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED && result != ERR_EVENT_OBSERVED) {
+            return result;
+        }
+       
+        first = last;
+    }
+
+    return RULES_OK;
+}
+
+
 static unsigned int flushQueuedActions(ruleset *tree) {
     if (tree->getIdleStateCallback) {
         char *sid;
@@ -2011,36 +2077,18 @@ static unsigned int flushQueuedActions(ruleset *tree) {
                 CHECK_RESULT(tree->getStoredMessagesCallback(tree->getStoredMessagesCallbackContext,
                                                              &tree->stringPool[tree->nameOffset],
                                                              state->sid,
-                                                             MESSAGE_TYPE_EVENT,
                                                              &messages));   
                 if (messages) {
-                    result = handleMessages(tree,
-                                            ACTION_ASSERT_EVENT,
+                    result = replayMessages(tree,
                                             messages,
                                             &stateOffset);
-                    if (result != RULES_OK && result != ERR_EVENT_OBSERVED && result != ERR_EVENT_NOT_HANDLED) {
+                    
+                    free(messages);
+                    if (result != RULES_OK) {
                         return result;
                     }
-
-                    free(messages);
+                    
                 }
-
-                CHECK_RESULT(tree->getStoredMessagesCallback(tree->getStoredMessagesCallbackContext,
-                                                             &tree->stringPool[tree->nameOffset],
-                                                             state->sid,
-                                                             MESSAGE_TYPE_FACT,
-                                                             &messages));   
-                if (messages) {
-                    result = handleMessages(tree,
-                                            ACTION_ASSERT_FACT,
-                                            messages,
-                                            &stateOffset);
-                    if (result != RULES_OK && result != ERR_EVENT_OBSERVED && result != ERR_EVENT_NOT_HANDLED) {
-                        return result;
-                    }
-
-                    free(messages);
-                }                                                        
             }
         }
     }
@@ -2051,24 +2099,19 @@ static unsigned int flushQueuedActions(ruleset *tree) {
             unsigned int nodeOffset = tree->reverseStateIndex[index];
             stateNode *currentState = STATE_NODE(tree, nodeOffset);
 
-            for (unsigned char actionType = 1; actionType <= 4; ++actionType) {
-                char *messages;
-                unsigned int stateOffset;
-                CHECK_RESULT(tree->getQueuedMessagesCallback(tree->getQueuedMessagesCallbackContext,
-                                                             &tree->stringPool[tree->nameOffset],
-                                                             currentState->sid,
-                                                             actionType,
-                                                             &messages));
-                if (messages) {
-                    unsigned int result = handleMessages(tree,
-                                                         actionType,
-                                                         messages,
-                                                         &stateOffset);
-                    if (result != RULES_OK && result != ERR_EVENT_OBSERVED && result != ERR_EVENT_NOT_HANDLED) {
-                        return result;
-                    }
-
-                    free(messages);
+            char *messages;
+            unsigned int stateOffset;
+            CHECK_RESULT(tree->getQueuedMessagesCallback(tree->getQueuedMessagesCallbackContext,
+                                                         &tree->stringPool[tree->nameOffset],
+                                                         currentState->sid,
+                                                         &messages));
+            if (messages) {
+                unsigned int result = replayMessages(tree,
+                                                     messages,
+                                                     &stateOffset);
+                free(messages);
+                if (result != RULES_OK) {
+                    return result;
                 }
             }
         }
@@ -2186,7 +2229,6 @@ static unsigned int deleteCurrentAction(ruleset *tree,
             if (currentMessageFrame->messageNodeOffset != UNDEFINED_HASH_OFFSET) {
                 messageNode *currentMessageNode = MESSAGE_NODE(state, 
                                                                currentMessageFrame->messageNodeOffset);
-
 
                 if (currentMessageNode->messageType == MESSAGE_TYPE_EVENT) {
                     jsonObject *jo = &currentMessageNode->jo;

@@ -122,7 +122,7 @@ unsigned int setStoreMessageCallback(unsigned int handle,
 
 unsigned int setDeleteMessageCallback(unsigned int handle, 
                                       void *context,
-                                      unsigned int (*callback)(void *, char *, char *, char *, unsigned char));
+                                      unsigned int (*callback)(void *, char *, char *, char *));
 
 unsigned int setQueueMessageCallback(unsigned int handle, 
                                      void *context, 
@@ -130,11 +130,11 @@ unsigned int setQueueMessageCallback(unsigned int handle,
 
 unsigned int setGetQueuedMessagesCallback(unsigned int handle, 
                                           void *context, 
-                                          unsigned int (*callback)(void *, char *, char *, unsigned char, char **));
+                                          unsigned int (*callback)(void *, char *, char *, char **));
 
 unsigned int setGetStoredMessagesCallback(unsigned int handle, 
                                           void *context, 
-                                          unsigned int (*callback)(void *, char *, char *, unsigned char, char **));
+                                          unsigned int (*callback)(void *, char *, char *, char **));
 
 unsigned int setGetIdleStateCallback(unsigned int handle, 
                                      void *context, 

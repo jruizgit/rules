@@ -572,18 +572,17 @@ void jsSetStoreMessageCallback(const FunctionCallbackInfo<Value>& args) {
     }
 }
 
-static unsigned int deleteMessageCallback(void *context, char *ruleset, char *sid, char *mid, unsigned char messageType) {
+static unsigned int deleteMessageCallback(void *context, char *ruleset, char *sid, char *mid) {
     CallbackProxy *p = (CallbackProxy *)context;
     Isolate* isolate = Isolate::GetCurrent();
      
-    Local<Value> args[4];
+    Local<Value> args[3];
     args[0] = String::NewFromUtf8(isolate, ruleset);
     args[1] = String::NewFromUtf8(isolate, sid);
     args[2] = String::NewFromUtf8(isolate, mid);
-    args[3] = Number::New(isolate, messageType);
-
+    
     Local<Function> func = Local<Function>::New(isolate, p->func);
-    Local<Value> result = func->Call(isolate->GetCurrentContext()->Global(), 4, args);    
+    Local<Value> result = func->Call(isolate->GetCurrentContext()->Global(), 3, args);    
     if (result->IsNumber()) {  
         return TO_NUMBER(isolate, result);
     } else {
@@ -656,18 +655,17 @@ void jsSetQueueMessageCallback(const FunctionCallbackInfo<Value>& args) {
     }
 }
 
-static unsigned int getQueuedMessagesCallback(void *context, char *ruleset, char *sid, unsigned char actionType, char **messages) {
+static unsigned int getQueuedMessagesCallback(void *context, char *ruleset, char *sid, char **messages) {
     CallbackProxy *p = (CallbackProxy *)context;
     Isolate* isolate = Isolate::GetCurrent();
      
     *messages = NULL;
-    Local<Value> args[3];
+    Local<Value> args[2];
     args[0] = String::NewFromUtf8(isolate, ruleset);
     args[1] = String::NewFromUtf8(isolate, sid);
-    args[2] = Number::New(isolate, actionType);
     
     Local<Function> func = Local<Function>::New(isolate, p->func);
-    Local<Value> result = func->Call(isolate->GetCurrentContext()->Global(), 3, args);    
+    Local<Value> result = func->Call(isolate->GetCurrentContext()->Global(), 2, args);    
     if (result->IsNumber()) {  
         return TO_NUMBER(isolate, result);
     } else if (result->IsString()) {
@@ -689,6 +687,49 @@ void jsSetGetQueuedMessagesCallback(const FunctionCallbackInfo<Value>& args) {
         unsigned int result = setGetQueuedMessagesCallback(TO_NUMBER(isolate, args[0]),
                                                            p,
                                                            &getQueuedMessagesCallback);  
+        if (result != RULES_OK) {
+            char *message = NULL;
+            if (asprintf(&message, "Could not set get queued messages callback, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+            }
+        }  
+    }
+}
+
+static unsigned int getStoredMessagesCallback(void *context, char *ruleset, char *sid, char **messages) {
+    CallbackProxy *p = (CallbackProxy *)context;
+    Isolate* isolate = Isolate::GetCurrent();
+     
+    *messages = NULL;
+    Local<Value> args[2];
+    args[0] = String::NewFromUtf8(isolate, ruleset);
+    args[1] = String::NewFromUtf8(isolate, sid);
+    
+    Local<Function> func = Local<Function>::New(isolate, p->func);
+    Local<Value> result = func->Call(isolate->GetCurrentContext()->Global(), 2, args);    
+    if (result->IsNumber()) {  
+        return TO_NUMBER(isolate, result);
+    } else if (result->IsString()) {
+        return cloneString(messages, TO_STRING(isolate, result));
+    } else {
+        return ERR_UNEXPECTED_TYPE;
+    }
+}
+
+void jsSetGetStoredMessagesCallback(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber() || !args[1]->IsFunction()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+    } else {
+        CallbackProxy *p = new CallbackProxy(Handle<Function>::Cast(args[1]));
+        unsigned int result = setGetStoredMessagesCallback(TO_NUMBER(isolate, args[0]),
+                                                           p,
+                                                           &getStoredMessagesCallback);  
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not set get queued messages callback, error code: %d", result) == -1) {
@@ -871,8 +912,8 @@ void init(Handle<Object> exports) {
     exports->Set(String::NewFromUtf8(isolate, "setGetQueuedMessagesCallback", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsSetGetQueuedMessagesCallback)->GetFunction());
 
-    // exports->Set(String::NewFromUtf8(isolate, "setGetStoredMessagesCallback", String::kInternalizedString),
-    //     FunctionTemplate::New(isolate, jsSetGetStoredMessagesCallback)->GetFunction());
+    exports->Set(String::NewFromUtf8(isolate, "setGetStoredMessagesCallback", String::kInternalizedString),
+        FunctionTemplate::New(isolate, jsSetGetStoredMessagesCallback)->GetFunction());
 
     exports->Set(String::NewFromUtf8(isolate, "setGetIdleStateCallback", String::kInternalizedString),
         FunctionTemplate::New(isolate, jsSetGetIdleStateCallback)->GetFunction());
