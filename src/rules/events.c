@@ -776,11 +776,16 @@ static unsigned int handleBetaFrame(ruleset *tree,
                                     node *oldNode,
                                     node *currentNode,
                                     leftFrameNode *oldFrame,
-                                    leftFrameNode *currentFrame) {
+                                    leftFrameNode *currentFrame,
+                                    unsigned char sideEffect) {
     frameLocation currentFrameLocation;
     unsigned int frameType = LEFT_FRAME; 
     
     if (currentNode->type == NODE_ACTION) {
+        if (!sideEffect) {
+            return RULES_OK;
+        }
+
         CHECK_RESULT(createActionFrame(state,
                                        currentNode,
                                        currentFrame,
@@ -898,7 +903,8 @@ static unsigned int handleBetaFrame(ruleset *tree,
                                currentNode,
                                nextNode,
                                NULL,
-                               currentFrame);
+                               currentFrame,
+                               sideEffect);
 
     } else if (currentNode->type == NODE_BETA) {
         // Find all messages for frame 
@@ -926,7 +932,8 @@ static unsigned int handleBetaFrame(ruleset *tree,
                                              currentNode,
                                              nextNode,
                                              NULL,
-                                             currentFrame));
+                                             currentFrame,
+                                             sideEffect));
             }
             
             unsigned int rightFrameOffset = rightFrame->prevOffset;
@@ -959,7 +966,8 @@ static unsigned int handleBetaFrame(ruleset *tree,
                                          currentNode,
                                          nextNode,
                                          connectorFrame,
-                                         currentFrame));
+                                         currentFrame,
+                                         sideEffect));
 
             connectorFrameOffset = connectorFrame->prevOffset;
             if (connectorFrameOffset == UNDEFINED_HASH_OFFSET) {
@@ -983,7 +991,8 @@ static unsigned int handleBetaFrame(ruleset *tree,
                                      currentNode,
                                      nextNode,
                                      NULL,
-                                     currentFrame));
+                                     currentFrame,
+                                     sideEffect));
     } 
 
     return RULES_OK;
@@ -1073,7 +1082,8 @@ static unsigned int handleDeleteMessage(ruleset *tree,
                                                              currentNode,
                                                              nextNode,
                                                              NULL,
-                                                             NULL));
+                                                             NULL,
+                                                             1));
                             }
                         } else {
                             unsigned int messageHash;
@@ -1109,7 +1119,8 @@ static unsigned int handleDeleteMessage(ruleset *tree,
                                                                  currentNode,
                                                                  nextNode,
                                                                  NULL,
-                                                                 currentFrame));
+                                                                 currentFrame,
+                                                                 1));
                                 }
 
                                 unsigned int currentFrameOffset = currentFrame->prevOffset;
@@ -1285,7 +1296,8 @@ static unsigned int handleMatchFrames(ruleset *tree,
                                       node *currentNode,
                                       jsonObject *messageObject,
                                       unsigned int currentMessageOffset,
-                                      unsigned int messageHash) { 
+                                      unsigned int messageHash,
+                                      unsigned char sideEffect) { 
     // Find frames for message
     leftFrameNode *currentFrame = NULL;
     node *nextNode = &tree->nodePool[currentNode->value.b.nextOffset];
@@ -1311,7 +1323,8 @@ static unsigned int handleMatchFrames(ruleset *tree,
                                          currentNode,
                                          nextNode,
                                          NULL,
-                                         currentFrame));
+                                         currentFrame,
+                                         sideEffect));
         }
 
         unsigned int currentFrameOffset = currentFrame->prevOffset;        
@@ -1336,7 +1349,8 @@ static unsigned int handleMatchFrames(ruleset *tree,
                                currentNode, 
                                nextNode,
                                NULL,
-                               NULL);   
+                               NULL,
+                               sideEffect);   
     }
 
     return RULES_OK;
@@ -1346,7 +1360,8 @@ static unsigned int handleBetaMessage(ruleset *tree,
                                       stateNode *state,
                                       node *betaNode,
                                       jsonObject *messageObject,
-                                      unsigned int currentMessageOffset) { 
+                                      unsigned int currentMessageOffset,
+                                      unsigned char sideEffect) { 
     if (betaNode->value.b.isFirst && !betaNode->value.b.not) {
         node *nextNode = &tree->nodePool[betaNode->value.b.nextOffset];
         return handleBetaFrame(tree,
@@ -1355,7 +1370,8 @@ static unsigned int handleBetaMessage(ruleset *tree,
                                betaNode, 
                                nextNode,
                                NULL,
-                               NULL);
+                               NULL,
+                               sideEffect);
     }
 
     frameLocation rightFrameLocation;
@@ -1397,7 +1413,8 @@ static unsigned int handleBetaMessage(ruleset *tree,
                              betaNode,
                              messageObject,
                              currentMessageOffset,
-                             messageHash);
+                             messageHash,
+                             sideEffect);
 }
 
 static unsigned int isArrayMatch(ruleset *tree,
@@ -1589,7 +1606,8 @@ static unsigned int handleAlpha(ruleset *tree,
                                 jsonObject *jo,
                                 unsigned char messageType,
                                 alpha *alphaNode, 
-                                unsigned int *messageOffset) { 
+                                unsigned int *messageOffset,
+                                unsigned char sideEffect) { 
     unsigned short top = 1;
     unsigned int entry;
     unsigned char messageStored = 0;
@@ -1671,6 +1689,7 @@ static unsigned int handleAlpha(ruleset *tree,
                                           mid,
                                           jo,
                                           messageType,
+                                          sideEffect,
                                           messageOffset));
 
                 messageStored = 1;
@@ -1683,7 +1702,8 @@ static unsigned int handleAlpha(ruleset *tree,
                                                state, 
                                                &tree->nodePool[betaList[entry]],
                                                jo,
-                                               *messageOffset));
+                                               *messageOffset,
+                                               sideEffect));
             }
         }
     }
@@ -1695,7 +1715,8 @@ static unsigned int handleMessageCore(ruleset *tree,
                                       jsonObject *jo, 
                                       unsigned char actionType,
                                       unsigned int *messageOffset,
-                                      unsigned int *stateOffset) {
+                                      unsigned int *stateOffset,
+                                      unsigned char sideEffect) {
     stateNode *sidState;
     jsonProperty *sidProperty = &jo->properties[jo->sidIndex];
     jsonProperty *midProperty = &jo->properties[jo->idIndex];
@@ -1763,7 +1784,8 @@ static unsigned int handleMessageCore(ruleset *tree,
                              jo,
                              MESSAGE_TYPE_FACT,
                              &tree->nodePool[NODE_M_OFFSET].value.a,
-                             messageOffset);
+                             messageOffset,
+                             sideEffect);
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED) {
             return result;
         } else if (result == ERR_EVENT_NOT_HANDLED) {
@@ -1771,7 +1793,8 @@ static unsigned int handleMessageCore(ruleset *tree,
                                   sidState,
                                   mid,
                                   jo,
-                                  MESSAGE_TYPE_FACT,
+                                  MESSAGE_TYPE_STATE,
+                                  sideEffect,
                                   messageOffset));
         }
 
@@ -1794,10 +1817,11 @@ static unsigned int handleMessageCore(ruleset *tree,
                                           jo,
                                           (actionType == ACTION_ASSERT_FACT ? MESSAGE_TYPE_FACT : MESSAGE_TYPE_EVENT),
                                           &tree->nodePool[NODE_M_OFFSET].value.a,
-                                          messageOffset);
+                                          messageOffset,
+                                          sideEffect);
 
         if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED) {
-            if (sidState->factOffset == UNDEFINED_HASH_OFFSET) {      
+            if (sideEffect && (sidState->factOffset == UNDEFINED_HASH_OFFSET)) {      
 #ifdef _WIN32
                 char *stateMessage = (char *)_alloca(sizeof(char)*(50 + sidProperty->valueLength * 2));
                 sprintf_s(stateMessage, sizeof(char)*(50 + sidProperty->valueLength * 2), "{ \"sid\":\"%s\", \"id\":\"sid-%s\", \"$s\":1}", sid, sid);
@@ -1846,7 +1870,8 @@ static unsigned int handleMessage(ruleset *tree,
                              &jo,
                              actionType,
                              messageOffset,
-                             stateOffset);
+                             stateOffset,
+                             1);
 }
 
 static unsigned int handleMessages(ruleset *tree, 
@@ -1886,7 +1911,8 @@ static unsigned int handleMessages(ruleset *tree,
                                    &jo, 
                                    actionType, 
                                    &messageOffset,
-                                   stateOffset);
+                                   stateOffset,
+                                   1);
         
         *last = lastTemp;
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED && result != ERR_EVENT_OBSERVED) {
@@ -1941,7 +1967,7 @@ unsigned int assertFacts(unsigned int handle,
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    return handleMessages(tree, ACTION_ASSERT_EVENT, messages, stateOffset);
+    return handleMessages(tree, ACTION_ASSERT_FACT, messages, stateOffset);
 }
 
 unsigned int retractFact(unsigned int handle, 
@@ -1979,7 +2005,8 @@ unsigned int updateState(unsigned int handle,
 
 static unsigned int replayMessages(ruleset *tree, 
                                    char *messages, 
-                                   unsigned int *stateOffset) {
+                                   unsigned int *stateOffset,
+                                   unsigned char sideEffect) {
     unsigned int result;
     unsigned int messageOffset;
     jsonObject jo;
@@ -1993,7 +2020,6 @@ static unsigned int replayMessages(ruleset *tree,
                          &first, 
                          &last, 
                          &type) == PARSE_OK) {
-
         if (type != JSON_INT) {
             return ERR_UNEXPECTED_TYPE;
         }
@@ -2028,13 +2054,15 @@ static unsigned int replayMessages(ruleset *tree,
             --last;
         }
 
+
         lastTemp = *last;
         *last = '\0';
         result = handleMessageCore(tree,
                                    &jo, 
                                    actionType, 
                                    &messageOffset,
-                                   stateOffset);
+                                   stateOffset,
+                                   sideEffect);
         
         *last = lastTemp;
         if (result != RULES_OK && result != ERR_EVENT_NOT_HANDLED && result != ERR_EVENT_OBSERVED) {
@@ -2048,76 +2076,79 @@ static unsigned int replayMessages(ruleset *tree,
 }
 
 
-static unsigned int flushQueuedActions(ruleset *tree) {
+static unsigned int startQueuedActions(ruleset *tree) {
     if (tree->getIdleStateCallback) {
-        char *sid;
         CHECK_RESULT(tree->getIdleStateCallback(tree->getIdleStateCallbackContext,
-                                                &tree->stringPool[tree->nameOffset],
-                                                &sid));
-        if (sid) {
-            stateNode *state;
-            unsigned int result = getStateNode(tree, 
-                                               sid,
-                                               &state);
-            if (result != RULES_OK && result != ERR_SID_NOT_FOUND) {
-                return result;
-            } else if (result == RULES_OK) {
-                CHECK_RESULT(deleteStateNode(tree,
-                                             state));
-            }
-                
-            CHECK_RESULT(createStateNode(tree, 
-                                         sid,
-                                         &state)); 
-
-            free(sid);
-            if (tree->getStoredMessagesCallback) {
-                char *messages;
-                unsigned int stateOffset;
-                CHECK_RESULT(tree->getStoredMessagesCallback(tree->getStoredMessagesCallbackContext,
-                                                             &tree->stringPool[tree->nameOffset],
-                                                             state->sid,
-                                                             &messages));   
-                if (messages) {
-                    result = replayMessages(tree,
-                                            messages,
-                                            &stateOffset);
-                    
-                    free(messages);
-                    if (result != RULES_OK) {
-                        return result;
-                    }
-                    
-                }
-            }
-        }
+                                                &tree->stringPool[tree->nameOffset]));
     }
-
 
     if (tree->getQueuedMessagesCallback) {
         for (unsigned int index = 0; index < tree->statePool.count; ++index) {
             unsigned int nodeOffset = tree->reverseStateIndex[index];
             stateNode *currentState = STATE_NODE(tree, nodeOffset);
 
-            char *messages;
-            unsigned int stateOffset;
             CHECK_RESULT(tree->getQueuedMessagesCallback(tree->getQueuedMessagesCallbackContext,
                                                          &tree->stringPool[tree->nameOffset],
-                                                         currentState->sid,
-                                                         &messages));
-            if (messages) {
-                unsigned int result = replayMessages(tree,
-                                                     messages,
-                                                     &stateOffset);
-                free(messages);
-                if (result != RULES_OK) {
-                    return result;
-                }
-            }
+                                                         currentState->sid));
         }
     }
 
     return RULES_OK;
+}
+
+unsigned int completeGetIdleState(unsigned int handle, 
+                                  char *sid, 
+                                  char *storedMessages) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+    stateNode *state;
+    unsigned int result = getStateNode(tree, 
+                                       sid,
+                                       &state);
+    if (result != RULES_OK && result != ERR_SID_NOT_FOUND) {
+        return result;
+    } else if (result == RULES_OK) {
+        CHECK_RESULT(deleteStateNode(tree,
+                                     state));
+    }
+        
+    CHECK_RESULT(createStateNode(tree, 
+                                 sid,
+                                 &state)); 
+
+
+    if (storedMessages) {
+        unsigned int stateOffset;
+        CHECK_RESULT(replayMessages(tree,
+                                    storedMessages,
+                                    &stateOffset,
+                                    0));
+    }
+
+    if (tree->getQueuedMessagesCallback) {
+        CHECK_RESULT(tree->getQueuedMessagesCallback(tree->getQueuedMessagesCallbackContext,
+                                                     &tree->stringPool[tree->nameOffset],
+                                                     sid));
+    }
+
+    return RULES_OK;
+}
+
+unsigned int completeGetQueuedMessages(unsigned int handle,
+                                       char *sid,
+                                       char *queuedMessages) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+    stateNode *state;
+    CHECK_RESULT(getStateNode(tree, 
+                              sid,
+                              &state));
+
+    unsigned int stateOffset;
+    return replayMessages(tree,
+                          queuedMessages,
+                          &stateOffset,
+                          1);
 }
 
 unsigned int startAction(unsigned int handle, 
@@ -2133,8 +2164,8 @@ unsigned int startAction(unsigned int handle,
     unsigned int resultFrameOffset;
     time_t currentTime = time(NULL);
 
-    CHECK_RESULT(flushQueuedActions(tree));  
-
+    CHECK_RESULT(startQueuedActions(tree));  
+    
     CHECK_RESULT(getNextResult(tree,
                                currentTime,
                                &resultState, 
@@ -2152,7 +2183,7 @@ unsigned int startAction(unsigned int handle,
     CHECK_RESULT(serializeState(resultState, 
                                 &resultState->context.stateFact));
 
-   
+
     resultState->context.actionStateIndex = actionStateIndex;
     resultState->context.resultCount = resultCount;
     resultState->context.resultFrameOffset = resultFrameOffset;

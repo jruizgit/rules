@@ -114,7 +114,7 @@ unsigned int readNextString(char *start, char **first, char **last, unsigned int
 
 unsigned int readNextArrayValue(char *start, char **first, char **last, unsigned char *type) {
     unsigned char state = ST_OBJECT_PROP_PARSE;
-    if (start[0] == '[') {
+    if (start[0] == '[' || start[0] == ',') {
         state = ST_OBJECT_PROP_VAL;
     } 
     ++start;

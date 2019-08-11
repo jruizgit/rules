@@ -109,9 +109,6 @@ extern char entriesInitialized;
     if (!firstEmptyEntry) firstEmptyEntry = lastEmptyEntry; \
 } while(0)
 
-
-unsigned int cloneString(char **target, char *source);
-
 unsigned int createRuleset(unsigned int *handle, 
                            char *name, 
                            char *rules);
@@ -130,15 +127,19 @@ unsigned int setQueueMessageCallback(unsigned int handle,
 
 unsigned int setGetQueuedMessagesCallback(unsigned int handle, 
                                           void *context, 
-                                          unsigned int (*callback)(void *, char *, char *, char **));
+                                          unsigned int (*callback)(void *, char *, char *));
 
-unsigned int setGetStoredMessagesCallback(unsigned int handle, 
-                                          void *context, 
-                                          unsigned int (*callback)(void *, char *, char *, char **));
+unsigned int completeGetQueuedMessages(unsigned int handle,
+                                       char *sid,
+                                       char *queuedMessages);
 
 unsigned int setGetIdleStateCallback(unsigned int handle, 
                                      void *context, 
-                                     unsigned int (*callback)(void *, char *, char **));
+                                     unsigned int (*callback)(void *, char *));
+
+unsigned int completeGetIdleState(unsigned int handle, 
+                                  char *sid, 
+                                  char *storedMessages);
 
 unsigned int deleteRuleset(unsigned int handle);
 

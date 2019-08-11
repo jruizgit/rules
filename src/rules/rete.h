@@ -157,13 +157,10 @@ typedef struct ruleset {
     unsigned int (*queueMessageCallback)(void *, char *, char *, unsigned char, char *);
     void *queueMessageCallbackContext;
     
-    unsigned int (*getQueuedMessagesCallback)(void *, char *, char *, char **);
+    unsigned int (*getQueuedMessagesCallback)(void *, char *, char *);
     void *getQueuedMessagesCallbackContext;
     
-    unsigned int (*getStoredMessagesCallback)(void *, char *, char *, char **);
-    void *getStoredMessagesCallbackContext;
-
-    unsigned int (*getIdleStateCallback)(void *, char *, char **);
+    unsigned int (*getIdleStateCallback)(void *, char *);
     void *getIdleStateCallbackContext;
 
 

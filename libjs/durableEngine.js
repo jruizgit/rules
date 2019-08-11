@@ -365,8 +365,16 @@ exports = module.exports = durableEngine = function () {
             r.setGetQueuedMessagesCallback(handle, func);
         };
 
+        that.completeGetQueuedMessages = function (sid, queuedMessages) {
+            r.completeGetQueuedMessages(handle, sid, queuedMessages);
+        };
+
         that.setGetIdleStateCallback = function (func) {
             r.setGetIdleStateCallback(handle, func);
+        };
+
+        that.completeGetIdleState = function (sid, storedMessages) {
+            r.completeGetIdleState(handle, sid, storedMessages);
         };
 
         var flushActions = function (state, resultContainer, stateOffset, complete) {
@@ -985,12 +993,8 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
-        that.setGetStoredMessagesCallback = function (func) {
-            getStoredMessagesCallback = func;
-
-            for (var ruleset in rulesList) {
-                ruleset.setGetStoredMessagesCallback(func);
-            }
+        that.completeGetQueuedMessages = function (rulesetName, sid, queuedMessages) {
+            that.getRuleset(rulesetName).completeGetQueuedMessages(sid, queuedMessages);
         };
 
         that.setGetIdleStateCallback = function (func) {
@@ -999,6 +1003,10 @@ exports = module.exports = durableEngine = function () {
             for (var ruleset in rulesList) {
                 ruleset.setGetIdleStateCallback(func);
             }
+        };
+
+        that.completeGetIdleState = function (rulesetName, sid, storedMessages) {
+            that.getRuleset(rulesetName).completeGetIdleState(sid, storedMessages);
         };
 
         var dispatchRules = function (index) {

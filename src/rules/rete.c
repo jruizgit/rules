@@ -1860,8 +1860,6 @@ unsigned int createRuleset(unsigned int *handle, char *name, char *rules) {
     tree->queueMessageCallbackContext = NULL;
     tree->getQueuedMessagesCallback = NULL;
     tree->getQueuedMessagesCallbackContext = NULL;
-    tree->getStoredMessagesCallback = NULL;
-    tree->getStoredMessagesCallbackContext = NULL;
     tree->getIdleStateCallback = NULL;
     tree->getIdleStateCallbackContext = NULL;
 
@@ -1939,7 +1937,7 @@ unsigned int setQueueMessageCallback(unsigned int handle,
 
 unsigned int setGetQueuedMessagesCallback(unsigned int handle, 
                                           void *context, 
-                                          unsigned int (*callback)(void *, char *, char *, char **)) {
+                                          unsigned int (*callback)(void *, char *, char *)) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
@@ -1948,20 +1946,9 @@ unsigned int setGetQueuedMessagesCallback(unsigned int handle,
     return RULES_OK;
 }
 
-unsigned int setGetStoredMessagesCallback(unsigned int handle, 
-                                          void *context, 
-                                          unsigned int (*callback)(void *, char *, char *, char **)) {
-    ruleset *tree;
-    RESOLVE_HANDLE(handle, &tree);
-
-    tree->getStoredMessagesCallbackContext = context;
-    tree->getStoredMessagesCallback = callback;
-    return RULES_OK;
-}
-
 unsigned int setGetIdleStateCallback(unsigned int handle, 
                                      void *context, 
-                                     unsigned int (*callback)(void *, char *, char **)) {
+                                     unsigned int (*callback)(void *, char *)) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 

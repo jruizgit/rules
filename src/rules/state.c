@@ -154,17 +154,6 @@ int asprintf(char** ret, char* format, ...){
     --pool.count; \
 } while (0)
 
-unsigned int cloneString(char **target, char *source) {
-    unsigned int length = (strlen(source) + 1) * sizeof(char);
-    *target = malloc(length);
-    if (!*target) {
-        return ERR_OUT_OF_MEMORY;
-    }
-    memcpy(*target, source, length);
-
-    return RULES_OK;
-}
-
 unsigned int fnv1Hash32(char *str, unsigned int length) {
     unsigned int hash = FNV_32_OFFSET_BASIS;
     for(unsigned int i = 0; i < length; str++, i++) {
@@ -750,6 +739,7 @@ unsigned int storeMessage(void *tree,
                           char *mid,
                           jsonObject *message,
                           unsigned char messageType,
+                          unsigned char sideEffect,
                           unsigned int *valueOffset) {
     unsigned int hash = fnv1Hash32(mid, strlen(mid));
     *valueOffset = UNDEFINED_HASH_OFFSET;
@@ -787,12 +777,20 @@ unsigned int storeMessage(void *tree,
     CHECK_RESULT(copyMessage(&node->jo, message));
 
     ruleset *rulesetTree = (ruleset*)tree;
-    if (rulesetTree->storeMessageCallback) {
-        unsigned char actionType = ACTION_ASSERT_FACT;
-        if (messageType == MESSAGE_TYPE_EVENT) {
-            actionType = ACTION_ASSERT_EVENT;
+    if (sideEffect && rulesetTree->storeMessageCallback) {
+        unsigned char actionType;
+        switch (messageType) {
+            case MESSAGE_TYPE_EVENT:
+                actionType = ACTION_ASSERT_EVENT;
+                break;
+            case MESSAGE_TYPE_FACT:
+                actionType = ACTION_ASSERT_FACT;
+                break;
+            case MESSAGE_TYPE_STATE:
+                actionType = ACTION_UPDATE_STATE;
+                break;
         }
-
+        
         return rulesetTree->storeMessageCallback(rulesetTree->storeMessageCallbackContext, 
                                                  &rulesetTree->stringPool[rulesetTree->nameOffset],
                                                  state->sid, 

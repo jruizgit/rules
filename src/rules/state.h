@@ -9,6 +9,7 @@
 
 #define MESSAGE_TYPE_EVENT 0
 #define MESSAGE_TYPE_FACT 1
+#define MESSAGE_TYPE_STATE 2
 
 #define ACTION_ASSERT_FACT 1
 #define ACTION_ASSERT_EVENT 2
@@ -326,6 +327,7 @@ unsigned int storeMessage(void *tree,
                           char *mid,
                           jsonObject *message,
                           unsigned char messageType,
+                          unsigned char sideEffect,
                           unsigned int *valueOffset);
 
 unsigned int getStateNode(void *tree, 
