@@ -547,6 +547,307 @@ static PyObject *pyRenewActionLease(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+static unsigned int storeMessageCallback(void *context, char *ruleset, char *sid, char *mid, unsigned char messageType, char *content) {
+    unsigned int errorCode;
+    PyObject *arglist;
+    PyObject *result;
+    PyObject *callback = (PyObject *)context;
+
+    arglist = Py_BuildValue("sssIs", ruleset, sid, mid, messageType, content);
+    
+    result = PyEval_CallObject(callback, arglist);
+    Py_DECREF(arglist);
+    
+    if (!PyArg_ParseTuple(result, "I", &errorCode)) {
+        return ERR_UNEXPECTED_TYPE;
+    } else {
+        return errorCode;
+    }
+}
+
+static PyObject *pySetStoreMessageCallback(PyObject *self, PyObject *args) {
+
+    unsigned int handle;
+    PyObject *callback;
+    if (!PyArg_ParseTuple(args, "IO", &handle, &callback)) {
+        PyErr_SetString(RulesError, "pySetStoreMessageCallback Invalid argument");
+        return NULL;
+    }
+
+    Py_XINCREF(callback);
+
+    unsigned int result = setStoreMessageCallback(handle,
+                                                  callback,
+                                                  &storeMessageCallback); 
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            if (asprintf(&message, "Could not set storage message callback, error code: %d", result) == -1) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
+        }
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
+static unsigned int deleteMessageCallback(void *context, char *ruleset, char *sid, char *mid) {
+    unsigned int errorCode;
+    PyObject *arglist;
+    PyObject *result;
+    PyObject *callback = (PyObject *)context;
+
+    arglist = Py_BuildValue("sss", ruleset, sid, mid);
+    
+    result = PyEval_CallObject(callback, arglist);
+    Py_DECREF(arglist);
+    
+    if (!PyArg_ParseTuple(result, "I", &errorCode)) {
+        return ERR_UNEXPECTED_TYPE;
+    } else {
+        return errorCode;
+    }
+}
+
+static PyObject *pySetDeleteMessageCallback(PyObject *self, PyObject *args) {
+
+    unsigned int handle;
+    PyObject *callback;
+    if (!PyArg_ParseTuple(args, "IO", &handle, &callback)) {
+        PyErr_SetString(RulesError, "pySetDeleteMessageCallback Invalid argument");
+        return NULL;
+    }
+
+    Py_XINCREF(callback);
+
+    unsigned int result = setDeleteMessageCallback(handle,
+                                                  callback,
+                                                  &deleteMessageCallback); 
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            if (asprintf(&message, "Could not set delete message callback, error code: %d", result) == -1) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
+        }
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
+static unsigned int queueMessageCallback(void *context, char *ruleset, char *sid, unsigned char actionType, char *content) {
+    unsigned int errorCode;
+    PyObject *arglist;
+    PyObject *result;
+    PyObject *callback = (PyObject *)context;
+
+    arglist = Py_BuildValue("ssIs", ruleset, sid, actionType, content);
+    
+    result = PyEval_CallObject(callback, arglist);
+    Py_DECREF(arglist);
+    
+    if (!PyArg_ParseTuple(result, "I", &errorCode)) {
+        return ERR_UNEXPECTED_TYPE;
+    } else {
+        return errorCode;
+    }
+}
+
+static PyObject *pySetQueueMessageCallback(PyObject *self, PyObject *args) {
+
+    unsigned int handle;
+    PyObject *callback;
+    if (!PyArg_ParseTuple(args, "IO", &handle, &callback)) {
+        PyErr_SetString(RulesError, "pySetQueueMessageCallback Invalid argument");
+        return NULL;
+    }
+
+    Py_XINCREF(callback);
+
+    unsigned int result = setQueueMessageCallback(handle,
+                                                  callback,
+                                                  &queueMessageCallback); 
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            if (asprintf(&message, "Could not set queue message callback, error code: %d", result) == -1) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
+        }
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
+static unsigned int getQueuedMessagesCallback(void *context, char *ruleset, char *sid) {
+    unsigned int errorCode;
+    PyObject *arglist;
+    PyObject *result;
+    PyObject *callback = (PyObject *)context;
+
+    arglist = Py_BuildValue("ss", ruleset, sid);
+    
+    result = PyEval_CallObject(callback, arglist);
+    Py_DECREF(arglist);
+    
+    if (!PyArg_ParseTuple(result, "I", &errorCode)) {
+        return ERR_UNEXPECTED_TYPE;
+    } else {
+        return errorCode;
+    }
+}
+
+static PyObject *pySetGetQueuedMessagesCallback(PyObject *self, PyObject *args) {
+
+    unsigned int handle;
+    PyObject *callback;
+    if (!PyArg_ParseTuple(args, "IO", &handle, &callback)) {
+        PyErr_SetString(RulesError, "pySetGetQueuedMessagesCallback Invalid argument");
+        return NULL;
+    }
+
+    Py_XINCREF(callback);
+
+    unsigned int result = setGetQueuedMessagesCallback(handle,
+                                                       callback,
+                                                       &getQueuedMessagesCallback); 
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            if (asprintf(&message, "Could not set get queued messages callback, error code: %d", result) == -1) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
+        }
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
+static PyObject *pyCompleteGetQueuedMessages(PyObject *self, PyObject *args) {
+    unsigned int handle;
+    char *sid;
+    char *messages = NULL;
+    if (!PyArg_ParseTuple(args, "Izs", &handle, &sid, &messages)) {
+        PyErr_SetString(RulesError, "pyCompleteGetQueuedMessages Invalid argument");
+        return NULL;
+    }
+
+    unsigned int result = completeGetQueuedMessages(handle, sid, messages);
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            if (asprintf(&message, "Could not complete get queued messages, error code: %d", result) == -1) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
+        }
+        return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
+
+static unsigned int getIdleStateCallback(void *context, char *ruleset) {
+    unsigned int errorCode;
+    PyObject *arglist;
+    PyObject *result;
+    PyObject *callback = (PyObject *)context;
+
+    arglist = Py_BuildValue("s", ruleset);
+    
+    result = PyEval_CallObject(callback, arglist);
+    Py_DECREF(arglist);
+    
+    if (!PyArg_ParseTuple(result, "I", &errorCode)) {
+        return ERR_UNEXPECTED_TYPE;
+    } else {
+        return errorCode;
+    }
+}
+
+static PyObject *pySetGetIdleStateCallback(PyObject *self, PyObject *args) {
+
+    unsigned int handle;
+    PyObject *callback;
+    if (!PyArg_ParseTuple(args, "IO", &handle, &callback)) {
+        PyErr_SetString(RulesError, "pySetGetIdleStateCallback Invalid argument");
+        return NULL;
+    }
+
+    Py_XINCREF(callback);
+
+    unsigned int result = setGetIdleStateCallback(handle,
+                                                  callback,
+                                                  &getIdleStateCallback); 
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            if (asprintf(&message, "Could not set get idle state callback, error code: %d", result) == -1) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
+        }
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
+static PyObject *pyCompleteGetIdleState(PyObject *self, PyObject *args) {
+    unsigned int handle;
+    char *sid;
+    char *messages = NULL;
+    if (!PyArg_ParseTuple(args, "Izs", &handle, &sid, &messages)) {
+        PyErr_SetString(RulesError, "pyCompleteGetIdleState Invalid argument");
+        return NULL;
+    }
+
+    unsigned int result = completeGetIdleState(handle, sid, messages);
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            if (asprintf(&message, "Could not complete get idle state, error code: %d", result) == -1) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
+        }
+        return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef myModule_methods[] = {
     {"create_ruleset", pyCreateRuleset, METH_VARARGS},
     {"delete_ruleset", pyDeleteRuleset, METH_VARARGS},
@@ -567,6 +868,13 @@ static PyMethodDef myModule_methods[] = {
     {"get_state", pyGetState, METH_VARARGS},
     {"delete_state", pyDeleteState, METH_VARARGS},
     {"renew_action_lease", pyRenewActionLease, METH_VARARGS},
+    {"set_store_message_callback", pySetStoreMessageCallback, METH_VARARGS},
+    {"set_delete_message_callback", pySetDeleteMessageCallback, METH_VARARGS},
+    {"set_queue_message_callback", pySetQueueMessageCallback, METH_VARARGS},
+    {"set_get_queued_messages_callback", pySetGetQueuedMessagesCallback, METH_VARARGS},
+    {"complete_get_queued_messages", pyCompleteGetQueuedMessages, METH_VARARGS},
+    {"set_get_idle_state_callback", pySetGetIdleStateCallback, METH_VARARGS},
+    {"complete_get_idle_state", pyCompleteGetIdleState, METH_VARARGS},
     {NULL, NULL}
 };
 
