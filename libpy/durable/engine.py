@@ -713,7 +713,8 @@ class Host(object):
             return self._ruleset_directory[ruleset_name]
 
     def set_rulesets(self, ruleset_definitions):
-        self.register_rulesets(ruleset_definitions)
+        ruleset_definitions_copy = copy.deepcopy(ruleset_definitions) 
+        self.register_rulesets(ruleset_definitions_copy)
         for ruleset_name, ruleset_definition in ruleset_definitions.items():
             self.save_ruleset(ruleset_name, ruleset_definition)
 
