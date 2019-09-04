@@ -691,7 +691,7 @@ class Host(object):
         self._ruleset_directory = {}
         self._ruleset_list = []
         if ruleset_definitions:
-            self.register_rulesets(None, ruleset_definitions)
+            self.register_rulesets(ruleset_definitions)
 
         self._run()
 
@@ -709,7 +709,7 @@ class Host(object):
             return self._ruleset_directory[ruleset_name]
         else:
             ruleset_definition = self.load_ruleset(ruleset_name)
-            self.register_rulesets(None, ruleset_definition)
+            self.register_rulesets(ruleset_definition)
             return self._ruleset_directory[ruleset_name]
 
     def set_rulesets(self, ruleset_definitions):
