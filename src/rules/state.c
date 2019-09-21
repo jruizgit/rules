@@ -90,11 +90,11 @@ int asprintf(char** ret, char* format, ...){
     valueOffset = pool.freeOffset; \
     type *value = &((type *)pool.content)[valueOffset]; \
     if (value->nextOffset == UNDEFINED_HASH_OFFSET) { \
-        pool.content = realloc(pool.content, (pool.contentLength * 1.5) * sizeof(type)); \
+        pool.content = realloc(pool.content, ((unsigned int)(pool.contentLength * 1.5)) * sizeof(type)); \
         if (!pool.content) { \
             return ERR_OUT_OF_MEMORY; \
         } \
-        for (unsigned int i = pool.contentLength; i < pool.contentLength * 1.5; ++ i) { \
+        for (unsigned int i = pool.contentLength; i < (unsigned int)(pool.contentLength * 1.5); ++ i) { \
             ((type *)pool.content)[i].isActive = 0; \
             ((type *)pool.content)[i].nextOffset = i + 1; \
             ((type *)pool.content)[i].prevOffset = i - 1; \
