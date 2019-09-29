@@ -6,19 +6,29 @@
 
 using namespace v8;
 
-#define TO_STRING(isolate, value) ((value->IsNull() || value->IsUndefined())? NULL: *v8::String::Utf8Value(isolate, value->ToString()))
+#define TO_STRING(i, value)((value->IsNull() || value->IsUndefined())? NULL: *v8::String::Utf8Value(i, value->ToString(i->GetCurrentContext()).FromMaybe(v8::Local<v8::String>())))
 
-#define TO_NUMBER(isolate, value) value->IntegerValue(isolate->GetCurrentContext()).FromJust()
+#define CREATE_STRING(i, value) String::NewFromUtf8(i, value, v8::NewStringType::kNormal).ToLocalChecked()
+
+#define TO_NUMBER(i, value) value->IntegerValue(i->GetCurrentContext()).FromJust()
+
+#define ARRAY_SET_NUMBER(i, array, index, value) array->Set(i->GetCurrentContext(), index, Number::New(i, value)).Check()
+
+#define ARRAY_SET_STRING(i, array, index, value) array->Set(i->GetCurrentContext(), index, String::NewFromUtf8(i, value, v8::NewStringType::kNormal).ToLocalChecked()).Check()
+
+#define CALL_FUNCTION(func, i, nargs, args) func->Call(i->GetCurrentContext(), i->GetCurrentContext()->Global(), nargs, args).ToLocalChecked() 
+
+#define DEFINE_FUNCTION(e, i, name, func) e->Set(i->GetCurrentContext(), String::NewFromUtf8(i, name, v8::NewStringType::kInternalized).ToLocalChecked(), FunctionTemplate::New(i, func)->GetFunction(i->GetCurrentContext()).ToLocalChecked()).Check()
 
 class ObjectProxy {
 public:
 
-    explicit ObjectProxy(Handle<Function> gvalue, Handle<Function> svalue) { 
+    explicit ObjectProxy(Local<Function> gvalue, Local<Function> svalue) { 
         Isolate* isolate = Isolate::GetCurrent();
         _gfunc.Reset(isolate, gvalue); 
         _sfunc.Reset(isolate, svalue); 
     }
-    Handle<Object> Wrap();
+    Local<Object> Wrap();
 
 private:
 
@@ -34,7 +44,7 @@ private:
 class CallbackProxy {
 public:
 
-    explicit CallbackProxy(Handle<Function> value) { 
+    explicit CallbackProxy(Local<Function> value) { 
         Isolate* isolate = Isolate::GetCurrent();
         func.Reset(isolate, value); 
 
@@ -47,9 +57,9 @@ void jsCreateRuleset(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsString() || !args[1]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int output = 0;
         unsigned int result = createRuleset(&output, 
@@ -58,9 +68,9 @@ void jsCreateRuleset(const FunctionCallbackInfo<Value>& args) {
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not create ruleset, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         } else {
             args.GetReturnValue().Set(output);
@@ -72,17 +82,17 @@ void jsDeleteRuleset(const FunctionCallbackInfo<Value>& args) {
     v8::Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 1) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int result = deleteRuleset(args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust()); 
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not delete ruleset, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         }
     }
@@ -92,25 +102,25 @@ void jsAssertEvent(const FunctionCallbackInfo<v8::Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int stateOffset;
         unsigned int result = assertEvent(TO_NUMBER(isolate, args[0]),
                                           TO_STRING(isolate, args[1]),
                                           &stateOffset);
         if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_DEFERRED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, result));
-            array->Set(1, Number::New(isolate, stateOffset));
+            Local<Array> array = Array::New(isolate, 2);
+            ARRAY_SET_NUMBER(isolate, array, 0, result);
+            ARRAY_SET_NUMBER(isolate, array, 1, stateOffset);
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not assert event, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             } 
         } 
     }
@@ -120,25 +130,25 @@ void jsAssertEvents(const FunctionCallbackInfo<v8::Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int stateOffset;
         unsigned int result = assertEvents(TO_NUMBER(isolate, args[0]), 
                                            TO_STRING(isolate, args[1]),
                                            &stateOffset);
         if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_DEFERRED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, result));
-            array->Set(1, Number::New(isolate, stateOffset));
+            Local<Array> array = Array::New(isolate, 2);
+            ARRAY_SET_NUMBER(isolate, array, 0, result);
+            ARRAY_SET_NUMBER(isolate, array, 1, stateOffset);
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not assert events, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             } 
         } 
     }
@@ -148,25 +158,25 @@ void jsAssertFact(const FunctionCallbackInfo<v8::Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int stateOffset;
         unsigned int result = assertFact(TO_NUMBER(isolate, args[0]), 
                                          TO_STRING(isolate, args[1]),
                                          &stateOffset);
         if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_DEFERRED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, result));
-            array->Set(1, Number::New(isolate, stateOffset));
+            Local<Array> array = Array::New(isolate, 2);
+            ARRAY_SET_NUMBER(isolate, array, 0, result);
+            ARRAY_SET_NUMBER(isolate, array, 1, stateOffset);
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not assert events, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             } 
         } 
     }
@@ -176,25 +186,25 @@ void jsAssertFacts(const FunctionCallbackInfo<v8::Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int stateOffset;
         unsigned int result = assertFacts(TO_NUMBER(isolate, args[0]), 
                                           TO_STRING(isolate, args[1]),
                                           &stateOffset);
         if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_DEFERRED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, result));
-            array->Set(1, Number::New(isolate, stateOffset));
+            Local<Array> array = Array::New(isolate, 2);
+            ARRAY_SET_NUMBER(isolate, array, 0, result);
+            ARRAY_SET_NUMBER(isolate, array, 1, stateOffset);
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not assert facts, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             } 
         } 
     }
@@ -204,25 +214,25 @@ void jsRetractFact(const FunctionCallbackInfo<v8::Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int stateOffset;
         unsigned int result = retractFact(TO_NUMBER(isolate, args[0]), 
                                           TO_STRING(isolate, args[1]),
                                           &stateOffset);
         if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_DEFERRED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, result));
-            array->Set(1, Number::New(isolate, stateOffset));
+            Local<Array> array = Array::New(isolate, 2);
+            ARRAY_SET_NUMBER(isolate, array, 0, result);
+            ARRAY_SET_NUMBER(isolate, array, 1, stateOffset);
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not retract fact, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             } 
         } 
     }
@@ -232,25 +242,25 @@ void jsRetractFacts(const FunctionCallbackInfo<v8::Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int stateOffset;
         unsigned int result = retractFacts(TO_NUMBER(isolate, args[0]), 
                                            TO_STRING(isolate, args[1]),
                                            &stateOffset);
         if (result == RULES_OK || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_DEFERRED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, result));
-            array->Set(1, Number::New(isolate, stateOffset));
+            Local<Array> array = Array::New(isolate, 2);
+            ARRAY_SET_NUMBER(isolate, array, 0, result);
+            ARRAY_SET_NUMBER(isolate, array, 1, stateOffset);
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not retract facts, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             } 
         } 
     }
@@ -260,25 +270,25 @@ void jsUpdateState(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int stateOffset;
         unsigned int result = updateState(TO_NUMBER(isolate, args[0]),
                                           TO_STRING(isolate, args[1]),
                                           &stateOffset);
         if (result == RULES_OK || result == ERR_EVENT_DEFERRED) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, Number::New(isolate, result));
-            array->Set(1, Number::New(isolate, stateOffset));
+            Local<Array> array = Array::New(isolate, 2);
+            ARRAY_SET_NUMBER(isolate, array, 0, result);
+            ARRAY_SET_NUMBER(isolate, array, 1, stateOffset);
             args.GetReturnValue().Set(array);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not update state, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         } 
     }
@@ -288,9 +298,9 @@ void jsStartAction(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 1) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         char *session;
         char *messages;
@@ -300,17 +310,17 @@ void jsStartAction(const FunctionCallbackInfo<Value>& args) {
                                           &messages, 
                                           &stateOffset); 
         if (result == RULES_OK) {
-            Handle<Array> array = Array::New(isolate, 3);
-            array->Set(0, String::NewFromUtf8(isolate, session));
-            array->Set(1, String::NewFromUtf8(isolate, messages));
-            array->Set(2, Number::New(isolate, stateOffset));
+            Local<Array> array = Array::New(isolate, 3);
+            ARRAY_SET_STRING(isolate, array, 0, session);
+            ARRAY_SET_STRING(isolate, array, 1, messages);
+            ARRAY_SET_NUMBER(isolate, array, 2, stateOffset);
             args.GetReturnValue().Set(array);
         } else if (result != ERR_NO_ACTION_AVAILABLE) {
             char *message = NULL;
             if (asprintf(&message, "Could not start action, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         }
     }
@@ -320,9 +330,9 @@ void jsStartActionForState(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsNumber()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         char *session;
         char *messages;
@@ -331,16 +341,16 @@ void jsStartActionForState(const FunctionCallbackInfo<Value>& args) {
                                                   &session, 
                                                   &messages); 
         if (result == RULES_OK) {
-            Handle<Array> array = Array::New(isolate, 2);
-            array->Set(0, String::NewFromUtf8(isolate, session));
-            array->Set(1, String::NewFromUtf8(isolate, messages));
+            Local<Array> array = Array::New(isolate, 2);
+            ARRAY_SET_STRING(isolate, array, 0, session);
+            ARRAY_SET_STRING(isolate, array, 1, messages);
             args.GetReturnValue().Set(array);
         } else if (result != ERR_NO_ACTION_AVAILABLE) {
             char *message = NULL;
             if (asprintf(&message, "Could not start action, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         }
     }
@@ -350,22 +360,22 @@ void jsCompleteAndStartAction(const FunctionCallbackInfo<v8::Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsNumber()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         char *messages = NULL;
         unsigned int result = completeAndStartAction(TO_NUMBER(isolate, args[0]),
                                                      TO_NUMBER(isolate, args[1]),
                                                      &messages);
         if (result == RULES_OK) {
-            args.GetReturnValue().Set(String::NewFromUtf8(isolate, messages));
+            args.GetReturnValue().Set(CREATE_STRING(isolate, messages));
         } else if (result != ERR_NO_ACTION_AVAILABLE) {
             char *message = NULL;
             if (asprintf(&message, "Could not complete and start action, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         } 
     }
@@ -375,9 +385,9 @@ void jsAbandonAction(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsNumber()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int result = abandonAction(TO_NUMBER(isolate, args[0]),
                                             TO_NUMBER(isolate, args[1]));
@@ -385,9 +395,9 @@ void jsAbandonAction(const FunctionCallbackInfo<Value>& args) {
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not abandon action, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         } 
     }
@@ -397,9 +407,9 @@ void jsStartTimer(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 5) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[2]->IsNumber() || !args[3]->IsNumber() || !args[4]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int result = startTimer(TO_NUMBER(isolate, args[0]),
                                          TO_STRING(isolate, args[1]),
@@ -410,9 +420,9 @@ void jsStartTimer(const FunctionCallbackInfo<Value>& args) {
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not start timer, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         } 
     }
@@ -422,9 +432,9 @@ void jsCancelTimer(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 3) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[2]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int result = cancelTimer(TO_NUMBER(isolate, args[0]),
                                           TO_STRING(isolate, args[1]),
@@ -433,9 +443,9 @@ void jsCancelTimer(const FunctionCallbackInfo<Value>& args) {
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not cancel timer, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         } 
     }
@@ -445,17 +455,17 @@ void jsAssertTimers(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 1) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int result = assertTimers(TO_NUMBER(isolate, args[0]));
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not assert timers, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         } 
     }
@@ -465,23 +475,23 @@ void jsGetState(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         char *state;
         unsigned int result = getState(TO_NUMBER(isolate, args[0]), 
                                        TO_STRING(isolate, args[1]), 
                                        &state); 
         if (result == RULES_OK) {
-            args.GetReturnValue().Set(String::NewFromUtf8(isolate, state));
+            args.GetReturnValue().Set(CREATE_STRING(isolate, state));
             free(state);
         } else {
             char *message = NULL;
             if (asprintf(&message, "Could not get state, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         }
     }
@@ -491,18 +501,18 @@ void jsDeleteState(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int result = deleteState(TO_NUMBER(isolate, args[0]), 
                                           TO_STRING(isolate, args[1])); 
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not delete state, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         }
     }
@@ -512,18 +522,18 @@ void jsRenewActionLease(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int result = renewActionLease(TO_NUMBER(isolate, args[0]), 
                                                TO_STRING(isolate, args[1])); 
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not renew action lease, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         }
     }
@@ -534,14 +544,15 @@ static unsigned int storeMessageCallback(void *context, char *ruleset, char *sid
     Isolate* isolate = Isolate::GetCurrent();
      
     Local<Value> args[5];
-    args[0] = String::NewFromUtf8(isolate, ruleset);
-    args[1] = String::NewFromUtf8(isolate, sid);
-    args[2] = String::NewFromUtf8(isolate, mid);
+    args[0] = CREATE_STRING(isolate, ruleset);
+    args[1] = CREATE_STRING(isolate, sid);
+    args[2] = CREATE_STRING(isolate, mid);
     args[3] = Number::New(isolate, messageType);
-    args[4] = String::NewFromUtf8(isolate, content);
+    args[4] = CREATE_STRING(isolate, content);
+
 
     Local<Function> func = Local<Function>::New(isolate, p->func);
-    Local<Value> result = func->Call(isolate->GetCurrentContext()->Global(), 5, args);  
+    Local<Value> result = CALL_FUNCTION(func, isolate, 5, args);
     if (result->IsNumber()) {  
         return TO_NUMBER(isolate, result);
     } else {
@@ -553,20 +564,20 @@ void jsSetStoreMessageCallback(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsFunction()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
-        CallbackProxy *p = new CallbackProxy(Handle<Function>::Cast(args[1]));
+        CallbackProxy *p = new CallbackProxy(Local<Function>::Cast(args[1]));
         unsigned int result = setStoreMessageCallback(TO_NUMBER(isolate, args[0]),
                                                       p,
                                                       &storeMessageCallback);  
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not set storage message callback, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         }  
     }
@@ -577,12 +588,12 @@ static unsigned int deleteMessageCallback(void *context, char *ruleset, char *si
     Isolate* isolate = Isolate::GetCurrent();
      
     Local<Value> args[3];
-    args[0] = String::NewFromUtf8(isolate, ruleset);
-    args[1] = String::NewFromUtf8(isolate, sid);
-    args[2] = String::NewFromUtf8(isolate, mid);
+    args[0] = CREATE_STRING(isolate, ruleset);
+    args[1] = CREATE_STRING(isolate, sid);
+    args[2] = CREATE_STRING(isolate, mid);
     
     Local<Function> func = Local<Function>::New(isolate, p->func);
-    Local<Value> result = func->Call(isolate->GetCurrentContext()->Global(), 3, args);    
+    Local<Value> result = CALL_FUNCTION(func, isolate, 3, args);
     if (result->IsNumber()) {  
         return TO_NUMBER(isolate, result);
     } else {
@@ -594,20 +605,20 @@ void jsSetDeleteMessageCallback(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsFunction()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
-        CallbackProxy *p = new CallbackProxy(Handle<Function>::Cast(args[1]));
+        CallbackProxy *p = new CallbackProxy(Local<Function>::Cast(args[1]));
         unsigned int result = setDeleteMessageCallback(TO_NUMBER(isolate, args[0]),
                                                        p,
                                                        &deleteMessageCallback);  
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not set delete message callback, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         }  
     }
@@ -618,13 +629,13 @@ static unsigned int queueMessageCallback(void *context, char *ruleset, char *sid
     Isolate* isolate = Isolate::GetCurrent();
      
     Local<Value> args[4];
-    args[0] = String::NewFromUtf8(isolate, ruleset);
-    args[1] = String::NewFromUtf8(isolate, sid);
+    args[0] = CREATE_STRING(isolate, ruleset);
+    args[1] = CREATE_STRING(isolate, sid);
     args[2] = Number::New(isolate, actionType);
-    args[3] = String::NewFromUtf8(isolate, content);
+    args[3] = CREATE_STRING(isolate, content);
 
     Local<Function> func = Local<Function>::New(isolate, p->func);
-    Local<Value> result = func->Call(isolate->GetCurrentContext()->Global(), 4, args);    
+    Local<Value> result = CALL_FUNCTION(func, isolate, 4, args);
     if (result->IsNumber()) {  
         return TO_NUMBER(isolate, result);
     } else {
@@ -636,20 +647,20 @@ void jsSetQueueMessageCallback(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsFunction()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
-        CallbackProxy *p = new CallbackProxy(Handle<Function>::Cast(args[1]));
+        CallbackProxy *p = new CallbackProxy(Local<Function>::Cast(args[1]));
         unsigned int result = setQueueMessageCallback(TO_NUMBER(isolate, args[0]),
                                                        p,
                                                        &queueMessageCallback);  
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not set queue message callback, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         }  
     }
@@ -660,11 +671,11 @@ static unsigned int getQueuedMessagesCallback(void *context, char *ruleset, char
     Isolate* isolate = Isolate::GetCurrent();
      
     Local<Value> args[2];
-    args[0] = String::NewFromUtf8(isolate, ruleset);
-    args[1] = String::NewFromUtf8(isolate, sid);
+    args[0] = CREATE_STRING(isolate, ruleset);
+    args[1] = CREATE_STRING(isolate, sid);
     
     Local<Function> func = Local<Function>::New(isolate, p->func);
-    Local<Value> result = func->Call(isolate->GetCurrentContext()->Global(), 2, args);    
+    Local<Value> result = CALL_FUNCTION(func, isolate, 2, args);   
     if (result->IsNumber()) {  
         return TO_NUMBER(isolate, result);
     } else {
@@ -676,20 +687,20 @@ void jsSetGetQueuedMessagesCallback(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsFunction()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
-        CallbackProxy *p = new CallbackProxy(Handle<Function>::Cast(args[1]));
+        CallbackProxy *p = new CallbackProxy(Local<Function>::Cast(args[1]));
         unsigned int result = setGetQueuedMessagesCallback(TO_NUMBER(isolate, args[0]),
                                                            p,
                                                            &getQueuedMessagesCallback);  
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not set get queued messages callback, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         }  
     }
@@ -699,9 +710,9 @@ void jsCompleteGetQueuedMessages(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 3) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsString() || !args[2]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int result = completeGetQueuedMessages(TO_NUMBER(isolate, args[0]), 
                                                         TO_STRING(isolate, args[1]),
@@ -709,9 +720,9 @@ void jsCompleteGetQueuedMessages(const FunctionCallbackInfo<Value>& args) {
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not complete get queued messages, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         }
     }
@@ -722,10 +733,10 @@ static unsigned int getIdleStateCallback(void *context, char *ruleset) {
     Isolate* isolate = Isolate::GetCurrent();
      
     Local<Value> args[1];
-    args[0] = String::NewFromUtf8(isolate, ruleset);
+    args[0] = CREATE_STRING(isolate, ruleset);
     
     Local<Function> func = Local<Function>::New(isolate, p->func);
-    Local<Value> result = func->Call(isolate->GetCurrentContext()->Global(), 1, args);    
+    Local<Value> result = CALL_FUNCTION(func, isolate, 1, args);   
     if (result->IsNumber()) {  
         return TO_NUMBER(isolate, result);
     } else {
@@ -737,20 +748,20 @@ void jsSetGetIdleStateCallback(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsFunction()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
-        CallbackProxy *p = new CallbackProxy(Handle<Function>::Cast(args[1]));
+        CallbackProxy *p = new CallbackProxy(Local<Function>::Cast(args[1]));
         unsigned int result = setGetIdleStateCallback(TO_NUMBER(isolate, args[0]),
                                                       p,
                                                       &getIdleStateCallback);  
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not set get idle state callback, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         }  
     }
@@ -760,9 +771,9 @@ void jsCompleteGetIdleState(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 3) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsNumber() || !args[1]->IsString() || !args[2]->IsString()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
         unsigned int result = completeGetIdleState(TO_NUMBER(isolate, args[0]), 
                                                    TO_STRING(isolate, args[1]),
@@ -770,9 +781,9 @@ void jsCompleteGetIdleState(const FunctionCallbackInfo<Value>& args) {
         if (result != RULES_OK) {
             char *message = NULL;
             if (asprintf(&message, "Could not complete get idle state, error code: %d", result) == -1) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Out of memory")));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
             } else {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, message)));
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
             }
         }
     }
@@ -782,11 +793,11 @@ void jsCreateProxy(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate;
     isolate = args.GetIsolate();
     if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
     } else if (!args[0]->IsFunction() || !args[1]->IsFunction()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type")));
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
     } else {
-        ObjectProxy *p = new ObjectProxy(Handle<Function>::Cast(args[0]), Handle<Function>::Cast(args[1]));
+        ObjectProxy *p = new ObjectProxy(Local<Function>::Cast(args[0]), Local<Function>::Cast(args[1]));
         args.GetReturnValue().Set(p->Wrap());
     }
 }
@@ -798,7 +809,7 @@ void ObjectProxy::Get(Local<Name> name, const PropertyCallbackInfo<Value>& info)
     Local<Value> args[1];
     args[0] = name;
     Local<Function> gfunc = Local<Function>::New(isolate, p->_gfunc);
-    Local<Value> result = gfunc->Call(info.Holder(), 1, args);
+    Local<Value> result = gfunc->Call(isolate->GetCurrentContext(), info.Holder(), 1, args).ToLocalChecked();
     info.GetReturnValue().Set(result);
 }
 
@@ -810,17 +821,17 @@ void ObjectProxy::Set(Local<Name> name, Local<Value> value, const PropertyCallba
     args[0] = name;
     args[1] = value;
     Local<Function> sfunc = Local<Function>::New(isolate, p->_sfunc);
-    Local<Value> result = sfunc->Call(info.Holder(), 2, args);
+    Local<Value> result = sfunc->Call(isolate->GetCurrentContext(), info.Holder(), 2, args).ToLocalChecked();
     info.GetReturnValue().Set(result);
 }
 
-Handle<Object> ObjectProxy::Wrap() { 
+Local<Object> ObjectProxy::Wrap() { 
     Isolate* isolate = Isolate::GetCurrent();
     Local<ObjectTemplate> proxyTempl = ObjectTemplate::New(isolate);
     proxyTempl->SetInternalFieldCount(1);
     proxyTempl->SetHandler(NamedPropertyHandlerConfiguration(Get, Set));
 
-    Local<Object> result = proxyTempl->NewInstance();
+    Local<Object> result = proxyTempl->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
     result->SetInternalField(0, External::New(isolate, this));
 
     return result;
@@ -833,88 +844,61 @@ ObjectProxy* ObjectProxy::Unwrap(Local<Object> obj) {
 }
 
 
-void init(Handle<Object> exports) {
+void init(Local<Object> exports) {
     Isolate* isolate = Isolate::GetCurrent();
-    exports->Set(String::NewFromUtf8(isolate, "createRuleset", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsCreateRuleset)->GetFunction());
+    DEFINE_FUNCTION(exports, isolate, "createRuleset", jsCreateRuleset);
+    
+    DEFINE_FUNCTION(exports, isolate, "deleteRuleset", jsDeleteRuleset);
+    
+    DEFINE_FUNCTION(exports, isolate, "assertEvent", jsAssertEvent);
+    
+    DEFINE_FUNCTION(exports, isolate, "assertEvents", jsAssertEvents);
+    
+    DEFINE_FUNCTION(exports, isolate, "assertFact", jsAssertFact);
+    
+    DEFINE_FUNCTION(exports, isolate, "assertFacts", jsAssertFacts);
+    
+    DEFINE_FUNCTION(exports, isolate, "retractFact", jsRetractFact);
 
-    exports->Set(String::NewFromUtf8(isolate, "deleteRuleset", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsDeleteRuleset)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "assertEvent", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsAssertEvent)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "assertEvents", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsAssertEvents)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "assertFact", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsAssertFact)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "assertFacts", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsAssertFacts)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "retractFact", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsRetractFact)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "retractFacts", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsRetractFacts)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "assertTimers", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsAssertTimers)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "updateState", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsUpdateState)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "startAction", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsStartAction)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "startActionForState", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsStartActionForState)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "completeAndStartAction", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsCompleteAndStartAction)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "abandonAction", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsAbandonAction)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "startTimer", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsStartTimer)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "cancelTimer", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsCancelTimer)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "getState", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsGetState)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "deleteState", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsDeleteState)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "renewActionLease", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsRenewActionLease)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "createProxy", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsCreateProxy)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "setStoreMessageCallback", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsSetStoreMessageCallback)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "setDeleteMessageCallback", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsSetDeleteMessageCallback)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "setQueueMessageCallback", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsSetQueueMessageCallback)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "setGetQueuedMessagesCallback", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsSetGetQueuedMessagesCallback)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "completeGetQueuedMessages", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsCompleteGetQueuedMessages)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "setGetIdleStateCallback", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsSetGetIdleStateCallback)->GetFunction());
-
-    exports->Set(String::NewFromUtf8(isolate, "completeGetIdleState", String::kInternalizedString),
-        FunctionTemplate::New(isolate, jsCompleteGetIdleState)->GetFunction());
+    DEFINE_FUNCTION(exports, isolate, "retractFacts", jsRetractFacts);
+    
+    DEFINE_FUNCTION(exports, isolate, "assertTimers", jsAssertTimers);
+    
+    DEFINE_FUNCTION(exports, isolate, "updateState", jsUpdateState);
+    
+    DEFINE_FUNCTION(exports, isolate, "startAction", jsStartAction);
+    
+    DEFINE_FUNCTION(exports, isolate, "startActionForState", jsStartActionForState);
+    
+    DEFINE_FUNCTION(exports, isolate, "completeAndStartAction", jsCompleteAndStartAction);
+    
+    DEFINE_FUNCTION(exports, isolate, "abandonAction", jsAbandonAction);
+    
+    DEFINE_FUNCTION(exports, isolate, "startTimer", jsStartTimer);
+    
+    DEFINE_FUNCTION(exports, isolate, "cancelTimer", jsCancelTimer);
+    
+    DEFINE_FUNCTION(exports, isolate, "getState", jsGetState);
+    
+    DEFINE_FUNCTION(exports, isolate, "deleteState", jsDeleteState);
+    
+    DEFINE_FUNCTION(exports, isolate, "renewActionLease", jsRenewActionLease);
+    
+    DEFINE_FUNCTION(exports, isolate, "createProxy", jsCreateProxy);
+    
+    DEFINE_FUNCTION(exports, isolate, "setStoreMessageCallback", jsSetStoreMessageCallback);
+    
+    DEFINE_FUNCTION(exports, isolate, "setDeleteMessageCallback", jsSetDeleteMessageCallback);
+    
+    DEFINE_FUNCTION(exports, isolate, "setQueueMessageCallback", jsSetQueueMessageCallback);
+    
+    DEFINE_FUNCTION(exports, isolate, "setGetQueuedMessagesCallback", jsSetGetQueuedMessagesCallback);
+    
+    DEFINE_FUNCTION(exports, isolate, "completeGetQueuedMessages", jsCompleteGetQueuedMessages);
+    
+    DEFINE_FUNCTION(exports, isolate, "setGetIdleStateCallback", jsSetGetIdleStateCallback);
+    
+    DEFINE_FUNCTION(exports, isolate, "completeGetIdleState", jsCompleteGetIdleState);
 }
 
 NODE_MODULE(rulesjs, init)
