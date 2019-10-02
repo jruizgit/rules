@@ -737,6 +737,9 @@ d.ruleset('risk6', function() {
     }
     run: console.log('risk6 fraud 12 detected ' + JSON.stringify(m));
 
+    whenAll: m.array.anyItem(+item.malformed)
+    run: console.log('risk6 fraud 8 detected ' + JSON.stringify(m));
+
 });
 
 d.post('risk6', { payments: [ 2500, 150, 450 ]}, function(err, state) {console.log('risk6: ' + err.message)});
@@ -754,10 +757,11 @@ d.post('risk6', { payments: [{field3: 2}]});
 d.post('risk6', { payments: [{field2: 1, field3: 2}]}); 
 d.post('risk6', { payments: [{field1: 1, field2: 2}]}, function(err, state) {console.log('risk6: ' + err.message)});  
 d.post('risk6', { payments: [{field1: 1, field2: 1}]}, function(err, state) {console.log('risk6: ' + err.message)});
-d.post('risk6', { a1: [{ field: 8, a2: [{field: 1}]}]})
-d.post('risk6', { a1: [{ field1: 8, a2: [{field2: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)})
-d.post('risk6', { a1: [{ field1: 8, a2: [{field: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)})
-d.post('risk6', { a1: [{ field: 8, a2: [{field2: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)})  
+d.post('risk6', { a1: [{ field: 8, a2: [{field: 1}]}]});
+d.post('risk6', { a1: [{ field1: 8, a2: [{field2: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)});
+d.post('risk6', { a1: [{ field1: 8, a2: [{field: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)});
+d.post('risk6', { a1: [{ field: 8, a2: [{field2: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)});  
+d.post('risk6', { array:[ { tc:0 } ] }, function(err, state) {console.log('risk6: ' + err.message)});
 
 d.ruleset('expense1', function() {
     whenAny: {

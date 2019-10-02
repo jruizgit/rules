@@ -1558,31 +1558,33 @@ static unsigned int isArrayMatch(ruleset *tree,
             for(unsigned int propertyIndex = 0; propertyIndex < jo.propertiesLength; ++propertyIndex) {
                 jsonProperty *currentProperty = &jo.properties[propertyIndex];
                 for (unsigned int entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
-                    node *hashNode = &tree->nodePool[nextHashset[entry]];  
-                    if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
-                        CHECK_RESULT(isArrayMatch(tree,
-                                                  &jo,
-                                                  currentProperty, 
-                                                  &hashNode->value.a,
-                                                  propertyMatch));
-                    } else {
-                        CHECK_RESULT(isAlphaMatch(tree, 
-                                                  &hashNode->value.a,
-                                                  &jo, 
-                                                  propertyMatch));
-                    }
+                    node *hashNode = &tree->nodePool[nextHashset[entry]]; 
+                    if (currentProperty->hash == hashNode->value.a.expression.left.value.id.propertyNameHash) {
+                        if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
+                            CHECK_RESULT(isArrayMatch(tree,
+                                                      &jo,
+                                                      currentProperty, 
+                                                      &hashNode->value.a,
+                                                      propertyMatch));
+                        } else {
+                            CHECK_RESULT(isAlphaMatch(tree, 
+                                                      &hashNode->value.a,
+                                                      &jo, 
+                                                      propertyMatch));
+                        }
 
-                    if (*propertyMatch && hashNode->value.a.nextOffset) {
-                        CHECK_RESULT(isNextMatch(tree,
-                                                 &jo,
-                                                 &hashNode->value.a,
-                                                 propertyMatch));
+                        if (*propertyMatch && hashNode->value.a.nextOffset) {
+                            CHECK_RESULT(isNextMatch(tree,
+                                                     &jo,
+                                                     &hashNode->value.a,
+                                                     propertyMatch));
 
-                    }
+                        }
 
-                    if (*propertyMatch && (hashNode->value.a.nextOffset || hashNode->value.a.nextListOffset)) {
-                        break;
-                    }   
+                        if (*propertyMatch && (hashNode->value.a.nextOffset || hashNode->value.a.nextListOffset)) {
+                            break;
+                        }  
+                    } 
                 }
             }
         }
