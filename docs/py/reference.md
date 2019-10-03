@@ -362,7 +362,7 @@ post('risk', { 'amount': 251 })
 [top](reference.md#table-of-contents)  
 
 ### Choice of Sequences
-durable_rules allows expressing and efficiently evaluating richer event sequences In the example below each of the two event\fact sequences will trigger an action. 
+durable_rules allows expressing and efficiently evaluating richer event sequences. In the example below each of the two event\fact sequences will trigger an action.
 
 The following two functions can be used and combined to define richer event sequences:  
 * all: a set of event or fact patterns. All of them are required to match to trigger an action.  
@@ -401,18 +401,18 @@ from durable.lang import *
 with ruleset('risk'):
     @when_all(c.first << m.t == 'deposit',
               none(m.t == 'balance'),
-              c.third << m.t == 'withrawal',
+              c.third << m.t == 'withdrawal',
               c.fourth << m.t == 'chargeback')
     def detected(c):
         print('fraud detected {0} {1} {2}'.format(c.first.t, c.third.t, c.fourth.t))
         
 assert_fact('risk', { 't': 'deposit' })
-assert_fact('risk', { 't': 'withrawal' })
+assert_fact('risk', { 't': 'withdrawal' })
 assert_fact('risk', { 't': 'chargeback' })
 
 assert_fact('risk', { 'sid': 1, 't': 'balance' })
 assert_fact('risk', { 'sid': 1, 't': 'deposit' })
-assert_fact('risk', { 'sid': 1, 't': 'withrawal' })
+assert_fact('risk', { 'sid': 1, 't': 'withdrawal' })
 assert_fact('risk', { 'sid': 1, 't': 'chargeback' })
 retract_fact('risk', { 'sid': 1, 't': 'balance' })
 
@@ -535,7 +535,7 @@ When a high number of events or facts satisfy a consequent, the consequent resul
 * count: defines the exact number of times the rule needs to be satisfied before scheduling the action.   
 * cap: defines the maximum number of times the rule needs to be satisfied before scheduling the action.  
 
-This example batches exaclty three approvals and caps the number of rejects to two:  
+This example batches exactly three approvals and caps the number of rejects to two:
 ```python
 from durable.lang import *
 
@@ -697,7 +697,7 @@ from durable.lang import *
 with statechart('worker'):
     # super-state 'work' has two states and one trigger
     with state('work'):
-        # sub-sate 'enter' has only one trigger
+        # sub-state 'enter' has only one trigger
         with state('enter'):
             @to('process')
             @when_all(m.subject == 'enter')
@@ -784,7 +784,7 @@ post('expense', { 'sid': 2, 'subject': 'approve', 'amount': 10000})
 ```
 [top](reference.md#table-of-contents)  
 ### Timers
-Events can be scheduled with timers. A timeout condition can be included in the rule antecedent. By default a timeuot is triggered as an event (observed only once). Timeouts can also be triggered as facts by 'manual reset' timers and the timers can be reset during action execution (see last example). 
+Events can be scheduled with timers. A timeout condition can be included in the rule antecedent. By default a timeout is triggered as an event (observed only once). Timeouts can also be triggered as facts by 'manual reset' timers and the timers can be reset during action execution (see last example).
 
 * start_timer: starts a timer with the name and duration specified (manual_reset is optional).
 * reset_timer: resets a 'manual reset' timer.
