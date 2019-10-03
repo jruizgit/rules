@@ -366,7 +366,7 @@ d.post('risk', { amount: 251 });
 [top](reference.md#table-of-contents)  
 
 ### Choice of Sequences
-durable_rules allows expressing and efficiently evaluating richer events sequences In the example below any of the two event\fact sequences will trigger an action. 
+durable_rules allows expressing and efficiently evaluating richer events sequences. In the example below any of the two event\fact sequences will trigger an action.
 
 The following two labels can be used and combined to define richer event sequences:  
 * whenAll: a set of event or fact patterns. All of them are required to match to trigger an action.  
@@ -414,24 +414,24 @@ d.ruleset('risk', function() {
     whenAll: {
         first = m.t == 'deposit'
         none(m.t == 'balance')
-        third = m.t == 'withrawal'
+        third = m.t == 'withdrawal'
         fourth = m.t == 'chargeback'
     }
     run: console.log('fraud detected ' + first.t + ' ' + third.t + ' ' + fourth.t);
 });
 
 d.assert('risk', {t: 'deposit'});
-d.assert('risk', {t: 'withrawal'});
+d.assert('risk', {t: 'withdrawal'});
 d.assert('risk', {t: 'chargeback'});
 
 d.assert('risk', {sid: 1, t: 'balance'});
 d.assert('risk', {sid: 1, t: 'deposit'});
-d.assert('risk', {sid: 1, t: 'withrawal'});
+d.assert('risk', {sid: 1, t: 'withdrawal'});
 d.assert('risk', {sid: 1, t: 'chargeback'});
 d.retract('risk', {sid: 1, t: 'balance'});
 
 d.assert('risk', {sid: 2, t: 'deposit'});
-d.assert('risk', {sid: 2, t: 'withrawal'});
+d.assert('risk', {sid: 2, t: 'withdrawal'});
 d.assert('risk', {sid: 2, t: 'chargeback'});
 d.assert('risk', {sid: 2, t: 'balance'});
 ```
@@ -568,7 +568,7 @@ When a high number of events or facts satisfy a consequent, the consequent resul
 * count: defines the exact number of times the rule needs to be satisfied before scheduling the action.   
 * cap: defines the maximum number of times the rule needs to be satisfied before scheduling the action.  
 
-This example batches exaclty three approvals and caps the number of rejects to two:  
+This example batches exactly three approvals and caps the number of rejects to two:
 ```javascript
 var d = require('durable');
 
@@ -725,7 +725,7 @@ var d = require('durable');
 d.statechart('worker', function() {
     // super-state 'work' has two states and one trigger
     work: {
-        // sub-sate 'enter' has only one trigger
+        // sub-state 'enter' has only one trigger
         enter: {
             to: 'process'
             whenAll: m.subject == 'enter'
@@ -811,7 +811,7 @@ d.post('expense', {sid: 2, subject: 'approve', amount: 10000});
 ```
 [top](reference.md#table-of-contents)  
 ### Timers
-Events can be scheduled with timers. A timeout condition can be included in the rule antecedent. By default a timeuot is triggered as an event (observed only once). Timeouts can also be triggered as facts by 'manual reset' timers, the timers can be reset during action execution (see last example). 
+Events can be scheduled with timers. A timeout condition can be included in the rule antecedent. By default a timeout is triggered as an event (observed only once). Timeouts can also be triggered as facts by 'manual reset' timers, the timers can be reset during action execution (see last example).
 
 * startTimer: starts a timer with the name and duration specified (manual_reset is optional).
 * resetTimer: resets a 'manual reset' timer.
@@ -838,7 +838,7 @@ d.ruleset('timer', function() {
 d.post('timer', {subject: 'start'});
 ```
 
-The example below use a timer to detect higher event rate:  
+The example below uses a timer to detect higher event rate:
 
 ```javascript
 var d = require('durable');
