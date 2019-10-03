@@ -377,7 +377,7 @@ Durable.post :risk, { :t => "purchase", :amount => 251 }
 [top](reference.md#table-of-contents)  
 
 ### Choice of Sequences
-durable_rules allows expressing and efficiently evaluating richer events sequences In the example below any of the two event\fact sequences will trigger an action. 
+durable_rules allows expressing and efficiently evaluating richer events sequences. In the example below any of the two event\fact sequences will trigger an action.
 
 The following two functions can be used and combined to define richer event sequences:  
 * all: a set of event or fact patterns. All of them are required to match to trigger an action.  
@@ -417,19 +417,19 @@ require "durable"
 Durable.ruleset :risk do
   when_all c.first = m.t == "deposit",
            none(m.t == "balance"),
-           c.third = m.t == "withrawal",
+           c.third = m.t == "withdrawal",
            c.fourth = m.t == "chargeback" do
     puts "fraud detected #{first.t} #{third.t} #{fourth.t}"
   end
 end
 
 Durable.assert :risk, { :t => "deposit" }
-Durable.assert :risk, { :t => "withrawal" }
+Durable.assert :risk, { :t => "withdrawal" }
 Durable.assert :risk, { :t => "chargeback" }
 
 Durable.assert :risk, { :sid => 1, :t => "balance" }
 Durable.assert :risk, { :sid => 1, :t => "deposit" }
-Durable.assert :risk, { :sid => 1, :t => "withrawal" }
+Durable.assert :risk, { :sid => 1, :t => "withdrawal" }
 Durable.assert :risk, { :sid => 1, :t => "chargeback" }
 Durable.retract :risk, { :sid => 1, :t => "balance" }
 ```  
@@ -568,7 +568,7 @@ When a high number of events or facts satisfy a consequent, the consequent resul
 * count: defines the exact number of times the rule needs to be satisfied before scheduling the action.   
 * cap: defines the maximum number of times the rule needs to be satisfied before scheduling the action.  
 
-This example batches exaclty three approvals and caps the number of rejects to two:  
+This example batches exactly three approvals and caps the number of rejects to two:
 ```ruby
 require "durable"
 
@@ -723,7 +723,7 @@ require "durable"
 Durable.statechart :worker do
   # super-state :work has two states and one trigger
   state :work do
-    # sub-sate :enter has only one trigger   
+    # sub-state :enter has only one trigger
     state :enter do
       to :process, when_all(m.subject == "enter") do
         puts "start process"
@@ -807,7 +807,7 @@ Durable.post :expense, {:sid => 2, :subject => "approve", :amount => 10000}
 ```  
 [top](reference.md#table-of-contents)  
 ### Timers
-Events can be scheduled with timers. A timeout condition can be included in the rule antecedent. By default a timeuot is triggered as an event (observed only once). Timeouts can also be triggered as facts by 'manual reset' timers, the timers can be reset during action execution (see last example). 
+Events can be scheduled with timers. A timeout condition can be included in the rule antecedent. By default a timeout is triggered as an event (observed only once). Timeouts can also be triggered as facts by 'manual reset' timers, the timers can be reset during action execution (see last example).
 
 * start_timer: starts a timer with the name and duration specified (manual_reset is optional).
 * reset_timer: resets a 'manual reset' timer.
