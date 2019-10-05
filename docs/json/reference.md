@@ -540,7 +540,7 @@ The `$not` modifier can be used in rules with correlated sequences to evaluate t
         },
         {
           "third": {
-            "t": "withrawal"
+            "t": "withdrawal"
           }
         },
         {
@@ -975,7 +975,7 @@ Statechart rules:
 ```
 [top](reference.md#table-of-contents)  
 ### Nested States
-Nested states allow for writing compact statecharts. If a context is in the nested state, it also (implicitly) is in the surrounding state. The statechart will attempt to handle any event in the context of the sub-state. If the sub-state does not  handle an event, the event is automatically handled at the context of the super-state. Nested states are defined as an object with the name `"$chart"`.  
+Nested states allow for writing compact statecharts. If a context is in the nested state, it also (implicitly) is in the surrounding state. The statechart will attempt to handle any event in the context of the sub-state. If the sub-state does not handle an event, the event is automatically handled at the context of the super-state. Nested states are defined as an object with the name `"$chart"`.
 
 ```javascript
 {
@@ -1191,7 +1191,7 @@ Events can be scheduled with timers. A timeout condition can be included in the 
 }
 ```
 
-The example below use a timer to detect higher event rate (use `"count"` to match a specific number of events):  
+The example below uses a timer to detect higher event rate (use `"count"` to match a specific number of events):
 
 ```javascript
 {
