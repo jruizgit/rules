@@ -1397,7 +1397,7 @@ unsigned int setObjectProperty(jsonObject *jo,
         case JSON_INT:
             temp = first[property->valueLength];
             first[property->valueLength] = '\0';
-            property->value.i = atol(first);
+            property->value.i = atoll(first);
             first[property->valueLength] = temp;
             break;
         case JSON_DOUBLE:

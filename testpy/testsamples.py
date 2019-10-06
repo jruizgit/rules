@@ -210,13 +210,13 @@ post('expense1', { 'amount': 10000 })
 with ruleset('risk1'):
     @when_all(c.first << m.t == 'deposit',
               none(m.t == 'balance'),
-              c.third << m.t == 'withrawal',
+              c.third << m.t == 'withdrawal',
               c.fourth << m.t == 'chargeback')
     def detected(c):
         print('risk1-> fraud detected {0} {1} {2}'.format(c.first.t, c.third.t, c.fourth.t))
         
 post('risk1', { 't': 'deposit' })
-post('risk1', { 't': 'withrawal' })
+post('risk1', { 't': 'withdrawal' })
 post('risk1', { 't': 'chargeback' })
 
 
@@ -361,7 +361,7 @@ post('expense4', { 'sid': 2, 'subject': 'approve', 'amount': 10000})
 with statechart('worker'):
     # super-state 'work' has two states and one trigger
     with state('work'):
-        # sub-sate 'enter' has only one trigger
+        # sub-state 'enter' has only one trigger
         with state('enter'):
             @to('process')
             @when_all(m.subject == 'enter')

@@ -350,25 +350,25 @@ d.ruleset('risk2_0', function() {
     whenAll: {
         first = m.t == 'deposit'
         none(m.t == 'balance')
-        third = m.t == 'withrawal'
+        third = m.t == 'withdrawal'
         fourth = m.t == 'chargeback'
     }
     run: console.log('risk2_0 fraud detected sid: ' + s.sid + ' result: ' + first.t + ' ' + third.t + ' ' + fourth.t);
 });
 
 d.assert('risk2_0', {t: 'deposit'});
-d.assert('risk2_0', {t: 'withrawal'});
+d.assert('risk2_0', {t: 'withdrawal'});
 d.assert('risk2_0', {t: 'chargeback'});
 
 d.assert('risk2_0', {sid: 1, t: 'balance'});
 d.assert('risk2_0', {sid: 1, t: 'deposit'});
-d.assert('risk2_0', {sid: 1, t: 'withrawal'});
+d.assert('risk2_0', {sid: 1, t: 'withdrawal'});
 d.assert('risk2_0', {sid: 1, t: 'chargeback'});
 d.retract('risk2_0', {sid: 1, t: 'balance'});
 
 
 d.assert('risk2_0', {sid: 2, t: 'deposit'});
-d.assert('risk2_0', {sid: 2, t: 'withrawal'});
+d.assert('risk2_0', {sid: 2, t: 'withdrawal'});
 d.assert('risk2_0', {sid: 2, t: 'chargeback'});
 d.assert('risk2_0', {sid: 2, t: 'balance'});
 
@@ -718,6 +718,11 @@ d.ruleset('risk6', function() {
     run: console.log('risk6 fraud 7 detected ' + JSON.stringify(m.payments))
 
     whenAll: {
+        m.array.anyItem(+item.malformed)
+    }
+    run: console.log('risk6 fraud 8 detected ' + JSON.stringify(m));
+
+    whenAll: {
         m.array1.anyItem(item.array2.anyItem(item.field21 == 1) && item.field == 8)
     }
     run: console.log('risk6 fraud 9 detected ' + JSON.stringify(m));
@@ -737,9 +742,15 @@ d.ruleset('risk6', function() {
     }
     run: console.log('risk6 fraud 12 detected ' + JSON.stringify(m));
 
-    whenAll: m.array.anyItem(+item.malformed)
-    run: console.log('risk6 fraud 8 detected ' + JSON.stringify(m));
+    whenAll: { 
+        m.a4.anyItem(~item.field1 || item.field2 == 3)
+    }
+    run: console.log('risk6 fraud 13 detected ' + JSON.stringify(m))
 
+    whenAll: {
+        m.a5.anyItem(item.a6.anyItem(item.field21 == 1) && ~item.field)
+    }
+    run: console.log('risk6 fraud 14 detected ' + JSON.stringify(m))
 });
 
 d.post('risk6', { payments: [ 2500, 150, 450 ]}, function(err, state) {console.log('risk6: ' + err.message)});
@@ -750,6 +761,8 @@ d.post('risk6', { payments: [[ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ]]});
 d.post('risk6', { payments: [ 150, 350, 450 ], cash : true});    
 d.post('risk6', { field: 1, payments: [ [ 200, 300 ], [ 150, 200 ] ]}); 
 d.post('risk6', { field: 1, payments: [ [ 20, 80 ], [ 90, 180 ] ]});   
+d.post('risk6', { array:[{ tc: 0 }]}, function(err, state) {console.log('risk6: ' + err.message)});
+d.post('risk6', { array:[{ malformed: 0 }]});
 d.assert('risk6', { array1: [{ field: 8, array2: [{field21: 1}]}]})
 d.assert('risk6', { array1: [{ field: 7, array2: [{field21: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)})
 d.assert('risk6', { array1: [{ field: 8, array2: [{field21: 2}]}]}, function(err, state) {console.log('risk6: ' + err.message)})
@@ -761,7 +774,9 @@ d.post('risk6', { a1: [{ field: 8, a2: [{field: 1}]}]});
 d.post('risk6', { a1: [{ field1: 8, a2: [{field2: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)});
 d.post('risk6', { a1: [{ field1: 8, a2: [{field: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)});
 d.post('risk6', { a1: [{ field: 8, a2: [{field2: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)});  
-d.post('risk6', { array:[ { tc:0 } ] }, function(err, state) {console.log('risk6: ' + err.message)});
+d.post('risk6', { a4: [{field2: 2}]});
+d.post('risk6', { a5: [{field: 7, a6: [{field21 : 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)}); 
+d.post('risk6', { a5: [{a6: [{field21 : 1}]}]}); 
 
 d.ruleset('expense1', function() {
     whenAny: {

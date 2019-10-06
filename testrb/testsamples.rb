@@ -208,14 +208,14 @@ end
 Durable.ruleset :risk do
   when_all c.first = m.t == "deposit",
            none(m.t == "balance"),
-           c.third = m.t == "withrawal",
+           c.third = m.t == "withdrawal",
            c.fourth = m.t == "chargeback" do
     puts "risk-> fraud detected: #{first.t} #{third.t} #{fourth.t}"
   end
 end
 
 Durable.post :risk, { :t => "deposit" }
-Durable.post :risk, { :t => "withrawal" }
+Durable.post :risk, { :t => "withdrawal" }
 Durable.post :risk, { :t => "chargeback" }
 
 Durable.ruleset :expense4 do
@@ -311,7 +311,7 @@ Durable.post :expense5, { :sid => 2, :subject => 'approve', :amount => 10000 }
 Durable.statechart :worker do
   # super-state :work has two states and one trigger
   state :work do
-    # sub-sate :enter has only one trigger   
+    # sub-state :enter has only one trigger   
     state :enter do
       to :process, when_all(m.subject == "enter") do
         puts "worker-> start process"

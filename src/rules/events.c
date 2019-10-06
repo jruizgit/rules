@@ -156,8 +156,8 @@ static unsigned int reduceBool(unsigned char left,
     return RULES_OK;
 }
 
-static unsigned int reduceInt(long left, 
-                              long right, 
+static unsigned int reduceInt(long long left, 
+                              long long right, 
                               unsigned char op,
                               jsonProperty *targetProperty) {
     switch(op) {
@@ -354,10 +354,10 @@ static unsigned int reduceProperties(unsigned char operator,
             {
 #ifdef _WIN32
                 char *leftString = (char *)_alloca(sizeof(char)*(MAX_INT_LENGTH + 1));
-                sprintf_s(leftString, sizeof(char)*(MAX_INT_LENGTH + 1), "%ld", leftProperty->value.i);
+                sprintf_s(leftString, sizeof(char)*(MAX_INT_LENGTH + 1), "%lld", leftProperty->value.i);
 #else
                 char leftString[MAX_INT_LENGTH + 1];
-                snprintf(leftString, sizeof(char)*(MAX_INT_LENGTH + 1), "%ld", leftProperty->value.i);
+                snprintf(leftString, sizeof(char)*(MAX_INT_LENGTH + 1), "%lld", leftProperty->value.i);
 #endif         
                 return reduceString(leftString,
                                     leftProperty->valueLength,
@@ -403,10 +403,10 @@ static unsigned int reduceProperties(unsigned char operator,
             {
 #ifdef _WIN32
                 char *rightString = (char *)_alloca(sizeof(char)*(MAX_INT_LENGTH + 1));
-                sprintf_s(rightString, sizeof(char)*(MAX_INT_LENGTH + 1), "%ld", rightProperty->value.i);
+                sprintf_s(rightString, sizeof(char)*(MAX_INT_LENGTH + 1), "%lld", rightProperty->value.i);
 #else
                 char rightString[MAX_INT_LENGTH + 1];
-                snprintf(rightString, sizeof(char)*(MAX_INT_LENGTH + 1), "%ld", rightProperty->value.i);
+                snprintf(rightString, sizeof(char)*(MAX_INT_LENGTH + 1), "%lld", rightProperty->value.i);
 #endif         
                 return reduceString(leftProperty->value.s,
                                     leftProperty->valueLength,
@@ -617,10 +617,10 @@ static unsigned int getFrameHashForExpression(ruleset *tree,
         {
 #ifdef _WIN32
             char *string = (char *)_alloca(sizeof(char)*(MAX_INT_LENGTH + 1));
-            sprintf_s(string, sizeof(char)*(MAX_INT_LENGTH + 1), "%ld", property->value.i);
+            sprintf_s(string, sizeof(char)*(MAX_INT_LENGTH + 1), "%lld", property->value.i);
 #else
             char string[MAX_INT_LENGTH + 1];
-            snprintf(string, sizeof(char)*(MAX_INT_LENGTH + 1), "%ld", property->value.i);
+            snprintf(string, sizeof(char)*(MAX_INT_LENGTH + 1), "%lld", property->value.i);
 #endif   
             *hash = fnv1Hash32(string, strlen(string));
             break;
@@ -716,7 +716,6 @@ static unsigned int isAlphaMatch(ruleset *tree,
                                  alpha *currentAlpha,
                                  jsonObject *messageObject,
                                  unsigned char *propertyMatch) {
-
     *propertyMatch = 0;
     if (currentAlpha->expression.operator == OP_EX) {
         *propertyMatch = 1;
@@ -1444,47 +1443,49 @@ static unsigned int isNextMatch(ruleset *tree,
                 }    
 
                 if (*propertyMatch) {
-                    break;
+                    return RULES_OK;
                 }
                 
             }
         }
     }
-
+    
     if (currentAlpha->nextOffset) {
         unsigned int *nextHashset = &tree->nextPool[currentAlpha->nextOffset];
         for(unsigned int propertyIndex = 0; propertyIndex < jo->propertiesLength; ++propertyIndex) {
             jsonProperty *currentProperty = &jo->properties[propertyIndex];
             for (unsigned int entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
-                node *hashNode = &tree->nodePool[nextHashset[entry]];  
-                if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
-                    CHECK_RESULT(isArrayMatch(tree,
-                                              jo,
-                                              currentProperty, 
-                                              &hashNode->value.a,
-                                              propertyMatch));
-                } else {
-                    CHECK_RESULT(isAlphaMatch(tree, 
-                                              &hashNode->value.a,
-                                              jo, 
-                                              propertyMatch));
+                node *hashNode = &tree->nodePool[nextHashset[entry]];
+                if (currentProperty->hash == hashNode->value.a.expression.left.value.id.propertyNameHash) {
+                    if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
+                        CHECK_RESULT(isArrayMatch(tree,
+                                                  jo,
+                                                  currentProperty, 
+                                                  &hashNode->value.a,
+                                                  propertyMatch));
+                    } else {
+                        CHECK_RESULT(isAlphaMatch(tree, 
+                                                  &hashNode->value.a,
+                                                  jo, 
+                                                  propertyMatch));
+                    }
+
+                    if (*propertyMatch && (hashNode->value.a.nextOffset || hashNode->value.a.nextListOffset)) {
+                        CHECK_RESULT(isNextMatch(tree,
+                                                 jo,
+                                                 &hashNode->value.a,
+                                                 propertyMatch));
+
+                    }
+
+                    if (*propertyMatch) {
+                        break;
+                    }   
                 }
-
-                if (*propertyMatch && (hashNode->value.a.nextOffset || hashNode->value.a.nextListOffset)) {
-                    CHECK_RESULT(isNextMatch(tree,
-                                             jo,
-                                             &hashNode->value.a,
-                                             propertyMatch));
-
-                }
-
-                if (*propertyMatch) {
-                    break;
-                }   
             }
         }
     }   
-    
+
     return RULES_OK;
 }
 
@@ -1493,6 +1494,7 @@ static unsigned int isArrayMatch(ruleset *tree,
                                  jsonProperty *currentProperty,
                                  alpha *arrayAlpha,
                                  unsigned char *propertyMatch) {
+    
     unsigned int result = RULES_OK;
     if (currentProperty->type != JSON_ARRAY) {
         return RULES_OK;
@@ -1553,42 +1555,44 @@ static unsigned int isArrayMatch(ruleset *tree,
             }
         }
 
-        if (arrayAlpha->arrayListOffset) {
-            unsigned int *nextHashset = &tree->nextPool[arrayAlpha->arrayListOffset];
-            for(unsigned int propertyIndex = 0; propertyIndex < jo.propertiesLength; ++propertyIndex) {
-                jsonProperty *currentProperty = &jo.properties[propertyIndex];
-                for (unsigned int entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
-                    node *hashNode = &tree->nodePool[nextHashset[entry]]; 
-                    if (currentProperty->hash == hashNode->value.a.expression.left.value.id.propertyNameHash) {
-                        if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
-                            CHECK_RESULT(isArrayMatch(tree,
-                                                      &jo,
-                                                      currentProperty, 
-                                                      &hashNode->value.a,
-                                                      propertyMatch));
-                        } else {
-                            CHECK_RESULT(isAlphaMatch(tree, 
-                                                      &hashNode->value.a,
-                                                      &jo, 
-                                                      propertyMatch));
-                        }
+        if (!*propertyMatch) {
+            if (arrayAlpha->arrayListOffset) {
+                unsigned int *nextHashset = &tree->nextPool[arrayAlpha->arrayListOffset];
+                for(unsigned int propertyIndex = 0; propertyIndex < jo.propertiesLength; ++propertyIndex) {
+                    jsonProperty *currentProperty = &jo.properties[propertyIndex];
+                    for (unsigned int entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
+                        node *hashNode = &tree->nodePool[nextHashset[entry]]; 
+                        if (currentProperty->hash == hashNode->value.a.expression.left.value.id.propertyNameHash) {
+                            if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
+                                CHECK_RESULT(isArrayMatch(tree,
+                                                          &jo,
+                                                          currentProperty, 
+                                                          &hashNode->value.a,
+                                                          propertyMatch));
+                            } else {
+                                CHECK_RESULT(isAlphaMatch(tree, 
+                                                          &hashNode->value.a,
+                                                          &jo, 
+                                                          propertyMatch));
+                            }
 
-                        if (*propertyMatch && hashNode->value.a.nextOffset) {
-                            CHECK_RESULT(isNextMatch(tree,
-                                                     &jo,
-                                                     &hashNode->value.a,
-                                                     propertyMatch));
+                            if (*propertyMatch && hashNode->value.a.nextOffset) {
+                                CHECK_RESULT(isNextMatch(tree,
+                                                         &jo,
+                                                         &hashNode->value.a,
+                                                         propertyMatch));
 
-                        }
+                            }
 
-                        if (*propertyMatch && (hashNode->value.a.nextOffset || hashNode->value.a.nextListOffset)) {
-                            break;
-                        }  
-                    } 
+                            if (*propertyMatch && (hashNode->value.a.nextOffset || hashNode->value.a.nextListOffset)) {
+                                break;
+                            }  
+                        } 
+                    }
                 }
             }
         }
-        
+
         // OP_IANY, one element led a a valid path
         // OP_IALL, all elements led to a valid path
         if ((arrayAlpha->expression.operator == OP_IALL && !*propertyMatch) ||
@@ -1988,7 +1992,7 @@ unsigned int retractFacts(unsigned int handle,
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
 
-    return handleMessages(tree, ACTION_ASSERT_EVENT, messages, stateOffset);
+    return handleMessages(tree, ACTION_RETRACT_FACT, messages, stateOffset);
 }
 
 unsigned int updateState(unsigned int handle, 

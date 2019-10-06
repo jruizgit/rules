@@ -67,7 +67,7 @@ typedef struct jsonProperty {
     unsigned short valueOffset;
     unsigned short valueLength;
     union {
-        long i; 
+        long long i; 
         double d; 
         unsigned char b; 
         char *s;
