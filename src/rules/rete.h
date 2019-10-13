@@ -87,6 +87,7 @@ typedef struct alpha {
     unsigned int betaListOffset;
     unsigned int nextListOffset;
     unsigned int arrayListOffset;
+    unsigned int arrayOffset;
     unsigned int nextOffset;
 } alpha;
 
