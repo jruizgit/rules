@@ -281,17 +281,20 @@ class To(Promise):
     def _execute(self, c):
         c.s.running = True
         if self._from_state != self._to_state:
-            if self._from_state:
-                if c.m and isinstance(c.m, list):
-                    c.retract_fact(c.m[0].chart_context)
-                else:
-                    c.retract_fact(c.chart_context)
+            try:
+                if self._from_state:
+                    if c.m and isinstance(c.m, list):
+                        c.retract_fact(c.m[0].chart_context)
+                    else:
+                        c.retract_fact(c.chart_context)
 
-            if self._assert_state:
-                c.assert_fact({ 'label': self._to_state, 'chart': 1 })
-            else:
-                c.post({ 'label': self._to_state, 'chart': 1 })
-        
+                if self._assert_state:
+                    c.assert_fact({ 'label': self._to_state, 'chart': 1 })
+                else:
+                    c.post({ 'label': self._to_state, 'chart': 1 })
+            except:
+                pass
+            
 
 class Ruleset(object):
 
