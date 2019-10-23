@@ -9,8 +9,10 @@ from os import path
 from os import environ
 from sys import platform
 
-if (platform == 'win32'):
+if platform == 'win32':
   environ['CFLAGS'] = '-std=c99 -D_GNU_SOURCE -_WIN32'
+elif platform == 'darwin':
+    environ['CFLAGS'] = '-std=c99 -D_GNU_SOURCE -fcommon'
 else:
   environ['CFLAGS'] = '-std=c99 -D_GNU_SOURCE'
 
