@@ -22,9 +22,7 @@ with statechart('miss_manners'):
         @when_all(m.t == 'guest')
         def assign_first_seating(c):
             c.s.count = 0
-            c.s.g_count = 1000
             c.assert_fact({'t': 'seating',
-                           'id': c.s.g_count,
                            's_id': c.s.count, 
                            'p_id': 0, 
                            'path': True, 
@@ -33,12 +31,10 @@ with statechart('miss_manners'):
                            'right_seat': 1,
                            'right_guest_name': c.m.name})
             c.assert_fact({'t': 'path',
-                           'id': c.s.g_count + 1,
                            'p_id': c.s.count, 
                            'seat': 1, 
                            'guest_name': c.m.name})
             c.s.count += 1
-            c.s.g_count += 2
             print('assign {0}'.format(c.m.name))
 
     with state('assign'):
@@ -59,7 +55,6 @@ with statechart('miss_manners'):
                        (m.hobby == c.right_guest.hobby)))
         def find_seating(c):
             c.assert_fact({'t': 'seating',
-                           'id': c.s.g_count,
                            's_id': c.s.count, 
                            'p_id': c.seating.s_id, 
                            'path': False, 
@@ -68,29 +63,24 @@ with statechart('miss_manners'):
                            'right_seat': c.seating.right_seat + 1,
                            'right_guest_name': c.left_guest.name})
             c.assert_fact({'t': 'path',
-                           'id': c.s.g_count + 1,
                            'p_id': c.s.count, 
                            'seat': c.seating.right_seat + 1, 
                            'guest_name': c.left_guest.name})
             c.assert_fact({'t': 'chosen',
-                           'id': c.s.g_count + 2,
                            'c_id': c.seating.s_id,
                            'guest_name': c.left_guest.name,
                            'hobby': c.right_guest.hobby})
             c.s.count += 1
-            c.s.g_count += 3
-
+            
     with state('make'):
         @to('check')
         @when_all(pri(1), (m.t == 'seating') & (m.path == False))
         def path_done(c):
             c.retract_fact(c.m)
-            c.m.id = c.s.g_count
             c.m.path = True
             c.assert_fact(c.m)
-            c.s.g_count += 1
             print('path sid: {0}, pid: {1}, left guest: {2}, right guest {3}'.format(c.m.s_id, c.m.p_id, c.m.left_guest_name, c.m.right_guest_name))
-
+        
         @to('make')
         @when_all(cap(1000),
                   c.seating << (m.t == 'seating') & 
@@ -103,12 +93,10 @@ with statechart('miss_manners'):
         def make_path(c):
             for frame in c.m:
                 c.assert_fact({'t': 'path',
-                               'id': c.s.g_count,
                                'p_id': frame.seating.s_id, 
                                'seat': frame.path.seat, 
                                'guest_name': frame.path.guest_name})
-                c.s.g_count += 1
-            
+                
     with state('check'):
         @to('end')
         @when_all(c.last_seat << m.t == 'last_seat', 
@@ -116,9 +104,12 @@ with statechart('miss_manners'):
         def done(c):
             print('end {0}'.format(unix_time_millis(datetime.datetime.now()) - c.s.start_time))
             c.delete()
-        
-        to('assign')
 
+        @to('assign')
+        @when_all(pri(1))
+        def assign(c):
+            pass
+            
     state('end')
 
 
@@ -131,7 +122,7 @@ assert_fact('miss_manners', {'id': 6, 'sid': 1, 't': 'guest', 'name': '2', 'sex'
 assert_fact('miss_manners', {'id': 7, 'sid': 1, 't': 'guest', 'name': '2', 'sex': 'f', 'hobby': 'h2'})
 assert_fact('miss_manners', {'id': 8, 'sid': 1, 't': 'guest', 'name': '2', 'sex': 'f', 'hobby': 'h1'})
 assert_fact('miss_manners', {'id': 9, 'sid': 1, 't': 'guest', 'name': '2', 'sex': 'f', 'hobby': 'h4'})
-assert_fact('miss_manners', {'id': 20, 'sid': 1, 't': 'guest', 'name': '2', 'sex': 'f', 'hobby': 'h5'})
+assert_fact('miss_manners', {'id': 10, 'sid': 1, 't': 'guest', 'name': '2', 'sex': 'f', 'hobby': 'h5'})
 assert_fact('miss_manners', {'id': 11, 'sid': 1, 't': 'guest', 'name': '3', 'sex': 'f', 'hobby': 'h5'})
 assert_fact('miss_manners', {'id': 12, 'sid': 1, 't': 'guest', 'name': '3', 'sex': 'f', 'hobby': 'h4'})
 assert_fact('miss_manners', {'id': 13, 'sid': 1, 't': 'guest', 'name': '3', 'sex': 'f', 'hobby': 'h2'})
@@ -141,7 +132,7 @@ assert_fact('miss_manners', {'id': 16, 'sid': 1, 't': 'guest', 'name': '4', 'sex
 assert_fact('miss_manners', {'id': 17, 'sid': 1, 't': 'guest', 'name': '4', 'sex': 'm', 'hobby': 'h4'})
 assert_fact('miss_manners', {'id': 18, 'sid': 1, 't': 'guest', 'name': '5', 'sex': 'm', 'hobby': 'h2'})
 assert_fact('miss_manners', {'id': 19, 'sid': 1, 't': 'guest', 'name': '5', 'sex': 'm', 'hobby': 'h5'})
-assert_fact('miss_manners', {'id': 10, 'sid': 1, 't': 'guest', 'name': '5', 'sex': 'm', 'hobby': 'h3'})
+assert_fact('miss_manners', {'id': 20, 'sid': 1, 't': 'guest', 'name': '5', 'sex': 'm', 'hobby': 'h3'})
 assert_fact('miss_manners', {'id': 21, 'sid': 1, 't': 'guest', 'name': '6', 'sex': 'f', 'hobby': 'h1'})
 assert_fact('miss_manners', {'id': 22, 'sid': 1, 't': 'guest', 'name': '6', 'sex': 'f', 'hobby': 'h4'})
 assert_fact('miss_manners', {'id': 23, 'sid': 1, 't': 'guest', 'name': '6', 'sex': 'f', 'hobby': 'h2'})
@@ -561,6 +552,9 @@ assert_fact('miss_manners', {'id': 436, 'sid': 1, 't': 'guest', 'name': '128', '
 assert_fact('miss_manners', {'id': 437, 'sid': 1, 't': 'guest', 'name': '128', 'sex': 'f', 'hobby': 'h1'})
 assert_fact('miss_manners', {'id': 438, 'sid': 1, 't': 'guest', 'name': '128', 'sex': 'f', 'hobby': 'h3'})
 assert_fact('miss_manners', {'id': 439, 'sid': 1, 't': 'last_seat', 'seat': 128})
+
+
+
 
 
 

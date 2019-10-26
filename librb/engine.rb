@@ -301,18 +301,21 @@ module Engine
       super -> c {
         c.s.running = true
         if from_state != to_state
-          if from_state
-            if c.m && (c.m.kind_of? Array)
-              c.retract c.m[0].chart_context
-            else
-              c.retract c.chart_context
+          begin
+            if from_state
+              if c.m && (c.m.kind_of? Array)
+                c.retract c.m[0].chart_context
+              else
+                c.retract c.chart_context
+              end
             end
-          end
 
-          if assert_state
-            c.assert(:label => to_state, :chart => 1)
-          else
-            c.post(:label => to_state, :chart => 1)
+            if assert_state
+              c.assert(:label => to_state, :chart => 1)
+            else
+              c.post(:label => to_state, :chart => 1)
+            end
+          rescue MessageNotHandledError => e
           end
         end
       }

@@ -646,17 +646,19 @@ static PyObject *pySetDeleteMessageCallback(PyObject *self, PyObject *args) {
 }
 
 static unsigned int queueMessageCallback(void *context, char *ruleset, char *sid, unsigned char actionType, char *content) {
-    unsigned int errorCode;
+    unsigned int errorCode = 1;
     PyObject *arglist;
     PyObject *result;
     PyObject *callback = (PyObject *)context;
+    printf("calling %s, %s, %d, %s\n", ruleset, sid, actionType, content);
 
-    arglist = Py_BuildValue("ssIs", ruleset, sid, actionType, content);
+    arglist = Py_BuildValue("I", actionType);
     
     result = PyEval_CallObject(callback, arglist);
     Py_DECREF(arglist);
     
     if (!PyArg_ParseTuple(result, "I", &errorCode)) {
+        printf("couldn't parse return\n");
         return ERR_UNEXPECTED_TYPE;
     } else {
         return errorCode;

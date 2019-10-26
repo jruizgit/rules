@@ -292,7 +292,7 @@ class To(Promise):
                     c.assert_fact({ 'label': self._to_state, 'chart': 1 })
                 else:
                     c.post({ 'label': self._to_state, 'chart': 1 })
-            except:
+            except MessageNotHandledException:
                 pass
             
 

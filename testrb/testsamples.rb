@@ -49,7 +49,7 @@ Durable.assert :animal1, { :subject => "Greedy", :predicate => "lives", :object 
 Durable.assert :animal1, { :subject => "Tweety", :predicate => "eats", :object => "worms" }
 
 Durable.ruleset :animal do
-  # will be triggered by 'Kermit eats flies'
+  # will be triggered by "Kermit eats flies"
   when_all c.first = (m.predicate == "eats") & (m.object == "flies") do
     assert :subject => first.subject, :predicate => "is", :object => "frog"
   end
@@ -58,7 +58,7 @@ Durable.ruleset :animal do
     assert :subject => m.subject, :predicate => "is", :object => "bird"
   end
   
-  # will be chained after asserting 'Kermit is frog'
+  # will be chained after asserting "Kermit is frog"
   when_all (m.predicate == "is") & (m.object == "frog") do
     assert :subject => m.subject, :predicate => "is", :object => "green"
   end
@@ -86,9 +86,9 @@ Durable.post :risk1, { :t => "purchase", :location => "US" }
 Durable.post :risk1, { :t => "purchase", :location => "CA" }
 
 Durable.ruleset :flow1 do
-  # state condition uses 's'
+  # state condition uses "s"
   when_all s.status == "start" do
-    # state update on 's'
+    # state update on "s"
     s.status = "next"
     puts "flow1-> start"
   end
@@ -274,22 +274,22 @@ Durable.statechart :expense5 do
     # trigger to move to :denied given a condition
     to :denied, when_all((m.subject == "approve") & (m.amount > 1000)) do
       # action executed before state change
-      puts "expense5-> denied amount #{m.amount}"
+      s.status = "expense5-> denied amount #{m.amount}"
     end
 
     to :pending, when_all((m.subject == "approve") & (m.amount <= 1000)) do
-      puts "expense5-> requesting approve amount #{m.amount}"
+      s.status = "expense5-> requesting approve amount #{m.amount}"
     end
   end  
 
   # intermediate state :pending with two triggers
   state :pending do
     to :approved, when_all(m.subject == "approved") do
-      puts "expense5-> expense approved"
+      s.status = "expense5-> expense approved"
     end
 
     to :denied, when_all(m.subject == "denied") do
-      puts "expense5-> expense denied"
+      s.status = "expense5-> expense denied"
     end
   end
 
@@ -298,15 +298,15 @@ Durable.statechart :expense5 do
 end
 
 # events directed to default statechart instance
-Durable.post :expense5, { :subject => 'approve', :amount => 100 }
-Durable.post :expense5, { :subject => 'approved' }
+puts Durable.post(:expense5, { :subject => "approve", :amount => 100 })["status"]
+puts Durable.post(:expense5, { :subject => "approved" })["status"]
 
-# events directed to statechart instance with id '1'
-Durable.post :expense5, { :sid => 1, :subject => 'approve', :amount => 100 }
-Durable.post :expense5, { :sid => 1, :subject => 'denied' }
+# events directed to statechart instance with id "1"
+puts Durable.post(:expense5, { :sid => 1, :subject => "approve", :amount => 100 })["status"]
+puts Durable.post(:expense5, { :sid => 1, :subject => "denied" })["status"]
 
-# events directed to statechart instance with id '2'
-Durable.post :expense5, { :sid => 2, :subject => 'approve', :amount => 10000 }
+# events directed to statechart instance with id "2"
+puts Durable.post(:expense5, { :sid => 2, :subject => "approve", :amount => 10000 })["status"]
 
 Durable.statechart :worker do
   # super-state :work has two states and one trigger
@@ -333,10 +333,10 @@ Durable.statechart :worker do
   state :canceled
 end
 
-# will move the statechart to the 'work.process' sub-state
+# will move the statechart to the "work.process" sub-state
 Durable.post :worker, { :subject => "enter" }
 
-# will keep the statechart to the 'work.process' sub-state
+# will keep the statechart to the "work.process" sub-state
 Durable.post :worker, { :subject => "continue" }
 Durable.post :worker, { :subject => "continue" }
 
@@ -372,11 +372,11 @@ Durable.post :expense, { :subject => "approve", :amount => 100 }
 Durable.post :expense, { :subject => "retry" }
 Durable.post :expense, { :subject => "approved" }
 
-# events for the flowchart instance '1', denied after first try
+# events for the flowchart instance "1", denied after first try
 Durable.post :expense, {:sid => 1, :subject => "approve", :amount => 100}
 Durable.post :expense, {:sid => 1, :subject => "denied"}
 
- # event for the flowchart instance '2' immediately denied    
+ # event for the flowchart instance "2" immediately denied    
 Durable.post :expense, {:sid => 2, :subject => "approve", :amount => 10000}
 
 
@@ -388,7 +388,7 @@ Durable.ruleset :expense6 do
     end
   end
 
-  # this rule will be triggered when 'expense' is asserted batching at most two results
+  # this rule will be triggered when "expense" is asserted batching at most two results
   when_all cap(2), 
            c.expense = m.amount >= 100,
            c.approval = m.review == true do
@@ -461,13 +461,13 @@ Durable.statechart :risk3 do
 end
 
 # three events in a row will trigger the fraud rule
-Durable.post 'risk3', { :amount => 200 } 
-Durable.post 'risk3', { :amount => 300 } 
-Durable.post 'risk3', { :amount => 400 }
+Durable.post "risk3", { :amount => 200 } 
+Durable.post "risk3", { :amount => 300 } 
+Durable.post "risk3", { :amount => 400 }
 
 # two events will exit after 5 seconds
-Durable.post 'risk3', { :sid => 1, :amount => 500 } 
-Durable.post 'risk3', { :sid => 1, :amount => 600 } 
+Durable.post "risk3", { :sid => 1, :amount => 500 } 
+Durable.post "risk3", { :sid => 1, :amount => 600 } 
 
 Durable.statechart :risk4 do
   state :start do
@@ -494,10 +494,10 @@ Durable.statechart :risk4 do
 end
 
 # the velocity will 4 events in 5 seconds
-Durable.post 'risk4', { :amount => 200 } 
-Durable.post 'risk4', { :amount => 350 } 
-Durable.post 'risk4', { :amount => 300 } 
-Durable.post 'risk4', { :amount => 400 }
+Durable.post "risk4", { :amount => 200 } 
+Durable.post "risk4", { :amount => 350 } 
+Durable.post "risk4", { :amount => 300 } 
+Durable.post "risk4", { :amount => 400 }
 
 Durable.ruleset :flow3 do
 
@@ -519,7 +519,7 @@ Durable.ruleset :flow3 do
 
       # completes the action after 6 seconds
       # use the first argument to signal an error
-      complete.call Exception('error detected')
+      complete.call Exception("error detected")
     end
 
     # overrides the 5 second default abandon timeout
@@ -546,37 +546,37 @@ end
 
 # will return 0 because the fact assert was successful 
 puts Durable.assert :bookstore, {
-            :name => 'The new book',
-            :seller => 'bookstore',
-            :reference => '75323',
+            :name => "The new book",
+            :seller => "bookstore",
+            :reference => "75323",
             :price => 500}
 
 # will return 212 because the fact has already been asserted 
 begin
   Durable.assert :bookstore, {
-              :reference => '75323',
-              :name => 'The new book',
+              :reference => "75323",
+              :name => "The new book",
               :price => 500,
-              :seller => 'bookstore'}
+              :seller => "bookstore"}
 rescue Exception => e
   puts "bookstore expected: #{e}"
 end
 
 # will return 0 because a new event is being posted
 Durable.post :bookstore, {
-             :reference => '75323',
-             :status => 'Active'}
+             :reference => "75323",
+             :status => "Active"}
 
 # will return 0 because a new event is being posted
 Durable.post :bookstore, {
-             :reference => '75323',
-             :status => 'Active'}
+             :reference => "75323",
+             :status => "Active"}
 
 Durable.retract :bookstore, {
-            :name => 'The new book',
-            :reference => '75323',
+            :name => "The new book",
+            :reference => "75323",
             :price => 500,
-            :seller => 'bookstore'}
+            :seller => "bookstore"}
 
 Durable.ruleset :risk5 do
   # compares properties in the same event, this expression is evaluated in the client 
@@ -664,7 +664,7 @@ Durable.post :risk6, { :payments => [ { :field1 => 1 , :field2 => 1 } ] }, -> e,
 
 Durable.get_host().set_rulesets({ :risk7 => {
     :suspect => {
-        :run => -> c { puts('risk7 fraud detected') },
+        :run => -> c { puts("risk7 fraud detected") },
         :all => [
             {:first => {:t => "purchase"}},
             {:second => {:$neq => {:location => {:first => "location"}}}}

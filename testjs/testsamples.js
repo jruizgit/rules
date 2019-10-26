@@ -439,32 +439,32 @@ d.statechart('expense3', function() {
     input: {
         to: 'denied'
         whenAll: m.subject == 'approve' && m.amount > 1000
-        run: console.log('expense3: Denied amount: ' + m.amount)
+        run: s.status = 'expense3: Denied amount: ' + m.amount
 
         to: 'pending'
         whenAll: m.subject == 'approve' && m.amount <= 1000
-        run: console.log('expense3: sid ' + m.sid + ' requesting approve amount: ' + m.amount);
+        run: s.status = 'expense3: sid ' + m.sid + ' requesting approve amount: ' + m.amount
     }
 
     pending: {
         to: 'approved'
         whenAll: m.subject == 'approved'
-        run: console.log('expense3: Expense approved for sid ' + m.sid)
+        run: s.status = 'expense3: Expense approved for sid ' + m.sid
 
         to: 'denied'
         whenAll: m.subject == 'denied'
-        run: console.log('expense3: Expense denied for sid ' + m.sid)
+        run: s.status = 'expense3: Expense denied for sid ' + m.sid
     }
     
     denied: {}
     approved: {}
 });
 
-d.post('expense3', { subject: 'approve', amount: 100 });
-d.post('expense3', { subject: 'approved' });
-d.post('expense3', { sid: 1, subject: 'approve', amount: 100 });
-d.post('expense3', { sid: 1, subject: 'denied' });
-d.post('expense3', { sid: 2, subject: 'approve', amount: 10000 });
+console.log(d.post('expense3', { subject: 'approve', amount: 100 }).status);
+console.log(d.post('expense3', { subject: 'approved' }).status);
+console.log(d.post('expense3', { sid: 1, subject: 'approve', amount: 100 }).status);
+console.log(d.post('expense3', { sid: 1, subject: 'denied' }).status);
+console.log(d.post('expense3', { sid: 2, subject: 'approve', amount: 10000 }).status);
 
 d.statechart('worker', function() {
     work: {

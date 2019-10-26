@@ -86,8 +86,8 @@ with ruleset('risk'):
 
     
 # 'post' submits events, try 'assert' instead and to see differt behavior
-post('risk', {'t': 'purchase', 'location': 'US'});
-post('risk', {'t': 'purchase', 'location': 'CA'});
+post('risk', {'t': 'purchase', 'location': 'US'})
+post('risk', {'t': 'purchase', 'location': 'CA'})
 
 
 with ruleset('flow'):
@@ -276,6 +276,7 @@ post('flow1', { 'action': 'start' })
 
 
 with statechart('expense3'):
+    
     # initial state 'input' with two triggers
     with state('input'):
         # trigger to move to 'denied' given a condition
@@ -283,39 +284,39 @@ with statechart('expense3'):
         @when_all((m.subject == 'approve') & (m.amount > 1000))
         # action executed before state change
         def denied(c):
-            print ('expense3-> denied amount {0}'.format(c.m.amount))
+            c.s.status = 'expense3-> denied amount {0}'.format(c.m.amount)
         
         @to('pending')    
         @when_all((m.subject == 'approve') & (m.amount <= 1000))
         def request(c):
-            print ('expense3-> requesting approve amount {0}'.format(c.m.amount))
+            c.s.status = 'expense3-> requesting approve amount {0}'.format(c.m.amount)
     
     # intermediate state 'pending' with two triggers
     with state('pending'):
         @to('approved')
         @when_all(m.subject == 'approved')
         def approved(c):
-            print ('expense3-> expense approved')
+            c.s.status = 'expense3-> expense approved'
             
         @to('denied')
         @when_all(m.subject == 'denied')
         def denied(c):
-            print ('expense3-> expense denied')
+            c.s.status = 'expense3-> expense denied'
     
     # 'denied' and 'approved' are final states    
     state('denied')
     state('approved')
 
 # events directed to default statechart instance
-post('expense3', { 'subject': 'approve', 'amount': 100 });
-post('expense3', { 'subject': 'approved' });
+print(post('expense3', { 'subject': 'approve', 'amount': 100 })['status'])
+print(post('expense3', { 'subject': 'approved' })['status'])
 
 # events directed to statechart instance with id '1'
-post('expense3', { 'sid': 1, 'subject': 'approve', 'amount': 100 });
-post('expense3', { 'sid': 1, 'subject': 'denied' });
+print(post('expense3', { 'sid': 1, 'subject': 'approve', 'amount': 100 })['status'])
+print(post('expense3', { 'sid': 1, 'subject': 'denied' })['status'])
 
 # events directed to statechart instance with id '2'
-post('expense3', { 'sid': 2, 'subject': 'approve', 'amount': 10000 });
+print(post('expense3', { 'sid': 2, 'subject': 'approve', 'amount': 10000 })['status'])
 
 
 with flowchart('expense4'):
