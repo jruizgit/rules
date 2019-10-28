@@ -2,7 +2,7 @@ var d = require('../libjs/durable');
 
 var redisLib = require('redis');
 
-var provideDurability = function(host, port, redisHostName, options) {
+var provideDurability = function(host, redisHostName, port, options) {
     var redisClient = redisLib.createClient(port, redisHostName, options);
 
     var getHsetName = function(ruleset, sid) {

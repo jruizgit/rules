@@ -320,6 +320,8 @@ class Ruleset(object):
             raise MessageNotHandledException(message)
         elif result[0] == 2:
             raise MessageObservedException(message)
+        elif result[0] == 3:
+            return 0
 
         return result[1] 
 
@@ -394,7 +396,7 @@ class Ruleset(object):
         if sid != None: 
             sid = str(sid)
 
-        rules.set_get_stored_messages_callback(self._handle, sid, queued_messages)
+        rules.complete_get_queued_messages(self._handle, sid, queued_messages)
    
     def set_get_idle_state_callback(self, func):
         rules.set_get_idle_state_callback(self._handle, func)

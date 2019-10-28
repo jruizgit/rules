@@ -73,7 +73,7 @@ static PyObject *pyAssertEvent(PyObject *self, PyObject *args) {
     
     unsigned int stateOffset;
     unsigned int result = assertEvent(handle, event, &stateOffset);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_DEFERRED) {
         return Py_BuildValue("II", result, stateOffset);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
@@ -101,7 +101,7 @@ static PyObject *pyAssertEvents(PyObject *self, PyObject *args) {
 
     unsigned int stateOffset;
     unsigned int result = assertEvents(handle, events, &stateOffset);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_DEFERRED) {
         return Py_BuildValue("II", result, stateOffset);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
@@ -129,7 +129,7 @@ static PyObject *pyAssertFact(PyObject *self, PyObject *args) {
 
     unsigned int stateOffset;
     unsigned int result = assertFact(handle, fact, &stateOffset);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_DEFERRED) {
         return Py_BuildValue("II", result, stateOffset);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
@@ -157,7 +157,7 @@ static PyObject *pyAssertFacts(PyObject *self, PyObject *args) {
 
     unsigned int stateOffset;
     unsigned int result = assertFacts(handle, facts, &stateOffset);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_DEFERRED) {
         return Py_BuildValue("II", result, stateOffset);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
@@ -185,7 +185,7 @@ static PyObject *pyRetractFact(PyObject *self, PyObject *args) {
 
     unsigned int stateOffset;
     unsigned int result = retractFact(handle, fact, &stateOffset);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_DEFERRED) {
         return Py_BuildValue("II", result, stateOffset);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
@@ -213,7 +213,7 @@ static PyObject *pyRetractFacts(PyObject *self, PyObject *args) {
 
     unsigned int stateOffset;
     unsigned int result = retractFacts(handle, facts, &stateOffset);
-    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED) {
+    if (result == RULES_OK || result == ERR_EVENT_NOT_HANDLED || result == ERR_EVENT_OBSERVED || result == ERR_EVENT_DEFERRED) {
         return Py_BuildValue("II", result, stateOffset);
     } else {
         if (result == ERR_OUT_OF_MEMORY) {
@@ -548,21 +548,20 @@ static PyObject *pyRenewActionLease(PyObject *self, PyObject *args) {
 }
 
 static unsigned int storeMessageCallback(void *context, char *ruleset, char *sid, char *mid, unsigned char messageType, char *content) {
-    unsigned int errorCode;
+    unsigned int errorCode = ERR_UNEXPECTED_TYPE;
     PyObject *arglist;
     PyObject *result;
     PyObject *callback = (PyObject *)context;
 
-    arglist = Py_BuildValue("sssIs", ruleset, sid, mid, messageType, content);
-    
+    arglist = Py_BuildValue("(sssIs)", ruleset, sid, mid, messageType, content);
     result = PyEval_CallObject(callback, arglist);
     Py_DECREF(arglist);
-    
-    if (!PyArg_ParseTuple(result, "I", &errorCode)) {
-        return ERR_UNEXPECTED_TYPE;
-    } else {
-        return errorCode;
+    if (result && PyInt_Check(result)) {
+        errorCode = PyInt_AsLong(result);
     }
+
+    Py_XDECREF(result);   
+    return errorCode;
 }
 
 static PyObject *pySetStoreMessageCallback(PyObject *self, PyObject *args) {
@@ -597,21 +596,20 @@ static PyObject *pySetStoreMessageCallback(PyObject *self, PyObject *args) {
 }
 
 static unsigned int deleteMessageCallback(void *context, char *ruleset, char *sid, char *mid) {
-    unsigned int errorCode;
+    unsigned int errorCode = ERR_UNEXPECTED_TYPE;
     PyObject *arglist;
     PyObject *result;
     PyObject *callback = (PyObject *)context;
 
-    arglist = Py_BuildValue("sss", ruleset, sid, mid);
-    
+    arglist = Py_BuildValue("(sss)", ruleset, sid, mid);
     result = PyEval_CallObject(callback, arglist);
     Py_DECREF(arglist);
-    
-    if (!PyArg_ParseTuple(result, "I", &errorCode)) {
-        return ERR_UNEXPECTED_TYPE;
-    } else {
-        return errorCode;
+    if (result && PyInt_Check(result)) {
+        errorCode = PyInt_AsLong(result);
     }
+
+    Py_XDECREF(result);   
+    return errorCode;
 }
 
 static PyObject *pySetDeleteMessageCallback(PyObject *self, PyObject *args) {
@@ -646,23 +644,20 @@ static PyObject *pySetDeleteMessageCallback(PyObject *self, PyObject *args) {
 }
 
 static unsigned int queueMessageCallback(void *context, char *ruleset, char *sid, unsigned char actionType, char *content) {
-    unsigned int errorCode = 1;
+    unsigned int errorCode = ERR_UNEXPECTED_TYPE;
     PyObject *arglist;
     PyObject *result;
     PyObject *callback = (PyObject *)context;
-    printf("calling %s, %s, %d, %s\n", ruleset, sid, actionType, content);
 
-    arglist = Py_BuildValue("I", actionType);
-    
+    arglist = Py_BuildValue("(ssIs)", ruleset, sid, actionType, content);
     result = PyEval_CallObject(callback, arglist);
     Py_DECREF(arglist);
-    
-    if (!PyArg_ParseTuple(result, "I", &errorCode)) {
-        printf("couldn't parse return\n");
-        return ERR_UNEXPECTED_TYPE;
-    } else {
-        return errorCode;
+    if (result && PyInt_Check(result)) {
+        errorCode = PyInt_AsLong(result);
     }
+
+    Py_XDECREF(result);   
+    return errorCode;
 }
 
 static PyObject *pySetQueueMessageCallback(PyObject *self, PyObject *args) {
@@ -697,21 +692,20 @@ static PyObject *pySetQueueMessageCallback(PyObject *self, PyObject *args) {
 }
 
 static unsigned int getQueuedMessagesCallback(void *context, char *ruleset, char *sid) {
-    unsigned int errorCode;
+    unsigned int errorCode = ERR_UNEXPECTED_TYPE;
     PyObject *arglist;
     PyObject *result;
     PyObject *callback = (PyObject *)context;
 
-    arglist = Py_BuildValue("ss", ruleset, sid);
-    
+    arglist = Py_BuildValue("(ss)", ruleset, sid);
     result = PyEval_CallObject(callback, arglist);
     Py_DECREF(arglist);
-    
-    if (!PyArg_ParseTuple(result, "I", &errorCode)) {
-        return ERR_UNEXPECTED_TYPE;
-    } else {
-        return errorCode;
+    if (result && PyInt_Check(result)) {
+        errorCode = PyInt_AsLong(result);
     }
+
+    Py_XDECREF(result);   
+    return errorCode;
 }
 
 static PyObject *pySetGetQueuedMessagesCallback(PyObject *self, PyObject *args) {
@@ -774,21 +768,20 @@ static PyObject *pyCompleteGetQueuedMessages(PyObject *self, PyObject *args) {
 }
 
 static unsigned int getIdleStateCallback(void *context, char *ruleset) {
-    unsigned int errorCode;
+    unsigned int errorCode = ERR_UNEXPECTED_TYPE;
     PyObject *arglist;
     PyObject *result;
     PyObject *callback = (PyObject *)context;
 
-    arglist = Py_BuildValue("s", ruleset);
-    
+    arglist = Py_BuildValue("(s)", ruleset);
     result = PyEval_CallObject(callback, arglist);
     Py_DECREF(arglist);
-    
-    if (!PyArg_ParseTuple(result, "I", &errorCode)) {
-        return ERR_UNEXPECTED_TYPE;
-    } else {
-        return errorCode;
+    if (result && PyInt_Check(result)) {
+        errorCode = PyInt_AsLong(result);
     }
+
+    Py_XDECREF(result);   
+    return errorCode;
 }
 
 static PyObject *pySetGetIdleStateCallback(PyObject *self, PyObject *args) {
