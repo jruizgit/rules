@@ -119,8 +119,8 @@ with ruleset('test'):
 post('test', { 'subject': 'Hello', 'sid': 'a' })
 post('test', { 'subject': 'World', 'sid': 'b' })
 
-#post('test', { 'subject': 'Hello', 'sid': 'b' })
-#post('test', { 'subject': 'World', 'sid': 'a' })
+post('test', { 'subject': 'Hello', 'sid': 'b' })
+post('test', { 'subject': 'World', 'sid': 'a' })
 
 
 time.sleep(30)

@@ -8,6 +8,8 @@ A full forward chaining implementation (A.K.A. Rete) is used to evaluate facts a
 
 The durable_rules core engine is implemented in C, which enables fast rule evaluation as well as muti-language support.  
 
+durable_rules can be scaled out by offloading state to a data store out of process such as Redis. State offloading is extensible, so you can integrate the data store of your choice.  
+
 In durable_rules V2, less is more: The Rete tree is fully evaluated in C. Thus, the framework is 5x to 10x faster (depending on the scenario) and does not require Redis. The programming model for posting events, asserting and retracting facts is synchronous and does not prescribe any web framework.
 
 **Getting Started**
