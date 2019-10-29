@@ -9,6 +9,27 @@ static PyObject *RulesError;
     printf("args %s\n", s); \
 } while(0)
 
+
+#if PY_MAJOR_VERSION >= 3
+
+#define RESULT_TO_INT(result, errorCode) do { \
+    if (result && PyLong_Check(result)) { \
+        errorCode = PyLong_AsLong(result); \
+    } \
+} while(0)
+
+#else
+
+#define RESULT_TO_INT(result, errorCode) do { \
+    if (result && PyInt_Check(result)) { \
+        errorCode = PyInt_AsLong(result); \
+    } \
+} while(0)
+
+#endif
+
+
+
 static PyObject *pyCreateRuleset(PyObject *self, PyObject *args) {
     char *name;
     char *rules;
@@ -556,9 +577,8 @@ static unsigned int storeMessageCallback(void *context, char *ruleset, char *sid
     arglist = Py_BuildValue("(sssIs)", ruleset, sid, mid, messageType, content);
     result = PyEval_CallObject(callback, arglist);
     Py_DECREF(arglist);
-    if (result && PyInt_Check(result)) {
-        errorCode = PyInt_AsLong(result);
-    }
+    
+    RESULT_TO_INT(result, errorCode);
 
     Py_XDECREF(result);   
     return errorCode;
@@ -604,9 +624,8 @@ static unsigned int deleteMessageCallback(void *context, char *ruleset, char *si
     arglist = Py_BuildValue("(sss)", ruleset, sid, mid);
     result = PyEval_CallObject(callback, arglist);
     Py_DECREF(arglist);
-    if (result && PyInt_Check(result)) {
-        errorCode = PyInt_AsLong(result);
-    }
+    
+    RESULT_TO_INT(result, errorCode);
 
     Py_XDECREF(result);   
     return errorCode;
@@ -652,9 +671,8 @@ static unsigned int queueMessageCallback(void *context, char *ruleset, char *sid
     arglist = Py_BuildValue("(ssIs)", ruleset, sid, actionType, content);
     result = PyEval_CallObject(callback, arglist);
     Py_DECREF(arglist);
-    if (result && PyInt_Check(result)) {
-        errorCode = PyInt_AsLong(result);
-    }
+    
+    RESULT_TO_INT(result, errorCode);
 
     Py_XDECREF(result);   
     return errorCode;
@@ -700,11 +718,10 @@ static unsigned int getQueuedMessagesCallback(void *context, char *ruleset, char
     arglist = Py_BuildValue("(ss)", ruleset, sid);
     result = PyEval_CallObject(callback, arglist);
     Py_DECREF(arglist);
-    if (result && PyInt_Check(result)) {
-        errorCode = PyInt_AsLong(result);
-    }
 
-    Py_XDECREF(result);   
+    RESULT_TO_INT(result, errorCode);
+
+    Py_XDECREF(result);  
     return errorCode;
 }
 
@@ -776,10 +793,9 @@ static unsigned int getIdleStateCallback(void *context, char *ruleset) {
     arglist = Py_BuildValue("(s)", ruleset);
     result = PyEval_CallObject(callback, arglist);
     Py_DECREF(arglist);
-    if (result && PyInt_Check(result)) {
-        errorCode = PyInt_AsLong(result);
-    }
 
+    RESULT_TO_INT(result, errorCode);
+    
     Py_XDECREF(result);   
     return errorCode;
 }
