@@ -144,7 +144,7 @@ typedef struct ruleset {
     unsigned int regexStateMachineOffset;
     
     pool statePool;
-    unsigned int stateIndex[MAX_STATE_INDEX_LENGTH];
+    unsigned int stateIndex[MAX_STATE_INDEX_LENGTH * 2];
     unsigned int reverseStateIndex[MAX_STATE_INDEX_LENGTH];
     unsigned int currentStateIndex;
 
