@@ -2,14 +2,16 @@ from durable.lang import *
 import redis
 import time
 import datetime
+import traceback
+import sys
 
 def unix_time(dt):
     epoch = datetime.datetime.utcfromtimestamp(0)
     delta = dt - epoch
     return int(delta.total_seconds() * 1000.0)
 
-def provide_durability(host, redis_host_name = 'localhost', port = 6379 , options = 0):
-    r = redis.Redis(redis_host_name, port, options)
+def provide_durability(host, redis_host_name = 'localhost', port = 6379):
+    r = redis.StrictRedis(redis_host_name, port, charset="utf-8", decode_responses=True)
 
     def get_hset_name(ruleset, sid):
         return 'h!{0}!{1}'.format(ruleset, sid)
@@ -58,7 +60,7 @@ def provide_durability(host, redis_host_name = 'localhost', port = 6379 , option
         try:
             result = r.zscore(get_sset_name(ruleset), sid)
             if not result:
-                r.zadd(get_sset_name(ruleset), sid, unix_time(datetime.datetime.now()))
+                r.zadd(get_sset_name(ruleset), {sid: unix_time(datetime.datetime.now())})
 
             r.rpush(get_list_name(ruleset, sid), format_message(action_type, content))
         except BaseException as e:
@@ -69,7 +71,7 @@ def provide_durability(host, redis_host_name = 'localhost', port = 6379 , option
 
     def get_queued_messages_callback(ruleset, sid):
         try:
-            r.zadd(get_sset_name(ruleset), sid, unix_time(datetime.datetime.now()) + 5000)
+            r.zadd(get_sset_name(ruleset), {sid: unix_time(datetime.datetime.now()) + 5000})
             messages = r.lrange(get_list_name(ruleset, sid), 0, -1)
             if len(messages):
                 r.delete(get_list_name(ruleset, sid))
