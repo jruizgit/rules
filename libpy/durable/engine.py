@@ -281,17 +281,20 @@ class To(Promise):
     def _execute(self, c):
         c.s.running = True
         if self._from_state != self._to_state:
-            if self._from_state:
-                if c.m and isinstance(c.m, list):
-                    c.retract_fact(c.m[0].chart_context)
-                else:
-                    c.retract_fact(c.chart_context)
+            try:
+                if self._from_state:
+                    if c.m and isinstance(c.m, list):
+                        c.retract_fact(c.m[0].chart_context)
+                    else:
+                        c.retract_fact(c.chart_context)
 
-            if self._assert_state:
-                c.assert_fact({ 'label': self._to_state, 'chart': 1 })
-            else:
-                c.post({ 'label': self._to_state, 'chart': 1 })
-        
+                if self._assert_state:
+                    c.assert_fact({ 'label': self._to_state, 'chart': 1 })
+                else:
+                    c.post({ 'label': self._to_state, 'chart': 1 })
+            except MessageNotHandledException:
+                pass
+            
 
 class Ruleset(object):
 
@@ -317,6 +320,8 @@ class Ruleset(object):
             raise MessageNotHandledException(message)
         elif result[0] == 2:
             raise MessageObservedException(message)
+        elif result[0] == 3:
+            return 0
 
         return result[1] 
 
@@ -371,6 +376,36 @@ class Ruleset(object):
             sid = str(sid)
 
         rules.renew_action_lease(self._handle, sid)
+
+    def set_store_message_callback(self, func):
+        rules.set_store_message_callback(self._handle, func)
+
+    def set_delete_message_callback(self, func):
+        rules.set_delete_message_callback(self._handle, func)
+
+    def set_queue_message_callback(self, func):
+        rules.set_queue_message_callback(self._handle, func)
+   
+    def set_get_stored_messages_callback(self, func):
+        rules.set_get_stored_messages_callback(self._handle, func)
+      
+    def set_get_queued_messages_callback(self, func):
+        rules.set_get_queued_messages_callback(self._handle, func)
+   
+    def complete_get_queued_messages(self, sid, queued_messages):
+        if sid != None: 
+            sid = str(sid)
+
+        rules.complete_get_queued_messages(self._handle, sid, queued_messages)
+   
+    def set_get_idle_state_callback(self, func):
+        rules.set_get_idle_state_callback(self._handle, func)
+               
+    def complete_get_idle_state(self, sid, stored_messages):
+        if sid != None: 
+            sid = str(sid)
+
+        rules.complete_get_idle_state(self._handle, sid, stored_messages)
 
     def get_definition(self):
         return self._definition
@@ -690,6 +725,13 @@ class Host(object):
     def __init__(self, ruleset_definitions = None):    
         self._ruleset_directory = {}
         self._ruleset_list = []
+        self.store_message_callback = None
+        self.delete_message_callback = None
+        self.queue_message_callback = None
+        self.get_stored_messages_callback = None
+        self.get_queued_messages_callback = None
+        self.get_idle_state_callback = None
+
         if ruleset_definitions:
             self.register_rulesets(ruleset_definitions)
 
@@ -779,6 +821,42 @@ class Host(object):
     def renew_action_lease(self, ruleset_name, sid):
         self.get_ruleset(ruleset_name).renew_action_lease(sid)
 
+    def set_store_message_callback(self, func):
+        self.store_message_callback = func
+
+        for ruleset in self._ruleset_list:
+            ruleset.set_store_message_callback(func)
+
+    def set_delete_message_callback(self, func):
+        self.delete_message_callback = func
+
+        for ruleset in self._ruleset_list:
+            ruleset.set_delete_message_callback(func)
+
+    def set_queue_message_callback(self, func):
+        self.queue_message_callback = func
+
+        for ruleset in self._ruleset_list:
+            ruleset.set_queue_message_callback(func)
+
+    def set_get_queued_messages_callback(self, func):
+        self.get_queued_messages_callback = func
+
+        for ruleset in self._ruleset_list:
+            ruleset.set_get_queued_messages_callback(func)
+
+    def complete_get_queued_messages(self, ruleset_name, sid, queued_messages):
+        self.get_ruleset(ruleset_name).complete_get_queued_messages(sid, queued_messages)
+
+    def set_get_idle_state_callback(self, func):
+        self.get_idle_state_callback = func
+
+        for ruleset in self._ruleset_list:
+            ruleset.set_get_idle_state_callback(func)
+
+    def complete_get_idle_state(self, ruleset_name, sid, stored_messages):
+        self.get_ruleset(ruleset_name).complete_get_idle_state(sid, stored_messages)
+        
     def register_rulesets(self, ruleset_definitions):
         rulesets = Ruleset.create_rulesets(self, ruleset_definitions)
         for ruleset_name, ruleset in rulesets.items():
@@ -788,6 +866,24 @@ class Host(object):
                 self._ruleset_directory[ruleset_name] = ruleset
                 self._ruleset_list.append(ruleset)
 
+                if self.store_message_callback:
+                    ruleset.set_store_message_callback(self.store_message_callback)
+                
+                if self.delete_message_callback:
+                    ruleset.set_delete_message_callback(self.delete_message_callback)
+
+                if self.queue_message_callback:
+                    ruleset.set_queue_message_callback(self.queue_message_callback)
+
+                if self.get_stored_messages_callback:
+                    ruleset.set_get_stored_messages_callback(self.get_stored_messages_callback)
+                    
+                if self.get_queued_messages_callback:
+                    ruleset.set_get_queued_messages_callback(self.get_queued_messages_callback)
+                    
+                if self.get_idle_state_callback:
+                    ruleset.set_get_idle_state_callback(self.get_idle_state_callback)
+                    
         return list(rulesets.keys())
 
     def _run(self):

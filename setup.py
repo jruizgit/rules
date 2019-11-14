@@ -9,8 +9,10 @@ from os import path
 from os import environ
 from sys import platform
 
-if (platform == 'win32'):
+if platform == 'win32':
   environ['CFLAGS'] = '-std=c99 -D_GNU_SOURCE -D_WIN32'
+elif platform == 'darwin':
+    environ['CFLAGS'] = '-std=c99 -D_GNU_SOURCE -fcommon'
 else:
   environ['CFLAGS'] = '-std=c99 -D_GNU_SOURCE'
 
@@ -39,7 +41,7 @@ with open(path.join(here, 'README.txt'), encoding='utf-8') as f:
 
 setup (
     name = 'durable_rules',
-    version = '2.0.10',
+    version = '2.0.14',
     description = 'for real time analytics (a Python Rules Engine)',
     long_description=long_description,
     url='https://github.com/jruizgit/rules',

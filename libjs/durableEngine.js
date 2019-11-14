@@ -248,18 +248,22 @@ exports = module.exports = durableEngine = function () {
         var execute = function (c) {
             c.s.running = true;
             if (fromState !== toState) {
-                if (fromState) {
-                    if (c.m && c.m.constructor === Array) {
-                        c.retract(c.m[0].chart_context);
-                    } else {
-                        c.retract(c.chart_context);
+                try {
+                    if (fromState) {
+                        if (c.m && c.m.constructor === Array) {
+                            c.retract(c.m[0].chart_context);
+                        } else {
+                            c.retract(c.chart_context);
+                        }
                     }
-                }
-                
-                if (assertState) {
-                    c.assert({label: toState, chart: 1});
-                } else {
-                    c.post({label: toState, chart: 1});
+                    
+                    if (assertState) {
+                        c.assert({label: toState, chart: 1});
+                    } else {
+                        c.post({label: toState, chart: 1});
+                    }
+                } catch (error) {
+
                 }
             }
         };

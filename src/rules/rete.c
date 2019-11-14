@@ -156,6 +156,7 @@ static unsigned int storeAlpha(ruleset *tree,
         return result;
     }
 
+    (*newNode)->value.a.arrayOffset = 0;
     (*newNode)->value.a.arrayListOffset = 0;
     (*newNode)->value.a.nextListOffset = 0;
     (*newNode)->value.a.betaListOffset = 0;
@@ -190,9 +191,9 @@ static unsigned int allocateNext(ruleset *tree,
     return RULES_OK;
 }
 
-static unsigned int ensureNextArrayHashset(ruleset *tree, node *newNode) {
-    if (!newNode->value.a.arrayListOffset) {
-        return allocateNext(tree, NEXT_BUCKET_LENGTH, &newNode->value.a.arrayListOffset);
+static unsigned int ensureArrayHashset(ruleset *tree, node *newNode) {
+    if (!newNode->value.a.arrayOffset) {
+        return allocateNext(tree, NEXT_BUCKET_LENGTH, &newNode->value.a.arrayOffset);
     }
 
     return RULES_OK;
@@ -201,6 +202,14 @@ static unsigned int ensureNextArrayHashset(ruleset *tree, node *newNode) {
 static unsigned int ensureNextHashset(ruleset *tree, node *newNode) {
     if (!newNode->value.a.nextOffset) {
         return allocateNext(tree, NEXT_BUCKET_LENGTH, &newNode->value.a.nextOffset);
+    }
+
+    return RULES_OK;
+}
+
+static unsigned int ensureArrayList(ruleset *tree, node *newNode) {
+    if (!newNode->value.a.arrayListOffset) {
+        return allocateNext(tree, NEXT_LIST_LENGTH, &newNode->value.a.arrayListOffset);
     }
 
     return RULES_OK;
@@ -785,10 +794,19 @@ static unsigned int linkAlpha(ruleset *tree,
 
         parentBetaList[entry] = nextOffset;
     } else if (nextNode->value.a.expression.operator == OP_NEX) {
-        CHECK_RESULT(ensureNextList(tree, 
-                                    parentAlpha));
-        
-        unsigned int *parentNextList = &tree->nextPool[parentAlpha->value.a.nextListOffset];
+        unsigned int *parentNextList = NULL;
+        if ((parentAlpha->value.a.expression.operator == OP_IALL || parentAlpha->value.a.expression.operator == OP_IANY) && linkToArray) {
+            CHECK_RESULT(ensureArrayList(tree, 
+                                         parentAlpha));
+
+            parentNextList = &tree->nextPool[parentAlpha->value.a.arrayListOffset];
+        } else {
+            CHECK_RESULT(ensureNextList(tree, 
+                                        parentAlpha));
+
+            parentNextList = &tree->nextPool[parentAlpha->value.a.nextListOffset];
+        }
+
         unsigned int entry;
         for (entry = 0; parentNextList[entry] != 0; ++entry) {
             if (entry == NEXT_LIST_LENGTH) {
@@ -800,10 +818,10 @@ static unsigned int linkAlpha(ruleset *tree,
     } else {
         unsigned int *parentNext = NULL;
         if ((parentAlpha->value.a.expression.operator == OP_IALL || parentAlpha->value.a.expression.operator == OP_IANY) && linkToArray) {
-            CHECK_RESULT(ensureNextArrayHashset(tree, 
+            CHECK_RESULT(ensureArrayHashset(tree, 
                                                 parentAlpha));
 
-            parentNext = &tree->nextPool[parentAlpha->value.a.arrayListOffset];
+            parentNext = &tree->nextPool[parentAlpha->value.a.arrayOffset];
         } else {
             CHECK_RESULT(ensureNextHashset(tree, 
                                            parentAlpha));
@@ -1097,7 +1115,10 @@ static unsigned int createForwardAlpha(ruleset *tree,
     
     newAlpha->nameOffset = 0;
     newAlpha->type = NODE_ALPHA;
+    newAlpha->value.a.arrayOffset = 0;
     newAlpha->value.a.arrayListOffset = 0;
+    newAlpha->value.a.nextOffset = 0;
+    newAlpha->value.a.nextListOffset = 0;
     newAlpha->value.a.expression.left.type = JSON_MESSAGE_IDENTIFIER;
     newAlpha->value.a.expression.left.value.id.propertyNameOffset = 0;
     newAlpha->value.a.expression.left.value.id.propertyNameHash = HASH_FORWARD;
@@ -1280,7 +1301,7 @@ static unsigned int createAlpha(ruleset *tree,
                                          &first, 
                                          &last, 
                                          &type));
-        
+       
         CHECK_RESULT(createAlpha(tree, 
                                  first, 
                                  1,
@@ -1658,8 +1679,8 @@ static void printAlphaNode(ruleset *tree, node *alphaNode, int level, char *pref
     printSimpleExpression(tree, &alphaNode->value.a.expression, 1, NULL);
 
     printf("\n");
-    if (alphaNode->value.a.arrayListOffset) {
-        unsigned int *nextHashset = &tree->nextPool[alphaNode->value.a.arrayListOffset];
+    if (alphaNode->value.a.arrayOffset) {
+        unsigned int *nextHashset = &tree->nextPool[alphaNode->value.a.arrayOffset];
         for (unsigned int entry = 0; entry < NEXT_BUCKET_LENGTH; ++entry) { 
             if (nextHashset[entry]) {
                 printAlphaNode(tree, &tree->nodePool[nextHashset[entry]], level + 1, "Next Array ", nextHashset[entry]);  
@@ -1674,6 +1695,13 @@ static void printAlphaNode(ruleset *tree, node *alphaNode, int level, char *pref
                 printAlphaNode(tree, &tree->nodePool[nextHashset[entry]], level + 1, "Next ", nextHashset[entry]);  
             }
         }  
+    }
+
+    if (alphaNode->value.a.arrayListOffset) {
+        unsigned int *nextList = &tree->nextPool[alphaNode->value.a.arrayListOffset];
+        for (unsigned int entry = 0; nextList[entry] != 0; ++entry) {
+            printAlphaNode(tree, &tree->nodePool[nextList[entry]], level + 1, "Next Array List ", nextList[entry]);
+        }
     }
 
     if (alphaNode->value.a.nextListOffset) {

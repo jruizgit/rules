@@ -439,32 +439,32 @@ d.statechart('expense3', function() {
     input: {
         to: 'denied'
         whenAll: m.subject == 'approve' && m.amount > 1000
-        run: console.log('expense3: Denied amount: ' + m.amount)
+        run: s.status = 'expense3: Denied amount: ' + m.amount
 
         to: 'pending'
         whenAll: m.subject == 'approve' && m.amount <= 1000
-        run: console.log('expense3: sid ' + m.sid + ' requesting approve amount: ' + m.amount);
+        run: s.status = 'expense3: sid ' + m.sid + ' requesting approve amount: ' + m.amount
     }
 
     pending: {
         to: 'approved'
         whenAll: m.subject == 'approved'
-        run: console.log('expense3: Expense approved for sid ' + m.sid)
+        run: s.status = 'expense3: Expense approved for sid ' + m.sid
 
         to: 'denied'
         whenAll: m.subject == 'denied'
-        run: console.log('expense3: Expense denied for sid ' + m.sid)
+        run: s.status = 'expense3: Expense denied for sid ' + m.sid
     }
     
     denied: {}
     approved: {}
 });
 
-d.post('expense3', { subject: 'approve', amount: 100 });
-d.post('expense3', { subject: 'approved' });
-d.post('expense3', { sid: 1, subject: 'approve', amount: 100 });
-d.post('expense3', { sid: 1, subject: 'denied' });
-d.post('expense3', { sid: 2, subject: 'approve', amount: 10000 });
+console.log(d.post('expense3', { subject: 'approve', amount: 100 }).status);
+console.log(d.post('expense3', { subject: 'approved' }).status);
+console.log(d.post('expense3', { sid: 1, subject: 'approve', amount: 100 }).status);
+console.log(d.post('expense3', { sid: 1, subject: 'denied' }).status);
+console.log(d.post('expense3', { sid: 2, subject: 'approve', amount: 10000 }).status);
 
 d.statechart('worker', function() {
     work: {
@@ -701,56 +701,60 @@ d.ruleset('risk6', function() {
     pri: 1
     run: console.log('risk6 fraud 4 detected ' + JSON.stringify(m.payments))
 
-    // matching array and value
     whenAll: {
-        m.payments.allItems(item > 100) && m.cash == true
+        m.payments.anyItem(item > 100) && ~m.cash
     }
     run: console.log('risk6 fraud 5 detected ' + JSON.stringify(m))
 
     whenAll: {
-        m.field == 1 && m.payments.allItems(item.allItems(item > 100 && item < 1000))
+        m.payments.anyItem(item.amount > 100 && ~item.cash)
     }
-    run: console.log('risk6 fraud 6 detected ' + JSON.stringify(m.payments))
+    run: console.log('risk6 fraud 6 detected ' + JSON.stringify(m))
 
     whenAll: {
-        m.field == 1 && m.payments.allItems(item.anyItem(item > 100 || item < 50))
+        m.field == 1 && m.payments.allItems(item.allItems(item > 100 && item < 1000))
     }
     run: console.log('risk6 fraud 7 detected ' + JSON.stringify(m.payments))
 
     whenAll: {
-        m.array.anyItem(+item.malformed)
+        m.field == 1 && m.payments.allItems(item.anyItem(item > 100 || item < 50))
     }
-    run: console.log('risk6 fraud 8 detected ' + JSON.stringify(m));
+    run: console.log('risk6 fraud 8 detected ' + JSON.stringify(m.payments))
 
     whenAll: {
-        m.array1.anyItem(item.array2.anyItem(item.field21 == 1) && item.field == 8)
+        m.array.anyItem(+item.malformed)
     }
     run: console.log('risk6 fraud 9 detected ' + JSON.stringify(m));
 
     whenAll: {
-        m.array1.anyItem(item.field == 8 && item.array2.anyItem(item.field21 == 1))
+        m.array1.anyItem(item.array2.anyItem(item.field21 == 1) && item.field == 8)
     }
     run: console.log('risk6 fraud 10 detected ' + JSON.stringify(m));
+
+    whenAll: {
+        m.array1.anyItem(item.field == 8 && item.array2.anyItem(item.field21 == 1))
+    }
+    run: console.log('risk6 fraud 11 detected ' + JSON.stringify(m));
 
     whenAll: { 
         m.payments.anyItem((~item.field1 || ~item.field2) && item.field3 == 2) 
     }
-    run: console.log('risk6 fraud 11 detected ' + JSON.stringify(m.payments));
+    run: console.log('risk6 fraud 12 detected ' + JSON.stringify(m.payments));
 
     whenAll: { 
         m.a1.anyItem(~item.field1 && item.a2.anyItem(~item.field2)) 
     }
-    run: console.log('risk6 fraud 12 detected ' + JSON.stringify(m));
+    run: console.log('risk6 fraud 13 detected ' + JSON.stringify(m));
 
     whenAll: { 
         m.a4.anyItem(~item.field1 || item.field2 == 3)
     }
-    run: console.log('risk6 fraud 13 detected ' + JSON.stringify(m))
+    run: console.log('risk6 fraud 14 detected ' + JSON.stringify(m))
 
     whenAll: {
         m.a5.anyItem(item.a6.anyItem(item.field21 == 1) && ~item.field)
     }
-    run: console.log('risk6 fraud 14 detected ' + JSON.stringify(m))
+    run: console.log('risk6 fraud 15 detected ' + JSON.stringify(m))
 });
 
 d.post('risk6', { payments: [ 2500, 150, 450 ]}, function(err, state) {console.log('risk6: ' + err.message)});
@@ -758,7 +762,10 @@ d.post('risk6', { payments: [ 1500, 3500, 4500 ]});
 d.post('risk6', { payments: [{ amount: 200 }, { amount: 300 }, { amount: 400 }]});
 d.post('risk6', { cards: ['one card', 'two cards', 'three cards']});
 d.post('risk6', { payments: [[ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ]]});
-d.post('risk6', { payments: [ 150, 350, 450 ], cash : true});    
+d.post('risk6', { payments: [ 150, 50] }); 
+d.post('risk6', { payments: [ 150, 50 ],  cash: true }, function(err, state) {console.log('risk6: ' + err.message)});  
+d.post('risk6', { payments: [ { amount: 150 } ]}); 
+d.post('risk6', { payments: [ { amount: 150, cash: true } ] }, function(err, state) {console.log('risk6: ' + err.message)});    
 d.post('risk6', { field: 1, payments: [ [ 200, 300 ], [ 150, 200 ] ]}); 
 d.post('risk6', { field: 1, payments: [ [ 20, 80 ], [ 90, 180 ] ]});   
 d.post('risk6', { array:[{ tc: 0 }]}, function(err, state) {console.log('risk6: ' + err.message)});
@@ -775,6 +782,8 @@ d.post('risk6', { a1: [{ field1: 8, a2: [{field2: 1}]}]}, function(err, state) {
 d.post('risk6', { a1: [{ field1: 8, a2: [{field: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)});
 d.post('risk6', { a1: [{ field: 8, a2: [{field2: 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)});  
 d.post('risk6', { a4: [{field2: 2}]});
+d.post('risk6', { a4: [{field2: 3, field1: true}]});
+d.post('risk6', { a4: [{field2: 2, field1: true}]}, function(err, state) {console.log('risk6: ' + err.message)});
 d.post('risk6', { a5: [{field: 7, a6: [{field21 : 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)}); 
 d.post('risk6', { a5: [{a6: [{field21 : 1}]}]}); 
 
