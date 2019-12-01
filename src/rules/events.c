@@ -64,7 +64,8 @@ static unsigned int handleMessage(ruleset *tree,
 static unsigned int reduceExpression(ruleset *tree,
                                      stateNode *state, 
                                      expression *currentExpression,
-                                     jsonObject *messageObject,
+                                     jsonObject *leftMessageObject,
+                                     jsonObject *rightMessageObject,
                                      leftFrameNode *context,
                                      jsonProperty *targetProperty);
 
@@ -272,6 +273,7 @@ static unsigned int reduceOperand(ruleset *tree,
                                         state,
                                         currentExpression,
                                         messageObject,
+                                        messageObject,
                                         context,
                                         *targetProperty);
             }
@@ -467,7 +469,8 @@ static unsigned int reduceProperties(unsigned char operator,
 static unsigned int reduceExpression(ruleset *tree,
                                      stateNode *state, 
                                      expression *currentExpression,
-                                     jsonObject *messageObject,
+                                     jsonObject *leftMessageObject,
+                                     jsonObject *rightMessageObject,
                                      leftFrameNode *context,
                                      jsonProperty *targetProperty) {
     jsonProperty leftValue;
@@ -475,7 +478,7 @@ static unsigned int reduceExpression(ruleset *tree,
     CHECK_RESULT(reduceOperand(tree,
                                state,
                                &currentExpression->left,
-                               messageObject,
+                               leftMessageObject,
                                context,
                                &leftProperty));
 
@@ -496,7 +499,7 @@ static unsigned int reduceExpression(ruleset *tree,
     CHECK_RESULT(reduceOperand(tree,
                                state,
                                &currentExpression->right,
-                               messageObject,
+                               rightMessageObject,
                                context,
                                &rightProperty));
 
@@ -561,6 +564,7 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
                 CHECK_RESULT(reduceExpression(tree,
                                               state,
                                               currentExpression,
+                                              messageObject,
                                               messageObject,
                                               context,
                                               targetProperty));
@@ -714,7 +718,8 @@ static unsigned int isBetaMatch(ruleset *tree,
 
 static unsigned int isAlphaMatch(ruleset *tree,
                                  alpha *currentAlpha,
-                                 jsonObject *messageObject,
+                                 jsonObject *leftMessageObject,
+                                 jsonObject *rightMessageObject,
                                  unsigned char *propertyMatch) {
     *propertyMatch = 0;
     if (currentAlpha->expression.operator == OP_EX) {
@@ -724,7 +729,8 @@ static unsigned int isAlphaMatch(ruleset *tree,
         unsigned int result = reduceExpression(tree,
                                                NULL,
                                                &currentAlpha->expression,
-                                               messageObject,
+                                               leftMessageObject,
+                                               rightMessageObject,
                                                NULL,
                                                &resultProperty);
 
@@ -1417,13 +1423,15 @@ static unsigned int handleBetaMessage(ruleset *tree,
 }
 
 static unsigned int isArrayMatch(ruleset *tree,
+                                 jsonObject *currentObject,
                                  jsonObject *messageObject,
                                  jsonProperty *currentProperty,
                                  alpha *arrayAlpha,
                                  unsigned char *propertyMatch);
 
 static unsigned int isNextMatch(ruleset *tree,
-                                jsonObject *jo,
+                                jsonObject *currentObject,
+                                jsonObject *messageObject,
                                 alpha *currentAlpha,
                                 unsigned char *propertyMatch) {
     *propertyMatch = 0;
@@ -1432,12 +1440,13 @@ static unsigned int isNextMatch(ruleset *tree,
         for (unsigned int entry = 0; nextList[entry] != 0; ++entry) {
             node *listNode = &tree->nodePool[nextList[entry]];
             jsonProperty *currentProperty;
-            unsigned int aresult = getObjectProperty(jo, listNode->value.a.expression.left.value.id.propertyNameHash, &currentProperty);
+            unsigned int aresult = getObjectProperty(currentObject, listNode->value.a.expression.left.value.id.propertyNameHash, &currentProperty);
             if (aresult == ERR_PROPERTY_NOT_FOUND) {
                 *propertyMatch = 1;
                 if (listNode->value.a.nextOffset || listNode->value.a.nextListOffset) {
                     CHECK_RESULT(isNextMatch(tree,
-                                             jo,
+                                             currentObject,
+                                             messageObject,
                                              &listNode->value.a,
                                              propertyMatch));
                 }    
@@ -1452,27 +1461,30 @@ static unsigned int isNextMatch(ruleset *tree,
 
     if (currentAlpha->nextOffset) {
         unsigned int *nextHashset = &tree->nextPool[currentAlpha->nextOffset];
-        for(unsigned int propertyIndex = 0; propertyIndex < jo->propertiesLength; ++propertyIndex) {
-            jsonProperty *currentProperty = &jo->properties[propertyIndex];
+        for(unsigned int propertyIndex = 0; propertyIndex < currentObject->propertiesLength; ++propertyIndex) {
+            jsonProperty *currentProperty = &currentObject->properties[propertyIndex];
             for (unsigned int entry = currentProperty->hash & HASH_MASK; nextHashset[entry] != 0; entry = (entry + 1) % NEXT_BUCKET_LENGTH) {
                 node *hashNode = &tree->nodePool[nextHashset[entry]];
                 if (currentProperty->hash == hashNode->value.a.expression.left.value.id.propertyNameHash) {
                     if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
                         CHECK_RESULT(isArrayMatch(tree,
-                                                  jo,
+                                                  currentObject, 
+                                                  messageObject,
                                                   currentProperty, 
                                                   &hashNode->value.a,
                                                   propertyMatch));
                     } else {
                         CHECK_RESULT(isAlphaMatch(tree, 
                                                   &hashNode->value.a,
-                                                  jo, 
+                                                  currentObject, 
+                                                  messageObject,
                                                   propertyMatch));
                     }
 
                     if (*propertyMatch && (hashNode->value.a.nextOffset || hashNode->value.a.nextListOffset)) {
                         CHECK_RESULT(isNextMatch(tree,
-                                                 jo,
+                                                 currentObject, 
+                                                 messageObject,
                                                  &hashNode->value.a,
                                                  propertyMatch));
 
@@ -1490,6 +1502,7 @@ static unsigned int isNextMatch(ruleset *tree,
 }
 
 static unsigned int isArrayMatch(ruleset *tree,
+                                 jsonObject *currentObject,
                                  jsonObject *messageObject,
                                  jsonProperty *currentProperty,
                                  alpha *arrayAlpha,
@@ -1500,7 +1513,7 @@ static unsigned int isArrayMatch(ruleset *tree,
         return RULES_OK;
     }
 
-    char *first = messageObject->content + currentProperty->valueOffset;
+    char *first = currentObject->content + currentProperty->valueOffset;
     char *last;
     unsigned char type;
     jsonObject jo;
@@ -1543,6 +1556,7 @@ static unsigned int isArrayMatch(ruleset *tree,
                     if (listNode->value.a.nextOffset || listNode->value.a.nextListOffset) {
                         CHECK_RESULT(isNextMatch(tree,
                                                  &jo,
+                                                 messageObject,
                                                  &listNode->value.a,
                                                  propertyMatch));
                     }    
@@ -1565,6 +1579,7 @@ static unsigned int isArrayMatch(ruleset *tree,
                         if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
                             CHECK_RESULT(isArrayMatch(tree,
                                                       &jo,
+                                                      messageObject,
                                                       currentProperty, 
                                                       &hashNode->value.a,
                                                       propertyMatch));
@@ -1572,12 +1587,14 @@ static unsigned int isArrayMatch(ruleset *tree,
                             CHECK_RESULT(isAlphaMatch(tree, 
                                                       &hashNode->value.a,
                                                       &jo, 
+                                                      messageObject,
                                                       propertyMatch));
                         }
 
                         if (*propertyMatch && (hashNode->value.a.nextOffset || hashNode->value.a.nextListOffset)) {
                             CHECK_RESULT(isNextMatch(tree,
                                                      &jo,
+                                                     messageObject,
                                                      &hashNode->value.a,
                                                      propertyMatch));
 
@@ -1663,12 +1680,14 @@ static unsigned int handleAlpha(ruleset *tree,
                             if (hashNode->value.a.expression.operator == OP_IALL || hashNode->value.a.expression.operator == OP_IANY) {
                                 CHECK_RESULT(isArrayMatch(tree,
                                                           jo,
+                                                          jo,
                                                           currentProperty, 
                                                           &hashNode->value.a,
                                                           &match));
                             } else {
                                 CHECK_RESULT(isAlphaMatch(tree, 
                                                           &hashNode->value.a,
+                                                          jo,
                                                           jo, 
                                                           &match));
                             }

@@ -910,7 +910,7 @@ static unsigned int readExpression(ruleset *tree, char *rule, unsigned char *exp
                                      &newExpression, 
                                      expressionOffset));
         
-        *expressionType = JSON_EXPRESSION;  
+        *expressionType = 0;  
         newExpression->operator = operator;
         CHECK_PARSE_RESULT(readNextValue(last, 
                                          &first, 

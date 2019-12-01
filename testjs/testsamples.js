@@ -664,7 +664,7 @@ d.ruleset('risk5', function() {
 });
 
 d.post('risk5', { debit: 220, credit: 100 });
-d.post('risk5', { debit: 150, credit: 100 });
+d.post('risk5', { debit: 150, credit: 100 }, function(err, state) {console.log('risk5: ' + err.message)});
 d.post('risk5', { amount: 200 });
 d.post('risk5', { amount: 500 });
 
@@ -755,6 +755,11 @@ d.ruleset('risk6', function() {
         m.a5.anyItem(item.a6.anyItem(item.field21 == 1) && ~item.field)
     }
     run: console.log('risk6 fraud 15 detected ' + JSON.stringify(m))
+
+    whenAll: {
+        m.array.anyItem(item.field2 == m.field1)
+    }
+    run: console.log('risk6 fraud 16 detected ' + JSON.stringify(m))
 });
 
 d.post('risk6', { payments: [ 2500, 150, 450 ], cash: true }, function(err, state) {console.log('risk6: ' + err.message)});
@@ -786,6 +791,8 @@ d.post('risk6', { a4: [{field2: 3, field1: true}]});
 d.post('risk6', { a4: [{field2: 2, field1: true}]}, function(err, state) {console.log('risk6: ' + err.message)});
 d.post('risk6', { a5: [{field: 7, a6: [{field21 : 1}]}]}, function(err, state) {console.log('risk6: ' + err.message)}); 
 d.post('risk6', { a5: [{a6: [{field21 : 1}]}]}); 
+d.post('risk6', { field1: 8, array: [{field2 : 9}]}, function(err, state) {console.log('risk6: ' + err.message)});
+d.post('risk6', { field1: 8, array: [{field2 : 8}]});
 
 d.ruleset('expense1', function() {
     whenAny: {

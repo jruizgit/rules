@@ -592,7 +592,11 @@ Durable.ruleset :risk5 do
 end
 
 Durable.post :risk5, { :debit => 220, :credit => 100 }
-Durable.post :risk5, { :debit => 150, :credit => 100 }
+
+Durable.post :risk5, { :debit => 150, :credit => 100 }, -> e, state {
+  puts "risk5 expected:#{e}"
+}
+
 Durable.post :risk5, { :amount => 200 }
 Durable.post :risk5, { :amount => 500 }
 

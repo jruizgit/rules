@@ -466,7 +466,12 @@ with ruleset('risk5'):
         print('risk5-> fraud detected ->{0}'.format(c.second.amount))
         
 post('risk5', { 'debit': 220, 'credit': 100 })
-post('risk5', { 'debit': 150, 'credit': 100 })
+
+try:
+    post('risk5', { 'debit': 150, 'credit': 100 })
+except BaseException as e:
+    print('risk5 expected {0}'.format(e.message))
+
 post('risk5', { 'amount': 200 })
 post('risk5', { 'amount': 500 })
 
