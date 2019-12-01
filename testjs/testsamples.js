@@ -757,15 +757,15 @@ d.ruleset('risk6', function() {
     run: console.log('risk6 fraud 15 detected ' + JSON.stringify(m))
 });
 
-d.post('risk6', { payments: [ 2500, 150, 450 ]}, function(err, state) {console.log('risk6: ' + err.message)});
+d.post('risk6', { payments: [ 2500, 150, 450 ], cash: true }, function(err, state) {console.log('risk6: ' + err.message)});
 d.post('risk6', { payments: [ 1500, 3500, 4500 ]});
 d.post('risk6', { payments: [{ amount: 200 }, { amount: 300 }, { amount: 400 }]});
 d.post('risk6', { cards: ['one card', 'two cards', 'three cards']});
 d.post('risk6', { payments: [[ 10, 20, 30 ], [ 30, 40, 50 ], [ 10, 20 ]]});
 d.post('risk6', { payments: [ 150, 50] }); 
 d.post('risk6', { payments: [ 150, 50 ],  cash: true }, function(err, state) {console.log('risk6: ' + err.message)});  
-d.post('risk6', { payments: [ { amount: 150 } ]}); 
-d.post('risk6', { payments: [ { amount: 150, cash: true } ] }, function(err, state) {console.log('risk6: ' + err.message)});    
+d.post('risk6', { payments: [ { amount: 260 } ]}); 
+d.post('risk6', { payments: [ { amount: 260, cash: true } ] }, function(err, state) {console.log('risk6: ' + err.message)});    
 d.post('risk6', { field: 1, payments: [ [ 200, 300 ], [ 150, 200 ] ]}); 
 d.post('risk6', { field: 1, payments: [ [ 20, 80 ], [ 90, 180 ] ]});   
 d.post('risk6', { array:[{ tc: 0 }]}, function(err, state) {console.log('risk6: ' + err.message)});

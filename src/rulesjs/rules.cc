@@ -20,27 +20,6 @@ using namespace v8;
 
 #define DEFINE_FUNCTION(e, i, name, func) e->Set(i->GetCurrentContext(), String::NewFromUtf8(i, name, v8::NewStringType::kInternalized).ToLocalChecked(), FunctionTemplate::New(i, func)->GetFunction(i->GetCurrentContext()).ToLocalChecked()).Check()
 
-class ObjectProxy {
-public:
-
-    explicit ObjectProxy(Local<Function> gvalue, Local<Function> svalue) { 
-        Isolate* isolate = Isolate::GetCurrent();
-        _gfunc.Reset(isolate, gvalue); 
-        _sfunc.Reset(isolate, svalue); 
-    }
-    Local<Object> Wrap();
-
-private:
-
-    static ObjectProxy* Unwrap(Local<Object> obj);
-    static void Get(Local<Name> name, const PropertyCallbackInfo<Value>& info);
-    static void Set(Local<Name> name, Local<Value> value, const PropertyCallbackInfo<Value>& info);
-    
-    Persistent<Function> _gfunc;
-    Persistent<Function> _sfunc;
-};
-
-
 class CallbackProxy {
 public:
 
@@ -789,61 +768,6 @@ void jsCompleteGetIdleState(const FunctionCallbackInfo<Value>& args) {
     }
 }
 
-void jsCreateProxy(const FunctionCallbackInfo<Value>& args) {
-    Isolate* isolate;
-    isolate = args.GetIsolate();
-    if (args.Length() < 2) {
-        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
-    } else if (!args[0]->IsFunction() || !args[1]->IsFunction()) {
-        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
-    } else {
-        ObjectProxy *p = new ObjectProxy(Local<Function>::Cast(args[0]), Local<Function>::Cast(args[1]));
-        args.GetReturnValue().Set(p->Wrap());
-    }
-}
-
-void ObjectProxy::Get(Local<Name> name, const PropertyCallbackInfo<Value>& info) {
-    Isolate* isolate;
-    isolate = info.GetIsolate();
-    ObjectProxy* p = Unwrap(info.Holder());
-    Local<Value> args[1];
-    args[0] = name;
-    Local<Function> gfunc = Local<Function>::New(isolate, p->_gfunc);
-    Local<Value> result = gfunc->Call(isolate->GetCurrentContext(), info.Holder(), 1, args).ToLocalChecked();
-    info.GetReturnValue().Set(result);
-}
-
-void ObjectProxy::Set(Local<Name> name, Local<Value> value, const PropertyCallbackInfo<Value>& info) {
-    Isolate* isolate;
-    isolate = info.GetIsolate();
-    ObjectProxy* p = Unwrap(info.Holder());
-    Local<Value> args[2];
-    args[0] = name;
-    args[1] = value;
-    Local<Function> sfunc = Local<Function>::New(isolate, p->_sfunc);
-    Local<Value> result = sfunc->Call(isolate->GetCurrentContext(), info.Holder(), 2, args).ToLocalChecked();
-    info.GetReturnValue().Set(result);
-}
-
-Local<Object> ObjectProxy::Wrap() { 
-    Isolate* isolate = Isolate::GetCurrent();
-    Local<ObjectTemplate> proxyTempl = ObjectTemplate::New(isolate);
-    proxyTempl->SetInternalFieldCount(1);
-    proxyTempl->SetHandler(NamedPropertyHandlerConfiguration(Get, Set));
-
-    Local<Object> result = proxyTempl->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
-    result->SetInternalField(0, External::New(isolate, this));
-
-    return result;
-}
-
-ObjectProxy* ObjectProxy::Unwrap(Local<Object> obj) {
-    Local<External> field = Local<External>::Cast(obj->GetInternalField(0));
-    void* ptr = field->Value();
-    return static_cast<ObjectProxy*>(ptr);
-}
-
-
 void init(Local<Object> exports) {
     Isolate* isolate = Isolate::GetCurrent();
     DEFINE_FUNCTION(exports, isolate, "createRuleset", jsCreateRuleset);
@@ -883,8 +807,6 @@ void init(Local<Object> exports) {
     DEFINE_FUNCTION(exports, isolate, "deleteState", jsDeleteState);
     
     DEFINE_FUNCTION(exports, isolate, "renewActionLease", jsRenewActionLease);
-    
-    DEFINE_FUNCTION(exports, isolate, "createProxy", jsCreateProxy);
     
     DEFINE_FUNCTION(exports, isolate, "setStoreMessageCallback", jsSetStoreMessageCallback);
     
