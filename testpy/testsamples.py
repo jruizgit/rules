@@ -404,6 +404,14 @@ with ruleset('expense5'):
 post('expense5', {'t': 'bill', 'invoice': {'amount': 100}})
 post('expense5', {'t': 'account', 'payment': {'invoice': {'amount': 100}}})
 
+with ruleset('nested'):
+    @when_all(+m.item)
+    def test(c):
+        print('nested ->{0}'.format(c.m.item))
+
+post('nested', {'item': 'not_nested'})
+post('nested', {'item': {'nested': 'true'}})
+post('nested', {'item': {'nested': {'nested': 'true'}}})
 
 with ruleset('bookstore'):
     # this rule will trigger for events with status

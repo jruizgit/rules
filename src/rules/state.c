@@ -1471,6 +1471,14 @@ unsigned int constructObject(char *root,
 #endif
                 strncpy(newParent, firstName, nameLength);
                 newParent[nameLength] = '\0';
+
+                hash = fnv1Hash32(newParent, nameLength);
+                CHECK_RESULT(setObjectProperty(jo,
+                                               hash,
+                                               type,
+                                               first - root,
+                                               last - first + 1));
+
                 CHECK_RESULT(constructObject(root,
                                              newParent, 
                                              first,
@@ -1490,14 +1498,12 @@ unsigned int constructObject(char *root,
             fullName[parentNameLength] = '.';
             strncpy(&fullName[parentNameLength + 1], firstName, nameLength);
             fullName[fullNameLength] = '\0';
-            if (type != JSON_OBJECT) {
-                CHECK_RESULT(setObjectProperty(jo,
-                                               fnv1Hash32(fullName, fullNameLength),
-                                               type,
-                                               first - root,
-                                               last - first + 1));
-            } else {
-
+            CHECK_RESULT(setObjectProperty(jo,
+                                           fnv1Hash32(fullName, fullNameLength),
+                                           type,
+                                           first - root,
+                                           last - first + 1));
+            if (type == JSON_OBJECT) {
                 CHECK_RESULT(constructObject(root,
                                              fullName, 
                                              first,
