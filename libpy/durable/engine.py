@@ -1,6 +1,6 @@
 import json
 import copy
-import rules
+import durable_rules_engine
 import threading
 import inspect
 import random
@@ -312,7 +312,7 @@ class Ruleset(object):
             elif (hasattr(action, '__call__')):
                 self._actions[rule_name] = Promise(action)
 
-        self._handle = rules.create_ruleset(name, json.dumps(ruleset_definition, ensure_ascii=False))
+        self._handle = durable_rules_engine.create_ruleset(name, json.dumps(ruleset_definition, ensure_ascii=False))
         self._definition = ruleset_definition
 
     def _handle_result(self, result, message):
@@ -326,86 +326,86 @@ class Ruleset(object):
         return result[1] 
 
     def assert_event(self, message):
-        return self._handle_result(rules.assert_event(self._handle, json.dumps(message, ensure_ascii=False)), message)
+        return self._handle_result(durable_rules_engine.assert_event(self._handle, json.dumps(message, ensure_ascii=False)), message)
 
     def assert_events(self, messages):
-        return self._handle_result(rules.assert_events(self._handle, json.dumps(messages, ensure_ascii=False)), messages)
+        return self._handle_result(durable_rules_engine.assert_events(self._handle, json.dumps(messages, ensure_ascii=False)), messages)
 
     def assert_fact(self, fact):
-        return self._handle_result(rules.assert_fact(self._handle, json.dumps(fact, ensure_ascii=False)), fact)
+        return self._handle_result(durable_rules_engine.assert_fact(self._handle, json.dumps(fact, ensure_ascii=False)), fact)
 
     def assert_facts(self, facts):
-        return self._handle_result(rules.assert_facts(self._handle, json.dumps(facts, ensure_ascii=False)), facts)
+        return self._handle_result(durable_rules_engine.assert_facts(self._handle, json.dumps(facts, ensure_ascii=False)), facts)
 
     def retract_fact(self, fact):
-        return self._handle_result(rules.retract_fact(self._handle, json.dumps(fact, ensure_ascii=False)), fact)
+        return self._handle_result(durable_rules_engine.retract_fact(self._handle, json.dumps(fact, ensure_ascii=False)), fact)
 
     def retract_facts(self, facts):
-        return self._handle_result(rules.retract_facts(self._handle, json.dumps(facts, ensure_ascii=False)), facts)
+        return self._handle_result(durable_rules_engine.retract_facts(self._handle, json.dumps(facts, ensure_ascii=False)), facts)
 
     def start_timer(self, sid, timer, timer_duration, manual_reset):
         if sid != None: 
             sid = str(sid)
 
-        rules.start_timer(self._handle, timer_duration, manual_reset, timer, sid)
+        durable_rules_engine.start_timer(self._handle, timer_duration, manual_reset, timer, sid)
 
     def cancel_timer(self, sid, timer_name):
         if sid != None: 
             sid = str(sid)
 
-        rules.cancel_timer(self._handle, sid, timer_name)
+        durable_rules_engine.cancel_timer(self._handle, sid, timer_name)
 
     def update_state(self, state):
         state['$s'] = 1
-        return rules.update_state(self._handle, json.dumps(state, ensure_ascii=False))
+        return durable_rules_engine.update_state(self._handle, json.dumps(state, ensure_ascii=False))
 
     def get_state(self, sid):
         if sid != None: 
             sid = str(sid)
 
-        return json.loads(rules.get_state(self._handle, sid))
+        return json.loads(durable_rules_engine.get_state(self._handle, sid))
 
     def delete_state(self, sid):
         if sid != None: 
             sid = str(sid)
 
-        rules.delete_state(self._handle, sid)
+        durable_rules_engine.delete_state(self._handle, sid)
     
     def renew_action_lease(self, sid):
         if sid != None: 
             sid = str(sid)
 
-        rules.renew_action_lease(self._handle, sid)
+        durable_rules_engine.renew_action_lease(self._handle, sid)
 
     def set_store_message_callback(self, func):
-        rules.set_store_message_callback(self._handle, func)
+        durable_rules_engine.set_store_message_callback(self._handle, func)
 
     def set_delete_message_callback(self, func):
-        rules.set_delete_message_callback(self._handle, func)
+        durable_rules_engine.set_delete_message_callback(self._handle, func)
 
     def set_queue_message_callback(self, func):
-        rules.set_queue_message_callback(self._handle, func)
+        durable_rules_engine.set_queue_message_callback(self._handle, func)
    
     def set_get_stored_messages_callback(self, func):
-        rules.set_get_stored_messages_callback(self._handle, func)
+        durable_rules_engine.set_get_stored_messages_callback(self._handle, func)
       
     def set_get_queued_messages_callback(self, func):
-        rules.set_get_queued_messages_callback(self._handle, func)
+        durable_rules_engine.set_get_queued_messages_callback(self._handle, func)
    
     def complete_get_queued_messages(self, sid, queued_messages):
         if sid != None: 
             sid = str(sid)
 
-        rules.complete_get_queued_messages(self._handle, sid, queued_messages)
+        durable_rules_engine.complete_get_queued_messages(self._handle, sid, queued_messages)
    
     def set_get_idle_state_callback(self, func):
-        rules.set_get_idle_state_callback(self._handle, func)
+        durable_rules_engine.set_get_idle_state_callback(self._handle, func)
                
     def complete_get_idle_state(self, sid, stored_messages):
         if sid != None: 
             sid = str(sid)
 
-        rules.complete_get_idle_state(self._handle, sid, stored_messages)
+        durable_rules_engine.complete_get_idle_state(self._handle, sid, stored_messages)
 
     def get_definition(self):
         return self._definition
@@ -426,7 +426,7 @@ class Ruleset(object):
         return branches
 
     def dispatch_timers(self):
-        return rules.assert_timers(self._handle)
+        return durable_rules_engine.assert_timers(self._handle)
         
     def _flush_actions(self, state, result_container, state_offset, complete):
         while 'message' in result_container:
@@ -442,13 +442,13 @@ class Ruleset(object):
                     return
 
                 if e:
-                    rules.abandon_action(self._handle, c._handle)
+                    durable_rules_engine.abandon_action(self._handle, c._handle)
                     complete(e, None)
                 else:
                     try:
-                        rules.update_state(self._handle, json.dumps(c.s._d, ensure_ascii=False))
+                        durable_rules_engine.update_state(self._handle, json.dumps(c.s._d, ensure_ascii=False))
                         
-                        new_result = rules.complete_and_start_action(self._handle, c._handle)
+                        new_result = durable_rules_engine.complete_and_start_action(self._handle, c._handle)
                         if new_result:
                             result_container['message'] = json.loads(new_result)
                         else:
@@ -457,11 +457,11 @@ class Ruleset(object):
                     except BaseException as error:
                         t, v, tb = sys.exc_info()
                         print('base exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
-                        rules.abandon_action(self._handle, c._handle)
+                        durable_rules_engine.abandon_action(self._handle, c._handle)
                         complete(error, None)
                     except:
                         print('unknown exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
-                        rules.abandon_action(self._handle, c._handle)
+                        durable_rules_engine.abandon_action(self._handle, c._handle)
                         complete('unknown error', None)
 
                     if c._is_deleted():
@@ -474,7 +474,7 @@ class Ruleset(object):
 
     def do_actions(self, state_handle, complete):
         try:
-            result = rules.start_action_for_state(self._handle, state_handle)
+            result = durable_rules_engine.start_action_for_state(self._handle, state_handle)
             if not result:
                 complete(None, None)
             else:
@@ -486,7 +486,7 @@ class Ruleset(object):
         def callback(error, result):
             pass 
 
-        result = rules.start_action(self._handle)
+        result = durable_rules_engine.start_action(self._handle)
         if result:
             self._flush_actions(json.loads(result[0]), {'message': json.loads(result[1])}, result[2], callback)
 

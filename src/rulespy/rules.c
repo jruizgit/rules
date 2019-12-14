@@ -893,7 +893,7 @@ static PyMethodDef myModule_methods[] = {
 
 static struct PyModuleDef moduledef = {
         PyModuleDef_HEAD_INIT,
-        "rules",
+        "durable_rules_engine",
         NULL,
         -1,
         myModule_methods,
@@ -903,11 +903,11 @@ static struct PyModuleDef moduledef = {
         NULL
 };
 
-PyMODINIT_FUNC PyInit_rules(void)
+PyMODINIT_FUNC PyInit_durable_rules_engine(void)
 {
     PyObject *m = PyModule_Create(&moduledef);
     if (m != NULL) {
-        RulesError = PyErr_NewException("rules.error", NULL, NULL);
+        RulesError = PyErr_NewException("durable_rules_engine.error", NULL, NULL);
         Py_INCREF(RulesError);
         PyModule_AddObject(m, "error", RulesError);
     }
@@ -917,11 +917,11 @@ PyMODINIT_FUNC PyInit_rules(void)
 
 #else
 
-PyMODINIT_FUNC initrules(void)
+PyMODINIT_FUNC initdurable_rules_engine(void)
 {
-    PyObject *m = Py_InitModule("rules", myModule_methods);
+    PyObject *m = Py_InitModule("durable_rules_engine", myModule_methods);
     if (m != NULL) {
-        RulesError = PyErr_NewException("rules.error", NULL, NULL);
+        RulesError = PyErr_NewException("durable_rules_engine.error", NULL, NULL);
         Py_INCREF(RulesError);
         PyModule_AddObject(m, "error", RulesError);
     }

@@ -29,9 +29,9 @@ class install_lib(_install_lib.install_lib):
         if self.distribution.has_ext_modules():
           self.run_command('build_ext')
 
-rules_lib = ('rules_py', {'sources': ['src/rules/%s.c' % src for src in ('json', 'rete', 'state', 'events', 'regex')]})
+rules_lib = ('durable_rules_engine_py', {'sources': ['src/rules/%s.c' % src for src in ('json', 'rete', 'state', 'events', 'regex')]})
 
-rules = Extension('rules',
+rules = Extension('durable_rules_engine',
                   sources = ['src/rulespy/rules.c'],
                   include_dirs=['src/rules'])
 
