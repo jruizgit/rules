@@ -689,5 +689,31 @@ with ruleset('flow0'):
 
 update_state('flow0', { 'state': 'first' })
 
+
+with ruleset('multi_thread_test'):
+    
+    @when_all(m.subject == 'World')
+    def say_hello(c):
+        if not c.s.count:
+            c.s.count = 1
+        else:
+            c.s.count += 1
+
+        print('multi_thread_test -> Hello {0}, {1}, {2}'.format(c.m.subject, c.m.id, c.s.count))
+
+post('multi_thread_test', { 'subject': 'World' })
+
+def try_multi_thread_test(thread_number):
+    for ii in range(10):
+        post('multi_thread_test', { 'id': thread_number * 10000 + ii, 'subject': 'World' })
+
+threads = list()
+
+for i in range(10):
+    t = threading.Thread(target=try_multi_thread_test, args=(i,), daemon=True)
+    threads.append(t)
+    t.start()
+
+
 time.sleep(30)
 
