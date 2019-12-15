@@ -2236,8 +2236,10 @@ unsigned int startActionForState(unsigned int handle,
     unsigned int actionStateIndex;
     unsigned int resultCount;
     unsigned int resultFrameOffset;
+    time_t currentTime = time(NULL);
     
     CHECK_RESULT(getNextResultInState(tree,
+                                      currentTime,
                                       resultState,
                                       &actionStateIndex,
                                       &resultCount,
@@ -2256,7 +2258,7 @@ unsigned int startActionForState(unsigned int handle,
     resultState->context.actionStateIndex = actionStateIndex;
     resultState->context.resultCount = resultCount;
     resultState->context.resultFrameOffset = resultFrameOffset;
-    resultState->lockExpireTime = time(NULL) + STATE_LEASE_TIME;
+    resultState->lockExpireTime = currentTime + STATE_LEASE_TIME;
     *messages = resultState->context.messages;
     *stateFact = resultState->context.stateFact;
     
@@ -2302,6 +2304,7 @@ static unsigned int deleteCurrentAction(ruleset *tree,
 
                     mid[midProperty->valueLength] = '\0';
 
+
                     CHECK_RESULT(handleDeleteMessage(tree,
                                                      state,
                                                      mid, 
@@ -2311,10 +2314,7 @@ static unsigned int deleteCurrentAction(ruleset *tree,
         }
 
         resultFrameOffset = resultFrame->nextOffset;
-        unsigned int result = deleteDispatchingActionFrame(state, resultLocation);
-        if (result != RULES_OK) {
-            return result;
-        }
+        CHECK_RESULT(deleteDispatchingActionFrame(state, resultLocation));
     }
 
     return RULES_OK;
@@ -2345,16 +2345,17 @@ unsigned int completeAndStartAction(unsigned int handle,
                                      resultState->context.actionStateIndex,
                                      resultState->context.resultCount,
                                      resultState->context.resultFrameOffset));
-
-    
+ 
     freeActionContext(resultState);
     
     actionStateNode *resultAction;
     unsigned int actionStateIndex;
     unsigned int resultCount;
     unsigned int resultFrameOffset;
+    time_t currentTime = time(NULL);
     
     CHECK_RESULT(getNextResultInState(tree,
+                                      currentTime,
                                       resultState,
                                       &actionStateIndex,
                                       &resultCount,
@@ -2370,7 +2371,7 @@ unsigned int completeAndStartAction(unsigned int handle,
     resultState->context.actionStateIndex = actionStateIndex;
     resultState->context.resultCount = resultCount;
     resultState->context.resultFrameOffset = resultFrameOffset;
-    resultState->lockExpireTime = time(NULL) + STATE_LEASE_TIME;
+    resultState->lockExpireTime = currentTime + STATE_LEASE_TIME;
     *messages  = resultState->context.messages;
     return RULES_OK;
 }

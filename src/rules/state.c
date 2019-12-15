@@ -1126,6 +1126,7 @@ unsigned int serializeState(stateNode *state,
 }
 
 unsigned int getNextResultInState(void *tree, 
+                                  time_t currentTime,
                                   stateNode *state,
                                   unsigned int *actionStateIndex,
                                   unsigned int *resultCount,
@@ -1134,23 +1135,25 @@ unsigned int getNextResultInState(void *tree,
 
     ruleset *rulesetTree = (ruleset*)tree;
     *resultAction = NULL;
-    for (unsigned int index = 0; index < rulesetTree->actionCount; ++index) {
-        actionStateNode *actionNode = &state->actionState[index];
-        if (actionNode->reteNode) {
-            if ((actionNode->reteNode->value.c.cap && actionNode->resultPool.count) ||
-                (actionNode->reteNode->value.c.count && actionNode->resultPool.count >= actionNode->reteNode->value.c.count)) {
-                *resultAction = actionNode;
-                *actionStateIndex = index;
-                *resultFrameOffset = actionNode->resultIndex[0];
-                if (actionNode->reteNode->value.c.count) {
-                    *resultCount = actionNode->reteNode->value.c.count;
-                } else {
-                    *resultCount = (actionNode->reteNode->value.c.cap > actionNode->resultPool.count ? 
-                                    actionNode->resultPool.count : 
-                                    actionNode->reteNode->value.c.cap);
-                }
+    if (currentTime - state->lockExpireTime > STATE_LEASE_TIME) { 
+        for (unsigned int index = 0; index < rulesetTree->actionCount; ++index) {
+            actionStateNode *actionNode = &state->actionState[index];
+            if (actionNode->reteNode) {
+                if ((actionNode->reteNode->value.c.cap && actionNode->resultPool.count) ||
+                    (actionNode->reteNode->value.c.count && actionNode->resultPool.count >= actionNode->reteNode->value.c.count)) {
+                    *resultAction = actionNode;
+                    *actionStateIndex = index;
+                    *resultFrameOffset = actionNode->resultIndex[0];
+                    if (actionNode->reteNode->value.c.count) {
+                        *resultCount = actionNode->reteNode->value.c.count;
+                    } else {
+                        *resultCount = (actionNode->reteNode->value.c.cap > actionNode->resultPool.count ? 
+                                        actionNode->resultPool.count : 
+                                        actionNode->reteNode->value.c.cap);
+                    }
 
-                return RULES_OK;
+                    return RULES_OK;
+                }
             }
         }
     }
@@ -1177,18 +1180,18 @@ unsigned int getNextResult(void *tree,
     while (count < rulesetTree->statePool.count && !*resultAction) {
         unsigned int nodeOffset = rulesetTree->reverseStateIndex[rulesetTree->currentStateIndex];
         *resultState = STATE_NODE(tree, nodeOffset);
-        if (currentTime - (*resultState)->lockExpireTime > STATE_LEASE_TIME) { 
-            unsigned int result = getNextResultInState(tree,
-                                                       *resultState,
-                                                       actionStateIndex,
-                                                       resultCount,
-                                                       resultFrameOffset,
-                                                       resultAction);
-            if (result != ERR_NO_ACTION_AVAILABLE) {
-                return result;
-            }
+        
+        unsigned int result = getNextResultInState(tree,
+                                                   currentTime,
+                                                   *resultState,
+                                                   actionStateIndex,
+                                                   resultCount,
+                                                   resultFrameOffset,
+                                                   resultAction);
+        if (result != ERR_NO_ACTION_AVAILABLE) {
+            return result;
         }
-
+        
         rulesetTree->currentStateIndex = (rulesetTree->currentStateIndex + 1) % rulesetTree->statePool.count;
         ++count;
     }

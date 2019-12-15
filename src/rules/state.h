@@ -351,6 +351,7 @@ unsigned int serializeState(stateNode *state,
                             char **stateFact);
 
 unsigned int getNextResultInState(void *tree, 
+                                  time_t currentTime,
                                   stateNode *state,
                                   unsigned int *actionStateIndex,
                                   unsigned int *resultCount,
