@@ -382,13 +382,23 @@ exports = module.exports = durableEngine = function () {
                     name: 'term'
                 };
                 
-                expression['arguments'] = [{
-                    type: 'Literal', 
-                    value: expression.object.name
-                }, {
-                    type:'Literal', 
-                    value: expression.property.name
-                }];
+                if (expression.property.type === 'Literal') {
+                    expression['arguments'] = [{
+                        type: 'Literal', 
+                        value: expression.object.name
+                    }, {
+                        type:'Literal', 
+                        value: expression.property.value
+                    }];
+                } else {
+                    expression['arguments'] = [{
+                        type: 'Literal', 
+                        value: expression.object.name
+                    }, {
+                        type:'Literal', 
+                        value: expression.property.name
+                    }];
+                }
 
                 delete(expression['object']);
                 delete(expression['property']);
@@ -416,13 +426,24 @@ exports = module.exports = durableEngine = function () {
                         type: 'Identifier',
                         name: 'term'
                     };
-                    expression['arguments'] = [{
-                        type: 'Literal', 
-                        value: imap[expression.object.name]
-                    }, {
-                        type:'Literal', 
-                        value: expression.property.name
-                    }];
+
+                    if (expression.property.type === 'Literal') {
+                        expression['arguments'] = [{
+                            type: 'Literal', 
+                            value: imap[expression.object.name]
+                        }, {
+                            type:'Literal', 
+                            value: expression.property.value
+                        }];
+                    } else {
+                        expression['arguments'] = [{
+                            type: 'Literal', 
+                            value: imap[expression.object.name]
+                        }, {
+                            type:'Literal', 
+                            value: expression.property.name
+                        }];
+                    }
                 }
                 
 

@@ -306,6 +306,23 @@ d.post('distinct', {amount: 50});
 d.post('distinct', {amount: 200});
 d.post('distinct', {amount: 251});
 
+d.ruleset('bracket', function() {
+    whenAll: {
+        first = m['amount'] > 10
+        second = m['amount'] > first['amount'] * 2
+        third = m['amount'] > (first['amount'] + second['amount']) / 2
+    }
+    run: {
+        console.log('bracket detected -> ' + first['amount']);
+        console.log('               -> ' + second['amount']);
+        console.log('               -> ' + third['amount']);
+    }
+});
+
+d.post('bracket', {amount: 50});
+d.post('bracket', {amount: 200});
+d.post('bracket', {amount: 251});
+
 d.ruleset('expense0', function() {
     whenAll: m.subject == 'approve' || m.subject == 'ok'
     run: console.log('expense0 Approved');
