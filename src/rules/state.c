@@ -21,7 +21,7 @@ static unsigned int evictEntry(ruleset *tree) {
     unsigned int offset = tree->stateBuckets[lruBucket];
     unsigned int lastOffset = UNDEFINED_HASH_OFFSET;
     unsigned char found = 0;
-    while (!found) {
+    while (!found && offset != UNDEFINED_HASH_OFFSET) {
         stateEntry *current = &tree->state[offset];
         if (current->sidHash == lruEntry->sidHash) {
             if (!strcmp(current->sid, lruEntry->sid)) {
@@ -51,8 +51,10 @@ static unsigned int evictEntry(ruleset *tree) {
     }
 
     unsigned int result = tree->lruStateOffset;
-    tree->lruStateOffset = lruEntry->nextLruOffset;
-    tree->state[tree->lruStateOffset].prevLruOffset = UNDEFINED_HASH_OFFSET;
+    if (lruEntry->nextLruOffset != UNDEFINED_HASH_OFFSET) {
+        tree->lruStateOffset = lruEntry->nextLruOffset;
+        tree->state[tree->lruStateOffset].prevLruOffset = UNDEFINED_HASH_OFFSET;
+    }
     return result;
 }
 
