@@ -305,6 +305,8 @@ static unsigned int reduceOperand(ruleset *tree,
         case JSON_BOOL:
             (*targetProperty)->value.b = sourceOperand->value.b;
             return RULES_OK;
+        case JSON_NIL:
+            return RULES_OK;
     }
 
     return ERR_OPERATION_NOT_SUPPORTED;

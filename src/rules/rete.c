@@ -1527,6 +1527,10 @@ static void printExpression(ruleset *tree, operand *newValue) {
                 printf("true");
             }
             break;
+        case JSON_NIL:
+            printf("nil");
+            break;
+
     }
 }
 

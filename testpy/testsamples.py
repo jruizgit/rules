@@ -12,6 +12,17 @@ with ruleset('test'):
 
 post('test', { 'subject': 'World' })
 
+with ruleset('none_test'):
+    @when_all(m.v == None)
+    def is_none(c):
+        print('none_test passed')
+
+post('none_test', {'v': None})
+try:
+    post('none_test', {'v': 'something'})
+except BaseException as e:
+    print('none_test -> expected {0}'.format(e.message))
+
 
 with ruleset('animal'):
     @when_all(c.first << (m.predicate == 'eats') & (m.object == 'flies'),

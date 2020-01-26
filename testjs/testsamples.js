@@ -260,6 +260,14 @@ d.ruleset('test', function() {
 
 d.post('test', {subject: 'World'});
 
+d.ruleset('null', function() {
+    whenAll: m.subject == null
+    run: console.log('null passed')
+});
+
+d.post('null', {subject: null});
+d.post('null', {subject: 'something'}, function(err, state) {console.log('null expected error: ' + err.message)});
+
 d.ruleset('risk0', function() {
     whenAll: {
         first = m.t == 'purchase'
