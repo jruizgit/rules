@@ -368,10 +368,17 @@ exports = module.exports = durableEngine = function () {
                     }
                 };
                 
-                expression['arguments'] = [{
-                    type: 'Literal', 
-                    value: expression.property.name
-                }];
+                if (expression.property.type === 'Literal') {
+                    expression['arguments'] = [{
+                        type: 'Literal', 
+                        value: expression.property.value
+                    }];
+                } else {
+                    expression['arguments'] = [{
+                        type: 'Literal', 
+                        value: expression.property.name
+                    }];   
+                }
 
                 delete(expression['object']);
                 delete(expression['property']);
@@ -653,7 +660,6 @@ exports = module.exports = durableEngine = function () {
                 }
             }]
         }
-
         var func = ec.generate(program, {
             format: {
                 indent: {

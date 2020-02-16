@@ -260,6 +260,13 @@ d.ruleset('test', function() {
 
 d.post('test', {subject: 'World'});
 
+d.ruleset('mixedNested', function() {
+        whenAll: m['field1'].field2['field3'] == 8
+        run: console.log("mixedNested ok")
+});
+
+d.post('mixedNested',{field1 : {field2 : {field3 : 8}}});
+
 d.ruleset('null', function() {
     whenAll: m.subject == null
     run: console.log('null passed')
