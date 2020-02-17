@@ -348,7 +348,6 @@ static unsigned char compareValue(ruleset *tree,
                                   char *last,
                                   identifier *id,
                                   unsigned char type) {
-    
     if (right->type != type) {
         return 0;
     }
@@ -1009,6 +1008,7 @@ static unsigned int findAlpha(ruleset *tree,
                     }
                 }
             }
+            
         }
     }
     
@@ -1251,7 +1251,6 @@ static unsigned int createAlpha(ruleset *tree,
                                        0,
                                        single_offset, 
                                        *newOffset));
-                
 
                 result = readNextArrayValue(last, 
                                             &first, 

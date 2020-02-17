@@ -474,7 +474,7 @@ static unsigned int reduceExpression(ruleset *tree,
                                      jsonObject *leftMessageObject,
                                      jsonObject *rightMessageObject,
                                      leftFrameNode *context,
-                                     jsonProperty *targetProperty) {
+                                     jsonProperty *targetProperty) {        
     jsonProperty leftValue;
     jsonProperty *leftProperty = &leftValue;
     CHECK_RESULT(reduceOperand(tree,
@@ -505,10 +505,12 @@ static unsigned int reduceExpression(ruleset *tree,
                                context,
                                &rightProperty));
 
-    return reduceProperties(currentExpression->operator, 
+    unsigned int result = reduceProperties(currentExpression->operator, 
                             leftProperty, 
                             rightProperty, 
                             targetProperty);
+
+    return result;
 }
 
 static unsigned int reduceExpressionSequence(ruleset *tree,
@@ -527,56 +529,40 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
             return RULES_OK;          
         } 
 
-        if ((operator != OP_NOP) &&
-            ((operator == OP_OR && targetProperty->value.b) || 
-             (operator == OP_AND && !targetProperty->value.b))) {
-            if (currentExpression->operator == OP_AND || currentExpression->operator == OP_OR) {
-                jsonProperty dummyProperty;
-                dummyProperty.type = JSON_BOOL;
-                if (currentExpression->operator == OP_AND) {
-                    dummyProperty.value.b = 0;
-                } else {
-                    dummyProperty.value.b = 1;
-                }
-
-                ++*i;
-                CHECK_RESULT(reduceExpressionSequence(tree,
-                                                      state,
-                                                      exprs,
-                                                      currentExpression->operator,
-                                                      messageObject,
-                                                      context,
-                                                      i,
-                                                      &dummyProperty));
-            }
+        if (currentExpression->operator == OP_AND || currentExpression->operator == OP_OR) {
+            ++*i;
+            CHECK_RESULT(reduceExpressionSequence(tree,
+                                                  state,
+                                                  exprs,
+                                                  currentExpression->operator,
+                                                  messageObject,
+                                                  context,
+                                                  i,
+                                                  targetProperty));
         } else {
-            if (currentExpression->operator == OP_AND || currentExpression->operator == OP_OR) {
-                ++*i;
-                CHECK_RESULT(reduceExpressionSequence(tree,
-                                                      state,
-                                                      exprs,
-                                                      currentExpression->operator,
-                                                      messageObject,
-                                                      context,
-                                                      i,
-                                                      targetProperty));
-            } else if (currentExpression->operator == OP_IALL || currentExpression->operator == OP_IANY) {
-                
-            } else {
-                CHECK_RESULT(reduceExpression(tree,
-                                              state,
-                                              currentExpression,
-                                              messageObject,
-                                              messageObject,
-                                              context,
-                                              targetProperty));
-                if (targetProperty->type != JSON_BOOL) {
-                    return ERR_OPERATION_NOT_SUPPORTED;
-                }
-            }
+            CHECK_RESULT(reduceExpression(tree,
+                                          state,
+                                          currentExpression,
+                                          messageObject,
+                                          messageObject,
+                                          context,
+                                          targetProperty));
+            ++*i;
         }
 
-        ++*i;
+        if (targetProperty->type != JSON_BOOL) {
+            return ERR_OPERATION_NOT_SUPPORTED;
+        }
+        
+
+        if ((operator == OP_AND && !targetProperty->value.b) || 
+            (operator == OP_OR && targetProperty->value.b)) {
+            while (currentExpression->operator != OP_END) {
+                ++*i;
+                currentExpression = &exprs->expressions[*i];
+            }
+            return RULES_OK;
+        }
     }
 
     return RULES_OK;
@@ -665,27 +651,32 @@ static unsigned int getFrameHash(ruleset *tree,
                                              context,
                                              hash);
         }
-    } else if (exprs->length > 0) {
-        if (exprs->expressions[0].operator == OP_AND) {
-            *hash = FNV_32_OFFSET_BASIS;
-            unsigned int result;
-            for (unsigned int i = 1; i < exprs->length; ++ i) {
+    } else if (exprs->length > 0 && exprs->expressions[0].operator == OP_AND) {
+        
+        unsigned int result;
+        unsigned int i = 1;
+        while (exprs->expressions[i].operator != OP_OR && exprs->expressions[i].operator != OP_END) {
+            if (i == 1) {
+                *hash = FNV_32_OFFSET_BASIS;
+            }
 
-                if (exprs->expressions[i].operator == OP_EQ) {
-                    unsigned int newHash;
-                    result = getFrameHashForExpression(tree,
-                                                       state,
-                                                       &exprs->expressions[i],
-                                                       messageObject,
-                                                       context,
-                                                       &newHash);
-                    if (result == RULES_OK) {
-                        *hash ^= newHash;
-                        *hash *= FNV_32_PRIME;
-                    }
+            if (exprs->expressions[i].operator == OP_EQ) {
+                unsigned int newHash;
+                result = getFrameHashForExpression(tree,
+                                                   state,
+                                                   &exprs->expressions[i],
+                                                   messageObject,
+                                                   context,
+                                                   &newHash);
+                if (result == RULES_OK) {
+                    *hash ^= newHash;
+                    *hash *= FNV_32_PRIME;
                 }
             }
+
+            ++i;
         }
+        
     }
     
     return RULES_OK;
