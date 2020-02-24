@@ -286,6 +286,18 @@ d.ruleset('risk0', function() {
 d.post('risk0', {t: 'purchase', location: 'US'});
 d.post('risk0', {t: 'purchase', location: 'CA'});
 
+d.ruleset('counter_or', function() {
+    whenAll: {
+        first = +m.counter
+        second = m.countersValid == true && (m.primeCount == first.counter || m.secondCount == first.counter)
+    }
+    run: console.log('counter_or match')
+});
+
+d.assert('counter_or', { counter: 1}) 
+d.assert('counter_or', { primeCount: 2, secondCount: 1, countersValid: true})
+d.assert('counter_or', { primeCount: 2, secondCount: 2, countersValid: true})
+
 d.ruleset('indistinct', function() {
     whenAll: {
         first = m.amount > 10

@@ -100,6 +100,15 @@ with ruleset('risk'):
 post('risk', {'t': 'purchase', 'location': 'US'})
 post('risk', {'t': 'purchase', 'location': 'CA'})
 
+with ruleset('counter_or'): 
+    @when_all(c.first << (+m.counter), 
+              c.second<< ((m.countersValid == True) & ((m.primeCount == c.first.counter) | (m.secondCount == c.first.counter))))  
+    def match(c): 
+        print ('counter_or match') 
+
+assert_fact('counter_or', { 'counter': 1}) 
+assert_fact('counter_or', { 'primeCount': 2,'secondCount':1,'countersValid':True})
+assert_fact('counter_or', { 'primeCount': 2,'secondCount':2,'countersValid':True})
 
 with ruleset('flow'):
     # state condition uses 's'

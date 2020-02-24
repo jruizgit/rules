@@ -1372,14 +1372,6 @@ static unsigned int handleBetaMessage(ruleset *tree,
                                sideEffect);
     }
 
-    frameLocation rightFrameLocation;
-    rightFrameNode *rightFrame;
-
-    CHECK_RESULT(createRightFrame(state,
-                                  betaNode,
-                                  &rightFrame,
-                                  &rightFrameLocation));
-
     unsigned int messageHash;
     CHECK_RESULT(getFrameHash(tree,
                               state,
@@ -1387,6 +1379,40 @@ static unsigned int handleBetaMessage(ruleset *tree,
                               messageObject,
                               NULL,
                               &messageHash));
+
+    frameLocation rightFrameLocation;
+    rightFrameNode *rightFrame;
+
+    CHECK_RESULT(getLastRightFrame(state,
+                                   betaNode->value.b.index,
+                                   messageHash,
+                                   &rightFrame));
+
+    while (rightFrame) {
+        if (rightFrame->messageOffset == currentMessageOffset) {
+            return RULES_OK;
+
+        }
+        
+        unsigned int rightFrameOffset = rightFrame->prevOffset;
+        rightFrame = NULL;
+        while (rightFrameOffset != UNDEFINED_HASH_OFFSET && !rightFrame) {
+            rightFrame = RIGHT_FRAME_NODE(state,
+                                          betaNode->value.b.index, 
+                                          rightFrameOffset); 
+            if (rightFrame->hash != messageHash) {
+                rightFrameOffset = rightFrame->prevOffset;
+                rightFrame = NULL;
+            } 
+        }
+    }
+
+    CHECK_RESULT(createRightFrame(state,
+                                  betaNode,
+                                  &rightFrame,
+                                  &rightFrameLocation));
+
+
 
     rightFrame->messageOffset = currentMessageOffset;
     CHECK_RESULT(addFrameLocation(state,
