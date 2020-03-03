@@ -1,3 +1,5 @@
+import logging
+
 from . import engine
 
 class avalue(object):
@@ -8,7 +10,7 @@ class avalue(object):
         self._sid = sid
         self._op = op
         self._right = right
-        
+
     def __add__(self, other):
         return self._set_right('$add', other)
 
@@ -31,7 +33,7 @@ class avalue(object):
     def __getattr__(self, name):
         if self._left:
             self._left = '{0}.{1}'.format(self._left, name)
-        else:    
+        else:
             self._left = name
 
         return self
@@ -62,7 +64,7 @@ class avalue(object):
 
     def _set_right(self, op, other):
         if self._right:
-            self._left = avalue(self._name, self._left, self._sid, self._op, self._right) 
+            self._left = avalue(self._name, self._left, self._sid, self._op, self._right)
 
         self._op = op
         self._right = other
@@ -86,13 +88,13 @@ class avalue(object):
             left_definition = self._left.define()
         else:
             left_definition = {self._name: self._left}
-        
+
         righ_definition = self._right
         if isinstance(self._right, avalue):
             righ_definition = self._right.define()
 
         return {self._op: {'$l': left_definition, '$r': righ_definition}}
-        
+
 
 class closure(object):
 
@@ -108,16 +110,16 @@ class value(object):
         self._left = left
         self._op = op
         self._right = right
-        
+
     def __lt__(self, other):
         return value(self._type, self._left, '$lt', other, self.alias)
-        
+
     def __le__(self, other):
         return value(self._type, self._left, '$lte', other, self.alias)
-        
+
     def __gt__(self, other):
         return value(self._type, self._left, '$gt', other, self.alias)
-    
+
     def __ge__(self, other):
         return value(self._type, self._left, '$gte', other, self.alias)
 
@@ -147,13 +149,13 @@ class value(object):
 
     def __and__(self, other):
         return value(self._type, self, '$and', other, self.alias)
-    
+
     def __or__(self, other):
-        return value(self._type, self, '$or', other, self.alias)    
+        return value(self._type, self, '$or', other, self.alias)
 
     def __add__(self, other):
         return avalue(self._type, self._left, None, '$add', other)
-        
+
     def __sub__(self, other):
         return avalue(self._type, self._left, None, '$sub', other)
 
@@ -191,7 +193,7 @@ class value(object):
             else:
                 left_definition = left_definition[self._op]
                 left_definition.append(right_definition)
-            
+
             new_definition = {self._op: left_definition}
         elif self._op == '$nex' or self._op == '$ex':
             new_definition = {self._op: {self._left: 1}}
@@ -201,11 +203,11 @@ class value(object):
             if self._type == '$s':
                 raise Exception('s not allowed as rvalue')
 
-            print('defining {0}, {1}'.format(self._type, self._left))
+            logging.debug('defining {0}, {1}'.format(self._type, self._left))
             new_definition = {self._type: self._left}
         else:
             new_definition = {self._op: {self._left: right_definition}}
-        
+
         if self._type == '$s':
             return {'$and': [new_definition, {'$s': 1}]}
         else:
@@ -229,10 +231,10 @@ class rule(object):
         self.operator = operator
         self.multi = multi
         self.alias = None
-        
+
         if len(_ruleset_stack) and isinstance(_ruleset_stack[-1], ruleset):
             _ruleset_stack[-1].rules.append(self)
-        
+
         if not len(args):
             raise Exception('Invalid number of arguments')
 
@@ -258,7 +260,7 @@ class rule(object):
                 new_args.append(arg)
             else:
                 self.func = arg
-            
+
         if not multi:
             self.expression = new_args[0]
         else:
@@ -305,15 +307,15 @@ class rule(object):
                     new_expression = {'{0}$any'.format(name): current_expression.define(name)['any']}
                 elif isinstance(current_expression, none):
                     new_expression = {'{0}$not'.format(name): current_expression.define()['none'][0]['m']}
-                else:    
+                else:
                     new_expression = {name: current_expression.define()}
-                
+
                 defined_expression.append(new_expression)
                 index += 1
-        
+
         if len(self.func):
             if len(self.func) == 1 and not hasattr(self.func[0], 'define'):
-                defined_expression = {self.operator: defined_expression, 'run': self.func[0]}  
+                defined_expression = {self.operator: defined_expression, 'run': self.func[0]}
         elif self.operator:
                 defined_expression = {self.operator: defined_expression}
 
@@ -384,10 +386,10 @@ class when_start(object):
 
     def __call__(self, *args):
         return self.func(*args)
-    
+
 
 class ruleset(object):
-    
+
     def __init__(self, name):
         self.name = name
         self.rules = []
@@ -409,10 +411,10 @@ class ruleset(object):
         new_definition = {}
         for rule in self.rules:
             new_definition['r_{0}'.format(index)] = rule.define()
-            index += 1   
-        
+            index += 1
+
         return self.name, new_definition
-        
+
 
 class to(object):
 
@@ -437,7 +439,7 @@ class to(object):
 
     def when_any(self, *args):
         self.rule = rule('any', True, *args)
-        return self.rule 
+        return self.rule
 
     def __call__(self, *args):
         if len(args) == 1:
@@ -459,13 +461,13 @@ class to(object):
 
 
 class state(object):
-    
+
     def __init__(self, state_name):
         if not len(_ruleset_stack):
             raise Exception('Invalid statechart context')
 
         if isinstance(_ruleset_stack[-1], state):
-            _ruleset_stack[-1].states.append(self)    
+            _ruleset_stack[-1].states.append(self)
         elif isinstance(_ruleset_stack[-1], statechart):
             _ruleset_stack[-1].states.append(self)
         else:
@@ -492,7 +494,7 @@ class state(object):
             trigger_rule['to'] = trigger_to
             new_definition['t_{0}'.format(index)] = trigger_rule
             index += 1
-        
+
         if len(self.states):
             chart = {}
             for state in self.states:
@@ -505,7 +507,7 @@ class state(object):
 
 
 class statechart(object):
-    
+
     def __init__(self, name):
         self.name = name
         self.states = []
@@ -544,7 +546,7 @@ class stage(object):
             self.func = [func]
         else:
             self.func = []
-        
+
         self.switches = []
 
     def __enter__(self):
@@ -588,7 +590,7 @@ class stage(object):
 
 
 class flowchart(object):
-    
+
     def __init__(self, name):
         self.name = name
         self.stages = []
@@ -615,7 +617,7 @@ class flowchart(object):
 
 
 def timeout(name):
-    return all(avalue('base') << value('$m', '$timerName') == name, 
+    return all(avalue('base') << value('$m', '$timerName') == name,
                avalue('timeout') << value('$m', '$time') >= avalue('base', '$baseTime'))
 
 def count(value):
@@ -664,22 +666,22 @@ def get_host():
 
 def post(ruleset_name, message, complete = None):
     return get_host().post(ruleset_name, message, complete)
-        
+
 def post_batch(ruleset_name, messages, complete = None):
     return get_host().post_batch(ruleset_name, messages, complete)
-    
+
 def assert_fact(ruleset_name, fact, complete = None):
     return get_host().assert_fact(ruleset_name, fact, complete)
-    
+
 def assert_facts(ruleset_name, facts, complete = None):
     return get_host().assert_facts(ruleset_name, facts, complete)
-    
+
 def retract_fact(ruleset_name, fact, complete = None):
     return get_host().retract_fact(ruleset_name, fact, complete)
-    
+
 def retract_facts(ruleset_name, facts, complete = None):
     return get_host().retract_facts(ruleset_name, facts, complete)
-    
+
 def update_state(ruleset_name, state, complete = None):
     get_host().update_state(ruleset_name, state, complete)
 

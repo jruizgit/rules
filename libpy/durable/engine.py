@@ -9,6 +9,7 @@ import datetime
 import os
 import sys
 import traceback
+import logging
 
 def _unix_now():
     dt = datetime.datetime.now()
@@ -36,7 +37,7 @@ class Closure(object):
         self._completed = False
         self._deleted = False
         self._start_time = _unix_now()
-        if isinstance(message, dict): 
+        if isinstance(message, dict):
             self._m = message
         else:
             self.m = []
@@ -47,16 +48,16 @@ class Closure(object):
                 self.m.append(Content(one_message))
 
     def post(self, ruleset_name, message = None):
-        if message: 
+        if message:
             if not 'sid' in message:
                 message['sid'] = self.s.sid
 
             if isinstance(message, Content):
                 message = message._d
 
-            self.host.assert_event(ruleset_name, message) 
+            self.host.assert_event(ruleset_name, message)
         else:
-            message = ruleset_name 
+            message = ruleset_name
             if not 'sid' in message:
                 message['sid'] = self.s.sid
 
@@ -67,16 +68,16 @@ class Closure(object):
 
 
     def assert_fact(self, ruleset_name, fact = None):
-        if fact: 
+        if fact:
             if not 'sid' in fact:
                 fact['sid'] = self.s.sid
 
             if isinstance(fact, Content):
                 fact = fact._d
 
-            self.host.assert_fact(ruleset_name, fact) 
+            self.host.assert_fact(ruleset_name, fact)
         else:
-            fact = ruleset_name 
+            fact = ruleset_name
             if not 'sid' in fact:
                 fact['sid'] = self.s.sid
 
@@ -88,16 +89,16 @@ class Closure(object):
 
 
     def retract_fact(self, ruleset_name, fact = None):
-        if fact: 
+        if fact:
             if not 'sid' in fact:
                 fact['sid'] = self.s.sid
 
             if isinstance(fact, Content):
                 fact = fact._d
 
-            self.host.retract_fact(ruleset_name, fact) 
+            self.host.retract_fact(ruleset_name, fact)
         else:
-            fact = ruleset_name 
+            fact = ruleset_name
             if not 'sid' in fact:
                 fact['sid'] = self.s.sid
 
@@ -108,14 +109,14 @@ class Closure(object):
 
     def start_timer(self, timer_name, duration, manual_reset = False):
         self._ruleset.start_timer(self.s.sid, timer_name, duration, manual_reset)
-        
+
     def cancel_timer(self, timer_name):
         self._ruleset.cancel_timer(self.s.sid, timer_name)
-        
+
     def renew_action_lease(self):
         if _unix_now() - self._start_time < 10:
             self._start_time = _unix_now()
-            self._ruleset.renew_action_lease(self.s.sid) 
+            self._ruleset.renew_action_lease(self.s.sid)
 
     def delete_state(self):
         self._deleted = True
@@ -154,7 +155,7 @@ class Content(object):
             if isinstance(data, dict):
                 data = Content(data)
 
-            return data 
+            return data
         else:
             return None
 
@@ -163,7 +164,7 @@ class Content(object):
             del self._d[key]
         elif isinstance(value, Content):
             self._d[key] = value._d
-        else:    
+        else:
             self._d[key] = value
 
     def __iter__(self):
@@ -172,7 +173,7 @@ class Content(object):
     def __contains__(self, key):
         return key in self._d
 
-    def __getattr__(self, name):  
+    def __getattr__(self, name):
         return self.__getitem__(name)
 
     def __setattr__(self, name, value):
@@ -230,13 +231,13 @@ class Promise(object):
 
         if self._sync:
             try:
-                self._func(c) 
+                self._func(c)
             except BaseException as error:
                 t, v, tb = sys.exc_info()
                 c.s.exception = 'exception caught {0}, traceback {1}'.format(str(error), traceback.format_tb(tb))
             except:
                 c.s.exception = 'unknown exception'
-               
+
             if self._next:
                 self._next.run(c, complete)
             else:
@@ -249,17 +250,17 @@ class Promise(object):
                         self._timer = None
 
                     if e:
-                        c.s.exception = str(e) 
-                         
-                    if self._next: 
-                        self._next.run(c, complete) 
-                    else: 
+                        c.s.exception = str(e)
+
+                    if self._next:
+                        self._next.run(c, complete)
+                    else:
                         complete(None)
 
-                time_left = self._func(c, callback)     
+                time_left = self._func(c, callback)
                 if time_left:
-                    self._timer = threading.Timer(5, timeout, (_unix_now() + time_left, ))      
-                    self._timer.daemon = True     
+                    self._timer = threading.Timer(5, timeout, (_unix_now() + time_left, ))
+                    self._timer.daemon = True
                     self._timer.start()
             except BaseException as error:
                 t, v, tb = sys.exc_info()
@@ -268,7 +269,7 @@ class Promise(object):
             except:
                 c.s.exception = 'unknown exception'
                 complete(None)
-        
+
 
 class To(Promise):
 
@@ -277,7 +278,7 @@ class To(Promise):
         self._from_state = from_state
         self._to_state = to_state
         self._assert_state = assert_state
-        
+
     def _execute(self, c):
         c.s.running = True
         if self._from_state != self._to_state:
@@ -294,7 +295,7 @@ class To(Promise):
                     c.post({ 'label': self._to_state, 'chart': 1 })
             except MessageNotHandledException:
                 pass
-            
+
 
 class Ruleset(object):
 
@@ -323,7 +324,7 @@ class Ruleset(object):
         elif result[0] == 3:
             return 0
 
-        return result[1] 
+        return result[1]
 
     def assert_event(self, message):
         return self._handle_result(durable_rules_engine.assert_event(self._handle, json.dumps(message, ensure_ascii=False)), message)
@@ -344,13 +345,13 @@ class Ruleset(object):
         return self._handle_result(durable_rules_engine.retract_facts(self._handle, json.dumps(facts, ensure_ascii=False)), facts)
 
     def start_timer(self, sid, timer, timer_duration, manual_reset):
-        if sid != None: 
+        if sid != None:
             sid = str(sid)
 
         durable_rules_engine.start_timer(self._handle, timer_duration, manual_reset, timer, sid)
 
     def cancel_timer(self, sid, timer_name):
-        if sid != None: 
+        if sid != None:
             sid = str(sid)
 
         durable_rules_engine.cancel_timer(self._handle, sid, timer_name)
@@ -360,19 +361,19 @@ class Ruleset(object):
         return durable_rules_engine.update_state(self._handle, json.dumps(state, ensure_ascii=False))
 
     def get_state(self, sid):
-        if sid != None: 
+        if sid != None:
             sid = str(sid)
 
         return json.loads(durable_rules_engine.get_state(self._handle, sid))
 
     def delete_state(self, sid):
-        if sid != None: 
+        if sid != None:
             sid = str(sid)
 
         durable_rules_engine.delete_state(self._handle, sid)
-    
+
     def renew_action_lease(self, sid):
-        if sid != None: 
+        if sid != None:
             sid = str(sid)
 
         durable_rules_engine.renew_action_lease(self._handle, sid)
@@ -385,24 +386,24 @@ class Ruleset(object):
 
     def set_queue_message_callback(self, func):
         durable_rules_engine.set_queue_message_callback(self._handle, func)
-   
+
     def set_get_stored_messages_callback(self, func):
         durable_rules_engine.set_get_stored_messages_callback(self._handle, func)
-      
+
     def set_get_queued_messages_callback(self, func):
         durable_rules_engine.set_get_queued_messages_callback(self._handle, func)
-   
+
     def complete_get_queued_messages(self, sid, queued_messages):
-        if sid != None: 
+        if sid != None:
             sid = str(sid)
 
         durable_rules_engine.complete_get_queued_messages(self._handle, sid, queued_messages)
-   
+
     def set_get_idle_state_callback(self, func):
         durable_rules_engine.set_get_idle_state_callback(self._handle, func)
-               
+
     def complete_get_idle_state(self, sid, stored_messages):
-        if sid != None: 
+        if sid != None:
             sid = str(sid)
 
         durable_rules_engine.complete_get_idle_state(self._handle, sid, stored_messages)
@@ -413,7 +414,7 @@ class Ruleset(object):
     @staticmethod
     def create_rulesets(host, ruleset_definitions):
         branches = {}
-        for name, definition in ruleset_definitions.items():  
+        for name, definition in ruleset_definitions.items():
             if name.rfind('$state') != -1:
                 name = name[:name.rfind('$state')]
                 branches[name] = Statechart(name, host, definition)
@@ -427,7 +428,7 @@ class Ruleset(object):
 
     def dispatch_timers(self):
         return durable_rules_engine.assert_timers(self._handle)
-        
+
     def _flush_actions(self, state, result_container, state_offset, complete):
         while 'message' in result_container:
             action_name = None
@@ -436,7 +437,7 @@ class Ruleset(object):
 
             del(result_container['message'])
             c = Closure(self._host, self, state, message, state_offset)
-            
+
             def action_callback(e):
                 if c._has_completed():
                     return
@@ -447,20 +448,20 @@ class Ruleset(object):
                 else:
                     try:
                         durable_rules_engine.update_state(self._handle, json.dumps(c.s._d, ensure_ascii=False))
-                        
+
                         new_result = durable_rules_engine.complete_and_start_action(self._handle, c._handle)
                         if new_result:
                             result_container['message'] = json.loads(new_result)
                         else:
                             complete(None, state)
-                                    
+
                     except BaseException as error:
                         t, v, tb = sys.exc_info()
-                        print('base exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
+                        logging.error('base exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                         durable_rules_engine.abandon_action(self._handle, c._handle)
                         complete(error, None)
                     except:
-                        print('unknown exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
+                        logging.error('unknown exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
                         durable_rules_engine.abandon_action(self._handle, c._handle)
                         complete('unknown error', None)
 
@@ -468,9 +469,9 @@ class Ruleset(object):
                         try:
                             self.delete_state(c.s['sid'])
                         except:
-                           pass 
-                
-            self._actions[action_name].run(c, action_callback) 
+                           pass
+
+            self._actions[action_name].run(c, action_callback)
 
     def do_actions(self, state_handle, complete):
         try:
@@ -484,7 +485,7 @@ class Ruleset(object):
 
     def dispatch(self):
         def callback(error, result):
-            pass 
+            pass
 
         result = durable_rules_engine.start_action(self._handle)
         if result:
@@ -525,7 +526,7 @@ class Statechart(Ruleset):
             triggers = {}
             if parent_triggers:
                 for parent_trigger_name, trigger in parent_triggers.items():
-                    triggers['{0}.{1}'.format(qualified_name, parent_trigger_name)] = trigger 
+                    triggers['{0}.{1}'.format(qualified_name, parent_trigger_name)] = trigger
 
             for trigger_name, trigger in state.items():
                 if trigger_name != '$chart':
@@ -580,7 +581,7 @@ class Statechart(Ruleset):
                         else:
                             rule['run'] = To(from_state, to_state, assert_state)
 
-                        if to_state in start_state: 
+                        if to_state in start_state:
                             del start_state[to_state]
 
                         if parent_start_state and to_state in parent_start_state:
@@ -589,8 +590,8 @@ class Statechart(Ruleset):
                         raise Exception('Trigger {0} destination not defined'.format(trigger_name))
 
                     rules[trigger_name] = rule;
-                    
-        started = False 
+
+        started = False
         for state_name in start_state.keys():
             if started:
                 raise Exception('Chart {0} has more than one start state {1}'.format(self._name, state_name))
@@ -610,7 +611,7 @@ class Flowchart(Ruleset):
     def __init__(self, name, host, chart_definition):
         self._name = name
         self._host = host
-        ruleset_definition = {} 
+        ruleset_definition = {}
         self._transform(chart_definition, ruleset_definition)
         super(Flowchart, self).__init__(name, host, ruleset_definition)
         self._definition = chart_definition
@@ -722,7 +723,7 @@ class Flowchart(Ruleset):
 
 class Host(object):
 
-    def __init__(self, ruleset_definitions = None):    
+    def __init__(self, ruleset_definitions = None):
         self._ruleset_directory = {}
         self._ruleset_list = []
         self.store_message_callback = None
@@ -765,7 +766,7 @@ class Host(object):
         def callback(e, state):
             error[0] = e
             result[0] = state
-            
+
         if not complete:
             rules.do_actions(func(args), callback)
             if error[0]:
@@ -856,19 +857,19 @@ class Host(object):
 
     def complete_get_idle_state(self, ruleset_name, sid, stored_messages):
         self.get_ruleset(ruleset_name).complete_get_idle_state(sid, stored_messages)
-        
+
     def register_rulesets(self, ruleset_definitions):
         rulesets = Ruleset.create_rulesets(self, ruleset_definitions)
         for ruleset_name, ruleset in rulesets.items():
             if ruleset_name in self._ruleset_directory:
                 raise Exception('Ruleset with name {0} already registered'.format(ruleset_name))
-            else:    
+            else:
                 self._ruleset_directory[ruleset_name] = ruleset
                 self._ruleset_list.append(ruleset)
 
                 if self.store_message_callback:
                     ruleset.set_store_message_callback(self.store_message_callback)
-                
+
                 if self.delete_message_callback:
                     ruleset.set_delete_message_callback(self.delete_message_callback)
 
@@ -877,13 +878,13 @@ class Host(object):
 
                 if self.get_stored_messages_callback:
                     ruleset.set_get_stored_messages_callback(self.get_stored_messages_callback)
-                    
+
                 if self.get_queued_messages_callback:
                     ruleset.set_get_queued_messages_callback(self.get_queued_messages_callback)
-                    
+
                 if self.get_idle_state_callback:
                     ruleset.set_get_idle_state_callback(self.get_idle_state_callback)
-                    
+
         return list(rulesets.keys())
 
     def _run(self):
@@ -893,12 +894,12 @@ class Host(object):
                 self._d_timer = threading.Timer(0.5, dispatch_ruleset, (0, ))
                 self._d_timer.daemon = True
                 self._d_timer.start()
-            else: 
+            else:
                 ruleset = self._ruleset_list[index]
-                try: 
+                try:
                     ruleset.dispatch()
                 except BaseException as e:
-                    print('Error {0}'.format(str(e)))
+                    logging.error('Error {0}'.format(str(e)))
 
                 timeout = 0
                 if (index == (len(self._ruleset_list) -1)):
@@ -913,12 +914,12 @@ class Host(object):
                 self._t_timer = threading.Timer(0.5, dispatch_timers, (0, ))
                 self._t_timer.daemon = True
                 self._t_timer.start()
-            else: 
+            else:
                 ruleset = self._ruleset_list[index]
-                try: 
+                try:
                     ruleset.dispatch_timers()
                 except BaseException as e:
-                    print('Error {0}'.format(str(e)))
+                    logging.error('Error {0}'.format(str(e)))
 
                 timeout = 0
                 if (index == (len(self._ruleset_list) -1)):
