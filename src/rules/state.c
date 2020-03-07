@@ -587,7 +587,6 @@ unsigned int createActionFrame(stateNode *state,
                                leftFrameNode *oldNode,                        
                                leftFrameNode **newNode,
                                frameLocation *newLocation) {
-
     unsigned int newValueOffset;
     actionStateNode *actionNode = &state->actionState[reteNode->value.c.index];
     NEW(leftFrameNode, 
@@ -676,6 +675,9 @@ unsigned int deleteMessage(void *tree,
                            unsigned int messageNodeOffset) {
     messageNode *node = MESSAGE_NODE(state, messageNodeOffset);
     ruleset *rulesetTree = (ruleset*)tree;
+    if (mid == NULL) {
+        mid = (char*)node->jo.idBuffer;
+    }
     if (rulesetTree->deleteMessageCallback) {
         CHECK_RESULT(rulesetTree->deleteMessageCallback(rulesetTree->deleteMessageCallbackContext,
                                                         &rulesetTree->stringPool[rulesetTree->nameOffset],
@@ -825,7 +827,7 @@ unsigned int getStateNode(void *tree,
 
 unsigned int createStateNode(void *tree, 
                              char *sid, 
-                             stateNode **state) {  
+                             stateNode **state) {
     unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
     unsigned int nodeOffset;
     ruleset *rulesetTree = (ruleset*)tree;
@@ -922,7 +924,18 @@ unsigned int createStateNode(void *tree,
 unsigned int deleteStateNode(void *tree, 
                              stateNode *node) {
     ruleset *rulesetTree = (ruleset*)tree;
+
     free(node->sid);
+
+    if (node->context.messages) {
+        free(node->context.messages);
+        node->context.messages = NULL;
+    }
+
+    if (node->context.stateFact) {
+        free(node->context.stateFact);
+        node->context.stateFact = NULL;
+    }
 
     for (unsigned int i = 0; i < rulesetTree->betaCount; ++i) {
         betaStateNode *betaNode = &node->betaState[i];
@@ -943,6 +956,13 @@ unsigned int deleteStateNode(void *tree,
         free(actionNode->resultPool.content);
     }   
     free(node->actionState);
+
+    for (unsigned int i = 0; i < MAX_MESSAGE_INDEX_LENGTH * 2; ++i) {
+        if (node->messageIndex[i] != UNDEFINED_HASH_OFFSET) {
+            deleteMessage(tree, node, NULL, node->messageIndex[i]);
+        }
+    }
+    free(node->messagePool.content);
 
     DELETE(stateNode, 
            rulesetTree->stateIndex, 
