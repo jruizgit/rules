@@ -958,8 +958,12 @@ unsigned int deleteStateNode(void *tree,
     free(node->actionState);
 
     for (unsigned int i = 0; i < MAX_MESSAGE_INDEX_LENGTH * 2; ++i) {
-        if (node->messageIndex[i] != UNDEFINED_HASH_OFFSET) {
-            deleteMessage(tree, node, NULL, node->messageIndex[i]);
+        unsigned int currentMessageOffset = node->messageIndex[i];
+        while (currentMessageOffset != UNDEFINED_HASH_OFFSET) {
+            messageNode *currentMessageNode = MESSAGE_NODE(node, currentMessageOffset);
+            unsigned int nextMessageOffset = currentMessageNode->nextOffset; 
+            deleteMessage(tree, node, NULL, currentMessageOffset);
+            currentMessageOffset = nextMessageOffset;
         }
     }
     free(node->messagePool.content);
@@ -1127,20 +1131,6 @@ unsigned int serializeResult(void *tree,
         last[1] = '}';
         last[2] = 0;
     }
-
-    return RULES_OK;
-}
-
-unsigned int serializeState(stateNode *state, 
-                            char **stateFact) {
-
-    messageNode *stateFactNode = MESSAGE_NODE(state, state->factOffset);
-    unsigned int stateFactLength = strlen(stateFactNode->jo.content) + 1;
-    *stateFact = malloc(stateFactLength * sizeof(char));
-    if (!*stateFact) {
-        return ERR_OUT_OF_MEMORY;
-    }
-    memcpy(*stateFact, stateFactNode->jo.content, stateFactLength);
 
     return RULES_OK;
 }
@@ -1547,6 +1537,137 @@ unsigned int constructObject(char *root,
     return (result == PARSE_END ? RULES_OK: result);
 }
 
+static unsigned int getMessagesLength(stateNode *state, 
+                                      char messageType,
+                                      unsigned int *messageCount) {
+    unsigned int resultLength = 2;
+    *messageCount = 0;
+    for (unsigned int i = 0; i < MAX_MESSAGE_INDEX_LENGTH * 2; ++i) {
+        unsigned int currentMessageOffset = state->messageIndex[i];
+        while (currentMessageOffset != UNDEFINED_HASH_OFFSET) {
+            messageNode *currentMessageNode = MESSAGE_NODE(state, currentMessageOffset);
+            if (currentMessageNode->messageType == messageType) {
+                ++*messageCount;
+                resultLength += strlen(currentMessageNode->jo.content) + 1;
+            }
+            currentMessageOffset = currentMessageNode->nextOffset;
+        }
+    }
+
+    if (!*messageCount) {
+        ++resultLength;
+    }
+    
+    return resultLength;
+}
+ 
+static unsigned int serializeMessages(stateNode *state, 
+                                      char messageType,
+                                      unsigned int messageCount, 
+                                      char *messages) {
+
+    messages[0] = '['; 
+    ++messages;
+    unsigned int currentMessageCount = 0;
+    for (unsigned int i = 0; i < MAX_MESSAGE_INDEX_LENGTH * 2 && currentMessageCount < messageCount; ++i) {
+        unsigned int currentMessageOffset = state->messageIndex[i];
+        while (currentMessageOffset != UNDEFINED_HASH_OFFSET && currentMessageCount < messageCount) {
+            messageNode *currentMessageNode = MESSAGE_NODE(state, currentMessageOffset);
+            if (currentMessageNode->messageType == messageType) {
+                ++currentMessageCount;
+                unsigned int tupleLength = strlen(currentMessageNode->jo.content) + 1;
+                if (currentMessageCount < messageCount) {
+                    ++tupleLength;
+#ifdef _WIN32
+                    sprintf_s(messages, tupleLength, "%s,", currentMessageNode->jo.content);
+#else
+                    snprintf(messages, tupleLength, "%s,", currentMessageNode->jo.content);
+#endif
+                } else {
+#ifdef _WIN32
+                    sprintf_s(messages, tupleLength, "%s", currentMessageNode->jo.content);
+#else
+                    snprintf(messages, tupleLength, "%s", currentMessageNode->jo.content);
+#endif   
+                }
+
+                messages += (tupleLength - 1);
+            }
+            currentMessageOffset = currentMessageNode->nextOffset;
+        }
+    }
+
+    messages[0] = ']';
+    messages[1] = 0;
+    return RULES_OK;
+}
+
+
+static unsigned int getMessagesForType(unsigned int handle, 
+                                       char *sid, 
+                                       char messageType, 
+                                       char **messages) {
+    ruleset *tree;
+    RESOLVE_HANDLE(handle, &tree);
+
+    if (!sid) {
+        sid = "0";
+    }
+
+    stateNode *state = NULL;
+    CHECK_RESULT(getStateNode(tree, sid, &state));
+
+    unsigned int messageCount = 0;
+    unsigned int messagesLength = getMessagesLength(state, 
+                                                    messageType, 
+                                                    &messageCount);
+
+    *messages = malloc(messagesLength * sizeof(char));
+    if (!*messages) {
+        return ERR_OUT_OF_MEMORY;
+    }
+
+    return serializeMessages(state, 
+                             messageType, 
+                             messageCount, 
+                             *messages);
+    
+}
+
+unsigned int getEvents(unsigned int handle, 
+                       char *sid, 
+                       char **messages) {
+
+    return getMessagesForType(handle,
+                              sid,
+                              MESSAGE_TYPE_EVENT,
+                              messages);
+
+}
+
+unsigned int getFacts(unsigned int handle, 
+                      char *sid, 
+                      char **messages) {
+
+    return getMessagesForType(handle,
+                              sid,
+                              MESSAGE_TYPE_FACT,
+                              messages);
+
+}
+
+unsigned int serializeState(stateNode *state, char **stateFact) {
+    messageNode *stateFactNode = MESSAGE_NODE(state, state->factOffset);
+    unsigned int stateFactLength = strlen(stateFactNode->jo.content) + 1;
+    *stateFact = malloc(stateFactLength * sizeof(char));
+    if (!*stateFact) {
+        return ERR_OUT_OF_MEMORY;
+    }
+    memcpy(*stateFact, stateFactNode->jo.content, stateFactLength);
+
+    return RULES_OK;
+}
+
 unsigned int getState(unsigned int handle, char *sid, char **state) {
     ruleset *tree;
     RESOLVE_HANDLE(handle, &tree);
@@ -1554,26 +1675,12 @@ unsigned int getState(unsigned int handle, char *sid, char **state) {
     if (!sid) {
         sid = "0";
     }
-    unsigned int sidHash = fnv1Hash32(sid, strlen(sid));
-    unsigned int nodeOffset;
 
-    GET_FIRST(stateNode, 
-             tree->stateIndex, 
-             MAX_STATE_INDEX_LENGTH, 
-             ((ruleset*)tree)->statePool, 
-             sidHash, 
-             nodeOffset);
-
-    if (nodeOffset == UNDEFINED_HASH_OFFSET) {
-      return ERR_SID_NOT_FOUND;
-    }
-
-    stateNode *node = STATE_NODE(tree, nodeOffset); 
+    stateNode *node = NULL;
+    CHECK_RESULT(getStateNode(tree, sid, &node));
 
     return serializeState(node, state);
 }
-
-
 
 unsigned int deleteState(unsigned int handle, char *sid) {
     ruleset *tree;

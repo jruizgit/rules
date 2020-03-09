@@ -221,6 +221,14 @@ unsigned int deleteState(unsigned int handle,
 unsigned int renewActionLease(unsigned int handle, 
                               char *sid);
 
+unsigned int getEvents(unsigned int handle, 
+                       char *sid, 
+                       char **messages);
+
+unsigned int getFacts(unsigned int handle, 
+                      char *sid, 
+                      char **messages);
+
 #ifdef _WIN32
 int asprintf(char** ret, char* format, ...);
 #endif

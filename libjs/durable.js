@@ -1943,6 +1943,14 @@ exports = module.exports = durableEngine = function () {
         getHost().deleteState(rulesetName, sid);
     }
 
+    var getPendingEvents = function (rulesetName, sid) { 
+        return getHost().getPendingEvents(rulesetName, sid);
+    }
+
+    var getFacts = function (rulesetName, sid) { 
+        return getHost().getFacts(rulesetName, sid);
+    }
+
     var ex = {
         state: state,
         statechart: statechart,
@@ -1958,7 +1966,9 @@ exports = module.exports = durableEngine = function () {
         updateState: updateState,
         getState: getState,
         deleteState: deleteState,
-        getHost: getHost
+        getHost: getHost,
+        getPendingEvents: getPendingEvents,
+        getFacts: getFacts
     }; 
     extend(ex);
 

@@ -518,6 +518,58 @@ void jsRenewActionLease(const FunctionCallbackInfo<Value>& args) {
     }
 }
 
+void jsGetEvents(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber()) {
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
+    } else {
+        char *messages;
+        unsigned int result = getEvents(TO_NUMBER(isolate, args[0]), 
+                                        TO_STRING(isolate, args[1]), 
+                                        &messages); 
+        if (result == RULES_OK) {
+            args.GetReturnValue().Set(CREATE_STRING(isolate, messages));
+            free(messages);
+        } else {
+            char *message = NULL;
+            if (asprintf(&message, "Could not get events, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
+            }
+        }
+    }
+}
+
+void jsGetFacts(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate;
+    isolate = args.GetIsolate();
+    if (args.Length() < 2) {
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong number of arguments")));
+    } else if (!args[0]->IsNumber()) {
+        isolate->ThrowException(Exception::TypeError(CREATE_STRING(isolate, "Wrong argument type")));
+    } else {
+        char *messages;
+        unsigned int result = getFacts(TO_NUMBER(isolate, args[0]), 
+                                       TO_STRING(isolate, args[1]), 
+                                       &messages); 
+        if (result == RULES_OK) {
+            args.GetReturnValue().Set(CREATE_STRING(isolate, messages));
+            free(messages);
+        } else {
+            char *message = NULL;
+            if (asprintf(&message, "Could not get facts, error code: %d", result) == -1) {
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, "Out of memory")));
+            } else {
+                isolate->ThrowException(Exception::Error(CREATE_STRING(isolate, message)));
+            }
+        }
+    }
+}
+
 static unsigned int storeMessageCallback(void *context, char *ruleset, char *sid, char *mid, unsigned char messageType, char *content) {
     CallbackProxy *p = (CallbackProxy *)context;
     Isolate* isolate = Isolate::GetCurrent();
@@ -807,6 +859,10 @@ void init(Local<Object> exports) {
     DEFINE_FUNCTION(exports, isolate, "deleteState", jsDeleteState);
     
     DEFINE_FUNCTION(exports, isolate, "renewActionLease", jsRenewActionLease);
+
+    DEFINE_FUNCTION(exports, isolate, "getEvents", jsGetEvents);
+
+    DEFINE_FUNCTION(exports, isolate, "getFacts", jsGetFacts);
     
     DEFINE_FUNCTION(exports, isolate, "setStoreMessageCallback", jsSetStoreMessageCallback);
     

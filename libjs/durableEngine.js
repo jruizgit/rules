@@ -337,6 +337,14 @@ exports = module.exports = durableEngine = function () {
             return JSON.parse(r.getState(handle, sid));
         }
 
+        that.getPendingEvents = function (sid) {
+            return JSON.parse(r.getEvents(handle, sid));
+        }
+
+        that.getFacts = function (sid) {
+            return JSON.parse(r.getFacts(handle, sid));
+        }
+
         that.deleteState = function (sid) {
             r.deleteState(handle, sid);
         }
@@ -963,6 +971,14 @@ exports = module.exports = durableEngine = function () {
 
         that.renewActionLease = function (rulesetName, sid) {
             that.getRuleset(rulesetName).renewActionLease(sid);
+        };
+
+        that.getPendingEvents = function (rulesetName, sid) {
+            return that.getRuleset(rulesetName).getPendingEvents(sid);
+        };
+
+        that.getFacts = function (rulesetName, sid) {
+            return that.getRuleset(rulesetName).getFacts(sid);
         };
 
         that.setStoreMessageCallback = function (func) {
