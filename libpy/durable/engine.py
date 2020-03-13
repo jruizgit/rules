@@ -9,7 +9,8 @@ import datetime
 import os
 import sys
 import traceback
-import logging
+
+from . import logger
 
 def _unix_now():
     dt = datetime.datetime.now()
@@ -457,11 +458,11 @@ class Ruleset(object):
                                     
                     except BaseException as error:
                         t, v, tb = sys.exc_info()
-                        logging.exception('base exception type %s, value %s, traceback %s', t, str(v), traceback.format_tb(tb))
+                        logger.exception('base exception type %s, value %s, traceback %s', t, str(v), traceback.format_tb(tb))
                         durable_rules_engine.abandon_action(self._handle, c._handle)
                         complete(error, None)
                     except:
-                        logging.exception('unknown exception type %s, value %s, traceback %s', t, str(v), traceback.format_tb(tb))
+                        logger.exception('unknown exception type %s, value %s, traceback %s', t, str(v), traceback.format_tb(tb))
                         durable_rules_engine.abandon_action(self._handle, c._handle)
                         complete('unknown error', None)
 
@@ -899,7 +900,7 @@ class Host(object):
                 try: 
                     ruleset.dispatch()
                 except BaseException as e:
-                    logging.exception('Error dispatching ruleset')
+                    logger.exception('Error dispatching ruleset')
 
                 timeout = 0
                 if (index == (len(self._ruleset_list) -1)):
@@ -919,7 +920,7 @@ class Host(object):
                 try: 
                     ruleset.dispatch_timers()
                 except BaseException as e:
-                    logging.error('Error {0}'.format(str(e)))
+                    logger.exception('Error dispatching timers')
 
                 timeout = 0
                 if (index == (len(self._ruleset_list) -1)):
