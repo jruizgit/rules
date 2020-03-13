@@ -1,6 +1,5 @@
-import logging
+from . import engine, logger
 
-from . import engine
 
 class avalue(object):
 
@@ -203,7 +202,7 @@ class value(object):
             if self._type == '$s':
                 raise Exception('s not allowed as rvalue')
 
-            logging.debug('defining {0}, {1}'.format(self._type, self._left))
+            logging.debug('defining %s, %s', self._type, self._left)
             new_definition = {self._type: self._left}
         else:
             new_definition = {self._op: {self._left: right_definition}}

@@ -899,7 +899,7 @@ class Host(object):
                 try: 
                     ruleset.dispatch()
                 except BaseException as e:
-                    logging.error('Error {0}'.format(str(e)))
+                    logging.exception('Error dispatching ruleset')
 
                 timeout = 0
                 if (index == (len(self._ruleset_list) -1)):
