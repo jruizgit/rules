@@ -461,7 +461,7 @@ class Ruleset(object):
                         durable_rules_engine.abandon_action(self._handle, c._handle)
                         complete(error, None)
                     except:
-                        logging.error('unknown exception type {0}, value {1}, traceback {2}'.format(t, str(v), traceback.format_tb(tb)))
+                        logging.exception('unknown exception type %s, value %s, traceback %s', t, str(v), traceback.format_tb(tb))
                         durable_rules_engine.abandon_action(self._handle, c._handle)
                         complete('unknown error', None)
 
