@@ -23,7 +23,7 @@ Gem::Specification.new do |s|
   s.files += Dir["librb/*.rb"]
   s.files += %w(LICENSE Rakefile)
 
-  s.add_development_dependency "rake", "10.4.2"
+  s.add_development_dependency "rake", '~> 12.3', '>= 12.3.3'
   s.add_development_dependency "rake-compiler", "~> 0.9.5"
   s.add_runtime_dependency "timers", "~> 4.0"
 end

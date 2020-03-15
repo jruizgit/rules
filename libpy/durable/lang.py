@@ -684,10 +684,14 @@ def retract_facts(ruleset_name, facts, complete = None):
 def update_state(ruleset_name, state, complete = None):
     get_host().update_state(ruleset_name, state, complete)
 
-def get_state(ruleset_name, sid):
+def get_state(ruleset_name, sid = None):
     return get_host().get_state(ruleset_name, sid)
 
-def delete_state(ruleset_name, sid):
+def delete_state(ruleset_name, sid = None):
     get_host().delete_state(ruleset_name, sid)
 
+def get_facts(ruleset_name, sid = None):
+    return get_host().get_facts(ruleset_name, sid)
 
+def get_pending_events(ruleset_name, sid = None):
+    return get_host().get_pending_events(ruleset_name, sid)

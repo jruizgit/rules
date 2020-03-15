@@ -122,6 +122,12 @@ class Closure(object):
     def delete_state(self):
         self._deleted = True
 
+    def get_facts(self):
+        return self._ruleset.get_facts(self.s.sid)
+
+    def get_pending_events(self):
+        return self._ruleset.get_pending_events(self.s.sid)
+
     def _has_completed(self):
         if _unix_now() - self._start_time > 10:
             self._completed = True
@@ -378,6 +384,18 @@ class Ruleset(object):
             sid = str(sid)
 
         durable_rules_engine.renew_action_lease(self._handle, sid)
+
+    def get_facts(self, sid):
+        if sid != None: 
+            sid = str(sid)
+
+        return json.loads(durable_rules_engine.get_facts(self._handle, sid))
+
+    def get_pending_events(self, sid):
+        if sid != None: 
+            sid = str(sid)
+
+        return json.loads(durable_rules_engine.get_events(self._handle, sid))
 
     def set_store_message_callback(self, func):
         durable_rules_engine.set_store_message_callback(self._handle, func)
@@ -814,14 +832,20 @@ class Host(object):
         rules = self.get_ruleset(ruleset_name)
         self._handle_function(rules, rules.update_state, state, complete)
 
-    def get_state(self, ruleset_name, sid):
+    def get_state(self, ruleset_name, sid = None):
         return self.get_ruleset(ruleset_name).get_state(sid)
 
-    def delete_state(self, ruleset_name, sid):
+    def delete_state(self, ruleset_name, sid = None):
         self.get_ruleset(ruleset_name).delete_state(sid)
 
-    def renew_action_lease(self, ruleset_name, sid):
+    def renew_action_lease(self, ruleset_name, sid = None):
         self.get_ruleset(ruleset_name).renew_action_lease(sid)
+
+    def get_facts(self, ruleset_name, sid = None):
+        return self.get_ruleset(ruleset_name).get_facts(sid)
+
+    def get_pending_events(self, ruleset_name, sid = None):
+        return self.get_ruleset(ruleset_name).get_pending_events(sid)
 
     def set_store_message_callback(self, func):
         self.store_message_callback = func

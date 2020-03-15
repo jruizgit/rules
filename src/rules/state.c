@@ -957,8 +957,8 @@ unsigned int deleteStateNode(void *tree,
     }   
     free(node->actionState);
 
-    for (unsigned int i = 0; i < MAX_MESSAGE_INDEX_LENGTH * 2; ++i) {
-        unsigned int currentMessageOffset = node->messageIndex[i];
+    for (unsigned int i = 0; i < MAX_MESSAGE_INDEX_LENGTH; ++i) {
+        unsigned int currentMessageOffset = node->messageIndex[i * 2];
         while (currentMessageOffset != UNDEFINED_HASH_OFFSET) {
             messageNode *currentMessageNode = MESSAGE_NODE(node, currentMessageOffset);
             unsigned int nextMessageOffset = currentMessageNode->nextOffset; 
@@ -1542,8 +1542,8 @@ static unsigned int getMessagesLength(stateNode *state,
                                       unsigned int *messageCount) {
     unsigned int resultLength = 2;
     *messageCount = 0;
-    for (unsigned int i = 0; i < MAX_MESSAGE_INDEX_LENGTH * 2; ++i) {
-        unsigned int currentMessageOffset = state->messageIndex[i];
+    for (unsigned int i = 0; i < MAX_MESSAGE_INDEX_LENGTH; ++i) {
+        unsigned int currentMessageOffset = state->messageIndex[i * 2];
         while (currentMessageOffset != UNDEFINED_HASH_OFFSET) {
             messageNode *currentMessageNode = MESSAGE_NODE(state, currentMessageOffset);
             if (currentMessageNode->messageType == messageType) {
@@ -1569,8 +1569,8 @@ static unsigned int serializeMessages(stateNode *state,
     messages[0] = '['; 
     ++messages;
     unsigned int currentMessageCount = 0;
-    for (unsigned int i = 0; i < MAX_MESSAGE_INDEX_LENGTH * 2 && currentMessageCount < messageCount; ++i) {
-        unsigned int currentMessageOffset = state->messageIndex[i];
+    for (unsigned int i = 0; i < MAX_MESSAGE_INDEX_LENGTH && currentMessageCount < messageCount; ++i) {
+        unsigned int currentMessageOffset = state->messageIndex[i * 2];
         while (currentMessageOffset != UNDEFINED_HASH_OFFSET && currentMessageCount < messageCount) {
             messageNode *currentMessageNode = MESSAGE_NODE(state, currentMessageOffset);
             if (currentMessageNode->messageType == messageType) {

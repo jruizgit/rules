@@ -60,7 +60,7 @@ assert_fact('animal', { 'subject': 'Kermit', 'predicate': 'lives', 'object': 'wa
 assert_fact('animal', { 'subject': 'Greedy', 'predicate': 'eats', 'object': 'flies' })
 assert_fact('animal', { 'subject': 'Greedy', 'predicate': 'lives', 'object': 'land' })
 assert_fact('animal', { 'subject': 'Tweety', 'predicate': 'eats', 'object': 'worms' })
-
+print('animal -> {0}'.format(get_facts('animal')))
 
 with ruleset('animal0'):
     # will be triggered by 'Kermit eats flies'
@@ -244,6 +244,7 @@ with ruleset('attributes'):
     @when_all(pri(3), m.amount < 300)
     def first_detect(c):
         print('attributes-> P3: {0}'.format(c.m.amount))
+        print('attributes-> {0}'.format(c.get_facts()))
         
     @when_all(pri(2), m.amount < 200)
     def second_detect(c):
@@ -388,6 +389,7 @@ with statechart('worker'):
             @when_all(m.subject == 'enter')
             def continue_process(c):
                 print('worker-> start process')
+                print('worker-> {0}'.format(c.get_pending_events()))
     
         with state('process'):
             @to('process')

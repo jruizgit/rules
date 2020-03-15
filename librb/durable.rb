@@ -43,12 +43,20 @@ module Durable
     self.get_host().update_state ruleset_name, state, complete
   end
 
-  def self.get_state(ruleset_name, sid)
+  def self.get_state(ruleset_name, sid = nil)
     self.get_host().get_state ruleset_name, sid
   end
 
-  def self.delete_state(ruleset_name, sid)
+  def self.delete_state(ruleset_name, sid = nil)
     self.get_host().delete_state ruleset_name, sid
+  end
+
+  def self.get_facts(ruleset_name, sid = nil)
+    self.get_host().get_facts ruleset_name, sid
+  end
+
+  def self.get_pending_events(ruleset_name, sid = nil)
+    self.get_host().get_pending_events ruleset_name, sid
   end
 
   def self.ruleset(name, &block) 

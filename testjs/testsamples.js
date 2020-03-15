@@ -261,8 +261,8 @@ d.ruleset('test', function() {
 d.post('test', {subject: 'World'});
 
 d.ruleset('mixedNested', function() {
-        whenAll: m['field1'].field2['field3'] == 8
-        run: console.log("mixedNested ok")
+    whenAll: m['field1'].field2['field3'] == 8
+    run: console.log("mixedNested ok")
 });
 
 d.post('mixedNested',{field1 : {field2 : {field3 : 8}}});
@@ -284,7 +284,10 @@ d.ruleset('risk0', function() {
 });
 
 d.post('risk0', {t: 'purchase', location: 'US'});
+console.log('risk0 events');
+console.log(d.getPendingEvents('risk0'));
 d.post('risk0', {t: 'purchase', location: 'CA'});
+d.post('risk0', {t: 'purchase', location: 'US'});
 
 d.ruleset('counter_or', function() {
     whenAll: {
@@ -515,7 +518,10 @@ d.statechart('worker', function() {
         enter: {
             to: 'process'
             whenAll: m.subject == 'enter'
-            run: console.log('worker start process')
+            run: {
+                console.log('worker start process');
+                console.log(getPendingEvents());
+            }
         }
 
         process: {
@@ -628,12 +634,16 @@ d.ruleset('attributes', function() {
             
     whenAll: m.amount < 100
     pri: 1
-    run: console.log('attributes P1 ->' + m.amount);
+    run: { 
+        console.log('attributes P1 ->' + m.amount);
+        console.log(getFacts());
+    }
 });
 
 d.assert('attributes', {amount: 50});
 d.assert('attributes', {amount: 150});
 d.assert('attributes', {amount: 250});
+
 
 d.ruleset('expense5', function() {
     // use the '.' notation to match properties in nested objects
@@ -680,6 +690,7 @@ d.ruleset('animal', function() {
 
     whenAll: +m.subject
     run: console.log('animal fact: ' + m.subject + ' ' + m.predicate + ' ' + m.object)
+
 });
 
 d.assert('animal', { subject: 'Kermit', predicate: 'eats', object: 'flies'});
@@ -687,6 +698,7 @@ d.assert('animal', { subject: 'Kermit', predicate: 'lives', object: 'water'});
 d.assert('animal', { subject: 'Greedy', predicate: 'eats', object: 'flies'});
 d.assert('animal', { subject: 'Greedy', predicate: 'lives', object: 'land'});
 d.assert('animal', { subject: 'Tweety', predicate: 'eats', object: 'worms'});
+console.log(d.getFacts('animal'));
 
 d.ruleset('risk5', function() {
     
@@ -694,7 +706,7 @@ d.ruleset('risk5', function() {
     whenAll: {
         m.debit > 2 * m.credit
     }
-    run: console.log('risk5 debit ' + m.debit + ' more than twice the credit ' + m.credit)
+    run: { console.log('risk5 debit ' + m.debit + ' more than twice the credit ' + m.credit) }
    
     // correlates two events, evaluated in the beta tree (redis)
     whenAll: {

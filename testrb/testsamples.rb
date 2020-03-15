@@ -1,4 +1,5 @@
 require "durable"
+require "json"
 
 Durable.ruleset :test do
   # antecedent
@@ -47,6 +48,7 @@ Durable.assert :animal1, { :subject => "Kermit", :predicate => "lives", :object 
 Durable.assert :animal1, { :subject => "Greedy", :predicate => "eats", :object => "flies" }
 Durable.assert :animal1, { :subject => "Greedy", :predicate => "lives", :object => "land" }
 Durable.assert :animal1, { :subject => "Tweety", :predicate => "eats", :object => "worms" }
+puts "animal1 -> " + JSON.generate(Durable.get_facts(:animal1))
 
 Durable.ruleset :animal do
   # will be triggered by "Kermit eats flies"
@@ -239,6 +241,7 @@ Durable.post :expense4, { :amount => 10000 }
 Durable.ruleset :attributes do
   when_all pri(3), m.amount < 300 do
     puts "attributes-> P3: #{m.amount}"
+    puts "attributes-> " + JSON.generate(get_facts())
   end
 
   when_all pri(2), m.amount < 200 do
@@ -315,6 +318,7 @@ Durable.statechart :worker do
     state :enter do
       to :process, when_all(m.subject == "enter") do
         puts "worker-> start process"
+        puts "worker-> " + JSON.generate(get_pending_events())
       end
     end
 

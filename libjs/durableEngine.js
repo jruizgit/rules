@@ -138,6 +138,14 @@ exports = module.exports = durableEngine = function () {
             }
         };
 
+        that.getFacts = function() {
+            return ruleset.getFacts(that.s.sid);
+        };
+
+        that.getPendingEvents = function() {
+            return ruleset.getPendingEvents(that.s.sid);
+        };
+
         that.hasEnded = function () {
             if ((new Date().getTime() - startTime) > 10000) {
                 ended = true;

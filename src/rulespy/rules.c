@@ -568,6 +568,64 @@ static PyObject *pyRenewActionLease(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+static PyObject *pyGetFacts(PyObject *self, PyObject *args) {
+    unsigned int handle;
+    char *sid;
+    if (!PyArg_ParseTuple(args, "Iz", &handle, &sid)) {
+        PyErr_SetString(RulesError, "pyGetFacts Invalid argument");
+        return NULL;
+    }
+
+    char *facts;
+    unsigned int result = getFacts(handle, sid, &facts);
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            if (asprintf(&message, "Could not get facts, error code: %d", result) == -1) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
+        }
+        return NULL;
+    }
+    PyObject *returnValue = Py_BuildValue("s", facts);
+    free(facts);
+    return returnValue;
+}
+
+static PyObject *pyGetEvents(PyObject *self, PyObject *args) {
+    unsigned int handle;
+    char *sid;
+    if (!PyArg_ParseTuple(args, "Iz", &handle, &sid)) {
+        PyErr_SetString(RulesError, "pyGetEvents Invalid argument");
+        return NULL;
+    }
+
+    char *events;
+    unsigned int result = getEvents(handle, sid, &events);
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            PyErr_NoMemory();
+        } else { 
+            char *message;
+            if (asprintf(&message, "Could not get events, error code: %d", result) == -1) {
+                PyErr_NoMemory();
+            } else {
+                PyErr_SetString(RulesError, message);
+                free(message);
+            }
+        }
+        return NULL;
+    }
+    PyObject *returnValue = Py_BuildValue("s", events);
+    free(events);
+    return returnValue;
+}
+
 static unsigned int storeMessageCallback(void *context, char *ruleset, char *sid, char *mid, unsigned char messageType, char *content) {
     unsigned int errorCode = ERR_UNEXPECTED_TYPE;
     PyObject *arglist;
@@ -879,6 +937,8 @@ static PyMethodDef myModule_methods[] = {
     {"get_state", pyGetState, METH_VARARGS},
     {"delete_state", pyDeleteState, METH_VARARGS},
     {"renew_action_lease", pyRenewActionLease, METH_VARARGS},
+    {"get_facts", pyGetFacts, METH_VARARGS},
+    {"get_events", pyGetEvents, METH_VARARGS},
     {"set_store_message_callback", pySetStoreMessageCallback, METH_VARARGS},
     {"set_delete_message_callback", pySetDeleteMessageCallback, METH_VARARGS},
     {"set_queue_message_callback", pySetQueueMessageCallback, METH_VARARGS},

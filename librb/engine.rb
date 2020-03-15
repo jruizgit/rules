@@ -144,6 +144,14 @@ module Engine
       @_deleted = true
     end
 
+    def get_facts()
+      @_ruleset.get_facts @s.sid
+    end
+
+    def get_pending_events()
+      @_ruleset.get_pending_events @s.sid
+    end
+
     def has_completed()
       if Time.now - @_start_time > 10000
         @_completed = true
@@ -395,15 +403,43 @@ module Engine
     end
 
     def get_state(sid)
+      if sid == nil
+        sid = "0"
+      end
+
       JSON.parse Rules.get_state(@handle, sid.to_s)
     end
 
     def delete_state(sid)
+      if sid == nil
+        sid = "0"
+      end
+
       Rules.delete_state(@handle, sid.to_s)
     end
 
     def renew_action_lease(sid)
+      if sid == nil
+        sid = "0"
+      end
+
       Rules.renew_action_lease @handle, sid.to_s
+    end
+
+    def get_facts(sid)
+      if sid == nil
+        sid = "0"
+      end
+
+      JSON.parse Rules.get_facts(@handle, sid.to_s)
+    end
+
+    def get_pending_events(sid)
+      if sid == nil
+        sid = "0"
+      end
+
+      JSON.parse Rules.get_events(@handle, sid)
     end
 
     def Ruleset.create_rulesets(host, ruleset_definitions)
@@ -983,16 +1019,24 @@ module Engine
       handle_function rules, @update_state_func, state, complete
     end
 
-    def get_state(ruleset_name, sid)
+    def get_state(ruleset_name, sid = nil)
       get_ruleset(ruleset_name).get_state sid
     end
 
-    def delete_state(ruleset_name, sid)
+    def delete_state(ruleset_name, sid = nil)
       get_ruleset(ruleset_name).delete_state sid
     end
 
-    def renew_action_lease(ruleset_name, sid)
+    def renew_action_lease(ruleset_name, sid = nil)
       get_ruleset(ruleset_name).renew_action_lease sid
+    end
+
+    def get_facts(ruleset_name, sid = nil)
+      get_ruleset(ruleset_name).get_facts sid
+    end
+
+    def get_pending_events(ruleset_name, sid = nil)
+      get_ruleset(ruleset_name).get_pending_events sid
     end
 
     def register_rulesets(ruleset_definitions)

@@ -371,6 +371,46 @@ static VALUE rbRenewActionLease(VALUE self, VALUE handle, VALUE sid) {
     return Qnil;
 }
 
+static VALUE rbGetFacts(VALUE self, VALUE handle, VALUE sid) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(sid, T_STRING);
+
+    char *facts;
+    unsigned int result = getFacts(FIX2INT(handle), RSTRING_PTR(sid), &facts);
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not get facts, error code: %d", result);
+        }
+    }
+
+    VALUE output = rb_str_new2(facts);
+    free(facts);
+    return output;
+}
+
+
+static VALUE rbGetEvents(VALUE self, VALUE handle, VALUE sid) {
+    Check_Type(handle, T_FIXNUM);
+    Check_Type(sid, T_STRING);
+
+    char *events;
+    unsigned int result = getEvents(FIX2INT(handle), RSTRING_PTR(sid), &events);
+    if (result != RULES_OK) {
+        if (result == ERR_OUT_OF_MEMORY) {
+            rb_raise(rb_eNoMemError, "Out of memory");
+        } else { 
+            rb_raise(rb_eException, "Could not get events, error code: %d", result);
+        }
+    }
+
+    VALUE output = rb_str_new2(events);
+    free(events);
+    return output;
+}
+
+
 void Init_rules() {
     rulesModule = rb_define_module("Rules");
     rb_define_singleton_method(rulesModule, "create_ruleset", rbCreateRuleset, 2);
@@ -392,6 +432,8 @@ void Init_rules() {
     rb_define_singleton_method(rulesModule, "get_state", rbGetState, 2);
     rb_define_singleton_method(rulesModule, "delete_state", rbDeleteState, 2);
     rb_define_singleton_method(rulesModule, "renew_action_lease", rbRenewActionLease, 2);
+    rb_define_singleton_method(rulesModule, "get_facts", rbGetFacts, 2);
+    rb_define_singleton_method(rulesModule, "get_events", rbGetEvents, 2);
 }
 
 
