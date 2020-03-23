@@ -426,6 +426,27 @@ with ruleset('expense5'):
 post('expense5', {'t': 'bill', 'invoice': {'amount': 100}})
 post('expense5', {'t': 'account', 'payment': {'invoice': {'amount': 100}}})
 
+
+with ruleset('expense6'):
+    @when_any((m.subject == 'approve') & (m.amount == 1000), 
+              (m.subject == 'jumbo') & (m.amount == 10000))
+    def action(c):
+        print('expense6 matched')
+    
+post('expense6', { 'subject': 'approve', 'amount': 1000 })
+post('expense6', { 'subject': 'jumbo', 'amount': 10000 })
+
+
+with ruleset("expense7"):
+    @when_any(m.observations.anyItem(item.matches("a")) & m.observations.anyItem(item.matches("b")),
+              m.observations.anyItem(item.matches("c")) & m.observations.anyItem(item.matches("d")))
+    def match(c):
+        print("expense7 matched")
+
+post("expense7", {"observations": ["a", "b"]})
+post("expense7", {"observations": ["c", "d"]})
+
+
 with ruleset('nested'):
     @when_all(+m.item)
     def test(c):
@@ -434,6 +455,7 @@ with ruleset('nested'):
 post('nested', {'item': 'not_nested'})
 post('nested', {'item': {'nested': 'true'}})
 post('nested', {'item': {'nested': {'nested': 'true'}}})
+
 
 with ruleset('bookstore'):
     # this rule will trigger for events with status
@@ -726,12 +748,12 @@ with ruleset('multi_thread_test'):
 post('multi_thread_test', { 'subject': 'World' })
 
 def try_multi_thread_test(thread_number):
-    for ii in range(10):
+    for ii in range(5):
         post('multi_thread_test', { 'id': thread_number * 10000 + ii, 'subject': 'World' })
 
 threads = list()
 
-for i in range(10):
+for i in range(5):
     t = threading.Thread(target=try_multi_thread_test, args=(i,), daemon=True)
     threads.append(t)
     t.start()

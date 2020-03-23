@@ -780,7 +780,7 @@ unsigned int storeMessage(void *tree,
 
     ruleset *rulesetTree = (ruleset*)tree;
     if (sideEffect && rulesetTree->storeMessageCallback) {
-        unsigned char actionType;
+        unsigned char actionType = ACTION_ASSERT_EVENT;
         switch (messageType) {
             case MESSAGE_TYPE_EVENT:
                 actionType = ACTION_ASSERT_EVENT;

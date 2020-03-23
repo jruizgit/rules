@@ -934,6 +934,33 @@ d.assert('expense7', {amount: 1000});
 d.assert('expense7', {subject: 'jumbo'});
 d.post('expense7', {amount: 10000});
 
+
+d.ruleset('expense8', function() {
+    whenAny: { 
+        m.subject == 'approve' && m.amount == 1000
+        m.subject == 'jumbo' && m.amount == 10000
+    }
+    run: {
+        console.log('expense8 matched');
+    }
+});
+
+d.post('expense8', {subject: 'approve', amount: 1000});
+d.post('expense8', {subject: 'jumbo', amount: 10000});
+
+d.ruleset('expense9', function() {
+    whenAny: { 
+        m.observations.anyItem(item.matches('a')) && m.observations.anyItem(item.matches('b'))
+        m.observations.anyItem(item.matches('c')) && m.observations.anyItem(item.matches('d'))
+    }
+    run: {
+        console.log('expense9 matched');
+    }
+});
+
+d.post('expense9', {observations: ['a', 'b']});
+d.post('expense9', {observations: ['c', 'd']});
+
 d.getHost().setRulesets({ risk7: {
     suspect: {
         run: function(c) { console.log('risk7: fraud detected'); },

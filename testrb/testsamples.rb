@@ -410,6 +410,29 @@ Durable.post_batch :expense6, [{ :amount => 10 },
                          { :amount => 400 }]
 Durable.assert :expense6, { :review => true }
 
+
+Durable.ruleset :expense7 do
+  when_any (m.subject == "approve") & (m.amount == 1000),
+           (m.subject == "jumbo") & (m.amount == 10000) do
+    puts "expense7 matched"
+  end
+end
+
+Durable.post :expense7, { :subject => "approve" , :amount => 1000 }
+Durable.post :expense7, { :subject => "jumbo", :amount => 10000 }
+
+
+Durable.ruleset :expense8 do
+  when_any m.observations.anyItem(item.matches("a")) & m.observations.anyItem(item.matches("b")),
+           m.observations.anyItem(item.matches("c")) & m.observations.anyItem(item.matches("d")) do
+    puts "expense8 matched"
+  end
+end
+
+Durable.post :expense8, { :observations => ["a", "b"] }
+Durable.post :expense8, { :observations => ["c", "d"] }
+
+
 Durable.ruleset :timer1 do
   when_all m.subject == "start" do
     start_timer "MyTimer", 5

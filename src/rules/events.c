@@ -1000,7 +1000,7 @@ static unsigned int handleDeleteMessage(ruleset *tree,
                                         stateNode *state,
                                         char *mid,
                                         unsigned int messageOffset) {
-    unsigned int result;
+    unsigned int result = RULES_OK;
     unsigned int count = 0;
     unsigned int i = 1;
     messageNode *message = MESSAGE_NODE(state, messageOffset);
@@ -1340,15 +1340,22 @@ static unsigned int handleMatchFrames(ruleset *tree,
         }
     }
 
-    if(currentNode->value.b.gateType == GATE_OR && !currentNode->value.b.expressionSequence.length) {
-        return handleBetaFrame(tree,
-                               state,
-                               currentMessageOffset,
-                               currentNode, 
-                               nextNode,
-                               NULL,
-                               NULL,
-                               sideEffect);   
+    if(currentNode->value.b.gateType == GATE_OR) {
+        if (currentNode->value.b.expressionSequence.length == 0 ||
+            (currentNode->value.b.expressionSequence.length == 2 && 
+                currentNode->value.b.expressionSequence.expressions[1].operator == OP_END &&
+                    (currentNode->value.b.expressionSequence.expressions[0].operator == OP_AND || 
+                        currentNode->value.b.expressionSequence.expressions[0].operator == OP_OR))) {
+        
+            return handleBetaFrame(tree,
+                                   state,
+                                   currentMessageOffset,
+                                   currentNode, 
+                                   nextNode,
+                                   NULL,
+                                   NULL,
+                                   sideEffect);   
+        }
     }
 
     return RULES_OK;

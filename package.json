@@ -1,6 +1,6 @@
 {
   "name": "durable",
-  "version": "2.0.29",
+  "version": "2.0.30",
   "description": "A lightweight rules engine for real-time, consistent and scalable coordination of events.",
   "keywords": [
     "business rules",
@@ -30,8 +30,8 @@
   "license": "MIT",
   "gypfile": true,
   "engines": {
-    "node": "12.11.x",
-    "npm": "6.11.x"
+    "node": ">=12.11 <13.11",
+    "npm": ">=6.11"
   },
   "author": {
     "name": "Jesus Ruiz",
