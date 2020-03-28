@@ -233,6 +233,28 @@ d.assert('match21', {subject: 'has hello string'});
 d.assert('match21', {subject: 'error while abc'});
 d.assert('match21', {subject: 'error error error'});
 d.assert('match21', {subject: 'does not match'}, function(err, state){ console.log('match 21 ' + err.message)});
+d.assert('match21', {subject: 5}, function(err, state){ console.log('match 21 ' + err.message)});
+
+
+d.ruleset('coerce', function() {
+    whenAll: m.subject.matches('10.500000')
+    run: console.log('coerce-> matches: ' + m.subject)
+
+    whenAll: m.subject.matches('5')
+    run: console.log('coerce-> matches: ' + m.subject)
+
+    whenAll: m.subject.matches('false')
+    run: console.log('coerce-> matches: ' + m.subject)
+
+    whenAll: m.subject.matches('nil')
+    run: console.log('coerce-> matches: nil')
+});
+
+d.assert('coerce', {subject: 10.5 });
+d.assert('coerce', {subject: 5 });
+d.assert('coerce', {subject: false });
+d.assert('coerce', {subject: null });
+
 
 d.ruleset('match22', function() {
     whenAll: m.subject.imatches('hello.*')

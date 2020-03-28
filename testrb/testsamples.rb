@@ -164,6 +164,32 @@ Durable.assert :strings, { :subject => "has Hello string" }
 Durable.assert :strings, { :subject => "does not match" }, -> e, state {
   puts "strings expected:#{e}"
 }
+Durable.assert :strings, { :subject => 5 }, -> e, state {
+  puts "strings expected:#{e}"
+}
+
+Durable.ruleset :coerce do
+  when_all m.subject.matches("10.500000") do
+    puts "coerce-> matches: #{m.subject}"
+  end
+
+  when_all m.subject.matches("5") do
+    puts "coerce-> matches: #{m.subject}"
+  end
+
+  when_all m.subject.matches("false") do
+    puts "coerce-> matches: #{m.subject}"
+  end
+
+  when_all m.subject.matches("nil") do
+    puts "coerce-> matches: nil"
+  end
+end
+
+Durable.assert :coerce, { :subject => 10.5 }
+Durable.assert :coerce, { :subject => 5 }
+Durable.assert :coerce, { :subject => false }
+Durable.assert :coerce, { :subject => nil }
 
 Durable.ruleset :indistinct do
   when_all distinct(false),

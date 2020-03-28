@@ -485,19 +485,67 @@ static unsigned int reduceExpression(ruleset *tree,
                                &leftProperty));
 
     if (currentExpression->right.type == JSON_REGEX || currentExpression->right.type == JSON_IREGEX) {
-        
         targetProperty->type = JSON_BOOL;
-        if (leftProperty->type != JSON_STRING) {
-            targetProperty->value.b = 0;
-        } else {
-            targetProperty->value.b = evaluateRegex(tree,
-                                                    leftProperty->value.s, 
-                                                    leftProperty->valueLength, 
-                                                    (currentExpression->right.type == JSON_REGEX) ? 0 : 1,
-                                                    currentExpression->right.value.regex.vocabularyLength,
-                                                    currentExpression->right.value.regex.statesLength,
-                                                    currentExpression->right.value.regex.stateMachineOffset);
+        targetProperty->value.b = 0;
+
+        char *leftString = "";
+        unsigned short leftLength = 0;
+        switch(leftProperty->type) {
+            case JSON_INT:
+                {
+    #ifdef _WIN32
+                    leftString = (char *)_alloca(sizeof(char)*(MAX_INT_LENGTH + 1));
+                    sprintf_s(leftString, sizeof(char)*(MAX_INT_LENGTH + 1), "%lld", leftProperty->value.i);
+    #else
+                    char newString[MAX_INT_LENGTH + 1];
+                    leftString = newString;
+                    snprintf(leftString, sizeof(char)*(MAX_INT_LENGTH + 1), "%lld", leftProperty->value.i);
+    #endif         
+                    leftLength = strlen(leftString);
+                    break;
+                }
+            case JSON_DOUBLE:
+                {
+    #ifdef _WIN32
+                    leftString = (char *)_alloca(sizeof(char)*(MAX_DOUBLE_LENGTH + 1));
+                    sprintf_s(leftString, sizeof(char)*(MAX_DOUBLE_LENGTH + 1), "%f", leftProperty->value.d);
+    #else
+                    char newString[MAX_DOUBLE_LENGTH + 1];
+                    leftString = newString;
+                    snprintf(leftString, sizeof(char)*(MAX_DOUBLE_LENGTH + 1), "%f", leftProperty->value.d);
+    #endif         
+                    leftLength = strlen(leftString);
+                    break;
+                }
+            case JSON_BOOL:
+                if (leftProperty->value.b) {
+                    leftString = "true";
+                    leftLength = 4;
+                }
+                else {
+                    leftString = "false";
+                    leftLength = 5;
+                }
+
+                break;
+            case JSON_NIL:
+                leftString = "nil";
+                leftLength = 3;
+                break;
+            case JSON_STRING:
+                leftString = leftProperty->value.s;
+                leftLength = leftProperty->valueLength;
+                break;
         }
+
+        targetProperty->value.b = evaluateRegex(tree,
+                                                leftString, 
+                                                leftLength, 
+                                                (currentExpression->right.type == JSON_REGEX) ? 0 : 1,
+                                                currentExpression->right.value.regex.vocabularyLength,
+                                                currentExpression->right.value.regex.statesLength,
+                                                currentExpression->right.value.regex.stateMachineOffset);
+        
 
         return RULES_OK;
     }

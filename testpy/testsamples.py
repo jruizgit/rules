@@ -180,6 +180,35 @@ try:
 except BaseException as e:
     print('strings -> expected {0}'.format(e.message))
 
+try:
+    assert_fact('strings', { 'subject': 5 })
+except BaseException as e:
+    print('strings -> expected {0}'.format(e.message))
+
+
+with ruleset('coerce'):
+    @when_all(m.subject.matches('10.500000'))
+    def starts_with(c):
+        print ('coerce-> matches 10.500000: {0}'.format(c.m.subject))
+
+    @when_all(m.subject.matches('5'))
+    def starts_with(c):
+        print ('coerce-> matches 5: {0}'.format(c.m.subject))
+
+    @when_all(m.subject.matches('false'))
+    def starts_with(c):
+        print ('coerce-> matches false: {0}'.format(c.m.subject))
+   
+    @when_all(m.subject.matches('nil'))
+    def starts_with(c):
+        print ('coerce-> matches nil')
+
+
+assert_fact('coerce', { 'subject': 10.5 })
+assert_fact('coerce', { 'subject': 5 })
+assert_fact('coerce', { 'subject': False })
+assert_fact('coerce', { 'subject': None })
+
 
 with ruleset('indistinct'):
     @when_all(distinct(False),
