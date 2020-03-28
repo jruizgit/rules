@@ -485,14 +485,20 @@ static unsigned int reduceExpression(ruleset *tree,
                                &leftProperty));
 
     if (currentExpression->right.type == JSON_REGEX || currentExpression->right.type == JSON_IREGEX) {
+        
         targetProperty->type = JSON_BOOL;
-        targetProperty->value.b = evaluateRegex(tree,
-                                                leftProperty->value.s, 
-                                                leftProperty->valueLength, 
-                                                (currentExpression->right.type == JSON_REGEX) ? 0 : 1,
-                                                currentExpression->right.value.regex.vocabularyLength,
-                                                currentExpression->right.value.regex.statesLength,
-                                                currentExpression->right.value.regex.stateMachineOffset);
+        if (leftProperty->type != JSON_STRING) {
+            targetProperty->value.b = 0;
+        } else {
+            targetProperty->value.b = evaluateRegex(tree,
+                                                    leftProperty->value.s, 
+                                                    leftProperty->valueLength, 
+                                                    (currentExpression->right.type == JSON_REGEX) ? 0 : 1,
+                                                    currentExpression->right.value.regex.vocabularyLength,
+                                                    currentExpression->right.value.regex.statesLength,
+                                                    currentExpression->right.value.regex.stateMachineOffset);
+        }
+
         return RULES_OK;
     }
 
