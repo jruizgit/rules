@@ -654,13 +654,16 @@ def get_host():
     if not _main_host:
         _main_host = engine.Host()
 
-    ruleset_definitions = {}
-    for name, rset in _rulesets.items():
-        full_name, ruleset_definition = rset.define()
-        ruleset_definitions[full_name] = ruleset_definition
+    try:
+        ruleset_definitions = {}
+        for name, rset in _rulesets.items():
+            full_name, ruleset_definition = rset.define()
+            ruleset_definitions[full_name] = ruleset_definition
 
-    _main_host.register_rulesets(ruleset_definitions)
-    _rulesets = {}
+        _main_host.register_rulesets(ruleset_definitions)
+    finally:
+        _rulesets = {}
+        
     return _main_host
 
 def post(ruleset_name, message, complete = None):

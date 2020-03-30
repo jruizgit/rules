@@ -191,6 +191,42 @@ Durable.assert :coerce, { :subject => 5 }
 Durable.assert :coerce, { :subject => false }
 Durable.assert :coerce, { :subject => nil }
 
+begin
+  Durable.ruleset :invalid1 do
+    when_all m.subject.matches("*") do
+      puts "should not work: #{m.subject}"
+    end
+  end
+
+  Durable.assert :invalid1, { :subject => "hello world" }
+rescue Exception => e
+  puts "invalid1 expected: #{e}"
+end
+
+begin
+  Durable.ruleset :invalid2 do
+    when_all m.subject.matches(".**") do
+      puts "should not work: #{m.subject}"
+    end
+  end
+
+  Durable.assert :invalid2, { :subject => "hello world" }
+rescue Exception => e
+  puts "invalid2 expected: #{e}"
+end
+
+begin
+  Durable.ruleset :invalid3 do
+    when_all m.subject.matches(".?*") do
+      puts "should not work: #{m.subject}"
+    end
+  end
+
+  Durable.assert :invalid3, { :subject => "hello world" }
+rescue Exception => e
+  puts "invalid3 expected: #{e}"
+end
+
 Durable.ruleset :indistinct do
   when_all distinct(false),
            c.first = m.amount > 10,

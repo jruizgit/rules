@@ -23,6 +23,7 @@
 #define MAX_SET 8192
 #define MAX_LIST 1024
 #define MAX_INTERVAL 100
+#define MAX_REFCOUNT 1000
 
 
 #define CREATE_QUEUE(type) \
@@ -597,10 +598,6 @@ static unsigned int linkStates(state *previousState,
     previousState->transitions[previousState->transitionsLength].next = nextState;
     ++previousState->transitionsLength;
     ++nextState->refCount;
-    if (previousState->transitionsLength == MAX_TRANSITIONS) {
-        return ERR_REGEX_MAX_TRANSITIONS;
-    }
-
     return RULES_OK;
 }
 
@@ -852,10 +849,18 @@ static unsigned int validateGraph(char **first, char *last) {
         switch (currentToken.type) {
             case REGEX_SYMBOL:
             case REGEX_UNION:
-            case REGEX_STAR:
             case REGEX_PLUS:
-            case REGEX_QUESTION:
                 break;
+            case REGEX_STAR:
+            case REGEX_QUESTION:
+            {
+                char *nextFirst = *first; 
+                token nextToken;
+                unsigned int nextResult = readNextToken(&nextFirst, last, &nextToken); 
+                if (nextResult == REGEX_PARSE_OK && nextToken.type == REGEX_STAR) {
+                    return ERR_REGEX_INVALID;
+                }
+            }
             case REGEX_REGEX:
                 result = validateGraph(first, last);
                 if (result != REGEX_PARSE_OK) {
@@ -1141,7 +1146,7 @@ static unsigned int transformToDFA(state *nfa,
             }
         }
 
-        DEQUEUE(&currentState);    
+        DEQUEUE(&currentState);
     }
 
     return RULES_OK;
@@ -1343,6 +1348,12 @@ unsigned int compileRegex(void *tree,
     if (result != RULES_OK) {
         return result;
     }
+
+    if (!*vocabularyLength || !*statesLength) {
+        return ERR_REGEX_INVALID;
+    }
+
+
     void *newStateMachine;    
     result = storeRegexStateMachine((ruleset *)tree, 
                                     *vocabularyLength, 

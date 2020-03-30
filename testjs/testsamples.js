@@ -255,6 +255,38 @@ d.assert('coerce', {subject: 5 });
 d.assert('coerce', {subject: false });
 d.assert('coerce', {subject: null });
 
+try {
+    d.ruleset('invalid1', function() {
+        whenAll: m.subject.matches('*')
+        run: console.log('should not work: ' + m.subject)
+    });
+
+    d.assert('invalid1', {subject: 'hello world' });
+} catch (err) {
+    console.log('invalid1 expected: ' + err.message);  
+}
+
+try {
+    d.ruleset('invalid2', function() {
+        whenAll: m.subject.matches('.**')
+        run: console.log('should not work: ' + m.subject)
+    });
+
+    d.assert('invalid2', {subject: 'hello world' });
+} catch (err) {
+    console.log('invalid2 expected: ' + err.message);  
+}
+
+try {
+    d.ruleset('invalid3', function() {
+        whenAll: m.subject.matches('.?*')
+        run: console.log('should not work: ' + m.subject)
+    });
+
+    d.assert('invalid3', {subject: 'hello world' });
+} catch (err) {
+    console.log('invalid3 expected: ' + err.message);  
+}
 
 d.ruleset('match22', function() {
     whenAll: m.subject.imatches('hello.*')

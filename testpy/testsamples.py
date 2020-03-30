@@ -210,6 +210,39 @@ assert_fact('coerce', { 'subject': False })
 assert_fact('coerce', { 'subject': None })
 
 
+try:
+    with ruleset('invalid1'):
+        @when_all(m.subject.matches('*'))
+        def should_not_work(c):
+            print ('should not work: {0}'.format(c.m.subject))
+
+    assert_fact('invalid1', { 'subject': 'hello world' })
+except BaseException as e:
+    print('invalid1 -> expected {0}'.format(e))
+
+
+try:
+    with ruleset('invalid2'):
+        @when_all(m.subject.matches('.**'))
+        def should_not_work(c):
+            print ('should not work: {0}'.format(c.m.subject))
+
+    assert_fact('invalid2', { 'subject': 'hello world' })
+except BaseException as e:
+    print('invalid2 -> expected {0}'.format(e))
+
+
+try:
+    with ruleset('invalid3'):
+        @when_all(m.subject.matches('.?*'))
+        def should_not_work(c):
+            print ('should not work: {0}'.format(c.m.subject))
+
+    assert_fact('invalid3', { 'subject': 'hello world' })
+except BaseException as e:
+    print('invalid3 -> expected {0}'.format(e))
+
+
 with ruleset('indistinct'):
     @when_all(distinct(False),
               c.first << m.amount > 10,
