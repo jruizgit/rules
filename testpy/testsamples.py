@@ -635,6 +635,10 @@ with ruleset('risk6'):
     def rule8(c):
         print('risk6-> fraud 8 detected {0}'.format(c.m.payments))
  
+    @when_all(m.features.feature1.anyItem(item == 'a') | (m.features.feature2 == 'c'))
+    def rule9(c):
+        print('risk6-> fraud 9 detected {0}'.format(c.m.features))
+
 def risk6_callback(e, state):
     print('risk6 -> expected {0}'.format(e.message))
 
@@ -649,7 +653,8 @@ post('risk6', {'payments': [ {'field2': 2 } ]})
 post('risk6', {'payments': [ {'field2': 1 } ]}, risk6_callback)
 post('risk6', {'payments': [ {'field1': 1, 'field2': 2} ]}, risk6_callback)
 post('risk6', {'payments': [ {'field1': 1, 'field2': 1} ]}, risk6_callback)
-
+post('risk6', {'features': {'feature1': ['a'],'feature2': 'c'}})
+post('risk6', {'features': {'feature1': [],'feature2': 'c'}})
 
 def risk7_callback(c):
     print('risk7 fraud detected')

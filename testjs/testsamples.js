@@ -870,6 +870,11 @@ d.ruleset('risk6', function() {
         m.array.anyItem(item.field2 == m.field1)
     }
     run: console.log('risk6 fraud 16 detected ' + JSON.stringify(m))
+
+    whenAll: {
+        m.features.feature1.anyItem(item == 'a') || (m.features.feature2 == 'c')
+    }
+    run: console.log('risk6 fraud 17 detected ' + JSON.stringify(m.features))
 });
 
 d.post('risk6', { payments: [ 2500, 150, 450 ], cash: true }, function(err, state) {console.log('risk6: ' + err.message)});
@@ -903,6 +908,8 @@ d.post('risk6', { a5: [{field: 7, a6: [{field21 : 1}]}]}, function(err, state) {
 d.post('risk6', { a5: [{a6: [{field21 : 1}]}]}); 
 d.post('risk6', { field1: 8, array: [{field2 : 9}]}, function(err, state) {console.log('risk6: ' + err.message)});
 d.post('risk6', { field1: 8, array: [{field2 : 8}]});
+d.post('risk6', { features: {feature1: ['a'], feature2: 'c'}})
+d.post('risk6', { features: {feature1: [], feature2: 'c'}})
 
 d.ruleset('expense1', function() {
     whenAny: {

@@ -731,6 +731,11 @@ Durable.ruleset :risk6 do
   when_all m.payments.anyItem(-item.field1 & (item.field2 == 2)) do
     puts "risk6-> fraud 8 detected #{m.payments}"
   end
+
+  when_all m.features.feature1.anyItem(item == 'a') | (m.features.feature2 == 'c') do
+    puts "risk6-> fraud 9 detected #{m.features}"
+  end
+
 end
 
 Durable.post :risk6, { :payments => [ 2500, 150, 450 ] }, -> e, state {
@@ -754,6 +759,9 @@ Durable.post :risk6, { :payments => [ { :field1 => 1 , :field2 => 2 } ] }, -> e,
 Durable.post :risk6, { :payments => [ { :field1 => 1 , :field2 => 1 } ] }, -> e, state {
   puts "risk6 expected:#{e}"
 }
+Durable.post :risk6, { :features => { :feature1 => ['a'], :feature2 => 'c'}}
+Durable.post :risk6, { :features => { :feature1 => [], :feature2 => 'c'}}
+
 
 Durable.get_host().set_rulesets({ :risk7 => {
     :suspect => {

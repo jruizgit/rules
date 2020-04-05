@@ -132,6 +132,12 @@ unsigned int readNextArrayValue(char *start, char **first, char **last, unsigned
                 }
                 break;
             case ST_OBJECT_PROP_VAL:
+                if (start[0] == ']') {
+                    *first = start;
+                    *last = start;
+                    return PARSE_END;    
+                }
+                
                 return getValue(start, first, last, type);
                 break;
         }

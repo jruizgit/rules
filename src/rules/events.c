@@ -1587,7 +1587,7 @@ static unsigned int isArrayMatch(ruleset *tree,
                                  jsonProperty *currentProperty,
                                  alpha *arrayAlpha,
                                  unsigned char *propertyMatch) {
-    
+    *propertyMatch = 0;
     unsigned int result = RULES_OK;
     if (currentProperty->type != JSON_ARRAY) {
         return RULES_OK;
