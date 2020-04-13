@@ -1260,7 +1260,7 @@ static unsigned int packGraph(state *start,
         for (int i = 0; i < currentState->transitionsLength; ++ i) {
             transition *currentTransition = &currentState->transitions[i];
             unsigned int currentTransitionSymbol = currentTransition->symbol;
-            if (caseInsensitive) {
+            if (caseInsensitive && currentTransitionSymbol != REGEX_DOT) {
                 currentTransitionSymbol = tolower(currentTransitionSymbol);
             }
 
