@@ -1378,8 +1378,17 @@ unsigned int getObjectProperty(jsonObject *jo,
 unsigned int setObjectProperty(jsonObject *jo, 
                                unsigned int hash, 
                                unsigned char type, 
-                               unsigned short valueOffset, 
-                               unsigned short valueLength) {
+                               unsigned int valueOffset, 
+                               unsigned int valueLength) {
+
+    if (valueLength >= MAX_OBJECT_PROPERTY_SIZE) {
+        return ERR_EVENT_MAX_OBJECT_PROPERTY_SIZE;
+    }
+
+    if (valueOffset >= (MAX_OBJECT_SIZE - MAX_OBJECT_PROPERTY_SIZE)) {
+        return ERR_EVENT_MAX_OBJECT_SIZE;
+    }
+
     jsonProperty *property = &jo->properties[jo->propertiesLength]; 
     ++jo->propertiesLength;
     if (jo->propertiesLength == MAX_OBJECT_PROPERTIES) {

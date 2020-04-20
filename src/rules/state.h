@@ -1,5 +1,5 @@
 
-#include <time.h> 
+#include <time.h>
 
 #define HASH_ID 926444256
 #define HASH_SID 3593476751
@@ -18,6 +18,8 @@
 
 #define UNDEFINED_HASH_OFFSET 0
 #define MAX_OBJECT_PROPERTIES 255
+#define MAX_OBJECT_SIZE 4294967296
+#define MAX_OBJECT_PROPERTY_SIZE 16777216
 #define MAX_MESSAGE_FRAMES 16
 #define MAX_MESSAGE_INDEX_LENGTH 512
 #define MAX_LEFT_FRAME_INDEX_LENGTH 512
@@ -64,8 +66,8 @@ typedef struct pool {
 typedef struct jsonProperty {
     unsigned int hash;
     unsigned char type;
-    unsigned short valueOffset;
-    unsigned short valueLength;
+    unsigned int valueOffset;
+    unsigned int valueLength;
     union {
         long long i; 
         double d; 
@@ -193,8 +195,8 @@ unsigned int getObjectProperty(jsonObject *jo,
 unsigned int setObjectProperty(jsonObject *jo, 
                                unsigned int hash, 
                                unsigned char type, 
-                               unsigned short valueOffset, 
-                               unsigned short valueLength);
+                               unsigned int valueOffset, 
+                               unsigned int valueLength);
 
 unsigned int constructObject(char *root,
                              char *parentName, 
