@@ -66,7 +66,7 @@ typedef struct handleEntry {
     unsigned int nextEmptyEntry;
 } handleEntry;
 
-handleEntry handleEntries[MAX_HANDLES];
+extern handleEntry handleEntries[MAX_HANDLES];
 extern unsigned int firstEmptyEntry;
 extern unsigned int lastEmptyEntry;
 extern char entriesInitialized;

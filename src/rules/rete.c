@@ -59,6 +59,7 @@
 } while(0)
 
 
+handleEntry handleEntries[MAX_HANDLES];
 unsigned int firstEmptyEntry = 1;
 unsigned int lastEmptyEntry = MAX_HANDLES -1;
 char entriesInitialized = 0;
