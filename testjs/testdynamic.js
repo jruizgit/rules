@@ -1,36 +1,67 @@
 var stat = require('node-static');
-var redis = require('redis');
-var d = require('../libjs/durableEngine');
+var bodyParser = require('body-parser');
+var express = require('express');    
+var d = require('../libjs/durable');
 
-var host = d.host();
-var app = d.application(host);
-var db = redis.createClient();
+var app = express();
+var host = d.getHost();
 var fileServer = new stat.Server(__dirname);
+app.use(bodyParser.json());
 
 function printAction(actionName) {
     return function(c) {
         c.s.label = actionName;
-        console.log('Executing ' + actionName);
+        console.log('Running ' + actionName);
     }
 }
-
-host.loadRuleset = function(rulesetName, complete) {
-    db.hget('rulesets', rulesetName, function(err, result) {
-        if (err) {
-            complete(err);
-        } else {
-            complete(null, JSON.parse(result));
-        }
-    });
-};
-
-host.saveRuleset = function(rulesetName, rulesetDefinition, complete) {
-    db.hset('rulesets', rulesetName, JSON.stringify(rulesetDefinition), complete);
-};
 
 host.getAction = function(actionName) {
     return printAction(actionName);
 };
+
+app.get('/:rulesetName/state/:sid', function (request, response) {
+    response.contentType = 'application/json; charset=utf-8';
+    try {
+        response.status(200).send(host.getState(request.params.rulesetName, request.params.sid));
+    } catch (reason) {
+        response.status(500).send({ error: reason });
+    }
+});
+
+app.post('/:rulesetName/events/:sid', function (request, response) {
+    response.contentType = "application/json; charset=utf-8";
+    var message = request.body;
+    message.sid = request.params.sid;
+
+    host.post(request.params.rulesetName, message, function(e) {
+        if (e) {
+            response.status(500).send({ error: e });
+        } else {
+            response.status(200).send({});   
+        }
+    });
+});
+
+app.get('/:rulesetName/definition', function (request, response) {
+    response.contentType = 'application/json; charset=utf-8';
+    try {
+        response.status(200).send(host.getRuleset(request.params.rulesetName).getDefinition());
+    } catch (reason) {
+        response.status(500).send({ error: reason });
+    }
+});
+
+app.post('/:rulesetName/definition', function (request, response) {
+    response.contentType = "application/json; charset=utf-8";
+    host.setRulesets(request.body , function (e, result) {
+        if (e) {
+            response.status(500).send({ error: e });
+        }
+        else {
+            response.status(200).send();
+        }
+    });
+});
 
 app.get('/durableVisual.js', function (request, response) {
     request.addListener('end',function () {
@@ -50,4 +81,6 @@ app.get('/:rulesetName/:sid/admin.html', function (request, response) {
     }).resume();
 });
 
-app.run();
+app.listen(5000, function () {
+    console.log('Listening on 5000');
+}); 
