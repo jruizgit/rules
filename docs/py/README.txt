@@ -118,7 +118,7 @@ Waltzdb is a constraint propagation problem for image recognition: given a set o
 
 In this case too, the benchmark flow structure is defined using a statechart to improve code readability. The benchmark requirements are not altered. The execution time, for the case of 4 regions 654 ms.  
 
-https://github.com/jruizgit/rules/blob/master/testrb/waltzdb.rb  
+https://github.com/jruizgit/rules/blob/master/testpy/waltzdb.py
 
 IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive    
 
