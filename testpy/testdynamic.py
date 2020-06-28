@@ -1,18 +1,17 @@
 import os
-import redis
 import json
+from durable.lang import *
 from durable import engine
-from durable import interface
-from werkzeug.routing import Rule
 from werkzeug.wrappers import Request, Response
+from werkzeug.routing import Map, Rule
+from werkzeug.exceptions import HTTPException, NotFound
 from werkzeug.wsgi import SharedDataMiddleware
-
+from werkzeug.serving import run_simple
 
 class Host(engine.Host):
 
     def __init__(self):
         super(Host, self).__init__()
-        self._redis_server = redis.Redis()
 
     def get_action(self, action_name):
         def print_lamba(c):
@@ -21,25 +20,57 @@ class Host(engine.Host):
 
         return print_lamba;
 
-    def load_ruleset(self, ruleset_name):
-        ruleset_definition = self._redis_server.hget('rulesets', ruleset_name)
-        if ruleset_definition:
-            return json.loads(ruleset_definition)
-        else:
-            raise Exception('Ruleset with name {0} not found'.format(ruleset_name))
 
-    def save_ruleset(self, ruleset_name, ruleset_definition):
-        print('save ' + json.dumps(ruleset_definition))
-        self._redis_server.hset('rulesets', ruleset_name, json.dumps(ruleset_definition))
+class Application(object):
+
+    def __init__(self):
+        self._url_map = Map([Rule('/<ruleset_name>/definition', endpoint=self._ruleset_definition_request),
+                             Rule('/<ruleset_name>/state/<sid>', endpoint=self._state_request),
+                             Rule('/<ruleset_name>/events/<sid>', endpoint=self._events_request),
+                             Rule('/testdynamic.html', endpoint=self._dynamic_request), 
+                             Rule('/durableVisual.js', endpoint=self._dynamic_request), 
+                             Rule('/<ruleset_name>/<sid>/admin.html', endpoint=self._admin_request), 
+                             Rule('/favicon.ico', endpoint=self._empty)])
+
+        self._host = Host();
 
 
-class Application(interface.Application):
+    def _ruleset_definition_request(self, environ, start_response, ruleset_name):
+        def encode_promise(obj):
+            if isinstance(obj, engine.Promise) or hasattr(obj, '__call__'):
+                return 'function'
+            raise TypeError(repr(obj) + " is not JSON serializable")
 
-    def __init__(self, host):
-        super(Application, self).__init__(host, '127.0.0.1', 5000, [Rule('/testdynamic.html', endpoint=self._dynamic_request), 
-                                                                    Rule('/durableVisual.js', endpoint=self._dynamic_request), 
-                                                                    Rule('/<ruleset_name>/<sid>/admin.html', endpoint=self._admin_request), 
-                                                                    Rule('/favicon.ico', endpoint=self._empty)])
+        request = Request(environ)
+        if request.method == 'GET':
+            result = self._host.get_ruleset(ruleset_name)
+            return Response(json.dumps(result.get_definition(), default=encode_promise))(environ, start_response)
+        elif request.method == 'POST':
+            ruleset_definition = json.loads(request.stream.read().decode('utf-8'))
+            self._host.set_rulesets(ruleset_definition)
+
+        return Response()(environ, start_response)
+
+    def _state_request(self, environ, start_response, ruleset_name, sid):
+        request = Request(environ)
+        result = None
+        if request.method == 'GET':
+            result = self._host.get_state(ruleset_name, sid)
+            return Response(json.dumps(result))(environ, start_response)
+        elif request.method == 'POST':
+            message = json.loads(request.stream.read().decode('utf-8'))
+            message['sid'] = sid
+            result = self._host.update_state(ruleset_name, message)
+            return Response(json.dumps({'outcome': result}))(environ, start_response)
+        
+    def _events_request(self, environ, start_response, ruleset_name, sid):
+        request = Request(environ)
+        result = None
+        if request.method == 'POST':
+            message = json.loads(request.stream.read().decode('utf-8'))
+            message['sid'] = sid
+            result = self._host.post(ruleset_name, message)
+            return Response(json.dumps({'outcome': result}))(environ, start_response)
 
     def _empty(self, environ, start_response):
         return Response()(environ, start_response)
@@ -55,8 +86,19 @@ class Application(interface.Application):
         middleware = SharedDataMiddleware(self._not_found, {'/{0}/{1}/'.format(ruleset_name, sid): os.path.dirname(__file__)})
         return middleware(environ, start_response)
 
+    def __call__(self, environ, start_response):
+        request = Request(environ)
+        adapter = self._url_map.bind_to_environ(environ)
+        try:
+            endpoint, values = adapter.match()
+            return endpoint(environ, start_response, **values)
+        except HTTPException as e:
+            return e
+    
+    def run(self):
+        run_simple('127.0.0.1', 5000, self, threaded = True)
+
+
 if __name__ == '__main__':
-    main_host = Host()
-    main_host.run()
-    main_app = Application(main_host)
+    main_app = Application()
     main_app.run()

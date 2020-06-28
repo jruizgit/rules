@@ -116,6 +116,7 @@
         var url = window.location.pathname;
         var query = getQueryVariables(window.location.search);
         var state = rulesetState(url);
+        
         rulesetGraph(url, state).createVisual(query.size);
         
         function getQueryVariables(query) {

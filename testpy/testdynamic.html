@@ -27,7 +27,7 @@
                     alert('Server error ' + err.responseText);
                 } else {
                     d3.select('iframe')
-                      .attr('src', '/' + rulesetName + '/sample/admin.html?disableScratchpad=true&size=330');
+                      .attr('src', '/' + rulesetName + '/sample/admin.html?disableScratchpad=true&size=350');
                 }
             });
         } catch (err) {
@@ -43,7 +43,7 @@
             }
             else {
                 d3.select('iframe')
-                  .attr('src', '/' + rulesetName + '/sample/admin.html?disableScratchpad=true&size=330');
+                  .attr('src', '/' + rulesetName + '/sample/admin.html?disableScratchpad=true&size=350');
 
                 d3.select('textarea[id="rulesetpad"]')
                   .text(JSON.stringify(result, null, 4));
@@ -56,17 +56,12 @@
             var messageText = document.getElementById('messagepad').value;
             var message = JSON.parse(messageText);
             var rulesetName = document.getElementById('name').value;
-            server = d3.xhr('http://localhost:5000/' + rulesetName + '/events')
+            server = d3.xhr('http://localhost:5000/' + rulesetName + '/events/sample')
                        .header('content-type', 'application/json; charset=utf-8');
 
             server.post(messageText, function(err, result) {
                 if (err) {
                     alert('Server error ' + err.responseText);
-                } else {
-                    result = JSON.parse(result.responseText);
-                    if (result.outcome != 0) {
-                        alert('Server response ' + result.outcome);
-                    }
                 }
             });
         } catch (err) {
@@ -118,7 +113,7 @@
               '            }],\r\n' +
               '            "to": "suspect",\r\n' + 
               '            "run": "suspect"\r\n' + 
-              '         }\r\n' + 
+              '        }\r\n' + 
               '    },\r\n' +
               '    "suspect": {\r\n' + 
               '        "trigger": {\r\n' + 
@@ -132,14 +127,9 @@
               '    "fraud":{}\r\n' + 
               '}\r\n');
 
-    body.append('iframe')
-        .attr('width', 330)
-        .attr('height', 329)
-        .attr('scrolling', 'no')
-        .attr('style', "border:1px solid grey");
+    body.append('br');
+    body.append('br');
 
-    body.append('br');
-    body.append('br');
 
     body.append('input')
         .attr('type', 'button')
@@ -152,6 +142,15 @@
         .attr('id', 'approve')
         .attr('value', 'Load')
         .on('click', load);
+
+    body.append('br');
+    body.append('br');
+
+    body.append('iframe')
+        .attr('width', 350)
+        .attr('height', 350)
+        .attr('scrolling', 'no')
+        .attr('style', "border:1px solid grey");
 
     body.append('br');
     body.append('br');

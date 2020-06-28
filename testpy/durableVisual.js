@@ -943,7 +943,7 @@ function rulesetState(url) {
 
     var update = function () {
         var i;
-        var statusUrl = rulesetUrl + '/' + sid;
+        var statusUrl = rulesetUrl + '/state/' + sid;
         d3.json(statusUrl, function (err, status) {
             if (err) {
                 for (i = 0; i < errorEvents.length; ++i) {
@@ -963,7 +963,7 @@ function rulesetState(url) {
 
     var timeout = function () {
         update();
-        setTimeout(timeout, 5000);
+        setTimeout(timeout, 2000);
     }
 
     that.start = function () {
@@ -979,7 +979,7 @@ function rulesetGraph(url, state) {
     var nodes;
     var nodeDictionary = {};
     var sid = url.substring(0, url.lastIndexOf('/'));
-    var ruleSetUrl = sid.substring(0, sid.lastIndexOf('/'));
+    var rulesetUrl = sid.substring(0, sid.lastIndexOf('/'));
     sid= sid.substring(sid.lastIndexOf('/') + 1);
 
     if (sid.indexOf('.') !== -1) {
@@ -1399,13 +1399,15 @@ function rulesetGraph(url, state) {
     };
 
     that.createVisual = function (frameSize, callback) {
-        d3.json(ruleSetUrl, function (err, ruleSet) {
+        d3.json(rulesetUrl + '/definition', function (err, ruleSet) {
             if (err) {
+                alert(err)
                 var error;
                 try {
                     error = JSON.parse(err.responseText);
                 } catch (ex) {
                     error = { error: ex };
+
                 }
 
                 callback(error);
@@ -1432,7 +1434,7 @@ function rulesetGraph(url, state) {
                     y.domain([0, r]);
                 }
 
-                var title = ruleSetUrl.substring(1) + '/' + sid;
+                var title = rulesetUrl.substring(1) + '/' + sid;
                 if (nodes.type === 'stateChart') {
                     stateVisual(nodes, links, x, y, title, svg, state);
                 } else if (nodes.type === 'flowChart') {
