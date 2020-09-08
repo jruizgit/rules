@@ -1083,7 +1083,7 @@ module Engine
 
       timer = Timers::Group.new
 
-      thread_lambda = -> c {
+      thread_lambda = -> c, _t {
         if @ruleset_list.empty?
           timer.after 0.5, &thread_lambda
         else
@@ -1116,7 +1116,7 @@ module Engine
 
       timer = Timers::Group.new
 
-      thread_lambda = -> c {
+      thread_lambda = -> c, _t {
         if @ruleset_list.empty?
           timer.after 0.5, &thread_lambda
         else
