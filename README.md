@@ -271,9 +271,9 @@ Note how the benchmark flow structure is defined using a statechart to improve c
 
 _IMac, 4GHz i7, 32GB 1600MHz DDR3, 1.12 TB Fusion Drive_    
 
-* [Ruby](https://github.com/jruizgit/rules/blob/testrb/manners.rb)  
-* [Python](https://github.com/jruizgit/rules/blob/testpy/manners.py)  
-* [Node.js](https://github.com/jruizgit/rules/blob/testjs/manners.js)
+* [Ruby](https://github.com/jruizgit/rules/blob/master/testrb/manners.rb)  
+* [Python](https://github.com/jruizgit/rules/blob/master/testpy/manners.py)
+* [Node.js](https://github.com/jruizgit/rules/blob/master/testjs/manners.js)
 
 ## Image recognition and Waltzdb
 
