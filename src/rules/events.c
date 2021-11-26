@@ -601,7 +601,7 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
                                           messageObject,
                                           context,
                                           targetProperty));
-            ++*i;
+            ++*i;  // increment to next expression makes currentExpression invalid
         }
 
         if (targetProperty->type != JSON_BOOL) {
@@ -611,6 +611,8 @@ static unsigned int reduceExpressionSequence(ruleset *tree,
 
         if ((operator == OP_AND && !targetProperty->value.b) || 
             (operator == OP_OR && targetProperty->value.b)) {
+            // after reduceExpression() index i moved on to next currentExpression
+            currentExpression = &exprs->expressions[*i];
             while (currentExpression->operator != OP_END) {
                 ++*i;
                 currentExpression = &exprs->expressions[*i];
