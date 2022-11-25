@@ -177,7 +177,7 @@ Events can be posted using the http API. When the example above is listening, ru
 <sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:5000/risk/events`</sub>  
 <sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:5000/risk/events`</sub>  
 
-**Note from the autor:**  
+**Note from the author:**  
 
 *Using facts in the example above will produce the following output:*   
 
