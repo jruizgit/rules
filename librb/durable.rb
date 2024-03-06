@@ -103,12 +103,12 @@ module Durable
           left_definition = {@name => @left}
         end
 
-        righ_definition = @right
+        right_definition = @right
         if @right.kind_of? Arithmetic
-          righ_definition = @right.definition
+          right_definition = @right.definition
         end
 
-        return {@op => {:$l => left_definition, :$r => righ_definition}}
+        return {@op => {:$l => left_definition, :$r => right_definition}}
       end
     end
 
@@ -224,18 +224,18 @@ module Durable
         if not @left
           raise ArgumentError, "Property for #{@__type} and #{@__op} not defined"
         end 
-        righ_definition = @right
+        right_definition = @right
         if (@right.kind_of? Expression) || (@right.kind_of? Arithmetic)
-          righ_definition = @right.definition
+          right_definition = @right.definition
         end
 
         if @__op == :$eq
-          new_definition = {@left => righ_definition}
+          new_definition = {@left => right_definition}
         else
           if not @right
             new_definition = {@__type => @left}
           else
-            new_definition = {@__op => {@left => righ_definition}}
+            new_definition = {@__op => {@left => right_definition}}
           end
         end
       end

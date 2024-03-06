@@ -88,11 +88,11 @@ class avalue(object):
         else:
             left_definition = {self._name: self._left}
         
-        righ_definition = self._right
+        right_definition = self._right
         if isinstance(self._right, avalue):
-            righ_definition = self._right.define()
+            right_definition = self._right.define()
 
-        return {self._op: {'$l': left_definition, '$r': righ_definition}}
+        return {self._op: {'$l': left_definition, '$r': right_definition}}
         
 
 class closure(object):
