@@ -821,7 +821,7 @@ def try_multi_thread_test(thread_number):
 threads = list()
 
 for i in range(5):
-    t = threading.Thread(target=try_multi_thread_test, args=(i,), daemon=True)
+    t = threading.Thread(target=try_multi_thread_test, args=(i,))
     threads.append(t)
     t.start()
 
