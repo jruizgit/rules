@@ -1,6 +1,8 @@
 Reference Manual
 =====
+
 ## Table of contents
+
 * [Basics](reference.md#basics)
   * [Rules](reference.md#rules)
   * [Facts](reference.md#facts)
@@ -17,10 +19,10 @@ Reference Manual
   * [Nested Objects](reference.md#nested-objects)
   * [Arrays](reference.md#arrays)
   * [Facts and Events as rvalues](reference.md#facts-and-events-as-rvalues)
-* [Consequents](reference.md#consequents)  
+* [Consequents](reference.md#consequents)
   * [Conflict Resolution](reference.md#conflict-resolution)
   * [Unhandled Exceptions](reference.md#unhandled-exceptions)
-* [Flow Structures](reference.md#flow-structures) 
+* [Flow Structures](reference.md#flow-structures)
   * [Statechart](reference.md#statechart)
   * [Nested States](reference.md#nested-states)
   * [Flowchart](reference.md#flowchart)
@@ -31,8 +33,8 @@ Reference Manual
 ### Rules
 
 * `all` and `any` label the antecendent definition of a rule
-* `run` label the consequent definition of a rule 
-  
+* `run` label the consequent definition of a rule
+
 ```javascript
 {
   "test": {
@@ -138,11 +140,11 @@ Reference Manual
 }
 ```
 
-Facts can  be asserted using the http API. For the example above, run the following command:  
+Facts can  be asserted using the http API. For the example above, run the following command:
 
 <sub>`curl -H "content-type: application/json" -X POST -d '{"subject": "Tweety", "predicate": "eats", "object": "worms"}' http://localhost:5000/animal/facts`</sub>
 
-[top](reference.md#table-of-contents)  
+[top](reference.md#table-of-contents)
 
 ### Events
 
@@ -172,19 +174,19 @@ Facts can  be asserted using the http API. For the example above, run the follow
 }
 ```
 
-Events can be posted using the http API. When the example above is listening, run the following commands:  
+Events can be posted using the http API. When the example above is listening, run the following commands:
 
-<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:5000/risk/events`</sub>  
-<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:5000/risk/events`</sub>  
+<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "BR"}' http://localhost:5000/risk/events`</sub>
+<sub>`curl -H "content-type: application/json" -X POST -d '{"t": "purchase", "location": "JP"}' http://localhost:5000/risk/events`</sub>
 
-**Note from the autor:**  
+**Note from the author:**
 
-*Using facts in the example above will produce the following output:*   
+*Using facts in the example above will produce the following output:*
 
-<sub>`Fraud detected -> US, CA`</sub>  
-<sub>`Fraud detected -> CA, US`</sub>  
+<sub>`Fraud detected -> US, CA`</sub>
+<sub>`Fraud detected -> CA, US`</sub>
 
-[top](reference.md#table-of-contents)  
+[top](reference.md#table-of-contents)
 ### State
 Context state changes can be evaluated by rules. By convention, context state change events have the `"$s": 1` attribute.
 
@@ -245,10 +247,10 @@ Context state changes can be evaluated by rules. By convention, context state ch
   }
 }
 ```
-State can also be retrieved and modified using the http API. When the example above is running, try the following commands:  
-<sub>`curl -H "content-type: application/json" -X POST -d '{"status": "next"}' http://localhost:5000/flow/state`</sub>  
+State can also be retrieved and modified using the http API. When the example above is running, try the following commands:
+<sub>`curl -H "content-type: application/json" -X POST -d '{"status": "next"}' http://localhost:5000/flow/state`</sub>
 
-[top](reference.md#table-of-contents)  
+[top](reference.md#table-of-contents)
 
 ### Identity
 
@@ -297,12 +299,12 @@ State can also be retrieved and modified using the http API. When the example ab
 
 ## Antecendents
 ### Simple Filter
-A rule antecedent is an expression. The left side of the expression represents an event or fact property. The right side defines a pattern to be matched.   
+A rule antecedent is an expression. The left side of the expression represents an event or fact property. The right side defines a pattern to be matched.
 
-Logical operators:  
-* Unary: "$nex" (does not exist), "$ex" (exists)  
-* Logical operators: "$and", "$or"  
-* Relational operators: "$lt", "$gt", "$lte", "$gte", "$neq", attribute relation tests equality  
+Logical operators:
+* Unary: "$nex" (does not exist), "$ex" (exists)
+* Logical operators: "$and", "$or"
+* Relational operators: "$lt", "$gt", "$lte", "$gte", "$neq", attribute relation tests equality
 
 ```javascript
 {
@@ -326,33 +328,33 @@ Logical operators:
     }
   }
 }
-```  
+```
 [top](reference.md#table-of-contents)
 ### Pattern Matching
-durable_rules implements a simple pattern matching dialect. Use `"$mt"` to define the rule match pattern. 
+durable_rules implements a simple pattern matching dialect. Use `"$mt"` to define the rule match pattern.
 
-**Repetition**  
-\+ 1 or more repetitions  
-\* 0 or more repetitions  
-? optional (0 or 1 occurrence)  
+**Repetition**
+\+ 1 or more repetitions
+\* 0 or more repetitions
+? optional (0 or 1 occurrence)
 
-**Special**  
-() group  
-| disjunct  
-[] range  
-{} repeat  
+**Special**
+() group
+| disjunct
+[] range
+{} repeat
 
-**Character classes**  
-.	all characters  
-%a	letters  
-%c	control characters  
-%d	digits  
-%l	lower case letters  
-%p	punctuation characters  
-%s	space characters  
-%u	upper case letters  
-%w	alphanumeric characters  
-%x	hexadecimal digits  
+**Character classes**
+.	all characters
+%a	letters
+%c	control characters
+%d	digits
+%l	lower case letters
+%p	punctuation characters
+%s	space characters
+%u	upper case letters
+%w	alphanumeric characters
+%x	hexadecimal digits
 
 ```javascript
 {
@@ -371,9 +373,9 @@ durable_rules implements a simple pattern matching dialect. Use `"$mt"` to defin
     }
   }
 }
-```  
-[top](reference.md#table-of-contents) 
-### String Operations  
+```
+[top](reference.md#table-of-contents)
+### String Operations
 The pattern matching dialect can be used for common string operations. Use `"$imt"` fto define case insensitive rule match pattern.
 
 ```javascript
@@ -417,13 +419,13 @@ The pattern matching dialect can be used for common string operations. Use `"$im
     }
   }
 }
-```  
+```
 [top](reference.md#table-of-contents)
 
 ### Correlated Sequence
 The `"all"` object expresses a sequence of events or facts. The object names are used to name events or facts, which can be referenced in subsequent expressions. When referencing events or facts, all properties are available. Complex patterns can be expressed using arithmetic operators.  Arithmetic operators have left `"$l"` and right `"$r"` subexpressions.
 
-Arithmetic operators: `"$add"`, `"$sub"`, `"$mul"`, `"$div"`  
+Arithmetic operators: `"$add"`, `"$sub"`, `"$mul"`, `"$div"`
 ```javascript
 {
   "risk": {
@@ -472,12 +474,12 @@ Arithmetic operators: `"$add"`, `"$sub"`, `"$mul"`, `"$div"`
   }
 }
 ```
-[top](reference.md#table-of-contents)  
+[top](reference.md#table-of-contents)
 
 ### Choice of Sequences
-The following two labels can be used and combined to define richer event sequences:  
-* `"all"`: a set of event or fact patterns. All of them are required to match to trigger an action.  
-* `"any"`: a set of event or fact patterns. Any one match will trigger an action.  
+The following two labels can be used and combined to define richer event sequences:
+* `"all"`: a set of event or fact patterns. All of them are required to match to trigger an action.
+* `"any"`: a set of event or fact patterns. Any one match will trigger an action.
 
 ```javascript
 {
@@ -518,7 +520,7 @@ The following two labels can be used and combined to define richer event sequenc
   }
 }
 ```
-[top](reference.md#table-of-contents) 
+[top](reference.md#table-of-contents)
 
 ### Lack of Information
 The `$not` modifier can be used in rules with correlated sequences to evaluate the lack of information.
@@ -555,10 +557,10 @@ The `$not` modifier can be used in rules with correlated sequences to evaluate t
 }
 ```
 
-[top](reference.md#table-of-contents)  
+[top](reference.md#table-of-contents)
 
 ### Nested Objects
-Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.  
+Queries on nested events or facts are also supported. The `.` notation is used for defining conditions on properties in nested objects.
 
 ```javascript
 {
@@ -599,11 +601,11 @@ Queries on nested events or facts are also supported. The `.` notation is used f
   }
 }
 ```
-[top](reference.md#table-of-contents)  
+[top](reference.md#table-of-contents)
 
 ### Arrays
 
-Use `"$iall"` to match all items in an array, `"$iany"` to match any element in an array, `"$i"` to specify an item in the array.  
+Use `"$iall"` to match all items in an array, `"$iany"` to match any element in an array, `"$i"` to specify an item in the array.
 
 ```javascript
 {
@@ -727,10 +729,10 @@ Use `"$iall"` to match all items in an array, `"$iany"` to match any element in 
   }
 }
 ```
-[top](reference.md#table-of-contents) 
+[top](reference.md#table-of-contents)
 ### Facts and Events as rvalues
 
-Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. Use `"$m"` to reference the event or fact. 
+Aside from scalars (strings, number and boolean values), it is possible to use the fact or event observed on the right side of an expression. Use `"$m"` to reference the event or fact.
 
 ```javascript
 {
@@ -791,11 +793,11 @@ Aside from scalars (strings, number and boolean values), it is possible to use t
 }
 ```
 
-[top](reference.md#table-of-contents) 
+[top](reference.md#table-of-contents)
 
 ## Consequents
 ### Conflict Resolution
-Event and fact evaluation can lead to multiple consequents. The triggering order can be controlled by using the `pri` (salience) attribute. 
+Event and fact evaluation can lead to multiple consequents. The triggering order can be controlled by using the `pri` (salience) attribute.
 ```javascript
 {
   "attributes": {
@@ -841,10 +843,10 @@ Event and fact evaluation can lead to multiple consequents. The triggering order
   }
 }
 ```
-[top](reference.md#table-of-contents) 
+[top](reference.md#table-of-contents)
 
-### Unhandled Exceptions  
-When exceptions are not handled by actions, they are stored in the context state. Exceptions are stored as an object with `"$ex"` name. 
+### Unhandled Exceptions
+When exceptions are not handled by actions, they are stored in the context state. Exceptions are stored as an object with `"$ex"` name.
 
 ```javascript
 {
@@ -881,22 +883,22 @@ When exceptions are not handled by actions, they are stored in the context state
   }
 }
 ```
-[top](reference.md#table-of-contents)  
+[top](reference.md#table-of-contents)
 
 ## Flow Structures
 
 ### Statechart
-Rules can be organized using statecharts. A statechart is a deterministic finite automaton (DFA). The state context is in one of a number of possible states with conditional transitions between these states. 
+Rules can be organized using statecharts. A statechart is a deterministic finite automaton (DFA). The state context is in one of a number of possible states with conditional transitions between these states.
 
-Statechart rules:  
-* A statechart can have one or more states.  
-* A statechart requires an initial state.  
-* An initial state is defined as a vertex without incoming edges.  
-* A state can have zero or more triggers.  
-* A state can have zero or more states (see [nested states](reference.md#nested-states)).  
-* A trigger has a destination state.  
-* A trigger can have a rule (absence means state enter).  
-* A trigger can have an action.  
+Statechart rules:
+* A statechart can have one or more states.
+* A statechart requires an initial state.
+* An initial state is defined as a vertex without incoming edges.
+* A state can have zero or more triggers.
+* A state can have zero or more states (see [nested states](reference.md#nested-states)).
+* A trigger has a destination state.
+* A trigger can have a rule (absence means state enter).
+* A trigger can have an action.
 
 ```javascript
 {
@@ -973,7 +975,7 @@ Statechart rules:
 }
 
 ```
-[top](reference.md#table-of-contents)  
+[top](reference.md#table-of-contents)
 ### Nested States
 Nested states allow for writing compact statecharts. If a context is in the nested state, it also (implicitly) is in the surrounding state. The statechart will attempt to handle any event in the context of the sub-state. If the sub-state does not handle an event, the event is automatically handled at the context of the super-state. Nested states are defined as an object with the name `"$chart"`.
 
@@ -1029,15 +1031,15 @@ Nested states allow for writing compact statecharts. If a context is in the nest
 ```
 [top](reference.md#table-of-contents)
 ### Flowchart
-A flowchart is another way of organizing a ruleset flow. In a flowchart each stage represents an action to be executed. So (unlike the statechart state), when applied to the context state, it results in a transition to another stage.  
+A flowchart is another way of organizing a ruleset flow. In a flowchart each stage represents an action to be executed. So (unlike the statechart state), when applied to the context state, it results in a transition to another stage.
 
-Flowchart rules:  
-* A flowchart can have one or more stages.  
-* A flowchart requires an initial stage.  
-* An initial stage is defined as a vertex without incoming edges.  
-* A stage can have an action.  
-* A stage can have zero or more conditions.  
-* A condition has a rule and a destination stage.  
+Flowchart rules:
+* A flowchart can have one or more stages.
+* A flowchart requires an initial stage.
+* An initial stage is defined as a vertex without incoming edges.
+* A stage can have an action.
+* A stage can have zero or more conditions.
+* A condition has a rule and a destination stage.
 
 ```javascript
 {
@@ -1125,7 +1127,7 @@ Flowchart rules:
   }
 }
 ```
-[top](reference.md#table-of-contents)  
+[top](reference.md#table-of-contents)
 ### Timers
 Events can be scheduled with timers. A timeout condition can be included in the rule antecedent. Use `"$t"` to specify the timer name to be observed.
 
@@ -1234,11 +1236,11 @@ The example below uses a timer to detect higher event rate (use `"count"` to mat
 }
 ```
 
-In this example a manual reset timer is used for measuring velocity (use  `"cap"` to limit the number of events matched). 
+In this example a manual reset timer is used for measuring velocity (use  `"cap"` to limit the number of events matched).
 
 Try issuing the command below multiple times.
 
-<sub>`curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk/events`</sub>  
+<sub>`curl -H "content-type: application/json" -X POST -d '{"amount": 200}' http://localhost:5000/risk/events`</sub>
 
 ```javascript
 {
@@ -1286,6 +1288,6 @@ Try issuing the command below multiple times.
 
 ```
 
-[top](reference.md#table-of-contents)  
- 
+[top](reference.md#table-of-contents)
+
 
