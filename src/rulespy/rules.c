@@ -633,7 +633,7 @@ static unsigned int storeMessageCallback(void *context, char *ruleset, char *sid
     PyObject *callback = (PyObject *)context;
 
     arglist = Py_BuildValue("(sssIs)", ruleset, sid, mid, messageType, content);
-    result = PyEval_CallObject(callback, arglist);
+    result = PyObject_CallObject(callback, arglist);
     Py_DECREF(arglist);
     
     RESULT_TO_INT(result, errorCode);
@@ -680,7 +680,7 @@ static unsigned int deleteMessageCallback(void *context, char *ruleset, char *si
     PyObject *callback = (PyObject *)context;
 
     arglist = Py_BuildValue("(sss)", ruleset, sid, mid);
-    result = PyEval_CallObject(callback, arglist);
+    result = PyObject_CallObject(callback, arglist);
     Py_DECREF(arglist);
     
     RESULT_TO_INT(result, errorCode);
@@ -727,7 +727,7 @@ static unsigned int queueMessageCallback(void *context, char *ruleset, char *sid
     PyObject *callback = (PyObject *)context;
 
     arglist = Py_BuildValue("(ssIs)", ruleset, sid, actionType, content);
-    result = PyEval_CallObject(callback, arglist);
+    result = PyObject_CallObject(callback, arglist);
     Py_DECREF(arglist);
     
     RESULT_TO_INT(result, errorCode);
@@ -774,7 +774,7 @@ static unsigned int getQueuedMessagesCallback(void *context, char *ruleset, char
     PyObject *callback = (PyObject *)context;
 
     arglist = Py_BuildValue("(ss)", ruleset, sid);
-    result = PyEval_CallObject(callback, arglist);
+    result = PyObject_CallObject(callback, arglist);
     Py_DECREF(arglist);
 
     RESULT_TO_INT(result, errorCode);
@@ -849,7 +849,7 @@ static unsigned int getIdleStateCallback(void *context, char *ruleset) {
     PyObject *callback = (PyObject *)context;
 
     arglist = Py_BuildValue("(s)", ruleset);
-    result = PyEval_CallObject(callback, arglist);
+    result = PyObject_CallObject(callback, arglist);
     Py_DECREF(arglist);
 
     RESULT_TO_INT(result, errorCode);
