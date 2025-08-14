@@ -1,0 +1,42 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [master, 'test-me-*']
+    tags: ['*']
+
+jobs:
+  build-py:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+        os: [ubuntu-20.04]
+        include:
+          - { os: "windows-latest" , python-version: "3.8" }
+          - { os: "windows-latest" , python-version: "3.12" }
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        if: matrix.python-version != '2.7'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install python2-dev
+        if: matrix.python-version == '2.7'
+        run: sudo apt-get install python2-dev
+
+      - name: Switch to Python 2.7
+        if: matrix.python-version == '2.7'
+        run: sudo ln -sf /usr/bin/python2.7 /usr/bin/python && curl -sSL https://bootstrap.pypa.io/pip/2.7/get-pip.py | python
+
+      - name: Install dependencies
+        run: python -m pip install -U tox
+
+      - name: Tox tests
+        run: tox -e py
