@@ -71,7 +71,7 @@ Durable.post :test, { :subject => "World" }
 ```  
 ## Forward Inference  
 
-durable_rules super-power is the foward-chaining evaluation of rules. In other words, the repeated application of logical [modus ponens](https://en.wikipedia.org/wiki/Modus_ponens) to a set of facts or observed events to derive a conclusion. The example below shows a set of rules applied to a small knowledge base (set of facts).
+durable_rules super-power is the forward-chaining evaluation of rules. In other words, the repeated application of logical [modus ponens](https://en.wikipedia.org/wiki/Modus_ponens) to a set of facts or observed events to derive a conclusion. The example below shows a set of rules applied to a small knowledge base (set of facts).
 
 ### Node.js
 ```javascript
