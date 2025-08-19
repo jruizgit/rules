@@ -63,7 +63,7 @@ function (err, result) {
 
 			var hash3 = result;
 			client.script('load', 'for i = 1, 500000, 1 do\n' +
-						          '    local resul = redis.call("lrange", "test2", 0, -1)\n' +
+						          '    local result = redis.call("lrange", "test2", 0, -1)\n' +
 		                          'end\n',
 			function (err, result) {
 				if (err) {

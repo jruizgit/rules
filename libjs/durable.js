@@ -523,7 +523,7 @@ exports = module.exports = durableEngine = function () {
                 } else if (s.type === 'LabeledStatement') {
                     return s; 
                 } else {
-                    throw 'syntax error: statment type ' + s.type + ' unexpected';
+                    throw 'syntax error: statement type ' + s.type + ' unexpected';
                 }
             }, []);
         } else {
