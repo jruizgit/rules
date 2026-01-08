@@ -126,8 +126,7 @@ post('risk', {'t': 'purchase', 'location': 'CA'})
 **Note:**  
 
 *Using facts in the example above will produce the following output:*   
-
-<sub>`Fraud detected -> US, CA`</sub>  
+ 
 <sub>`Fraud detected -> CA, US`</sub>  
 
 *In the example both facts satisfy the first condition m.t == 'purchase' and each fact satisfies the second condition m.location != c.first.location in relation to the facts which satisfied the first.*  
